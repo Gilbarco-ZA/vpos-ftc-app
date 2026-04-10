@@ -1,0 +1,18 @@
+trigger:
+  branches: { include: ['master'] }
+  tags: { include: [v*] }
+
+pr:
+  branches: { include: [master] }
+
+resources:
+  repositories:
+    - repository: ci
+      type: git
+      name: GAFS.Vpos/vpos-mono-package-mgr
+      ref: refs/heads/master
+
+extends:
+  template: azure/templates/node-nextjs.yml@ci
+  parameters:
+    consumerPath: 'vpos-ftc-app'

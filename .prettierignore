@@ -1,0 +1,7 @@
+.config
+.next
+node_modules
+tests
+*.js
+*.mjs
+*.cjs

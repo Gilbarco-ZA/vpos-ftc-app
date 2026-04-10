@@ -1,0 +1,9 @@
+import { requireNonEmptyString } from '@/src/shared/utils/inputs'
+
+import { getStationSettingsRepo } from '@/src/modules/admin-config/infrastructure/adminConfigRepo'
+
+export async function getAdminSettings(stationId: string) {
+  return await getStationSettingsRepo(
+    requireNonEmptyString(stationId, 'stationId'),
+  )
+}

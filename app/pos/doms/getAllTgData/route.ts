@@ -1,0 +1,6 @@
+import { GET as getAllTgData } from '../../../api/pos/doms/getAllTgData/route'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+export const GET = getAllTgData

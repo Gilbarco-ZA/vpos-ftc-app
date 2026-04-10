@@ -1,0 +1,110 @@
+import type { MetadataRoute } from 'next'
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    id: '/',
+    dir: 'ltr',
+    lang: 'en',
+    name: 'VPOS APP',
+    scope: '/',
+    display: 'standalone',
+    start_url: '/',
+    short_name: 'vpos-app',
+    theme_color: '#FFFFFF',
+    description:
+      'This application provides the solution for the Virtual POS (VPOS) Engine for the Fiscalization of Fuel station transactions.',
+    orientation: 'any',
+    background_color: '#FFFFFF',
+    prefer_related_applications: false,
+    display_override: ['window-controls-overlay'],
+    icons: [
+      {
+        src: '/assets/android/192-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/assets/android/192-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/assets/android/512-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/assets/android/512-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+    ],
+    categories: ['productivity'],
+    shortcuts: [
+      {
+        name: 'Create Customer',
+        short_name: 'New Customer',
+        description: 'Create a new Customer',
+        url: '/customers',
+        icons: [
+          {
+            src: '/assets/icons/newCustomer.png',
+            sizes: '256x256',
+          },
+        ],
+      },
+      {
+        name: 'Update Customer',
+        short_name: 'Update Customer',
+        description: 'Update a Customer',
+        url: '/customers',
+        icons: [
+          {
+            src: '/assets/icons/updateCustomer.png',
+            sizes: '256x256',
+          },
+        ],
+      },
+      {
+        name: 'Link Customer',
+        short_name: 'Link Customer',
+        description: 'Link a Customer to a transaction',
+        url: '/transactions?status=non-fiscalized',
+        icons: [
+          {
+            src: '/assets/icons/linkCustomer.png',
+            sizes: '256x256',
+          },
+        ],
+      },
+      {
+        name: 'Print Receipt',
+        short_name: 'Print Receipt',
+        description: "Print a Customer's Receipt",
+        url: '/transactions?status=fiscalized&view=receipt&print=1',
+        icons: [
+          {
+            src: '/assets/icons/print.png',
+            sizes: '256x256',
+          },
+        ],
+      },
+      {
+        name: 'Dashboard',
+        short_name: 'Dashboard',
+        description: 'Navigate tot the Dashboard',
+        url: '/dashboard',
+        icons: [
+          {
+            src: '/assets/icons/dashboard.png',
+            sizes: '256x256',
+          },
+        ],
+      },
+    ],
+  }
+}
