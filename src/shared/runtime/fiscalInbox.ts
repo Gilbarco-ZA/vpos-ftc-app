@@ -30,6 +30,49 @@ export type EnqueueFiscalInboxArgs = {
   message: Record<string, unknown>
 }
 
+export type EnqueueFiscalInboxReviewItemArgs = {
+  stationId: string
+  transactionId: string
+  requestId?: string | null
+  errorText?: string | null
+  message?: Record<string, unknown> | null
+}
+
+export async function enqueueFiscalInboxReviewItem(
+  args: EnqueueFiscalInboxReviewItemArgs,
+) {
+  const stationId = requireNonEmptyString(args.stationId, 'stationId')
+  const transactionId = requireNonEmptyString(
+    args.transactionId,
+    'transactionId',
+  )
+  const errorText = String(args.errorText || 'Requires manual fiscal review')
+  const id = await enqueueFiscalInboxMessage({
+    stationId,
+    topic: 'external_fiscalization',
+    requestId: args.requestId ?? `txn-review:${transactionId}`,
+    message: {
+      type: 'transactionFiscalizationReviewRequired',
+      stationId,
+      transactionId,
+      error: errorText,
+      requiresManualReview: true,
+      at: Date.now(),
+      ...(ensurePlainObject(args.message ?? {}, {}) as Record<string, unknown>),
+    },
+  })
+
+  if (id != null) {
+    await fiscalInboxRepository.markDeadById({
+      id: Number(id),
+      stationId,
+      errorText,
+    })
+  }
+
+  return id
+}
+
 export type ListFiscalInboxArgs = {
   stationId: string
   status?: FiscalInboxStatus | 'ANY'
@@ -62,6 +105,32 @@ export async function enqueueFiscalInboxMessage(args: EnqueueFiscalInboxArgs) {
     requestId: args.requestId != null ? String(args.requestId) : null,
     message: ensurePlainObject(args.message, args.message),
   })
+}
+
+export type EnqueueFiscalInboxReviewFailureArgs = EnqueueFiscalInboxArgs & {
+  error: unknown
+  markDead?: boolean
+}
+
+export async function enqueueFiscalInboxReviewFailure(
+  args: EnqueueFiscalInboxReviewFailureArgs,
+) {
+  const stationId = requireNonEmptyString(args.stationId, 'stationId')
+  const id = await fiscalInboxRepository.enqueue({
+    stationId,
+    topic: args.topic ?? 'external_fiscalization',
+    requestId: args.requestId != null ? String(args.requestId) : null,
+    message: ensurePlainObject(args.message, args.message),
+  })
+  if (!id) return null
+
+  const errorText = String((args.error as Error)?.message ?? args.error)
+  if (args.markDead ?? true) {
+    await fiscalInboxRepository.markDeadById({ id, stationId, errorText })
+  } else {
+    await fiscalInboxRepository.markFailedById({ id, stationId, errorText })
+  }
+  return id
 }
 
 async function claimBatch(limit: number): Promise<FiscalInboxQueueRow[]> {

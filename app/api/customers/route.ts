@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { wantsHtmlRedirect } from '@/src/platform/web/api/request'
 import { ok } from '@/src/platform/web/api/response'

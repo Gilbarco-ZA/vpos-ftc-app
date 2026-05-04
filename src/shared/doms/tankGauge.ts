@@ -59,6 +59,44 @@ export async function resolveConfiguredTankGaugeIds(stationId: string) {
   return Array.from(new Set(ids))
 }
 
+export async function resolveTankRecordsByGaugeIds(stationId: string) {
+  if (!stationId)
+    return new Map<
+      string,
+      { tankId: string; code: string | null; name: string | null }
+    >()
+
+  const rows = await queryAll<{
+    id: string
+    doms_tank_id: string | null
+    code: string | null
+    name: string | null
+  }>(
+    `SELECT id, doms_tank_id, code, name
+       FROM tanks
+      WHERE station_id = $1`,
+    [stationId],
+  )
+
+  const byGaugeId = new Map<
+    string,
+    { tankId: string; code: string | null; name: string | null }
+  >()
+
+  for (const row of rows) {
+    const configuredId =
+      toConfiguredTgId(row.doms_tank_id) ?? toConfiguredTgId(row.code)
+    if (!configuredId || byGaugeId.has(configuredId)) continue
+    byGaugeId.set(configuredId, {
+      tankId: row.id,
+      code: row.code ?? null,
+      name: row.name ?? null,
+    })
+  }
+
+  return byGaugeId
+}
+
 const toNumberOrNull = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null
   const num = Number(value)
@@ -144,33 +182,79 @@ export async function syncTankGaugeVolumes(
   stationId: string,
   items: NormalizedTgData[],
 ) {
+  const tanks = await queryAll<{
+    id: string
+    code: string | null
+    doms_tank_id: string | null
+  }>(
+    `SELECT id, code, doms_tank_id
+       FROM tanks
+      WHERE station_id = $1`,
+    [stationId],
+  )
+
+  const tankIdByGaugeId = new Map<string, string>()
+  for (const tank of tanks) {
+    const configuredId = toConfiguredTgId(tank.doms_tank_id)
+    if (configuredId && !tankIdByGaugeId.has(configuredId)) {
+      tankIdByGaugeId.set(configuredId, tank.id)
+    }
+    const fallbackId = toConfiguredTgId(tank.code)
+    if (fallbackId && !tankIdByGaugeId.has(fallbackId)) {
+      tankIdByGaugeId.set(fallbackId, tank.id)
+    }
+  }
+
   const updates: Array<{
     tankId: string
+    tgId: string
     gross: number | null
     water: number | null
     updatedAt: string | null
   }> = []
+
   for (const item of items) {
-    const tank = await queryOne<{ id: string }>(
-      `SELECT id FROM tanks WHERE station_id = $1 AND (code = $2 OR id = $2) LIMIT 1`,
-      [stationId, item.tgId],
-    )
-    if (!tank?.id) continue
+    const tgId = toConfiguredTgId(item.tgId)
+    if (!tgId) continue
+
+    const tankId = tankIdByGaugeId.get(tgId)
+    if (!tankId) continue
+
+    const liveVolumeLitres =
+      item.tankGrossObservedVol ??
+      item.tankTotalObservedVol ??
+      item.tankGrossStdVol ??
+      null
+
     await queryOne(
       `UPDATE tanks
-          SET current_volume_liters = COALESCE($3, current_volume_liters),
-              current_water_liters = COALESCE($4, current_water_liters),
+          SET live_volume_litres = COALESCE($3, live_volume_litres),
+              live_volume_updated_at = CASE
+                WHEN $4::timestamptz IS NOT NULL THEN $4::timestamptz
+                WHEN $3 IS NOT NULL THEN NOW()
+                ELSE live_volume_updated_at
+              END,
+              last_tg_payload = $5::jsonb,
               updated_at = NOW()
         WHERE station_id = $1 AND id = $2`,
-      [stationId, tank.id, item.tankGrossObservedVol, item.tankWaterVol],
+      [
+        stationId,
+        tankId,
+        liveVolumeLitres,
+        item.tankDataLastUpdateAt,
+        JSON.stringify(item.sourcePayload ?? {}),
+      ],
     )
+
     updates.push({
-      tankId: tank.id,
-      gross: item.tankGrossObservedVol,
+      tankId,
+      tgId,
+      gross: liveVolumeLitres,
       water: item.tankWaterVol,
       updatedAt: item.tankDataLastUpdateAt,
     })
   }
+
   return { ok: true, updated: updates.length, tanks: updates }
 }
 

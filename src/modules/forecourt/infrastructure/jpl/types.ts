@@ -54,10 +54,17 @@ export type NozzleMapping = {
   nozzleNumber: number
   fuelType?: string | null
   productCode?: string | null
+  domsGradeOptionId?: number | null
+  domsGradeId?: string | null
+  domsTankId?: string | null
 }
 
 export type PumpMapping = {
+  /** App-facing pump number used by POS/UI/transactions. */
   pumpNumber: number
+  /** DOMS/JPL FuellingPoint ID. Pump mapping cache is keyed by this when available. */
+  domsFpId?: number | null
+  deviceSubAddress?: number | null
   nozzles: NozzleMapping[]
 }
 
@@ -70,6 +77,8 @@ export type PumpMappingsCache = {
 export type NormalizedTransactionResult = {
   sourceMode: BufferMode
   pumpNumber: number
+  /** DOMS/JPL FuellingPoint ID that produced the transaction. */
+  domsFpId?: number | null
   transSeqNo: number
   lockId: string | number | null
   persisted: boolean

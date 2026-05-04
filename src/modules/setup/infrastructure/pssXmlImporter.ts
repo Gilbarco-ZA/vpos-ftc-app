@@ -335,6 +335,8 @@ export const importPssConfigXml = async (args: {
     importedAt: new Date().toISOString(),
     productDbIdByGradeId: {},
     tankDbIdByTankId: {},
+    pumpDbIdByFpId: {},
+    nozzleDbIdByFpIdGradeOptionId: {},
   }
 
   // 1) Upsert products + tanks in a single transaction.
@@ -510,17 +512,90 @@ export const importPssConfigXml = async (args: {
             const tankDbId = idMap.tankDbIdByTankId[pssTankId]
             if (!tankDbId) return null
 
-            return { nozzleId, tankId: tankDbId }
+            return {
+              nozzleId,
+              tankId: tankDbId,
+              domsGradeOptionId: nozzleId,
+              domsGradeId: safeTrim(go.gradeId) || null,
+              domsTankId: pssTankId,
+            }
           })
-          .filter(Boolean) as Array<{ nozzleId: string; tankId: string }>
+          .filter(Boolean) as Array<{
+          nozzleId: string
+          tankId: string
+          domsGradeOptionId: string
+          domsGradeId: string | null
+          domsTankId: string
+        }>
 
-        return nozzles.length ? { pumpId, nozzles } : null
+        return nozzles.length
+          ? {
+              pumpId,
+              pumpNumber: pumpId,
+              domsFpId: pumpId,
+              deviceSubAddress: fp.deviceSubAddress ?? null,
+              pssPortNo: fp.pssPortNo ?? null,
+              endpointHost: safeTrim(fp.ipAddress) || null,
+              endpointPort: fp.tcpUdpPortNo ?? null,
+              nozzles,
+            }
+          : null
       })
       .filter(Boolean) as Array<{ pumpId: string; nozzles: any[] }>,
   }
 
   if (pumpsPayload.pumps.length) {
     await syncForecourtFromPumpsConfig(stationId, pumpsPayload as any)
+
+    // Persist the DB UUIDs assigned during reconciliation so future export and support tooling
+    // can compare DOMS FuellingPoint/GradeOption identities with app rows.
+    await withTransaction(async (client) => {
+      const domsFpIds = pumpsPayload.pumps
+        .map((p: any) => Number(p.domsFpId ?? p.pumpId))
+        .filter((n: number) => Number.isFinite(n))
+
+      const pumpRows = await txQuery<{
+        id: string
+        doms_fp_id: number | null
+        pump_number: number
+      }>(
+        client,
+        `SELECT id, doms_fp_id, pump_number
+           FROM pumps
+          WHERE station_id = $1
+            AND COALESCE(doms_fp_id, pump_number) = ANY($2::int[])`,
+        [stationId, domsFpIds],
+      )
+      for (const row of pumpRows.rows) {
+        const fpId = String(row.doms_fp_id ?? row.pump_number)
+        idMap.pumpDbIdByFpId![fpId] = String(row.id)
+      }
+
+      const nozzleRows = await txQuery<{
+        id: string
+        fp_id: number | null
+        pump_number: number
+        doms_grade_option_id: number | null
+        nozzle_number: number
+      }>(
+        client,
+        `SELECT n.id,
+                p.doms_fp_id AS fp_id,
+                p.pump_number,
+                n.doms_grade_option_id,
+                n.nozzle_number
+           FROM nozzles n
+           JOIN pumps p ON p.id = n.pump_id AND p.station_id = n.station_id
+          WHERE n.station_id = $1
+            AND COALESCE(p.doms_fp_id, p.pump_number) = ANY($2::int[])`,
+        [stationId, domsFpIds],
+      )
+      for (const row of nozzleRows.rows) {
+        const fpId = String(row.fp_id ?? row.pump_number)
+        const goId = String(row.doms_grade_option_id ?? row.nozzle_number)
+        idMap.nozzleDbIdByFpIdGradeOptionId![fpId + ':' + goId] = String(row.id)
+      }
+    })
 
     // Best-effort: update has_nozzle_selector flag based on nozzle count.
     await withTransaction(async (client) => {

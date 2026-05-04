@@ -39,7 +39,7 @@ const emptyState: State = {
     baseUrl: '',
     timeoutMs: 10000,
     apiKey: '',
-    healthPath: '/health',
+    healthPath: '/api/healthz',
     commandPath: '/pos/command',
   },
   ligo: { baseUrl: '', timeoutMs: 10000, apiKey: '' },
@@ -80,12 +80,13 @@ export default function PosIntegrationSettings() {
       const data = cfgJson?.data ?? cfgJson
       const jplData = data?.jpl ?? {}
       const rawBackend = data?.backend
+      const inferredBackend = rawBackend ?? (jplData?.host ? 'jpl' : 'none')
 
       setBackendOptions(readOptions(await backendsRes.json().catch(() => ({}))))
 
       setState((prev) => ({
         ...prev,
-        backend: (rawBackend ?? 'none') as PosBackend,
+        backend: inferredBackend as PosBackend,
         jpl: {
           ...prev.jpl,
           ...jplData,
@@ -380,7 +381,7 @@ export default function PosIntegrationSettings() {
               (n) => setState((s) => ({ ...s, ppx: n })),
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <Input
-                  placeholder="Health path (default /health)"
+                  placeholder="Health path (default /api/healthz)"
                   value={state.ppx?.healthPath ?? ''}
                   onChange={(e) =>
                     setState((s) => ({

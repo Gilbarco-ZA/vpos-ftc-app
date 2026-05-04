@@ -29,7 +29,7 @@ export const StationConfigGuard = () => {
         const res = await fetch('/api/config/station-status', {
           cache: 'no-store',
         })
-        const json: StationStatus = await res.json().catch(() => ({}) as any)
+        const json: StationStatus = await res.json().catch(() => (({}) as any))
         const hasConfig = Boolean(json?.data?.hasConfig)
 
         if (cancelled) return

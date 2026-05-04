@@ -16,11 +16,12 @@ import { RowActionsClient } from './rowActionsClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function FiscalInboxDetailPage({
-  params,
-}: {
-  params: { id: string }
-}) {
+export default async function FiscalInboxDetailPage(
+  props: {
+    params: Promise<{ id: string }>
+  }
+) {
+  const params = await props.params;
   const user = await requireAuth(['administrator'])
   const id = Number(params.id)
   if (!Number.isFinite(id) || id <= 0) {

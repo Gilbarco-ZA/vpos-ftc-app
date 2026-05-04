@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorDetails } from '@/components/ui/error-details'
 
+import { AutoPrintReceiptsForm } from './AutoPrintReceiptsForm'
 import { DecimalSettingsForm } from './DecimalSettingsForm'
 import { LinkingWindowForm } from './LinkingWindowForm'
 
@@ -50,6 +51,8 @@ const AdminSettingsPage = async () => {
         : null,
   }
 
+  const autoPrintReceipts = row?.auto_print_receipts === true
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -88,6 +91,18 @@ const AdminSettingsPage = async () => {
             prices, and volumes across printed receipts and previews.
           </p>
           <DecimalSettingsForm currentDecimals={decimalSettings} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Receipt printing</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Control whether receipts print automatically after fiscalization.
+          </p>
+          <AutoPrintReceiptsForm enabled={autoPrintReceipts} />
         </CardContent>
       </Card>
 

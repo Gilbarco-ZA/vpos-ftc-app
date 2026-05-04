@@ -36,6 +36,11 @@ const getText = (el: any) => {
   return raw
 }
 
+const toIntOrNull = (value: unknown): number | null => {
+  const n = Number(String(value ?? '').trim())
+  return Number.isFinite(n) ? Math.trunc(n) : null
+}
+
 const getDirectChild = (parent: any, name: string): Element | null => {
   if (!parent?.childNodes) return null
   const children = toArray<any>(parent.childNodes)
@@ -144,6 +149,18 @@ export const parsePssConfigXml = (xml: string): PssXmlConfig => {
       const id = getAttr(fp, 'ID').trim()
       if (!id) continue
 
+      const pssPortNo = toIntOrNull(getText(getDirectChild(fp, 'PSSPortNo')))
+      const deviceSubAddress = toIntOrNull(
+        getText(getDirectChild(fp, 'DeviceSubAddress')),
+      )
+      const endpointNode = getDirectChild(fp, 'IPAddressAndPortNo')
+      const ipAddress = endpointNode
+        ? getText(getDirectChild(endpointNode, 'IPAddress'))
+        : ''
+      const tcpUdpPortNo = endpointNode
+        ? toIntOrNull(getText(getDirectChild(endpointNode, 'TCP_UDP_PortNo')))
+        : null
+
       const gradeOptions: PssXmlGradeOption[] = []
       const gradeOptionsNode = getDirectChild(fp, 'GradeOptions')
       if (gradeOptionsNode) {
@@ -157,16 +174,25 @@ export const parsePssConfigXml = (xml: string): PssXmlConfig => {
 
           const partNode = getDirectChild(go, 'Part')
           const tankId = partNode ? getAttr(partNode, 'TankID').trim() : ''
+          const parts = partNode ? getAttr(partNode, 'Parts').trim() : ''
 
           gradeOptions.push({
             id: goId,
             gradeId: gradeId || null,
             tankId: tankId || null,
+            parts: parts || null,
           })
         }
       }
 
-      fuellingPoints.push({ id, gradeOptions })
+      fuellingPoints.push({
+        id,
+        pssPortNo,
+        ipAddress: ipAddress || null,
+        tcpUdpPortNo,
+        deviceSubAddress,
+        gradeOptions,
+      })
     }
   }
 
@@ -212,7 +238,7 @@ export const patchPssXmlFuellingPoints = (args: {
 
   let fpsNode = getDirectChild(devices, 'FuellingPoints')
   if (!fpsNode) {
-    fpsNode = doc.createElement('FuellingPoints')
+    fpsNode = doc.createElement('FuellingPoints') as Element
     devices.appendChild(fpsNode)
   }
 
@@ -232,7 +258,7 @@ export const patchPssXmlFuellingPoints = (args: {
 
     let gradeOptionsNode = getDirectChild(fp, 'GradeOptions')
     if (!gradeOptionsNode) {
-      gradeOptionsNode = doc.createElement('GradeOptions')
+      gradeOptionsNode = doc.createElement('GradeOptions') as Element
       fp.appendChild(gradeOptionsNode)
     }
 

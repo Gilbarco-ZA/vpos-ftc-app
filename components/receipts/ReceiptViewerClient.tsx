@@ -371,6 +371,16 @@ const ReceiptViewerClient = ({
                   This receipt has been voided by a credit note.
                 </Alert>
               )}
+              {receipt.meta.offlinePending ? (
+                <Alert
+                  variant={STATUS_VARIANT.WARN}
+                  title="Offline receipt / pending fiscalization"
+                >
+                  This transaction has not been fiscalized yet. Print only as an
+                  offline acknowledgement and retry fiscalization when the proxy
+                  or internet connection is available.
+                </Alert>
+              ) : null}
               <div className="no-print">
                 <div className="text-sm text-[var(--text-muted)]">
                   Receipt #{receipt.meta.receiptNumber ?? '—'} •{' '}

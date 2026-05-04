@@ -1,5 +1,5 @@
 import type { SessionUser } from '@/src/shared/types'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server";
 
 import { queryOne } from '@/src/platform/db/postgres'
 import { fail, serverError } from '@/src/platform/web/api/response'
@@ -15,10 +15,8 @@ const asType = (t: string): EwuraType | null => {
   return null
 }
 
-export const GET = async (
-  req: NextRequest,
-  { params }: { params: { type: string; id: string } },
-) => {
+export const GET = async (req: NextRequest, props: { params: Promise<{ type: string; id: string }> }) => {
+  const params = await props.params;
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])

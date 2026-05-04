@@ -8,10 +8,8 @@ import { getProductById } from '@/src/modules/products/application/queries/get-p
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const GET = async (
-  _req: Request,
-  { params }: { params: { productId: string } },
-) => {
+export const GET = async (_req: Request, props: { params: Promise<{ productId: string }> }) => {
+  const params = await props.params;
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])

@@ -4,6 +4,7 @@ import {
   normalizeForecourtHost,
   normalizeForecourtPort,
   normalizeJplOperationMode,
+  normalizeProtocolFamilyList,
   parseCsvStringList,
   toInt,
 } from '@/src/shared/forecourt/runtimeConfigShared'
@@ -11,6 +12,15 @@ import { kvGetMany } from '@/src/shared/storage/stationKv'
 import { logger } from '@/src/shared/utils/logger'
 
 export type ForecourtMode = 'jpl_tcp'
+
+export type RequestDispatchPolicy =
+  | 'correlation-required'
+  | 'auto'
+  | 'strict-single-flight-when-uncorrelated'
+
+export type RequestDispatchMode =
+  | 'correlated-concurrent'
+  | 'strict-single-flight'
 
 export type ForecourtRuntimeConfig = {
   mode: ForecourtMode
@@ -29,6 +39,10 @@ export type ForecourtRuntimeConfig = {
   jplUnsolicitedMfdrFlags: string[]
   jplStatusUpdateCode: number
   jplBootstrapSnapshotEnabled: boolean
+  jplRequestDispatchPolicy?: RequestDispatchPolicy
+  jplIntegrationScope?: string
+  jplTlsRequired?: boolean
+  jplOptionalProtocolFamilies?: string[]
 
   // Buffer health thresholds (minutes + depths)
   bufferWarnDepthSup: number
@@ -39,6 +53,35 @@ export type ForecourtRuntimeConfig = {
   bufferCritDepthUnsup: number
   bufferWarnAgeMinUnsup: number
   bufferCritAgeMinUnsup: number
+}
+
+const EXTRA_REQUEST_POLICY_KEY = 'JPL_REQUEST_DISPATCH_POLICY'
+
+const normalizeRequestDispatchPolicy = (
+  value: unknown,
+  fallback: RequestDispatchPolicy = 'auto',
+): RequestDispatchPolicy => {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase()
+
+  switch (normalized) {
+    case 'correlation-required':
+      return 'correlation-required'
+    case 'strict-single-flight-when-uncorrelated':
+      return 'strict-single-flight-when-uncorrelated'
+    case 'auto':
+      return 'auto'
+    case '':
+      return fallback
+    default:
+      logger.warn('[forecourt-config]', {
+        msg: 'invalid JPL request dispatch policy; using fallback',
+        value,
+        fallback,
+      })
+      return fallback
+  }
 }
 
 declare global {
@@ -92,7 +135,7 @@ const resolveFromEnv = (): ForecourtRuntimeConfig => {
   )
   const jplUnsolicitedFlags = parseCsvStringList(
     process.env.JPL_UNSOLICITED_FLAGS ||
-      'UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1',
+      'UNSO_INSTSTA_1,UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1,UNSO_PRISTA_1',
   )
   const jplUnsolicitedMfdrFlags = parseCsvStringList(
     process.env.JPL_UNSOLICITED_MFDR_FLAGS || 'UNSO_FPSTA_3',
@@ -101,6 +144,22 @@ const resolveFromEnv = (): ForecourtRuntimeConfig => {
   const jplBootstrapSnapshotEnabled = normalizeBooleanFlag(
     process.env.JPL_BOOTSTRAP_SNAPSHOT_ENABLED,
     true,
+  )
+  const jplRequestDispatchPolicy = normalizeRequestDispatchPolicy(
+    process.env.JPL_REQUEST_DISPATCH_POLICY,
+    'auto',
+  )
+  const jplIntegrationScope = String(
+    process.env.JPL_INTEGRATION_SCOPE || 'dispense_wetstock_first_release',
+  )
+    .trim()
+    .toLowerCase()
+  const jplTlsRequired = normalizeBooleanFlag(
+    process.env.JPL_TLS_REQUIRED,
+    false,
+  )
+  const jplOptionalProtocolFamilies = normalizeProtocolFamilyList(
+    process.env.JPL_OPTIONAL_PROTOCOL_FAMILIES,
   )
 
   return {
@@ -120,6 +179,10 @@ const resolveFromEnv = (): ForecourtRuntimeConfig => {
     jplUnsolicitedMfdrFlags,
     jplStatusUpdateCode,
     jplBootstrapSnapshotEnabled,
+    jplRequestDispatchPolicy,
+    jplIntegrationScope,
+    jplTlsRequired,
+    jplOptionalProtocolFamilies,
     bufferWarnDepthSup: toInt(process.env.BUFFER_WARN_DEPTH_SUP, 2),
     bufferCritDepthSup: toInt(process.env.BUFFER_CRIT_DEPTH_SUP, 5),
     bufferWarnAgeMinSup: toInt(process.env.BUFFER_WARN_AGE_MIN_SUP, 5),
@@ -174,6 +237,11 @@ const isSameConfig = (
       JSON.stringify(b.jplUnsolicitedMfdrFlags) &&
     a.jplStatusUpdateCode === b.jplStatusUpdateCode &&
     a.jplBootstrapSnapshotEnabled === b.jplBootstrapSnapshotEnabled &&
+    a.jplRequestDispatchPolicy === b.jplRequestDispatchPolicy &&
+    a.jplIntegrationScope === b.jplIntegrationScope &&
+    a.jplTlsRequired === b.jplTlsRequired &&
+    JSON.stringify(a.jplOptionalProtocolFamilies) ===
+      JSON.stringify(b.jplOptionalProtocolFamilies) &&
     a.bufferWarnDepthSup === b.bufferWarnDepthSup &&
     a.bufferCritDepthSup === b.bufferCritDepthSup &&
     a.bufferWarnAgeMinSup === b.bufferWarnAgeMinSup &&
@@ -215,6 +283,10 @@ export const loadForecourtRuntimeConfigFromDb = async (stationId: string) => {
     KEY.JPL_UNSOLICITED_MFDR_FLAGS,
     KEY.JPL_STATUS_UPDATE_CODE,
     KEY.JPL_BOOTSTRAP_SNAPSHOT_ENABLED,
+    EXTRA_REQUEST_POLICY_KEY,
+    KEY.JPL_INTEGRATION_SCOPE,
+    KEY.JPL_TLS_REQUIRED,
+    KEY.JPL_OPTIONAL_PROTOCOL_FAMILIES,
     KEY.BUFFER_WARN_DEPTH_SUP,
     KEY.BUFFER_CRIT_DEPTH_SUP,
     KEY.BUFFER_WARN_AGE_MIN_SUP,
@@ -241,6 +313,10 @@ export const loadForecourtRuntimeConfigFromDb = async (stationId: string) => {
     jplUnsolicitedMfdrFlags,
     jplStatusUpdateCode,
     jplBootstrapSnapshotEnabled,
+    jplRequestDispatchPolicy,
+    jplIntegrationScope,
+    jplTlsRequired,
+    jplOptionalProtocolFamilies,
     bufferWarnDepthSup,
     bufferCritDepthSup,
     bufferWarnAgeMinSup,
@@ -314,6 +390,25 @@ export const loadForecourtRuntimeConfigFromDb = async (stationId: string) => {
             base.jplBootstrapSnapshotEnabled,
           )
         : base.jplBootstrapSnapshotEnabled,
+    jplRequestDispatchPolicy: normalizeRequestDispatchPolicy(
+      jplRequestDispatchPolicy,
+      base.jplRequestDispatchPolicy,
+    ),
+    jplIntegrationScope:
+      jplIntegrationScope != null && String(jplIntegrationScope).trim().length
+        ? String(jplIntegrationScope).trim().toLowerCase()
+        : base.jplIntegrationScope,
+    jplTlsRequired:
+      jplTlsRequired != null
+        ? normalizeBooleanFlag(jplTlsRequired, base.jplTlsRequired ?? false)
+        : (base.jplTlsRequired ?? false),
+    jplOptionalProtocolFamilies:
+      jplOptionalProtocolFamilies != null
+        ? normalizeProtocolFamilyList(
+            jplOptionalProtocolFamilies,
+            base.jplOptionalProtocolFamilies as any,
+          )
+        : base.jplOptionalProtocolFamilies,
     bufferWarnDepthSup:
       bufferWarnDepthSup != null
         ? toInt(bufferWarnDepthSup, base.bufferWarnDepthSup)

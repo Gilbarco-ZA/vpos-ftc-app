@@ -1,4 +1,4 @@
-import { query, queryOne } from '@/src/platform/db/postgres'
+import { query, queryAll, queryOne } from '@/src/platform/db/postgres'
 
 import { printJobsSql } from './printJobs.sql'
 
@@ -9,6 +9,7 @@ export type PrintJobRow = {
   payload: any
   attempts?: number
   max_attempts?: number
+  source_transaction_id?: string | null
 }
 
 export const printJobsRepo = {
@@ -16,6 +17,21 @@ export const printJobsRepo = {
     return await queryOne<any>(printJobsSql.selectDefaultPrinterConfig, [
       stationId,
     ])
+  },
+
+  async listEnabledPrinterConfigRows(stationId: string) {
+    return await queryAll<any>(printJobsSql.selectEnabledPrinterConfigs, [
+      stationId,
+    ])
+  },
+
+  async getTransactionPumpNumber(stationId: string, transactionId: string) {
+    const row = await queryOne<{ pump_number: number | null }>(
+      printJobsSql.selectTransactionPumpNumber,
+      [stationId, transactionId],
+    )
+    const pumpNumber = row?.pump_number
+    return pumpNumber == null ? null : Number(pumpNumber)
   },
 
   async markDone(id: string) {

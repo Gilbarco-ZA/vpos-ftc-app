@@ -1,3 +1,5 @@
+import type { ForecourtPendingPriceSetStatus } from '@/src/modules/forecourt/infrastructure/pendingPriceSetsRepo'
+
 import { dispatchPosDomsCommand } from '@/src/shared/pos/doms'
 import {
   legacyDomsFailure,
@@ -5,8 +7,24 @@ import {
 } from '@/src/shared/vpos/legacyPosApi'
 
 import { upsertPendingForecourtPriceSet } from '@/src/modules/forecourt/infrastructure/pendingPriceSetsRepo'
+import { appendForecourtPriceScheduleEvent } from '@/src/modules/forecourt/infrastructure/priceScheduleEventsRepo'
+import {
+  appendWetstockEvent,
+  markTankDeliveryCheckpointCleared,
+} from '@/src/modules/forecourt/infrastructure/wetstockLifecycleRepo'
 
 import type { PosDomsRouteCommand } from './posDomsTypes'
+
+type NormalizedDomsCommandBody = Record<string, unknown> & {
+  deliveryReportSeqNo?: unknown
+  DeliveryReportSeqNo?: unknown
+  tankDeliveries?: unknown
+  TankDeliveries?: unknown
+  posId?: unknown
+  PosId?: unknown
+  tankId?: unknown
+  TankId?: unknown
+}
 
 function fcDateTimeToIso(value: unknown): string | null {
   const text = String(value ?? '').trim()
@@ -19,17 +37,40 @@ function fcDateTimeToIso(value: unknown): string | null {
 function normalizePayload(
   command: PosDomsRouteCommand,
   body: Record<string, unknown>,
-) {
-  if (command === 'changeDynamicTankData' || command === 'getTgErrorMsg') {
-    return (body?.data as unknown) ?? body
+): NormalizedDomsCommandBody {
+  const resolved =
+    command === 'changeDynamicTankData' ||
+    command === 'getTgErrorMsg' ||
+    command === 'clearTankDeliveryData' ||
+    command === 'openTankController' ||
+    command === 'closeTankController' ||
+    command === 'startDeliveryProcess' ||
+    command === 'stopDeliveryProcess'
+      ? ((body?.data as unknown) ?? body)
+      : body
+
+  if (!resolved || typeof resolved !== 'object' || Array.isArray(resolved)) {
+    return {}
   }
-  return body
+
+  return resolved as NormalizedDomsCommandBody
+}
+
+const resolvePendingStatus = (data: any): ForecourtPendingPriceSetStatus => {
+  if (data?.scheduled) return 'confirmed_on_doms'
+  if (data?.capabilities?.supportsPendingQueue === false) {
+    return 'verification_unavailable'
+  }
+  return 'submitted_local'
 }
 
 export async function runPosDomsCommand(
   stationId: string,
   command: PosDomsRouteCommand,
   body: Record<string, unknown>,
+  options: {
+    userId?: string
+  } = {},
 ) {
   const normalizedBody = normalizePayload(command, body)
   const result = await dispatchPosDomsCommand(
@@ -52,23 +93,160 @@ export async function runPosDomsCommand(
     const priceSetId = Number(
       data?.priceBank?.fcPriceSetId ?? data?.response?.data?.FcPriceSetId,
     )
+    const pendingStatus = resolvePendingStatus(data)
+
     if (activationAtIso && Number.isFinite(priceSetId)) {
+      const eventData = {
+        activationAt: data?.activationAt ?? null,
+        priceBank: data?.priceBank ?? null,
+        warnings: data?.warnings ?? [],
+        responseSubCode: data?.responseSubCode ?? null,
+        requestedBy: data?.requestedBy ?? null,
+        payload: normalizedBody ?? {},
+      }
+
       await upsertPendingForecourtPriceSet({
         stationId,
         priceSetId,
         activationAt: activationAtIso,
+        source: pendingStatus === 'confirmed_on_doms' ? 'doms' : 'local',
+        status: pendingStatus,
+        isConfirmedOnDoms: pendingStatus === 'confirmed_on_doms',
+        lastEventType: pendingStatus,
+        data: eventData,
+      })
+
+      await appendForecourtPriceScheduleEvent({
+        stationId,
+        priceSetId,
+        activationAt: activationAtIso,
+        eventType: 'submitted_local',
         source: 'local',
-        isConfirmedOnDoms: Boolean(data?.scheduled),
+        submittedBy: options.userId ?? null,
+        domsConfirmationStatus: pendingStatus,
+        payload: normalizedBody ?? {},
         data: {
-          activationAt: data?.activationAt ?? null,
-          priceBank: data?.priceBank ?? null,
-          warnings: data?.warnings ?? [],
-          responseSubCode: data?.responseSubCode ?? null,
-          requestedBy: data?.requestedBy ?? null,
-          payload: normalizedBody ?? {},
+          ...eventData,
+          controllerAccepted: Boolean(data?.controllerAccepted),
+          verifiedOnController: Boolean(data?.verifiedOnController),
         },
       })
+
+      if (pendingStatus === 'confirmed_on_doms') {
+        await appendForecourtPriceScheduleEvent({
+          stationId,
+          priceSetId,
+          activationAt: activationAtIso,
+          eventType: 'confirmed_on_doms',
+          source: 'doms',
+          submittedBy: options.userId ?? null,
+          domsConfirmationStatus: 'confirmed_on_doms',
+          payload: data?.scheduled ?? {},
+          data: {
+            scheduled: data?.scheduled ?? null,
+            responseSubCode: data?.responseSubCode ?? null,
+          },
+        })
+      } else if (pendingStatus === 'verification_unavailable') {
+        await appendForecourtPriceScheduleEvent({
+          stationId,
+          priceSetId,
+          activationAt: activationAtIso,
+          eventType: 'verification_unavailable',
+          source: 'local',
+          submittedBy: options.userId ?? null,
+          domsConfirmationStatus: 'verification_unavailable',
+          payload: normalizedBody ?? {},
+          data: {
+            responseSubCode: data?.responseSubCode ?? null,
+            warnings: data?.warnings ?? [],
+          },
+        })
+      }
     }
+  }
+
+  if (command === 'clearTankDeliveryData') {
+    const deliveryReportSeqNo = String(
+      normalizedBody?.deliveryReportSeqNo ??
+        normalizedBody?.DeliveryReportSeqNo ??
+        '0',
+    ).trim()
+    const tankDeliveries = Array.isArray(
+      normalizedBody?.tankDeliveries ?? normalizedBody?.TankDeliveries,
+    )
+      ? (
+          (normalizedBody?.tankDeliveries ??
+            normalizedBody?.TankDeliveries) as any[]
+        )
+          .map((entry) => ({
+            tgId: String(entry?.tgId ?? entry?.TgId ?? '')
+              .trim()
+              .padStart(2, '0'),
+            tankDeliverySeqNo: String(
+              entry?.tankDeliverySeqNo ?? entry?.TankDeliverySeqNo ?? '',
+            ).trim(),
+          }))
+          .filter((entry) => entry.tgId && entry.tankDeliverySeqNo)
+      : []
+
+    if (deliveryReportSeqNo && tankDeliveries.length) {
+      const rows = await markTankDeliveryCheckpointCleared({
+        stationId,
+        deliveryReportSeqNo,
+        tankDeliveries,
+        posId:
+          String(normalizedBody?.posId ?? normalizedBody?.PosId ?? '').trim() ||
+          null,
+        payload: data,
+        data: {
+          commandPayload: normalizedBody,
+        },
+      })
+      for (const row of rows) {
+        await appendWetstockEvent({
+          stationId,
+          tankId: row.tank_id ?? null,
+          tgId: row.tg_id ?? null,
+          deliveryReportSeqNo: row.delivery_report_seq_no ?? null,
+          tankDeliverySeqNo: row.tank_delivery_seq_no ?? null,
+          eventType: 'cleared_on_doms',
+          source: 'doms',
+          payload: data,
+          data: {
+            commandPayload: normalizedBody,
+          },
+        })
+      }
+    }
+  }
+
+  if (
+    command === 'openTankController' ||
+    command === 'closeTankController' ||
+    command === 'startDeliveryProcess' ||
+    command === 'stopDeliveryProcess'
+  ) {
+    const tankId = String(
+      normalizedBody?.tankId ?? normalizedBody?.TankId ?? '',
+    )
+      .trim()
+      .padStart(2, '0')
+    await appendWetstockEvent({
+      stationId,
+      tgId: tankId || null,
+      eventType:
+        command === 'openTankController'
+          ? 'tank_controller_open_requested'
+          : command === 'closeTankController'
+            ? 'tank_controller_close_requested'
+            : command === 'startDeliveryProcess'
+              ? 'delivery_process_start_requested'
+              : 'delivery_process_stop_requested',
+      source: 'local',
+      payload: normalizedBody,
+      data: data ?? {},
+    })
   }
 
   return legacyDomsSuccess(data)

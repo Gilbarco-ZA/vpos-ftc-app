@@ -14,6 +14,9 @@ declare global {
   var __jplTcpReconnectTimer: NodeJS.Timeout | undefined
   var __jplTcpHeartbeatTimer: NodeJS.Timeout | undefined
   var __jplTcpHealthTimer: NodeJS.Timeout | undefined
+  var __jplTcpFallbackPollTimer: NodeJS.Timeout | undefined
+  var __jplTcpFallbackPollInFlight: boolean | undefined
+  var __jplTcpAcceptedAccessCode: string | undefined
   var __jplPersistDedupe: Map<string, number> | undefined
   var __jplReplayLocks: Map<string, Promise<void>> | undefined
   var __jplInFlightReplayKeys: Set<string> | undefined

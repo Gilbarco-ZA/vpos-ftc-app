@@ -1,5 +1,5 @@
 import type { AdminSetupCurrentPayload } from '@/src/modules/setup/application/getAdminSetupCurrent'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { defineGetRoute } from '@/src/shared/http/defineRoute'
 

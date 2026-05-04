@@ -7,10 +7,8 @@ import { getProductStatusViaProxy } from '@/src/shared/proxy/client'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const GET = async (
-  req: Request,
-  { params }: { params: { productId: string } },
-) => {
+export const GET = async (req: Request, props: { params: Promise<{ productId: string }> }) => {
+  const params = await props.params;
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])

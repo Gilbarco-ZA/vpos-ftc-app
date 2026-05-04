@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { ok } from '@/src/platform/web/api/response'
 import { createAuditLog } from '@/src/shared/audit/log'

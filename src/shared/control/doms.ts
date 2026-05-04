@@ -155,9 +155,60 @@ const getAllTankDeliveryData: CommandHandler = async () => {
   )
 }
 
-const getAllTgData: CommandHandler = async () => {
-  // no payload
-  return await enqueueAndMaybeWait({ args: {} }, { type: 'GET_ALL_TG_DATA' })
+const getAllTgData: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'GET_ALL_TG_DATA',
+    payload: (ctx.args as any) ?? {},
+  })
+}
+
+const getSiteDeliveryStatus: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'GET_SITE_DELIVERY_STATUS',
+    payload: (ctx.args as any) ?? {},
+  })
+}
+
+const getTgStatus: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'GET_TG_STATUS',
+    payload: (ctx.args as any) ?? {},
+  })
+}
+
+const clearTankDeliveryData: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'CLEAR_TANK_DELIVERY_DATA',
+    payload: (ctx.args as any) ?? {},
+  })
+}
+
+const openTankController: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'OPEN_TANK_CONTROLLER',
+    payload: (ctx.args as any) ?? {},
+  })
+}
+
+const closeTankController: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'CLOSE_TANK_CONTROLLER',
+    payload: (ctx.args as any) ?? {},
+  })
+}
+
+const startDeliveryProcess: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'START_DELIVERY_PROCESS',
+    payload: (ctx.args as any) ?? {},
+  })
+}
+
+const stopDeliveryProcess: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'STOP_DELIVERY_PROCESS',
+    payload: (ctx.args as any) ?? {},
+  })
 }
 
 const changeDynamicTankData: CommandHandler = async (ctx) => {
@@ -216,6 +267,20 @@ export const domsCommands: Record<string, CommandHandler> = {
 
   getAllTgData,
   get_all_tg_data: getAllTgData,
+  getSiteDeliveryStatus,
+  get_site_delivery_status: getSiteDeliveryStatus,
+  getTgStatus,
+  get_tg_status: getTgStatus,
+  clearTankDeliveryData,
+  clear_tank_delivery_data: clearTankDeliveryData,
+  openTankController,
+  open_tank_controller: openTankController,
+  closeTankController,
+  close_tank_controller: closeTankController,
+  startDeliveryProcess,
+  start_delivery_process: startDeliveryProcess,
+  stopDeliveryProcess,
+  stop_delivery_process: stopDeliveryProcess,
   changeDynamicTankData,
   change_dynamic_tank_data: changeDynamicTankData,
   getTgErrorMsg,
@@ -255,6 +320,20 @@ export const domsCommandAliases: Record<string, string> = {
   get_all_tank_delivery_data: 'getAllTankDeliveryData',
   getAllTgData: 'getAllTgData',
   get_all_tg_data: 'getAllTgData',
+  getSiteDeliveryStatus: 'getSiteDeliveryStatus',
+  get_site_delivery_status: 'getSiteDeliveryStatus',
+  getTgStatus: 'getTgStatus',
+  get_tg_status: 'getTgStatus',
+  clearTankDeliveryData: 'clearTankDeliveryData',
+  clear_tank_delivery_data: 'clearTankDeliveryData',
+  openTankController: 'openTankController',
+  open_tank_controller: 'openTankController',
+  closeTankController: 'closeTankController',
+  close_tank_controller: 'closeTankController',
+  startDeliveryProcess: 'startDeliveryProcess',
+  start_delivery_process: 'startDeliveryProcess',
+  stopDeliveryProcess: 'stopDeliveryProcess',
+  stop_delivery_process: 'stopDeliveryProcess',
   changeDynamicTankData: 'changeDynamicTankData',
   change_dynamic_tank_data: 'changeDynamicTankData',
   getTgErrorMsg: 'getTgErrorMsg',

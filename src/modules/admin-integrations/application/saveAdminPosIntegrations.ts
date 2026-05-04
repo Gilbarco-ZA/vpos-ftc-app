@@ -65,8 +65,7 @@ export async function saveAdminPosIntegrations(
     ...currentCfg,
     integrations: { ...(currentCfg.integrations ?? {}) },
   }
-  nextCfg.integrations.posBackend =
-    parsed.data.backend === 'none' ? null : parsed.data.backend
+  nextCfg.integrations.posBackend = parsed.data.backend
   if (parsed.data.jpl) {
     nextCfg.integrations.jpl = parsed.data.jpl
   }
@@ -83,7 +82,7 @@ export async function saveAdminPosIntegrations(
   await createAuditLog({
     stationId: user.stationId,
     userId: user.id,
-    action: 'CONFIG_UPDATED',
+    action: 'POS_INTEGRATIONS_UPDATED',
     entityType: 'station_config',
     metadata: { scope: 'integrations.pos', backend: parsed.data.backend },
   }).catch(() => {})

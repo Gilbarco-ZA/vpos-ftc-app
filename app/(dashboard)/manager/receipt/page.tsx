@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 
-export default async function ManagerReceiptPage({
-  searchParams,
-}: {
-  searchParams: { transactionId?: string; q?: string; print?: string }
-}) {
+export default async function ManagerReceiptPage(
+  props: {
+    searchParams: Promise<{ transactionId?: string; q?: string; print?: string }>
+  }
+) {
+  const searchParams = await props.searchParams;
   const params = new URLSearchParams({
     status: 'fiscalized',
     view: 'receipt',

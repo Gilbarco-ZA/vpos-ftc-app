@@ -3,11 +3,14 @@ import { requestTankGaugeSnapshot } from '@/src/shared/forecourt/jplTankGauge'
 
 export async function syncTankVolumes(stationId: string) {
   if (!stationId) {
-    return { synced: 0 }
+    return { synced: 0, tanks: [] }
   }
 
   const tankGaugePayload = await requestTankGaugeSnapshot()
-  const synced = await syncTankGaugeVolumes(stationId, tankGaugePayload)
+  const result = await syncTankGaugeVolumes(stationId, tankGaugePayload)
 
-  return { synced }
+  return {
+    synced: Number(result.updated ?? 0),
+    tanks: Array.isArray(result.tanks) ? result.tanks : [],
+  }
 }

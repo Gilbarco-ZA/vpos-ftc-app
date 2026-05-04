@@ -23,6 +23,7 @@ export async function updateStationSettings(
       vat_rate_tz = COALESCE($5, vat_rate_tz),
       vat_rate_ke = COALESCE($6, vat_rate_ke),
       vat_rate_default = COALESCE($7, vat_rate_default),
+      auto_print_receipts = COALESCE($8, auto_print_receipts),
       updated_at = NOW()
     WHERE station_id = $1
     RETURNING *
@@ -35,6 +36,7 @@ export async function updateStationSettings(
       patch.vatRateTz ?? null,
       patch.vatRateKe ?? null,
       patch.vatRateDefault ?? null,
+      patch.autoPrintReceipts ?? null,
     ],
   )
   return row

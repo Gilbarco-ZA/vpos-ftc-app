@@ -1,9 +1,20 @@
+import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
+
 import { padId2 } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
 import { getForecourtRuntimeConfig } from '@/src/shared/forecourt/runtimeConfig'
 
+import {
+  buildFpStatusSubCodePreference,
+  resolveDispenseAuthorizeMode,
+} from '@/src/modules/forecourt/infrastructure/jpl/dispense'
 import { normalizeJplPosId } from '@/src/modules/forecourt/infrastructure/jpl/protocol/bootstrap'
 import { validateJplOutboundMessage } from '@/src/modules/forecourt/infrastructure/jpl/protocol/schema'
-import { DEFAULT_TRANSACTION_PAR_IDS } from '@/src/modules/forecourt/infrastructure/jpl/transactionService'
+import {
+  buildClearSupervisedTransactionRequest,
+  buildReadSupervisedTransactionRequest,
+  buildUnlockSupervisedTransactionRequest,
+  DEFAULT_TRANSACTION_PAR_IDS,
+} from '@/src/modules/forecourt/infrastructure/jpl/transactionService'
 
 export type JplCommandName =
   | 'open_Fp_req'
@@ -26,9 +37,119 @@ export type JplCommandName =
   | 'cancel_FpEstop_req'
   | 'reset_Fp_req'
   | 'TgStatus_req'
+  | 'open_TankController_req'
+  | 'close_TankController_req'
+  | 'start_DeliveryProcess_req'
+  | 'stop_DeliveryProcess_req'
   | 'SiteDeliveryStatus_req'
   | 'TankDeliveryData_req'
   | 'clear_TankDeliveryData_req'
+  | 'clear_InstallData_req'
+  | 'PpStatus_req'
+  | 'open_Pp_req'
+  | 'close_Pp_req'
+  | 'PpErrorMsg_req'
+  | 'clear_PpError_req'
+  | 'reset_Pp_req'
+  | 'WpStatus_req'
+  | 'prepare_WpAuth_req'
+  | 'authorize_Wp_req'
+  | 'cancel_WpAuth_req'
+  | 'stop_Wp_req'
+  | 'cancel_WpStop_req'
+  | 'WpErrorMsg_req'
+  | 'clear_WpError_req'
+  | 'reset_Wp_req'
+  | 'DiopStatus_req'
+  | 'change_DiopOutput_req'
+  | 'SensorStatus_req'
+  | 'VmStatus_req'
+  | 'open_Vm_req'
+  | 'close_Vm_req'
+  | 'VmDrystockTotals_req'
+  | 'VmErrorMsg_req'
+  | 'clear_VmError_req'
+  | 'reset_Vm_req'
+
+export type JplCommandRequest = {
+  name: JplCommandName | string
+  subCode?: string
+  data?: Record<string, any>
+  [key: string]: any
+}
+
+const buildFpStatusEnvelope = (DomsPosJpl as any).buildFpStatusEnvelope as
+  | ((input: { fpId: string; variant?: string }) => any)
+  | undefined
+
+const buildFpFuellingDataEnvelope = (DomsPosJpl as any)
+  .buildFpFuellingDataEnvelope as ((input: { fpId: string }) => any) | undefined
+
+const EXTENDED_INSTALL_MESSAGE_CODES = {
+  fuellingPoint: '0010H',
+  pricePole: '0037H',
+  tankGauge: '0040H',
+  electronicPaymentTerminal: '0050H',
+  vapourRecoveryController: '002AH',
+  washPoint: '0101H',
+  serialServer: '0201H',
+  externalTerminalSubDevice: '0301H',
+  digitalIoPin: '0401H',
+  dispenser: '0710H',
+  vendingMachine: '0C01H',
+} as const
+
+const ALL_TANK_DELIVERY_ITEM_IDS = Array.from({ length: 29 }, (_, index) =>
+  String(index + 1).padStart(2, '0'),
+)
+
+const normalizeCode1 = (value: unknown, fallback = '00H') => {
+  const raw = String(value ?? '')
+    .trim()
+    .toUpperCase()
+  if (/^[0-9A-F]{2}H$/.test(raw)) return raw
+  const numeric = Number(raw.replace(/H$/, ''))
+  if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 255) {
+    return `${String(Math.trunc(numeric)).padStart(2, '0')}H`
+  }
+  return fallback
+}
+
+const normalizeCode2 = (value: unknown, fallback = '0000H') => {
+  const raw = String(value ?? '')
+    .trim()
+    .toUpperCase()
+  if (/^[0-9A-F]{4}H$/.test(raw)) return raw
+  const numeric = Number(raw.replace(/H$/, ''))
+  if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 0xffff) {
+    return `${String(Math.trunc(numeric)).padStart(4, '0')}H`
+  }
+  return fallback
+}
+
+const buildWashAuthorizeParsPayload = (payload: any) => {
+  const nested = payload?.AuthorizePars ?? payload?.authorizePars
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return nested
+  }
+
+  const authorizePars = cleanObject({
+    WpValidWashPrograms: normalizeId2List(
+      payload?.WpValidWashPrograms ?? payload?.wpValidWashPrograms,
+    ),
+    WpStartLimit: payload?.WpStartLimit ?? payload?.wpStartLimit,
+    WpTransReturnData: maybeArray(
+      payload?.WpTransReturnData ?? payload?.wpTransReturnData,
+    ),
+    WpLogData: payload?.WpLogData ?? payload?.wpLogData,
+    WpTransReturnData2: maybeArray(
+      payload?.WpTransReturnData2 ?? payload?.wpTransReturnData2,
+    ),
+    WpWashOptions: maybeArray(payload?.WpWashOptions ?? payload?.wpWashOptions),
+  })
+
+  return Object.keys(authorizePars).length ? authorizePars : undefined
+}
 
 export const normalizeJplCommandAction = (action: string) =>
   String(action ?? '')
@@ -136,7 +257,17 @@ const toPresetPayload = (payload: any) => {
   return request
 }
 
-export const buildJplCommandRequest = (action: string, payload: any) => {
+export const describeJplAuthorizeRequest = (
+  action: string,
+  payload: Record<string, unknown> | null | undefined,
+) => ({
+  authorizeMode: resolveDispenseAuthorizeMode(action, payload ?? undefined),
+})
+
+export const buildJplCommandRequest = (
+  action: string,
+  payload: any,
+): JplCommandRequest | null => {
   const normalized = normalizeJplCommandAction(action)
   const cfg = getForecourtRuntimeConfig()
 
@@ -222,13 +353,21 @@ export const buildJplCommandRequest = (action: string, payload: any) => {
   }
 
   if (normalized === 'GET_FP_STATUS' || normalized === 'READ_FP_STATUS') {
-    return validateJplOutboundMessage({
-      name: 'FpStatus_req' as JplCommandName,
-      subCode: String(payload?.subCode ?? payload?.SubCode ?? '03H')
-        .trim()
-        .toUpperCase(),
-      data: { FpId: fpId },
-    })
+    const preferred = buildFpStatusSubCodePreference(
+      String(payload?.subCode ?? payload?.SubCode ?? '03H'),
+    )[0]
+    const request = buildFpStatusEnvelope
+      ? buildFpStatusEnvelope({
+          fpId,
+          variant: preferred,
+        })
+      : {
+          name: 'FpStatus_req' as JplCommandName,
+          subCode: preferred,
+          data: { FpId: fpId },
+        }
+
+    return validateJplOutboundMessage(request)
   }
 
   if (normalized === 'GET_FP_INFO' || normalized === 'READ_FP_INFO') {
@@ -248,13 +387,22 @@ export const buildJplCommandRequest = (action: string, payload: any) => {
     normalized === 'GET_FP_FUELLING_DATA' ||
     normalized === 'READ_FP_FUELLING_DATA'
   ) {
-    return validateJplOutboundMessage({
-      name: 'FpFuellingData_req' as JplCommandName,
-      subCode: String(payload?.subCode ?? payload?.SubCode ?? '01H')
-        .trim()
-        .toUpperCase(),
-      data: { FpId: fpId },
-    })
+    const request = buildFpFuellingDataEnvelope
+      ? {
+          ...buildFpFuellingDataEnvelope({ fpId }),
+          subCode: String(payload?.subCode ?? payload?.SubCode ?? '01H')
+            .trim()
+            .toUpperCase(),
+        }
+      : {
+          name: 'FpFuellingData_req' as JplCommandName,
+          subCode: String(payload?.subCode ?? payload?.SubCode ?? '01H')
+            .trim()
+            .toUpperCase(),
+          data: { FpId: fpId },
+        }
+
+    return validateJplOutboundMessage(request)
   }
 
   if (normalized === 'GET_FP_ERROR' || normalized === 'READ_FP_ERROR') {
@@ -262,6 +410,75 @@ export const buildJplCommandRequest = (action: string, payload: any) => {
       name: 'FpErrorMsg_req' as JplCommandName,
       subCode: '00H',
       data: { FpId: fpId },
+    })
+  }
+
+  if (normalized === 'OPEN_TANK_CONTROLLER') {
+    return validateJplOutboundMessage({
+      name: 'open_TankController_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        TankId: padId2(payload?.tankId ?? payload?.TankId ?? payload?.tgId),
+        PosId: normalizeJplPosId(
+          payload?.posId ?? payload?.PosId ?? cfg.jplPosId ?? '01',
+          '01',
+          { allowZero: true },
+        ),
+        TankOperationModeNo: Number(
+          payload?.tankOperationModeNo ?? payload?.TankOperationModeNo ?? 0,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'CLOSE_TANK_CONTROLLER') {
+    return validateJplOutboundMessage({
+      name: 'close_TankController_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        TankId: padId2(
+          payload?.tankId ?? payload?.TankId ?? payload?.tgId ?? 0,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'START_DELIVERY_PROCESS') {
+    return validateJplOutboundMessage({
+      name: 'start_DeliveryProcess_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        TankId: padId2(payload?.tankId ?? payload?.TankId),
+        PosId: normalizeJplPosId(
+          payload?.posId ?? payload?.PosId ?? cfg.jplPosId ?? '01',
+          '01',
+          { allowZero: true },
+        ),
+        FcProductId: padId2(payload?.fcProductId ?? payload?.FcProductId),
+        ...((payload?.startDeliveryProcessPars ??
+        payload?.StartDeliveryProcessPars)
+          ? {
+              StartDeliveryProcessPars:
+                payload?.startDeliveryProcessPars ??
+                payload?.StartDeliveryProcessPars,
+            }
+          : {}),
+      },
+    })
+  }
+
+  if (normalized === 'STOP_DELIVERY_PROCESS') {
+    return validateJplOutboundMessage({
+      name: 'stop_DeliveryProcess_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        TankId: padId2(payload?.tankId ?? payload?.TankId),
+        PosId: normalizeJplPosId(
+          payload?.posId ?? payload?.PosId ?? cfg.jplPosId ?? '01',
+          '01',
+          { allowZero: true },
+        ),
+      },
     })
   }
 
@@ -311,7 +528,7 @@ export const buildJplCommandRequest = (action: string, payload: any) => {
           payload?.tankDeliveryDataItemId ?? payload?.TankDeliveryDataItemId,
         )
           ? (payload?.tankDeliveryDataItemId ?? payload?.TankDeliveryDataItemId)
-          : undefined,
+          : ALL_TANK_DELIVERY_ITEM_IDS,
       },
     })
   }
@@ -336,6 +553,340 @@ export const buildJplCommandRequest = (action: string, payload: any) => {
                 payload?.tankDeliveries ?? payload?.TankDeliveries,
             }
           : {}),
+      },
+    })
+  }
+
+  if (normalized === 'GET_PP_STATUS' || normalized === 'READ_PP_STATUS') {
+    return validateJplOutboundMessage({
+      name: 'PpStatus_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId),
+      },
+    })
+  }
+
+  if (normalized === 'OPEN_PP' || normalized === 'OPEN_PRICE_POLE') {
+    return validateJplOutboundMessage({
+      name: 'open_Pp_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId),
+        PosId: posId,
+        PpOperationModeNo: Number(
+          payload?.ppOperationModeNo ?? payload?.PpOperationModeNo ?? 0,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'CLOSE_PP' || normalized === 'CLOSE_PRICE_POLE') {
+    return validateJplOutboundMessage({
+      name: 'close_Pp_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId),
+      },
+    })
+  }
+
+  if (normalized === 'GET_PP_ERROR' || normalized === 'READ_PP_ERROR') {
+    return validateJplOutboundMessage({
+      name: 'PpErrorMsg_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId),
+      },
+    })
+  }
+
+  if (normalized === 'CLEAR_PP_ERROR') {
+    return validateJplOutboundMessage({
+      name: 'clear_PpError_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId),
+        PpErrorCode: String(
+          payload?.ppErrorCode ?? payload?.PpErrorCode ?? '00',
+        )
+          .trim()
+          .padStart(2, '0'),
+      },
+    })
+  }
+
+  if (normalized === 'RESET_PP' || normalized === 'RESET_PRICE_POLE') {
+    return validateJplOutboundMessage({
+      name: 'reset_Pp_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId),
+      },
+    })
+  }
+
+  if (normalized === 'GET_WP_STATUS' || normalized === 'READ_WP_STATUS') {
+    return validateJplOutboundMessage({
+      name: 'WpStatus_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+      },
+    })
+  }
+
+  if (normalized === 'PREPARE_WP_AUTH' || normalized === 'PREPARE_WASH_AUTH') {
+    return validateJplOutboundMessage({
+      name: 'prepare_WpAuth_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+        PosId: posId,
+        AuthorizePars: buildWashAuthorizeParsPayload(payload),
+      },
+    })
+  }
+
+  if (normalized === 'AUTHORIZE_WP' || normalized === 'AUTHORIZE_WASH') {
+    return validateJplOutboundMessage({
+      name: 'authorize_Wp_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+        PosId: posId,
+        AuthorizePars: buildWashAuthorizeParsPayload(payload),
+      },
+    })
+  }
+
+  if (normalized === 'CANCEL_WP_AUTH' || normalized === 'CANCEL_WASH_AUTH') {
+    return validateJplOutboundMessage({
+      name: 'cancel_WpAuth_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+        PosId: posId,
+      },
+    })
+  }
+
+  if (normalized === 'STOP_WP' || normalized === 'STOP_WASH') {
+    return validateJplOutboundMessage({
+      name: 'stop_Wp_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+        PosId: posId,
+      },
+    })
+  }
+
+  if (normalized === 'RESUME_WP' || normalized === 'RESUME_WASH') {
+    return validateJplOutboundMessage({
+      name: 'cancel_WpStop_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+        PosId: posId,
+      },
+    })
+  }
+
+  if (normalized === 'GET_WP_ERROR' || normalized === 'READ_WP_ERROR') {
+    return validateJplOutboundMessage({
+      name: 'WpErrorMsg_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+      },
+    })
+  }
+
+  if (normalized === 'CLEAR_WP_ERROR') {
+    return validateJplOutboundMessage({
+      name: 'clear_WpError_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+        WpErrorCode: String(
+          payload?.wpErrorCode ?? payload?.WpErrorCode ?? '00',
+        )
+          .trim()
+          .padStart(2, '0'),
+      },
+    })
+  }
+
+  if (normalized === 'RESET_WP' || normalized === 'RESET_WASH') {
+    return validateJplOutboundMessage({
+      name: 'reset_Wp_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+      },
+    })
+  }
+
+  if (normalized === 'GET_DIOP_STATUS' || normalized === 'READ_DIOP_STATUS') {
+    return validateJplOutboundMessage({
+      name: 'DiopStatus_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        DiopId: padId2(
+          payload?.diopId ?? payload?.DiopId ?? payload?.pinId ?? 0,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'CHANGE_DIOP_OUTPUT' || normalized === 'SET_DIOP_OUTPUT') {
+    return validateJplOutboundMessage({
+      name: 'change_DiopOutput_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        DiopId: padId2(
+          payload?.diopId ?? payload?.DiopId ?? payload?.pinId ?? 0,
+        ),
+        DiopControl: normalizeCode1(
+          payload?.diopControl ??
+            payload?.DiopControl ??
+            payload?.outputCode ??
+            '00H',
+        ),
+      },
+    })
+  }
+
+  if (
+    normalized === 'GET_SENSOR_STATUS' ||
+    normalized === 'READ_SENSOR_STATUS'
+  ) {
+    return validateJplOutboundMessage({
+      name: 'SensorStatus_req' as JplCommandName,
+      subCode: '00H',
+      data: { SensorId: padId2(payload?.sensorId ?? payload?.SensorId) },
+    })
+  }
+
+  if (normalized === 'GET_VM_STATUS' || normalized === 'READ_VM_STATUS') {
+    return validateJplOutboundMessage({
+      name: 'VmStatus_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        VmId: padId2(
+          payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'OPEN_VM' || normalized === 'OPEN_VENDING_MACHINE') {
+    return validateJplOutboundMessage({
+      name: 'open_Vm_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        VmId: padId2(
+          payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'CLOSE_VM' || normalized === 'CLOSE_VENDING_MACHINE') {
+    return validateJplOutboundMessage({
+      name: 'close_Vm_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        VmId: padId2(
+          payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId,
+        ),
+      },
+    })
+  }
+
+  if (
+    normalized === 'GET_VM_DRYSTOCK_TOTALS' ||
+    normalized === 'READ_VM_TOTALS'
+  ) {
+    return validateJplOutboundMessage({
+      name: 'VmDrystockTotals_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        VmId: padId2(
+          payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'GET_VM_ERROR' || normalized === 'READ_VM_ERROR') {
+    return validateJplOutboundMessage({
+      name: 'VmErrorMsg_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        VmId: padId2(
+          payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'CLEAR_VM_ERROR') {
+    return validateJplOutboundMessage({
+      name: 'clear_VmError_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        VmId: padId2(
+          payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId,
+        ),
+        VmErrorCode: String(
+          payload?.vmErrorCode ?? payload?.VmErrorCode ?? '00',
+        )
+          .trim()
+          .padStart(2, '0'),
+      },
+    })
+  }
+
+  if (normalized === 'RESET_VM' || normalized === 'RESET_VENDING_MACHINE') {
+    return validateJplOutboundMessage({
+      name: 'reset_Vm_req' as JplCommandName,
+      subCode: '00H',
+      data: {
+        VmId: padId2(
+          payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'CLEAR_SERIAL_SERVER_INSTALLATION') {
+    return validateJplOutboundMessage({
+      name: 'clear_InstallData_req' as JplCommandName,
+      subCode: '01H',
+      data: {
+        ExtendedInstallMsgCode: EXTENDED_INSTALL_MESSAGE_CODES.serialServer,
+        FcDeviceId: padId2(
+          payload?.serialServerId ??
+            payload?.SerialServerId ??
+            payload?.fcDeviceId ??
+            0,
+        ),
+      },
+    })
+  }
+
+  if (normalized === 'CLEAR_INSTALLATION_DATA') {
+    return validateJplOutboundMessage({
+      name: 'clear_InstallData_req' as JplCommandName,
+      subCode: '01H',
+      data: {
+        ExtendedInstallMsgCode: normalizeCode2(
+          payload?.extendedInstallMsgCode ?? payload?.ExtendedInstallMsgCode,
+          '0000H',
+        ),
+        FcDeviceId: padId2(payload?.fcDeviceId ?? payload?.FcDeviceId ?? 0),
       },
     })
   }
@@ -403,73 +954,29 @@ export const buildJplCommandRequest = (action: string, payload: any) => {
     normalized === 'GET_SUPERVISED_TRANSACTION' ||
     normalized === 'READ_SUPERVISED_TRANSACTION'
   ) {
-    return validateJplOutboundMessage({
-      name: 'FpSupTrans_req' as JplCommandName,
-      subCode: '00H',
-      data: {
-        FpId: fpId,
-        TransSeqNo: String(payload?.transSeqNo ?? payload?.TransSeqNo ?? '')
-          .trim()
-          .padStart(4, '0'),
-        PosId: padId2(payload?.posId ?? payload?.PosId ?? '00'),
-        TransParId: Array.isArray(payload?.TransParId ?? payload?.transParId)
-          ? (payload?.TransParId ?? payload?.transParId)
-          : [...DEFAULT_TRANSACTION_PAR_IDS],
-      },
+    return buildReadSupervisedTransactionRequest({
+      fpId,
+      posId: padId2(payload?.posId ?? payload?.PosId ?? '00'),
+      transSeqNo: payload?.transSeqNo ?? payload?.TransSeqNo ?? '',
+      transParId: payload?.TransParId ??
+        payload?.transParId ?? [...DEFAULT_TRANSACTION_PAR_IDS],
     })
   }
 
   if (normalized === 'UNLOCK_SUPERVISED_TRANSACTION') {
-    return validateJplOutboundMessage({
-      name: 'unlock_FpSupTrans_req' as JplCommandName,
-      subCode: '00H',
-      data: {
-        FpId: fpId,
-        PosId: padId2(payload?.posId ?? payload?.PosId ?? posId),
-        TransSeqNo: String(payload?.transSeqNo ?? payload?.TransSeqNo ?? '')
-          .trim()
-          .padStart(4, '0'),
-      },
+    return buildUnlockSupervisedTransactionRequest({
+      fpId,
+      posId: padId2(payload?.posId ?? payload?.PosId ?? posId),
+      transSeqNo: payload?.transSeqNo ?? payload?.TransSeqNo ?? '',
     })
   }
 
   if (normalized === 'CLEAR_SUPERVISED_TRANSACTION') {
-    const useExtended = Boolean(
-      payload?.Vol_e ??
-      payload?.vol_e ??
-      payload?.Money_e ??
-      payload?.money_e ??
-      payload?.PaymentParameters ??
-      payload?.paymentParameters,
-    )
-
-    return validateJplOutboundMessage({
-      name: 'clear_FpSupTrans_req' as JplCommandName,
-      subCode: useExtended ? '04H' : '00H',
-      data: {
-        FpId: fpId,
-        PosId: padId2(payload?.posId ?? payload?.PosId ?? posId),
-        TransSeqNo: String(payload?.transSeqNo ?? payload?.TransSeqNo ?? '')
-          .trim()
-          .padStart(4, '0'),
-        ...(payload?.Vol_e != null || payload?.vol_e != null
-          ? { Vol_e: String(payload?.Vol_e ?? payload?.vol_e) }
-          : {}),
-        ...(payload?.Money_e != null || payload?.money_e != null
-          ? { Money_e: String(payload?.Money_e ?? payload?.money_e) }
-          : {}),
-        ...(payload?.Money != null || payload?.money != null
-          ? { Money: String(payload?.Money ?? payload?.money) }
-          : {}),
-        ...((payload?.PaymentParameters ?? payload?.paymentParameters) &&
-        typeof (payload?.PaymentParameters ?? payload?.paymentParameters) ===
-          'object'
-          ? {
-              PaymentParameters:
-                payload?.PaymentParameters ?? payload?.paymentParameters,
-            }
-          : {}),
-      },
+    return buildClearSupervisedTransactionRequest({
+      fpId,
+      posId: padId2(payload?.posId ?? payload?.PosId ?? posId),
+      transSeqNo: payload?.transSeqNo ?? payload?.TransSeqNo ?? '',
+      payload,
     })
   }
 
@@ -563,23 +1070,12 @@ export const buildJplCommandRequest = (action: string, payload: any) => {
     ).trim()
     if (!transSeqNo) return null
 
-    const request: Record<string, any> = {
-      name: 'clear_FpSupTrans_req' as JplCommandName,
-      subCode: '00H',
-      data: {
-        FpId: fpId,
-        PosId: posId,
-        TransSeqNo: transSeqNo.padStart(4, '0'),
-      },
-    }
-
-    if (payload?.Money_e != null || payload?.money_e != null) {
-      request.data.Money_e = String(payload?.Money_e ?? payload?.money_e)
-    } else if (payload?.Money != null || payload?.money != null) {
-      request.data.Money = String(payload?.Money ?? payload?.money)
-    }
-
-    return validateJplOutboundMessage(request)
+    return buildClearSupervisedTransactionRequest({
+      fpId,
+      posId,
+      transSeqNo,
+      payload,
+    })
   }
 
   return null

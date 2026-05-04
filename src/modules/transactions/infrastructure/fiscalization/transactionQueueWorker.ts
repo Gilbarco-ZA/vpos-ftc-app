@@ -5,7 +5,10 @@ import { calculateExponentialBackoffSeconds } from '@/src/platform/queue/retry-p
 import { advisoryUnlock, tryAdvisoryLock } from '@/src/shared/db/locks'
 import { toNumberOr } from '@/src/shared/numbers'
 import { getRuntimeBus } from '@/src/shared/runtime/bus'
-import { enqueueFiscalInboxMessage } from '@/src/shared/runtime/fiscalInbox'
+import {
+  enqueueFiscalInboxMessage,
+  enqueueFiscalInboxReviewFailure,
+} from '@/src/shared/runtime/fiscalInbox'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
@@ -210,6 +213,7 @@ async function ensureTransactionFromQueue(
 
 async function processOne(row: TransactionQueueRow) {
   const maxRetries = Number(process.env.VPOS_TX_MAX_RETRIES ?? '5')
+  let txnForReview: any = null
   try {
     if (!row.payload || typeof row.payload !== 'object') {
       throw new Error('Invalid transaction payload (expected object)')
@@ -217,6 +221,7 @@ async function processOne(row: TransactionQueueRow) {
 
     // Idempotency anchor: transactions.source_queue_id is unique.
     const txn = await ensureTransactionFromQueue(row)
+    txnForReview = txn
 
     // If already fiscalized, only ensure a receipt print job exists (best-effort) and finish.
     if (txn?.status === 'FISCALIZED' && txn?.fiscalization_reference) {
@@ -328,6 +333,29 @@ async function processOne(row: TransactionQueueRow) {
     })
   } catch (e: any) {
     const msg = String(e?.message || e)
+    await enqueueFiscalInboxReviewFailure({
+      stationId: row.station_id,
+      topic: 'external_fiscalization',
+      requestId: txnForReview?.id
+        ? `txn-fiscalization-review:${txnForReview.id}`
+        : `queue-fiscalization-review:${row.id}`,
+      error: e,
+      message: {
+        type: 'transactionFiscalizationReviewRequired',
+        stationId: row.station_id,
+        transactionId: txnForReview?.id ?? null,
+        queueId: row.id,
+        payload: row.payload ?? null,
+        error: msg,
+        at: Date.now(),
+      },
+    }).catch((err) => {
+      logger.error('[vpos-transactions]', {
+        msg: 'Failed to enqueue fiscal inbox review item',
+        error: err,
+        queueId: row.id,
+      })
+    })
     await markFailed({
       id: row.id,
       retryCount: row.retry_count ?? 0,

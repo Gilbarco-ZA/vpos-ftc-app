@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { ensureCsrfCookie } from '@/src/shared/security/csrf'
 

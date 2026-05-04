@@ -1,4 +1,4 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export { GET, POST } from '@/app/api/vpos/restart-config/route'
+export {GET, POST } from '@/app/api/vpos/restart-config/route'

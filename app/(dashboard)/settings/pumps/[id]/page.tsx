@@ -7,11 +7,12 @@ import PumpDetailClient from './client'
 
 export const dynamic = 'force-dynamic'
 
-const SettingsPumpDetailPage = async ({
-  params,
-}: {
-  params: { id: string }
-}) => {
+const SettingsPumpDetailPage = async (
+  props: {
+    params: Promise<{ id: string }>
+  }
+) => {
+  const params = await props.params;
   const user = await requireAuth(['administrator', 'manager'])
   const pumpId = String(params.id || '').trim()
   if (!pumpId) return notFound()

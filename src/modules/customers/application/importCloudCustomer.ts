@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { fail } from '@/src/platform/web/api/response'
 import { auditCustomerImported } from '@/src/shared/audit/log'
 import { queryOne as azOne } from '@/src/shared/db/azureSql'

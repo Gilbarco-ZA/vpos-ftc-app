@@ -9,6 +9,7 @@ import type { Socket } from 'socket.io'
 import { Server as SocketIOServer } from 'socket.io'
 
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
+import { getJplGatewayState } from '@/src/platform/integrations/jpl/gateway'
 import {
   getJplTcpAdapterState,
   getJplTcpBufferHealth,
@@ -65,6 +66,17 @@ const sendSnapshot = (socket: Socket, snapshot: PumpStateSnapshot) => {
 
 const sendEnvelope = (socket: Socket, payload: Record<string, unknown>) => {
   socket.emit('message', payload)
+}
+
+const sendProtocolHealth = (socket: Socket, stationId: string) => {
+  const gatewayState: any = getJplGatewayState() as any
+  sendEnvelope(socket, {
+    type: 'forecourt:protocol',
+    data: {
+      stationId,
+      ...(gatewayState?.protocolHealth ?? gatewayState?.protocol ?? {}),
+    },
+  })
 }
 
 type ForecourtConnectionStatus = 'online' | 'offline' | 'degraded'
@@ -395,6 +407,7 @@ export function attachForecourtWs(server: HttpServer) {
             reconnectAttempts: status.reconnectAttempts,
           },
         })
+        sendProtocolHealth(socket, meta.stationId)
       }
     })()
 
@@ -474,6 +487,7 @@ export function attachForecourtWs(server: HttpServer) {
           reconnectAttempts: connStatus.reconnectAttempts,
         },
       })
+      sendProtocolHealth(socket, stationId)
 
       const handleCommandEnvelope = (payload: unknown) => {
         void (async () => {

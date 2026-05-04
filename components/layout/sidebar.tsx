@@ -129,6 +129,7 @@ const getNavSections = (role: UserRole): NavSection[] => {
         { label: 'Users', href: '/admin/users' },
         { label: 'Customers', href: '/customers' },
         { label: 'Station Settings', href: '/admin/settings' },
+        { label: 'Proxy Settings', href: '/admin/proxy-settings' },
         { label: 'Sync', href: '/admin/sync' },
         { label: 'Control', href: '/admin/control' },
         { label: 'Forecourt Monitor', href: '/admin/forecourt' },

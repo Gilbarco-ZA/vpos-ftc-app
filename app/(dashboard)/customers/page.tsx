@@ -4,11 +4,12 @@ import { CustomersRolePage } from '@/components/customers/CustomersRolePage'
 
 export const dynamic = 'force-dynamic'
 
-const CustomersPage = async ({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>
-}) => {
+const CustomersPage = async (
+  props: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>
+  }
+) => {
+  const searchParams = await props.searchParams;
   const user = await requireAuth(['tenant', 'manager', 'administrator'])
 
   return (

@@ -10,6 +10,15 @@ import {
   saveBrandingSettingsRepo,
 } from '@/src/modules/admin-config/infrastructure/adminConfigRepo'
 
+const isNonEmptyUpload = (value: unknown): value is File => {
+  if (!value || typeof value === 'string') return false
+  const file = value as File
+  const size = Number((file as any).size ?? 0)
+  const name = String((file as any).name ?? '').trim()
+  const type = String((file as any).type ?? '').trim()
+  return size > 0 && (name.length > 0 || type.length > 0)
+}
+
 export async function saveAdminBranding(args: {
   stationId: string
   userId: string
@@ -32,7 +41,7 @@ export async function saveAdminBranding(args: {
       : null
 
   const logoFile = args.body.logo
-  if (logoFile && typeof logoFile !== 'string') {
+  if (isNonEmptyUpload(logoFile)) {
     try {
       logoPath = await persistBrandLogo(logoFile as File)
     } catch (err: any) {

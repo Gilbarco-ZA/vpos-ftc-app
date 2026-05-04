@@ -1,11 +1,16 @@
 import '@/src/modules/forecourt/infrastructure/jpl/globals'
 
+import type { ProtocolHealthPayload } from '@/src/modules/forecourt/infrastructure/jpl/protocolHealth'
 import type {
   JplBufferAlert,
   JplBufferEntrySummary,
   JplBufferHealthSummary,
   JplBufferSeverity,
 } from '@/src/platform/integrations/jpl/types'
+import type {
+  RequestDispatchMode,
+  RequestDispatchPolicy,
+} from '@/src/shared/forecourt/runtimeConfig'
 import type { JplClient } from '@gilbarcoafs/doms-pos-jpl'
 
 import { mapJplMainState } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
@@ -16,10 +21,123 @@ import {
 import { getForecourtRuntimeConfig } from '@/src/shared/forecourt/runtimeConfig'
 
 import { enumLabel } from '@/src/modules/forecourt/infrastructure/jpl/protocol/normalize'
+import { buildProtocolHealth } from '@/src/modules/forecourt/infrastructure/jpl/protocolHealth'
 import { getReplayCapabilities } from '@/src/modules/forecourt/infrastructure/jpl/replayState'
 import { resolveStationId } from '@/src/modules/forecourt/infrastructure/jpl/station'
 
 let cachedStationId: string | null = null
+
+const resolveRequestDispatchPolicy = (
+  client: JplClient | null,
+): RequestDispatchPolicy => {
+  const candidate = (client as any)?.opts?.requestDispatchPolicy
+  if (
+    candidate === 'correlation-required' ||
+    candidate === 'auto' ||
+    candidate === 'strict-single-flight-when-uncorrelated'
+  ) {
+    return candidate
+  }
+  return getForecourtRuntimeConfig().jplRequestDispatchPolicy ?? 'auto'
+}
+
+const resolveCorrelationSupport = (
+  client: JplClient | null,
+): boolean | null => {
+  const value = (client as any)?.getServerSupportsCorrelationIds?.()
+  return value === true ? true : value === false ? false : null
+}
+
+const resolveRequestDispatchMode = (
+  client: JplClient | null,
+): RequestDispatchMode => {
+  const direct = (client as any)?.getRequestDispatchMode?.()
+  if (direct === 'correlated-concurrent' || direct === 'strict-single-flight') {
+    return direct
+  }
+
+  const dispatcherMode = (client as any)?.requestDispatcher?.getDispatchMode?.()
+  if (
+    dispatcherMode === 'correlated-concurrent' ||
+    dispatcherMode === 'strict-single-flight'
+  ) {
+    return dispatcherMode
+  }
+
+  return resolveCorrelationSupport(client) === true
+    ? 'correlated-concurrent'
+    : 'strict-single-flight'
+}
+
+const buildProtocolState = (
+  client: JplClient | null,
+  state: Record<string, any>,
+) => {
+  const cfg = getForecourtRuntimeConfig()
+  const version =
+    (client as any)?.getServerJplVersion?.() ??
+    state.welcomeVersion ??
+    state.protocolVersion ??
+    undefined
+  const secureMode =
+    typeof state.secureMode === 'boolean'
+      ? state.secureMode
+      : Number(cfg.jplPort) === 8889
+  const correlationSupport = resolveCorrelationSupport(client)
+  const requestDispatchPolicy = resolveRequestDispatchPolicy(client)
+  const requestDispatchMode = resolveRequestDispatchMode(client)
+  const requestMode =
+    requestDispatchMode === 'correlated-concurrent'
+      ? 'correlated'
+      : 'single-flight-fallback'
+  const defaultSubscriptions = {
+    unsolicitedFlags: [...(cfg.jplUnsolicitedFlags ?? [])],
+    unsolicitedMfdrFlags: [...(cfg.jplUnsolicitedMfdrFlags ?? [])],
+    drSeconds: cfg.jplUnsolicitedDrSeconds,
+    statusUpdateCode: cfg.jplStatusUpdateCode,
+  }
+  const rawFrameDiagnosticsEnabled = Boolean(
+    client &&
+    typeof (client as any).listenerCount === 'function' &&
+    (client as any).listenerCount('rawFrame') > 0,
+  )
+  const protocolHealth = buildProtocolHealth({
+    protocolVersion: version,
+    expectedMinVersion: cfg.jplExpectedMinVersion,
+    correlationSupported: correlationSupport,
+    requestMode,
+    requestDispatchMode,
+    requestDispatchPolicy,
+    secureTransport: secureMode,
+    expectedSecureTransport: Number(cfg.jplPort) === 8889,
+    lastReject: state.lastReject ?? undefined,
+    defaultSubscriptions,
+    rawFrameDiagnosticsEnabled,
+  })
+
+  return {
+    version,
+    secureMode,
+    tlsRequired: Boolean(cfg.jplTlsRequired),
+    integrationScope: cfg.jplIntegrationScope,
+    optionalProtocolFamilies: [...(cfg.jplOptionalProtocolFamilies ?? [])],
+    paymentControlEnabled: false,
+    correlationSupport,
+    correlationCapability:
+      correlationSupport === true
+        ? 'supported'
+        : correlationSupport === false
+          ? 'unsupported'
+          : 'unknown',
+    requestDispatchPolicy,
+    requestDispatchMode,
+    requestMode,
+    lastReject: state.lastReject ?? undefined,
+    defaultSubscriptions,
+    rawFrameDiagnosticsEnabled,
+    protocolHealth,
+  }
+}
 
 const deriveControllerFlags = (status: any) => ({
   serviceMessageReady: Boolean(status?.FcStatus2Flags?.bits?.ServiceMsgReady),
@@ -107,6 +225,10 @@ const derivePumpErrorDiagnostics = (
     pumpProtocolId: entry?.normalized?.pumpProtocolId,
     pumpErrorCode: entry?.normalized?.pumpErrorCode,
     severity: entry?.normalized?.severity,
+    category: entry?.normalized?.guidance?.category,
+    operatorMessage: entry?.normalized?.guidance?.operatorMessage,
+    recommendedAction: entry?.normalized?.guidance?.recommendedAction,
+    needsAdminIntervention: entry?.normalized?.guidance?.needsAdminIntervention,
   }))
 
 const deriveTankStatusSummary = (
@@ -122,6 +244,19 @@ const deriveTankStatusSummary = (
       undefined,
     flags: entry?.normalized?.flags ?? {},
     alarms: entry?.normalized?.alarms ?? {},
+    at: entry?.at,
+  }))
+
+const deriveOptionalDeviceSummary = (
+  entries: Array<{ normalized?: any; payload?: any; at: number }> | undefined,
+  idKey: string,
+  mainStateKey = 'mainState',
+) =>
+  (entries ?? []).map((entry) => ({
+    id: entry?.normalized?.[idKey],
+    [idKey]: entry?.normalized?.[idKey],
+    mainState: entry?.normalized?.[mainStateKey],
+    flags: entry?.normalized?.flags ?? {},
     at: entry?.at,
   }))
 
@@ -255,6 +390,8 @@ export async function ensureJplGatewayStarted() {
 
   cachedStationId = cachedStationId ?? (await resolveStationId())
   const state = getJplAdapterState()
+  const client = globalThis.__jplTcpClient ?? null
+  const protocol = buildProtocolState(client, state as Record<string, any>)
 
   return {
     started: Boolean(globalThis.__jplTcpClient) || Boolean(state.connected),
@@ -262,23 +399,35 @@ export async function ensureJplGatewayStarted() {
     loggedOn: Boolean(state.loggedOn),
     lastError: state.lastError,
     stationId: cachedStationId,
-    client: globalThis.__jplTcpClient ?? null,
+    client,
+    protocol,
+    protocolHealth: protocol.protocolHealth,
     sharedClient: true,
   }
 }
 
 export function getJplGatewayState() {
-  const state = getJplAdapterState()
+  const state = getJplAdapterState() as Record<string, any>
+  const client = globalThis.__jplTcpClient ?? null
   const started = Boolean(globalThis.__jplTcpClient) || Boolean(state.connected)
   const { bufferHealth, bufferAlerts } = deriveBufferHealth()
   const replayCapabilities = getReplayCapabilities()
+  const protocol = buildProtocolState(client, state)
+  const protocolHealth: ProtocolHealthPayload = protocol.protocolHealth
 
   return {
     started,
     stationId: cachedStationId,
     lastError: state.lastError,
-    version: state.welcomeVersion,
-    secureMode: state.secureMode,
+    version: protocol.version,
+    secureMode: protocol.secureMode,
+    correlationSupport: protocol.correlationSupport,
+    requestDispatchPolicy: protocol.requestDispatchPolicy,
+    requestDispatchMode: protocol.requestDispatchMode,
+    requestMode: protocol.requestMode,
+    lastReject: protocol.lastReject,
+    protocol,
+    protocolHealth,
     posId: state.posId,
     lastMessageAt: state.lastMessageAt,
     lastHeartbeatAt: state.lastHeartbeatAt,
@@ -294,6 +443,14 @@ export function getJplGatewayState() {
     tankStatuses: state.lastTgStatuses,
     siteDeliveryStatus: state.lastSiteDeliveryStatus,
     tankDeliveryData: state.lastTankDeliveryData,
+    pricePoleStatuses: state.lastPpStatuses,
+    pricePoleErrors: state.lastPpErrors,
+    washStatuses: state.lastWashStatuses,
+    washErrors: state.lastWashErrors,
+    digitalIoStatuses: state.lastDigitalIoStatuses,
+    sensorStatuses: state.lastSensorStatuses,
+    vendingStatuses: state.lastVendingStatuses,
+    vendingErrors: state.lastVendingErrors,
     fpErrors: state.lastFpErrors,
     serviceMessages: state.lastServiceMessages,
     backOfficeRecords: state.lastBackOfficeRecords,
@@ -306,6 +463,20 @@ export function getJplGatewayState() {
     peripheralAlerts: derivePeripheralAlerts(state.lastPssPeripheralsStatus),
     activePumpStatuses: derivePumpStatusSummary(state.lastFpStatuses),
     tankAlerts: deriveTankStatusSummary(state.lastTgStatuses),
+    pricePoleSummary: deriveOptionalDeviceSummary(state.lastPpStatuses, 'ppId'),
+    washSummary: deriveOptionalDeviceSummary(state.lastWashStatuses, 'wpId'),
+    digitalIoSummary: deriveOptionalDeviceSummary(
+      state.lastDigitalIoStatuses,
+      'diopId',
+    ),
+    sensorSummary: deriveOptionalDeviceSummary(
+      state.lastSensorStatuses,
+      'sensorId',
+    ),
+    vendingSummary: deriveOptionalDeviceSummary(
+      state.lastVendingStatuses,
+      'vmId',
+    ),
     pumpErrorDiagnostics: derivePumpErrorDiagnostics(state.lastFpErrors),
     replayCapabilities: { ...replayCapabilities },
     apcs: {

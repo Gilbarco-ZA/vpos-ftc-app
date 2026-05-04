@@ -4,6 +4,20 @@ import path from 'path'
 import { getPrimaryDataRoot } from '@/src/platform/config/app-config'
 
 export const MAX_PRODUCT_CATEGORY_IMAGE_BYTES = 2 * 1024 * 1024
+export const PRODUCT_CATEGORY_ASSET_ROUTE_BASE = '/api/category-assets'
+
+export const normalizeProductCategoryImagePath = (
+  pathValue: string | null | undefined,
+): string | null => {
+  const normalized = String(pathValue ?? '').trim()
+  if (!normalized) return null
+  if (normalized.startsWith(`${PRODUCT_CATEGORY_ASSET_ROUTE_BASE}/`))
+    return normalized
+  if (normalized.startsWith('/category-assets/')) {
+    return `${PRODUCT_CATEGORY_ASSET_ROUTE_BASE}/${normalized.split('/').pop()}`
+  }
+  return normalized
+}
 
 export type ProductCategoryImageFile = {
   arrayBuffer: () => Promise<ArrayBuffer>
@@ -75,5 +89,5 @@ export async function persistProductCategoryImage(
   )
 
   await fs.writeFile(absolutePath, buffer)
-  return `/category-assets/${basename}`
+  return `${PRODUCT_CATEGORY_ASSET_ROUTE_BASE}/${basename}`
 }

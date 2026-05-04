@@ -1,5 +1,5 @@
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
 import { serverError } from '@/src/platform/web/api/response'

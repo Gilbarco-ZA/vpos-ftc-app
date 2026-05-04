@@ -38,8 +38,14 @@ export type {
   SupervisorStatus,
 } from './supervisorTypes'
 
+type ResolvedSupervisorRuntimeDeps = Omit<
+  Required<SupervisorRuntimeDeps>,
+  'withLock'
+> &
+  Pick<SupervisorRuntimeDeps, 'withLock'>
+
 export class SupervisorRuntime {
-  private deps: Required<SupervisorRuntimeDeps>
+  private deps: ResolvedSupervisorRuntimeDeps
 
   constructor(
     private stationId: string,
@@ -53,12 +59,13 @@ export class SupervisorRuntime {
         deps.getSystemConfiguration ?? getSystemConfiguration,
       getRuntimeState: deps.getRuntimeState ?? getRuntimeState,
       setRuntimeState: deps.setRuntimeState ?? setRuntimeState,
-      withLock: deps.withLock ?? this.withLock,
+      withLock: deps.withLock,
     }
   }
 
   private async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    if (this.deps.withLock) return await this.deps.withLock(key, fn)
+    const externalWithLock = this.deps.withLock
+    if (externalWithLock) return await externalWithLock(key, fn)
 
     await this.deps.query(`SELECT pg_advisory_lock(hashtext($1))`, [key])
     try {

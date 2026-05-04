@@ -11,7 +11,7 @@ const baseStyles =
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--text-primary)] text-[var(--surface-page)] shadow-card hover:opacity-90 hover:shadow-elevated',
+    'bg-[var(--brand-primary,var(--text-primary))] text-[var(--brand-primary-foreground,var(--surface-page))] shadow-card hover:opacity-90 hover:shadow-elevated focus-visible:ring-[var(--border-focus,var(--brand-primary,var(--text-primary)))]',
   secondary:
     'border border-[var(--border-default)] bg-[var(--surface-hover)] text-[var(--text-primary)] shadow-card backdrop-blur-sm hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:shadow-elevated',
   ghost:

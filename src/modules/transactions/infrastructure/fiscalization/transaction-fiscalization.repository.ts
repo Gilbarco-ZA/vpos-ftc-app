@@ -146,55 +146,67 @@ export async function completeTransactionFiscalizationRepo(input: {
       [transactionId, stationId],
     )
 
-    if (!existingReceipt.rows?.[0]) {
+    const stationSettings = await txQuery<any>(
+      client,
+      `SELECT auto_print_receipts FROM station_settings WHERE station_id = $1`,
+      [stationId],
+    )
+    const autoPrintReceipts =
+      stationSettings.rows?.[0]?.auto_print_receipts === true
+
+    if (!existingReceipt.rows?.[0] || autoPrintReceipts) {
       const receiptPayload = await generateReceipt({ stationId, transactionId })
 
-      await txQuery(
-        client,
-        `
-          INSERT INTO receipts (
-            id, transaction_id, station_id, receipt_number,
-            html_content, plain_text_content, fiscal_data, branding_snapshot
-          )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-        `,
-        [
-          uuidv4(),
-          transactionId,
-          stationId,
-          receiptPayload.receiptNumber,
-          receiptPayload.htmlContent,
-          receiptPayload.plainTextContent || null,
-          JSON.stringify(receiptPayload.fiscalData),
-          receiptPayload.brandingSnapshot
-            ? JSON.stringify(receiptPayload.brandingSnapshot)
-            : null,
-        ],
-      )
+      if (!existingReceipt.rows?.[0]) {
+        await txQuery(
+          client,
+          `
+            INSERT INTO receipts (
+              id, transaction_id, station_id, receipt_number,
+              html_content, plain_text_content, fiscal_data, branding_snapshot
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          `,
+          [
+            uuidv4(),
+            transactionId,
+            stationId,
+            receiptPayload.receiptNumber,
+            receiptPayload.htmlContent,
+            receiptPayload.plainTextContent || null,
+            JSON.stringify(receiptPayload.fiscalData),
+            receiptPayload.brandingSnapshot
+              ? JSON.stringify(receiptPayload.brandingSnapshot)
+              : null,
+          ],
+        )
+      }
 
-      await txQuery(
-        client,
-        `
-          INSERT INTO print_jobs (
-            id, station_id, job_type, payload, priority,
-            idempotency_key, source_transaction_id
-          )
-          VALUES ($1, $2, 'print.receipt', $3::jsonb, 10, $4, $5)
-          ON CONFLICT (station_id, idempotency_key) DO UPDATE
-          SET updated_at = CURRENT_TIMESTAMP
-        `,
-        [
-          uuidv4(),
-          stationId,
-          JSON.stringify({
-            type: 'receiptData',
-            data: receiptPayload,
-            state: { transactionId },
-          }),
-          `receipt:${transactionId}:default`,
-          transactionId,
-        ],
-      )
+      if (autoPrintReceipts) {
+        await txQuery(
+          client,
+          `
+            INSERT INTO print_jobs (
+              id, station_id, job_type, payload, priority,
+              idempotency_key, source_transaction_id
+            )
+            VALUES ($1, $2, 'print.receipt', $3::jsonb, 10, $4, $5)
+            ON CONFLICT (station_id, idempotency_key) DO UPDATE
+            SET updated_at = CURRENT_TIMESTAMP
+          `,
+          [
+            uuidv4(),
+            stationId,
+            JSON.stringify({
+              type: 'receiptData',
+              data: receiptPayload,
+              state: { transactionId },
+            }),
+            `receipt:${transactionId}:default`,
+            transactionId,
+          ],
+        )
+      }
     }
 
     return { success: true, transactionId }

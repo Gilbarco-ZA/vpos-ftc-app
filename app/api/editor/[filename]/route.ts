@@ -1,7 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { readBody } from '@/src/platform/web/api/request'
 import { serverError } from '@/src/platform/web/api/response'
@@ -26,10 +26,8 @@ function safeJoin(root: string, name: string) {
   return path.join(root, clean)
 }
 
-export const GET = async (
-  req: Request,
-  { params }: { params: { filename: string } },
-) => {
+export const GET = async (req: Request, props: { params: Promise<{ filename: string }> }) => {
+  const params = await props.params;
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])
@@ -48,10 +46,8 @@ export const GET = async (
   }
 }
 
-export const POST = async (
-  req: Request,
-  { params }: { params: { filename: string } },
-) => {
+export const POST = async (req: Request, props: { params: Promise<{ filename: string }> }) => {
+  const params = await props.params;
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])
@@ -76,10 +72,8 @@ export const POST = async (
   }
 }
 
-export const DELETE = async (
-  req: Request,
-  { params }: { params: { filename: string } },
-) => {
+export const DELETE = async (req: Request, props: { params: Promise<{ filename: string }> }) => {
+  const params = await props.params;
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])

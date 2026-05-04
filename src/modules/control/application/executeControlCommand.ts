@@ -1,5 +1,5 @@
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { notFound } from '@/src/platform/web/api/response'
 import { controlCommandRegistry } from '@/src/shared/control/registry'

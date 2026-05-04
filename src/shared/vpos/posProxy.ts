@@ -1,3 +1,5 @@
+import type { JplAccessMode } from '@/src/shared/integrations/jplAccess'
+
 import {
   jplHealth,
   jplSendPosCommand,
@@ -11,6 +13,9 @@ function parsePath(pathValue: string) {
   return { pathname, searchParams: url.searchParams }
 }
 
+const matchesPath = (pathname: string, ...candidates: string[]) =>
+  candidates.includes(pathname)
+
 function toCommand(
   pathValue: string,
   opts: { method?: string; body?: any },
@@ -21,13 +26,22 @@ function toCommand(
     .toUpperCase()
   const payload = opts.body
 
-  if (method === 'GET' && pathname === '/health') {
+  if (method === 'GET' && matchesPath(pathname, '/health', '/api/healthz')) {
     return { kind: 'health' }
   }
-  if (method === 'GET' && pathname === '/pos/status') {
+  if (
+    method === 'GET' &&
+    matchesPath(pathname, '/pos/status', '/api/pos/status')
+  ) {
     return { kind: 'command', type: 'POS_STATUS' }
   }
-  if (pathname === '/pos/doms/getGradePrices') {
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/getGradePrices',
+      '/api/pos/doms/getGradePrices',
+    )
+  ) {
     return {
       kind: 'command',
       type: 'GET_GRADE_PRICES',
@@ -37,37 +51,177 @@ function toCommand(
       },
     }
   }
-  if (pathname === '/pos/doms/changeGradePrices') {
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/changeGradePrices',
+      '/api/pos/doms/changeGradePrices',
+    )
+  ) {
     return { kind: 'command', type: 'CHANGE_GRADE_PRICES', payload }
   }
-  if (method === 'GET' && pathname === '/pos/doms/getAllTankDeliveryData') {
+  if (
+    method === 'GET' &&
+    matchesPath(
+      pathname,
+      '/pos/doms/getAllTankDeliveryData',
+      '/api/pos/doms/getAllTankDeliveryData',
+    )
+  ) {
     return { kind: 'command', type: 'GET_ALL_TANK_DELIVERY_DATA' }
   }
-  if (method === 'GET' && pathname === '/pos/doms/getAllTgData') {
-    return { kind: 'command', type: 'GET_ALL_TG_DATA' }
+  if (
+    method === 'GET' &&
+    matchesPath(
+      pathname,
+      '/pos/doms/getAllTgData',
+      '/api/pos/doms/getAllTgData',
+    )
+  ) {
+    return { kind: 'command', type: 'GET_ALL_TG_DATA', payload }
   }
-  if (pathname === '/pos/doms/changeDynamicTankData') {
+  if (
+    method === 'GET' &&
+    matchesPath(
+      pathname,
+      '/pos/doms/getSiteDeliveryStatus',
+      '/api/pos/doms/getSiteDeliveryStatus',
+    )
+  ) {
+    return {
+      kind: 'command',
+      type: 'GET_SITE_DELIVERY_STATUS',
+      payload: {
+        ...(payload ?? {}),
+        ...(searchParams.get('subCode')
+          ? { subCode: searchParams.get('subCode') }
+          : {}),
+      },
+    }
+  }
+  if (
+    method === 'GET' &&
+    matchesPath(pathname, '/pos/doms/getTgStatus', '/api/pos/doms/getTgStatus')
+  ) {
+    return {
+      kind: 'command',
+      type: 'GET_TG_STATUS',
+      payload: {
+        ...(payload ?? {}),
+        ...(searchParams.get('tgId') ? { tgId: searchParams.get('tgId') } : {}),
+        ...(searchParams.get('subCode')
+          ? { subCode: searchParams.get('subCode') }
+          : {}),
+      },
+    }
+  }
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/clearTankDeliveryData',
+      '/api/pos/doms/clearTankDeliveryData',
+    )
+  ) {
+    return { kind: 'command', type: 'CLEAR_TANK_DELIVERY_DATA', payload }
+  }
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/openTankController',
+      '/api/pos/doms/openTankController',
+    )
+  ) {
+    return { kind: 'command', type: 'OPEN_TANK_CONTROLLER', payload }
+  }
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/closeTankController',
+      '/api/pos/doms/closeTankController',
+    )
+  ) {
+    return { kind: 'command', type: 'CLOSE_TANK_CONTROLLER', payload }
+  }
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/startDeliveryProcess',
+      '/api/pos/doms/startDeliveryProcess',
+    )
+  ) {
+    return { kind: 'command', type: 'START_DELIVERY_PROCESS', payload }
+  }
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/stopDeliveryProcess',
+      '/api/pos/doms/stopDeliveryProcess',
+    )
+  ) {
+    return { kind: 'command', type: 'STOP_DELIVERY_PROCESS', payload }
+  }
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/changeDynamicTankData',
+      '/api/pos/doms/changeDynamicTankData',
+    )
+  ) {
     return { kind: 'command', type: 'CHANGE_DYNAMIC_TANK_DATA', payload }
   }
-  if (pathname === '/pos/doms/getTgErrorMsg') {
+  if (
+    matchesPath(
+      pathname,
+      '/pos/doms/getTgErrorMsg',
+      '/api/pos/doms/getTgErrorMsg',
+    )
+  ) {
     return { kind: 'command', type: 'GET_TG_ERROR_MSG', payload }
   }
-  if (pathname === '/pos/control/openFps') {
+  if (
+    matchesPath(pathname, '/pos/control/openFps', '/api/pos/control/openFps')
+  ) {
     return { kind: 'command', type: 'OPEN_FPS', payload }
   }
-  if (pathname === '/pos/control/closeFps') {
+  if (
+    matchesPath(pathname, '/pos/control/closeFps', '/api/pos/control/closeFps')
+  ) {
     return { kind: 'command', type: 'CLOSE_FPS', payload }
   }
-  if (pathname === '/pos/control/attendantAuth') {
+  if (
+    matchesPath(
+      pathname,
+      '/pos/control/attendantAuth',
+      '/api/pos/control/attendantAuth',
+    )
+  ) {
     return { kind: 'command', type: 'ATTENDANT_AUTH', payload }
   }
-  if (pathname === '/pos/control/preFuelCustomer') {
+  if (
+    matchesPath(
+      pathname,
+      '/pos/control/preFuelCustomer',
+      '/api/pos/control/preFuelCustomer',
+    )
+  ) {
     return { kind: 'command', type: 'PREFUEL_CUSTOMER', payload }
   }
-  if (pathname === '/pos/control/clearPreFuelCustomer') {
+  if (
+    matchesPath(
+      pathname,
+      '/pos/control/clearPreFuelCustomer',
+      '/api/pos/control/clearPreFuelCustomer',
+    )
+  ) {
     return { kind: 'command', type: 'CLEAR_PREFUEL_CUSTOMER', payload }
   }
-  if (pathname === '/pos/control/clearFpError') {
+  if (
+    matchesPath(
+      pathname,
+      '/pos/control/clearFpError',
+      '/api/pos/control/clearFpError',
+    )
+  ) {
     return { kind: 'command', type: 'CLEAR_FP_ERROR', payload }
   }
   if (pathname === '/pos/command') {
@@ -101,12 +255,24 @@ export async function enqueuePosPrintJob(stationId: string, payload: any) {
     copies: Number.isFinite(copies) && copies > 0 ? copies : 1,
   }
 
+  const sourceTransactionId = String(
+    body?.transactionId ??
+      body?.data?.transactionId ??
+      body?.state?.transactionId ??
+      '',
+  ).trim()
+
   const id = await enqueuePrintJob(
     normalizedStationId,
     'print.receipt',
     basePayload,
     0,
-    body.idempotencyKey ? { idempotencyKey: String(body.idempotencyKey) } : {},
+    {
+      ...(body.idempotencyKey
+        ? { idempotencyKey: String(body.idempotencyKey) }
+        : {}),
+      ...(sourceTransactionId ? { sourceTransactionId } : {}),
+    },
   )
 
   return { ok: true, accepted: true, printJobId: id }
@@ -116,18 +282,25 @@ export async function jplRequest(
   stationId: string,
   path: string,
   opts: { method?: string; body?: any } = {},
+  requestOptions: { accessMode?: JplAccessMode } = {},
 ) {
   const normalizedStationId = requireNonEmptyString(stationId, 'stationId')
   const target = toCommand(requireNonEmptyString(path, 'path'), opts)
 
   if (target.kind === 'health') {
-    return await jplHealth(normalizedStationId)
+    return await jplHealth(normalizedStationId, {
+      accessMode: requestOptions.accessMode ?? 'pos',
+    })
   }
 
-  const result = await jplSendPosCommand(normalizedStationId, {
-    type: target.type,
-    payload: target.payload,
-  })
+  const result = await jplSendPosCommand(
+    normalizedStationId,
+    {
+      type: target.type,
+      payload: target.payload,
+    },
+    { accessMode: requestOptions.accessMode ?? 'pos' },
+  )
 
   if (!result.ok) {
     throw Object.assign(

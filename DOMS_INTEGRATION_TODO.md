@@ -1,69 +1,70 @@
 # DOMS Integration Todo List
 
-**Overall Progress: 35%** (97 / 281 tasks completed)
+**Overall Progress: 55%** (154 / 281 tasks completed)
 
 ### Per-Section Progress
 
-| Section | Completed | Total | Progress |
-|---------|-----------|-------|----------|
-| **1) Finalize scope and integration contract** | 0 | 9 | ░░░░░░░░░░░░░░░░░░░░ 0% |
-| **2) Transport, session, and connection management** | 5 | 14 | ███████░░░░░░░░░░░░░ 36% |
-| **3) Core protocol envelope handling** | 11 | 13 | █████████████████░░░ 85% |
-| **4) Forecourt logon and bootstrap** | 9 | 19 | █████████░░░░░░░░░░░ 47% |
-| **5) Current functionality already present - verify and harden** | 15 | 22 | █████████████░░░░░░░ 68% |
-| **6) General forecourt controller functions** | 6 | 15 | ████████░░░░░░░░░░░░ 40% |
-| **7) Forecourt special functions** | 13 | 20 | █████████████░░░░░░░ 65% |
-| **8) Dispense control - command surface completion** | 19 | 32 | ███████████░░░░░░░░░ 59% |
-| **9) Dispense control - transaction handling completion** | 13 | 21 | ████████████░░░░░░░░ 62% |
-| **10) Wetstock / tank integration completion** | 6 | 17 | ███████░░░░░░░░░░░░░ 35% |
-| **11) Price, payment, and other optional modules** | 0 | 22 | ░░░░░░░░░░░░░░░░░░░░ 0% |
-| **12) Configuration, commissioning, and site setup** | 0 | 16 | ░░░░░░░░░░░░░░░░░░░░ 0% |
-| **13) App-level adapters and internal abstractions** | 0 | 11 | ░░░░░░░░░░░░░░░░░░░░ 0% |
-| **14) Observability and supportability** | 0 | 14 | ░░░░░░░░░░░░░░░░░░░░ 0% |
-| **15) Testing and validation** | 0 | 19 | ░░░░░░░░░░░░░░░░░░░░ 0% |
-| **16) Recommended implementation order** | 0 | 9 | ░░░░░░░░░░░░░░░░░░░░ 0% |
-| **17) Definition of done** | 0 | 8 | ░░░░░░░░░░░░░░░░░░░░ 0% |
-
+| Section                                                          | Completed | Total | Progress                  |
+| ---------------------------------------------------------------- | --------- | ----- | ------------------------- |
+| **1) Finalize scope and integration contract**                   | 6         | 9     | █████████████░░░░░░░ 67%  |
+| **2) Transport, session, and connection management**             | 12        | 14    | █████████████████░░░ 86%  |
+| **3) Core protocol envelope handling**                           | 13        | 13    | ████████████████████ 100% |
+| **4) Forecourt logon and bootstrap**                             | 16        | 19    | ████████████████░░░░ 84%  |
+| **5) Current functionality already present - verify and harden** | 17        | 22    | ███████████████░░░░░ 77%  |
+| **6) General forecourt controller functions**                    | 8         | 15    | ██████████░░░░░░░░░░ 53%  |
+| **7) Forecourt special functions**                               | 13        | 20    | █████████████░░░░░░░ 65%  |
+| **8) Dispense control - command surface completion**             | 20        | 32    | ████████████░░░░░░░░ 63%  |
+| **9) Dispense control - transaction handling completion**        | 13        | 21    | ████████████░░░░░░░░ 62%  |
+| **10) Wetstock / tank integration completion**                   | 10        | 17    | ███████████░░░░░░░░░ 59%  |
+| **11) Price, payment, and other optional modules**               | 11        | 22    | ██████████░░░░░░░░░░ 50%  |
+| **12) Configuration, commissioning, and site setup**             | 9         | 16    | ███████████░░░░░░░░░ 56%  |
+| **13) App-level adapters and internal abstractions**             | 2         | 11    | ███░░░░░░░░░░░░░░░░░ 18%  |
+| **14) Observability and supportability**                         | 1         | 14    | █░░░░░░░░░░░░░░░░░░░ 7%   |
+| **15) Testing and validation**                                   | 0         | 19    | ░░░░░░░░░░░░░░░░░░░░ 0%   |
+| **16) Recommended implementation order**                         | 3         | 9     | ██████░░░░░░░░░░░░░░ 33%  |
+| **17) Definition of done**                                       | 0         | 8     | ░░░░░░░░░░░░░░░░░░░░ 0%   |
 
 ---
 
-*Last updated: April 10, 2026 at 03:50 PM*
+_Last updated: April 24, 2026 at 09:50 AM_
 
 This checklist is organized around what the current codebase already appears to support through `@gilbarcoafs/doms-pos-jpl`, and what still needs to be added to complete a production-grade DOMS integration.
 
+> First-release scope updated on April 24, 2026: Dispense + wetstock/tanks are the mandatory MVP; price poles, wash, digital I/O, serial server, sensors, and vending are enabled as optional protocol families; DOMS payment/EPT control remains out of first-release scope; TLS is configurable but not mandatory for the target environments.
+
 ## 1) Finalize scope and integration contract
 
-- [ ] Confirm the first-release scope for DOMS integration:
+- [x] Confirm the first-release scope for DOMS integration:
   - [ ] Dispense control only
-  - [ ] Dispense + wetstock/tanks
+  - [x] Dispense + wetstock/tanks
   - [ ] Dispense + wetstock + payment control
-  - [ ] Optional modules: price poles, wash, digital I/O, serial server, sensors, vending
-- [ ] Confirm which protocol features are mandatory for go-live vs later phases.
-- [ ] Confirm whether secure JPL/TLS is mandatory in the target environments.
+  - [x] Optional modules: price poles, wash, digital I/O, serial server, sensors, vending
+- [x] Confirm which protocol features are mandatory for go-live vs later phases.
+- [x] Confirm whether secure JPL/TLS is mandatory in the target environments. TLS is not mandatory for the target environments; default port remains 8888, with 8889 still configurable.
 - [ ] Confirm station commissioning expectations: which parts are configured in PSS Configurator vs installed dynamically from the app.
-- [ ] Document the supported PSS/JPL version floor for the integration.
+- [x] Document the supported PSS/JPL version floor for the integration.
 
 ## 2) Transport, session, and connection management
 
-- [ ] Add explicit support for selecting the correct JPL TCP port:
-  - [ ] 8888 for unencrypted
-  - [ ] 8889 for TLS
-- [ ] Expose secure-mode configuration cleanly from app settings to the DOMS client bootstrap.
+- [x] Add explicit support for selecting the correct JPL TCP port:
+  - [x] 8888 for unencrypted
+  - [x] 8889 for TLS
+- [x] Expose secure-mode configuration cleanly from app settings to the DOMS client bootstrap.
 - [ ] Add support for client certificate / secure connectivity requirements if the target PSS deployment requires them.
 - [x] Validate the server `jpl` welcome/version response and surface unsupported-version diagnostics.
-- [ ] Implement or verify permanent socket keepalive behavior.
+- [x] Implement or verify permanent socket keepalive behavior.
 - [x] Implement client heartbeat scheduling.
 - [x] Enforce connection-dead detection when no message arrives within the protocol timeout window.
-- [ ] Implement reconnect with backoff and clean session re-bootstrap.
-- [ ] Ensure reconnect always re-runs logon, unsolicited subscriptions, status update mode, and startup reconciliation.
+- [x] Implement reconnect with backoff and clean session re-bootstrap.
+- [x] Ensure reconnect always re-runs logon, unsolicited subscriptions, status update mode, and startup reconciliation.
 - [x] Add explicit online/offline lifecycle events for the rest of the app.
 - [ ] Add framing-level validation and logging for STX/ETX protocol boundaries.
 - [x] Add connection health metrics and structured logs.
 
 ## 3) Core protocol envelope handling
 
-- [ ] Normalize all incoming JPL messages by `name`, `subCode`, `solicited`, and `data`.
-- [ ] Make request serialization strictly case-sensitive for `name` and `subCode`.
+- [x] Normalize all incoming JPL messages by `name`, `subCode`, `solicited`, and `data`.
+- [x] Make request serialization strictly case-sensitive for `name` and `subCode`.
 - [x] Add correlation ID support end-to-end for every request.
 - [x] Preserve correlation IDs through request/response mapping and logs.
 - [x] Add a generic `RejectMessage_resp` handler.
@@ -83,13 +84,13 @@ This checklist is organized around what the current codebase already appears to 
 - [x] Ensure `RI` is always present unless intentionally disabled.
 - [x] Ensure required unsolicited feature flags are configurable, not hard-coded.
 - [ ] Review and support all needed access-code flags, including:
-  - [ ] `UNSO_FPSTA_3`
-  - [ ] `UNSO_FPSTA_3:MFDR=nn`
-  - [ ] `UNSO_TRBUFSTA_3`
-  - [ ] `UNSO_INSTSTA_1` / `UNSO_INSTSTA_2`
-  - [ ] `UNSO_TGSTA_1` / `UNSO_TGSTA_2`
-  - [ ] `UNSO_DELIVSTA_1`
-  - [ ] `UNSO_PRISTA_1`
+  - [x] `UNSO_FPSTA_3`
+  - [x] `UNSO_FPSTA_3:MFDR=nn`
+  - [x] `UNSO_TRBUFSTA_3`
+  - [x] `UNSO_INSTSTA_1` / `UNSO_INSTSTA_2`
+  - [x] `UNSO_TGSTA_1` / `UNSO_TGSTA_2`
+  - [x] `UNSO_DELIVSTA_1`
+  - [x] `UNSO_PRISTA_1`
 - [x] Make Max Fuelling Data Rate configurable in settings.
 - [x] Validate `PosId` rules at startup.
 - [ ] Enforce unique `PosId` per client/session.
@@ -121,10 +122,10 @@ This checklist is organized around what the current codebase already appears to 
 - [ ] Add exhaustive tests for the current command builders.
 - [ ] Confirm decimal, money, and volume normalization is correct for all current responses.
 - [ ] Confirm unsolicited `FpStatus` parsing covers all fields used by the UI and workflows.
-- [ ] Confirm `MultiMessage_resp` works for unsolicited pump statuses and buffer statuses.
+- [x] Confirm `MultiMessage_resp` works for unsolicited pump statuses and buffer statuses.
 - [ ] Confirm transaction replay/recovery is idempotent across reconnects and restarts.
 - [ ] Confirm watcher behavior when buffers are empty, locked, stale, or racing with another POS.
-- [ ] Confirm logs include correlation IDs and DOMS reject details for all current commands.
+- [x] Confirm logs include correlation IDs and DOMS reject details for all current commands.
 
 ## 6) General forecourt controller functions
 
@@ -137,8 +138,8 @@ This checklist is organized around what the current codebase already appears to 
   - [x] RTC error
   - [ ] hardware/software incompatibility
   - [x] fallback mode / stored transaction restrictions
-- [ ] Add `FcInstallStatus` read + unsolicited handling.
-- [ ] Add `FcPriceSetStatus` read + unsolicited handling if price control is in scope.
+- [x] Add `FcInstallStatus` read + unsolicited handling.
+- [x] Add `FcPriceSetStatus` read + unsolicited handling if price control is in scope.
 - [ ] Add `FcOperationModeStatus` read + change handling if needed.
 - [ ] Add `FcDateAndTime` read support.
 - [ ] Add `change_FcDateAndTime` support if clock sync is part of commissioning/ops.
@@ -224,7 +225,7 @@ This checklist is organized around what the current codebase already appears to 
 
 - [x] Keep `clear_FpError_req` support.
 - [x] Add `FpError` read flow if detailed error diagnostics are needed.
-- [ ] Map pump error codes into user-facing diagnostics.
+- [x] Map pump error codes into user-facing diagnostics.
 - [ ] Add alarm/error recovery runbooks in the admin tools.
 
 ## 9) Dispense control - transaction handling completion
@@ -265,9 +266,9 @@ This checklist is organized around what the current codebase already appears to 
 
 - [x] Add `TgStatus` support.
 - [x] Normalize tank state, alarms, substate bits, error state, product codes, and measurements.
-- [ ] Keep `TgData_req` support.
+- [x] Keep `TgData_req` support.
 - [ ] Expand `TgData` parsing to all fields required by the UI, reconciliation, and reporting.
-- [ ] Keep `TgErrorMsg_req` support.
+- [x] Keep `TgErrorMsg_req` support.
 - [ ] Add typed tank error/alarm mapping.
 
 ### Dynamic tank data changes
@@ -279,29 +280,29 @@ This checklist is organized around what the current codebase already appears to 
 
 ### Tank control and delivery monitoring
 
-- [ ] Implement `open_TankController` / `close_TankController` if site operations require it.
+- [x] Implement `open_TankController` / `close_TankController` if site operations require it.
 - [x] Implement delivery status reads.
 - [x] Implement delivery data reads.
 - [ ] Implement delivery report handling.
 - [x] Implement `clear_TankDeliveryData_req`.
-- [ ] Add support for unsolicited delivery status if needed.
+- [x] Add support for unsolicited delivery status if needed.
 - [ ] Add end-to-end workflows for delivery lifecycle handling.
 
 ## 11) Price, payment, and other optional modules
 
 ### Price control
 
-- [ ] Decide whether price-pole and forecourt price-set control are in scope.
+- [x] Decide whether price-pole and forecourt price-set control are in scope.
 - [ ] If yes, implement:
-  - [ ] `FcPriceSetStatus`
-  - [ ] `change_FcPriceSet`
-  - [ ] `PpStatus`
-  - [ ] `open_Pp` / `close_Pp`
-  - [ ] price-pole error read/reset flows
+  - [x] `FcPriceSetStatus`
+  - [x] `change_FcPriceSet`
+  - [x] `PpStatus`
+  - [x] `open_Pp` / `close_Pp`
+  - [x] price-pole error read/reset flows
 
 ### Payment control
 
-- [ ] Decide whether DOMS payment control is in scope or whether payments remain external.
+- [x] Decide whether DOMS payment control is in scope or whether payments remain external. Payment control is out of first release scope.
 - [ ] If yes, implement the minimum viable payment-control surface:
   - [ ] POS operator status
   - [ ] card server status
@@ -315,26 +316,26 @@ This checklist is organized around what the current codebase already appears to 
 
 ### Wash control
 
-- [ ] Decide whether wash control is in scope.
-- [ ] If yes, implement wash point status, authorize, cancel, stop/resume, transaction handling, and error/reset flows.
+- [x] Decide whether wash control is in scope.
+- [x] If yes, implement wash point status, authorize, cancel, stop/resume, and error/reset command flows. Transaction handling remains a later hardening item.
 
 ### Digital I/O, serial server, sensors, vending
 
-- [ ] Confirm whether any of these are actually needed.
-- [ ] If yes, create separate implementation tracks for each protocol family.
+- [x] Confirm whether any of these are actually needed.
+- [x] If yes, create separate implementation tracks for each protocol family.
 
 ## 12) Configuration, commissioning, and site setup
 
 - [ ] Define the complete DOMS configuration model in app settings:
-  - [ ] host
-  - [ ] port
-  - [ ] TLS on/off
-  - [ ] `PosId`
-  - [ ] `FcAccessCode`
-  - [ ] country code
-  - [ ] `PosVersionId`
-  - [ ] unsolicited data rate settings
-  - [ ] reconnect policy
+  - [x] host
+  - [x] port
+  - [x] TLS on/off
+  - [x] `PosId`
+  - [x] `FcAccessCode`
+  - [x] country code
+  - [x] `PosVersionId`
+  - [x] unsolicited data rate settings
+  - [x] reconnect policy
   - [ ] tracing level
 - [ ] Validate settings before allowing connection.
 - [ ] Add a DOMS connection test / health check action in the admin UI.
@@ -344,7 +345,7 @@ This checklist is organized around what the current codebase already appears to 
 
 ## 13) App-level adapters and internal abstractions
 
-- [ ] Expand the current command builder so it covers the real operational surface, not just the minimal proof-of-connectivity commands.
+- [x] Expand the current command builder so it covers the real operational surface, not just the minimal proof-of-connectivity commands.
 - [ ] Separate raw protocol DTOs from internal domain objects.
 - [ ] Add a stable internal API for:
   - [ ] connection/session lifecycle
@@ -354,11 +355,11 @@ This checklist is organized around what the current codebase already appears to 
   - [ ] tank monitoring
   - [ ] diagnostics/admin actions
 - [ ] Ensure the UI and workflows do not depend on raw JPL field names.
-- [ ] Add feature flags for protocol families still under rollout.
+- [x] Add feature flags for protocol families still under rollout.
 
 ## 14) Observability and supportability
 
-- [ ] Add structured request/response logging with redaction rules.
+- [x] Add structured request/response logging with redaction rules.
 - [ ] Add per-message latency metrics.
 - [ ] Add counters for:
   - [ ] reconnects
@@ -377,7 +378,7 @@ This checklist is organized around what the current codebase already appears to 
 
 ### Unit and contract tests
 
-- [ ] Add unit tests for every request builder.
+- [ ] Add unit tests for every request builder. (Expanded coverage for optional module command builders; still not exhaustive.)
 - [ ] Add unit tests for every response parser.
 - [ ] Add schema fixtures for reject messages, multi-messages, unsolicited statuses, transaction buffers, and tank data.
 - [ ] Add regression tests for decimal and fixed-width numeric handling.
@@ -427,10 +428,10 @@ This checklist is organized around what the current codebase already appears to 
 
 ### Phase 6 - add optional protocol families only if the business needs them
 
-- [ ] Price
+- [x] Price
 - [ ] Payment control
-- [ ] Wash
-- [ ] DIO / serial / sensors / vending
+- [x] Wash
+- [x] DIO / serial / sensors / vending
 
 ## 17) Definition of done
 

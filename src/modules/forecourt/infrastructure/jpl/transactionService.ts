@@ -1,7 +1,34 @@
+import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
+
 import { padId2 } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
 
 import { validateJplOutboundMessage } from '@/src/modules/forecourt/infrastructure/jpl/protocol/schema'
 import { getReplayCapabilities } from '@/src/modules/forecourt/infrastructure/jpl/replayState'
+
+const buildFpSupTransEnvelope = (DomsPosJpl as any).buildFpSupTransEnvelope as
+  | ((input: {
+      fpId: string
+      posId: string
+      transSeqNo: string
+      transParIds?: string[]
+    }) => any)
+  | undefined
+
+const buildClearFpSupTransEnvelope = (DomsPosJpl as any)
+  .buildClearFpSupTransEnvelope as
+  | ((input: {
+      fpId: string
+      posId: string
+      transSeqNo: string
+      subCode?: string
+      extraData?: Record<string, unknown>
+    }) => any)
+  | undefined
+
+const buildUnlockFpSupTransEnvelope = (DomsPosJpl as any)
+  .buildUnlockFpSupTransEnvelope as
+  | ((input: { fpId: string; posId: string; transSeqNo: string }) => any)
+  | undefined
 
 export const DEFAULT_TRANSACTION_PAR_IDS = [
   '30',
@@ -119,37 +146,61 @@ export const buildReadSupervisedTransactionRequest = (args: {
   posId: unknown
   transSeqNo: unknown
   transParId?: unknown
-}) =>
-  validateJplOutboundMessage({
-    name: 'FpSupTrans_req',
-    subCode: '00H',
-    data: {
-      FpId: toId2(args.fpId, '00'),
-      TransSeqNo: toDec4(args.transSeqNo),
-      PosId: toId2(args.posId, '00'),
-      TransParId:
-        Array.isArray(args.transParId) && args.transParId.length
-          ? (args.transParId as any[])
-              .map((entry) => toId2(entry, ''))
-              .filter(Boolean)
-          : [...DEFAULT_TRANSACTION_PAR_IDS],
-    },
-  })
+}) => {
+  const request = buildFpSupTransEnvelope
+    ? buildFpSupTransEnvelope({
+        fpId: toId2(args.fpId, '00'),
+        posId: toId2(args.posId, '00'),
+        transSeqNo: toDec4(args.transSeqNo),
+        transParIds:
+          Array.isArray(args.transParId) && args.transParId.length
+            ? (args.transParId as any[])
+                .map((entry) => toId2(entry, ''))
+                .filter(Boolean)
+            : [...DEFAULT_TRANSACTION_PAR_IDS],
+      })
+    : {
+        name: 'FpSupTrans_req',
+        subCode: '00H',
+        data: {
+          FpId: toId2(args.fpId, '00'),
+          TransSeqNo: toDec4(args.transSeqNo),
+          PosId: toId2(args.posId, '00'),
+          TransParId:
+            Array.isArray(args.transParId) && args.transParId.length
+              ? (args.transParId as any[])
+                  .map((entry) => toId2(entry, ''))
+                  .filter(Boolean)
+              : [...DEFAULT_TRANSACTION_PAR_IDS],
+        },
+      }
+
+  return validateJplOutboundMessage(request)
+}
 
 export const buildUnlockSupervisedTransactionRequest = (args: {
   fpId: unknown
   posId: unknown
   transSeqNo: unknown
-}) =>
-  validateJplOutboundMessage({
-    name: 'unlock_FpSupTrans_req',
-    subCode: '00H',
-    data: {
-      FpId: toId2(args.fpId, '00'),
-      PosId: toId2(args.posId, '00'),
-      TransSeqNo: toDec4(args.transSeqNo),
-    },
-  })
+}) => {
+  const request = buildUnlockFpSupTransEnvelope
+    ? buildUnlockFpSupTransEnvelope({
+        fpId: toId2(args.fpId, '00'),
+        posId: toId2(args.posId, '00'),
+        transSeqNo: toDec4(args.transSeqNo),
+      })
+    : {
+        name: 'unlock_FpSupTrans_req',
+        subCode: '00H',
+        data: {
+          FpId: toId2(args.fpId, '00'),
+          PosId: toId2(args.posId, '00'),
+          TransSeqNo: toDec4(args.transSeqNo),
+        },
+      }
+
+  return validateJplOutboundMessage(request)
+}
 
 export const buildClearSupervisedTransactionRequest = (args: {
   fpId: unknown
@@ -165,21 +216,38 @@ export const buildClearSupervisedTransactionRequest = (args: {
   ])
   const useExtended = Boolean(extra.Vol_e || extra.Money_e || paymentParameters)
 
-  return validateJplOutboundMessage({
-    name: 'clear_FpSupTrans_req',
-    subCode: useExtended ? '04H' : '00H',
-    data: {
-      FpId: toId2(args.fpId, '00'),
-      PosId: toId2(args.posId, '00'),
-      TransSeqNo: toDec4(args.transSeqNo),
-      ...(extra.Money ? { Money: extra.Money } : {}),
-      ...(extra.Vol_e ? { Vol_e: extra.Vol_e } : {}),
-      ...(extra.Money_e ? { Money_e: extra.Money_e } : {}),
-      ...(paymentParameters && typeof paymentParameters === 'object'
-        ? { PaymentParameters: paymentParameters }
-        : {}),
-    },
-  })
+  const request = buildClearFpSupTransEnvelope
+    ? buildClearFpSupTransEnvelope({
+        fpId: toId2(args.fpId, '00'),
+        posId: toId2(args.posId, '00'),
+        transSeqNo: toDec4(args.transSeqNo),
+        subCode: useExtended ? '04H' : '00H',
+        extraData: {
+          ...(extra.Money ? { Money: extra.Money } : {}),
+          ...(extra.Vol_e ? { Vol_e: extra.Vol_e } : {}),
+          ...(extra.Money_e ? { Money_e: extra.Money_e } : {}),
+          ...(paymentParameters && typeof paymentParameters === 'object'
+            ? { PaymentParameters: paymentParameters }
+            : {}),
+        },
+      })
+    : {
+        name: 'clear_FpSupTrans_req',
+        subCode: useExtended ? '04H' : '00H',
+        data: {
+          FpId: toId2(args.fpId, '00'),
+          PosId: toId2(args.posId, '00'),
+          TransSeqNo: toDec4(args.transSeqNo),
+          ...(extra.Money ? { Money: extra.Money } : {}),
+          ...(extra.Vol_e ? { Vol_e: extra.Vol_e } : {}),
+          ...(extra.Money_e ? { Money_e: extra.Money_e } : {}),
+          ...(paymentParameters && typeof paymentParameters === 'object'
+            ? { PaymentParameters: paymentParameters }
+            : {}),
+        },
+      }
+
+  return validateJplOutboundMessage(request)
 }
 
 export const buildReadUnsupervisedTransactionRequest = (args: {
@@ -262,9 +330,14 @@ export const buildClearUnsupervisedTransactionRequest = (args: {
 export const getReplayStatusSummary = async (stationId: string) => {
   const { forecourtJplReplayRepo } =
     await import('@/src/modules/forecourt/infrastructure/repositories/forecourtJplReplayRepo')
-  const pendingRows = await forecourtJplReplayRepo.listPendingClearRows({
-    stationId,
-  })
+  const { forecourtJplTransactionCheckpointRepo } =
+    await import('@/src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionCheckpointRepo')
+  const [pendingRows, checkpointRows] = await Promise.all([
+    forecourtJplReplayRepo.listPendingClearRows({
+      stationId,
+    }),
+    forecourtJplTransactionCheckpointRepo.listActiveByStation({ stationId }),
+  ])
   const capabilities = getReplayCapabilities()
 
   return {
@@ -277,6 +350,19 @@ export const getReplayStatusSummary = async (stationId: string) => {
       transSeqNo: Number(row.trans_seq_no),
       replayStage: row.replay_stage,
       lockId: row.lock_id,
+      updatedAt: row.updated_at,
+      lastError: row.last_error,
+    })),
+    transactionCheckpoints: checkpointRows.map((row) => ({
+      sourceMode: row.source_mode,
+      fpId: Number(row.fp_id),
+      transSeqNo: Number(row.trans_seq_no),
+      lifecycleStage: row.lifecycle_stage,
+      lockId: row.lock_id,
+      ownerPosId: row.owner_pos_id,
+      blockedByForeignPos: Boolean(row.blocked_by_foreign_pos),
+      readAttempts: Number(row.read_attempts ?? 0),
+      clearAttempts: Number(row.clear_attempts ?? 0),
       updatedAt: row.updated_at,
       lastError: row.last_error,
     })),

@@ -14,5 +14,5 @@ export async function getPpxConfig(
     apiKey: node.apiKey,
     healthPath: node.healthPath,
     commandPath: node.commandPath,
-  }
+  };
 }

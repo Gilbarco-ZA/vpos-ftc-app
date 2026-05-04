@@ -194,6 +194,13 @@ export const TransactionReceiptSheet = ({
                   This receipt has been voided by a credit note.
                 </Alert>
               )}
+              {receipt.meta.isOfflineFiscalization ? (
+                <Alert variant={STATUS_VARIANT.WARN} title="Offline receipt">
+                  This receipt has not been fiscalized yet. Keep it visible for
+                  follow-up and retry once the internet/proxy connection is
+                  restored.
+                </Alert>
+              ) : null}
               {printError && (
                 <Alert
                   variant={STATUS_VARIANT.ERROR}

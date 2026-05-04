@@ -33,6 +33,9 @@ type PendingPriceSet = {
   activationAt: string
   source?: string
   confirmedOnDoms?: boolean
+  status?: string
+  lastEventType?: string | null
+  lastEventAt?: string | null
   data?: any
 }
 
@@ -71,6 +74,41 @@ function formatActivationAt(value?: string | null) {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return trimmed
   return date.toLocaleString()
+}
+
+function describePendingStatus(
+  item: PendingPriceSet,
+  supportsPendingQueue: boolean,
+) {
+  const status = String(item.status ?? '').trim()
+  if (status === 'confirmed_on_doms' || item.confirmedOnDoms) {
+    return {
+      label: 'Pending on DOMS',
+      detail: 'Confirmed by controller',
+      variant: STATUS_VARIANT.INFO,
+    }
+  }
+  if (status === 'verification_unavailable') {
+    return {
+      label: 'Awaiting activation',
+      detail:
+        'Controller accepted the update, but this controller does not expose the pending queue for verification.',
+      variant: STATUS_VARIANT.WARN,
+    }
+  }
+  if (supportsPendingQueue) {
+    return {
+      label: 'Pending (local)',
+      detail: 'Submitted locally pending controller confirmation',
+      variant: STATUS_VARIANT.WARN,
+    }
+  }
+  return {
+    label: 'Local record only',
+    detail:
+      'Recorded locally because this controller does not expose the pending queue',
+    variant: STATUS_VARIANT.WARN,
+  }
 }
 
 function getCurrentPriceBank(data?: PriceSetResponseData | null) {
@@ -297,7 +335,6 @@ export default function ForecourtPricingClient() {
           </>
         }
       />
-
       {isLoading ? (
         <Card>
           <CardContent className="space-y-3">
@@ -401,43 +438,43 @@ export default function ForecourtPricingClient() {
                     Pending activations
                   </div>
                   <div className="space-y-2">
-                    {pending.map((item) => (
-                      <div
-                        key={`${item.fcPriceSetId}-${item.activationAt}`}
-                        className="rounded-card border border-border bg-surface-card p-3"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <div className="text-sm font-semibold text-[var(--text-primary)]">
-                              Price set {item.fcPriceSetId}
+                    {pending.map((item) => {
+                      const pendingStatus = describePendingStatus(
+                        item,
+                        supportsPendingQueue,
+                      )
+
+                      return (
+                        <div
+                          key={`${item.fcPriceSetId}-${item.activationAt}`}
+                          className="rounded-card border border-border bg-surface-card p-3"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-semibold text-[var(--text-primary)]">
+                                Price set {item.fcPriceSetId}
+                              </div>
+                              <div className="text-xs text-[var(--text-muted)]">
+                                Activates{' '}
+                                {formatActivationAt(item.activationAt)}
+                              </div>
+                              <div className="text-[11px] text-[var(--text-muted)]">
+                                {pendingStatus.detail}
+                              </div>
+                              {item.lastEventAt ? (
+                                <div className="text-[11px] text-[var(--text-muted)]">
+                                  Last change{' '}
+                                  {new Date(item.lastEventAt).toLocaleString()}
+                                </div>
+                              ) : null}
                             </div>
-                            <div className="text-xs text-[var(--text-muted)]">
-                              Activates {formatActivationAt(item.activationAt)}
-                            </div>
-                            <div className="text-[11px] text-[var(--text-muted)]">
-                              {item.confirmedOnDoms
-                                ? 'Confirmed by controller'
-                                : supportsPendingQueue
-                                  ? 'Saved locally pending controller confirmation'
-                                  : 'Recorded locally because this controller does not expose the pending queue'}
-                            </div>
+                            <Badge variant={pendingStatus.variant}>
+                              {pendingStatus.label}
+                            </Badge>
                           </div>
-                          <Badge
-                            variant={
-                              item.confirmedOnDoms
-                                ? STATUS_VARIANT.INFO
-                                : STATUS_VARIANT.WARN
-                            }
-                          >
-                            {item.confirmedOnDoms
-                              ? 'Pending on DOMS'
-                              : supportsPendingQueue
-                                ? 'Pending (local)'
-                                : 'Local record only'}
-                          </Badge>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               ) : supportsPendingQueue ? (
@@ -572,5 +609,5 @@ export default function ForecourtPricingClient() {
         </>
       )}
     </div>
-  )
+  );
 }

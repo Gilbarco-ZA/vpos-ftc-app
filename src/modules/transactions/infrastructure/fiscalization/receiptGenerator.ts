@@ -1,4 +1,5 @@
 import { queryOne as pgOne } from '@/src/platform/db/postgres'
+import { normalizeBrandLogoPath } from '@/src/shared/branding/settings'
 import { buildFiscalReceipt } from '@/src/shared/fiscalization/receiptBuilder'
 import { renderEscpos } from '@/src/shared/printers/escposRenderer'
 
@@ -48,7 +49,7 @@ export const generateReceipt = async (params: {
           stationDisplayName: branding.station_display_name,
           receiptHeaderText: branding.receipt_header_text,
           receiptFooterText: branding.receipt_footer_text,
-          logoPath: branding.logo_path,
+          logoPath: normalizeBrandLogoPath(branding.logo_path),
         }
       : undefined,
   }

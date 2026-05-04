@@ -7,7 +7,7 @@ const counters = new Map<CounterKey, Counter>()
 const gauges = new Map<string, Gauge>()
 
 function sanitizeName(name: string) {
-  return name.replace(/[^a-zA-Z0-9_]/g, '_')
+  return name.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
 export function incCounter(name: string, help: string, by = 1) {

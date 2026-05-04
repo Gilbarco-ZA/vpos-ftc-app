@@ -63,7 +63,7 @@ const toForm = (data: any): ForecourtSettingsForm => ({
     ? data.jplUnsolicitedFlags.join(',')
     : String(
         data?.jplUnsolicitedFlags ??
-          'UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1',
+          'UNSO_INSTSTA_1,UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1,UNSO_PRISTA_1',
       ),
   jplUnsolicitedMfdrFlags: Array.isArray(data?.jplUnsolicitedMfdrFlags)
     ? data.jplUnsolicitedMfdrFlags.join(',')
@@ -87,6 +87,9 @@ export default function ForecourtSettingsCard() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [testBusy, setTestBusy] = useState(false)
+  const [testResult, setTestResult] = useState<any>(null)
+  const [testError, setTestError] = useState<string | null>(null)
   const [legacyMode, setLegacyMode] = useState<string | null>(null)
 
   const load = async () => {
@@ -122,6 +125,8 @@ export default function ForecourtSettingsCard() {
     setBusy(true)
     setError(null)
     setNotice(null)
+    setTestResult(null)
+    setTestError(null)
 
     try {
       const payload = {
@@ -152,6 +157,36 @@ export default function ForecourtSettingsCard() {
       setError(e?.message || String(e))
     } finally {
       setBusy(false)
+    }
+  }
+
+  const testJplSettings = async () => {
+    if (!settings || testBusy) return
+    setTestBusy(true)
+    setTestError(null)
+    setTestResult(null)
+    setNotice(null)
+
+    try {
+      const res = await fetch('/api/admin/setup/test-jpl-settings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(settings),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || j?.ok === false) {
+        const details = j?.error?.details?.message
+          ? ` (${j.error.details.message})`
+          : ''
+        throw new Error(
+          `${j?.error?.message || j?.error || `HTTP ${res.status}`}${details}`,
+        )
+      }
+      setTestResult(j?.data ?? j)
+    } catch (e: any) {
+      setTestError(e?.message || String(e))
+    } finally {
+      setTestBusy(false)
     }
   }
 
@@ -320,7 +355,7 @@ export default function ForecourtSettingsCard() {
           </div>
           <Input
             value={settings?.jplUnsolicitedFlags ?? ''}
-            placeholder="UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1"
+            placeholder="UNSO_INSTSTA_1,UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1,UNSO_PRISTA_1"
             onChange={(e) => update('jplUnsolicitedFlags', e.target.value)}
           />
         </div>
@@ -461,7 +496,39 @@ export default function ForecourtSettingsCard() {
         </Alert>
       ) : null}
 
-      <div className="flex justify-end">
+      {testError ? (
+        <Alert variant={STATUS_VARIANT.ERROR} title="JPL settings test failed">
+          {testError}
+        </Alert>
+      ) : null}
+
+      {testResult ? (
+        <Alert
+          variant={
+            testResult.warning ? STATUS_VARIANT.WARN : STATUS_VARIANT.SUCCESS
+          }
+          title={
+            testResult.warning
+              ? 'JPL logon passed with warnings'
+              : 'JPL settings verified'
+          }
+        >
+          Connected to {testResult.host}:{testResult.port} and accepted access
+          code {testResult.acceptedAccessCode}. Status updates:{' '}
+          {testResult.statusUpdateOk ? 'OK' : 'check failed'}; pump snapshot:{' '}
+          {testResult.fpStatusOk ? 'OK' : 'check failed'}.
+          {testResult.warning ? ` ${testResult.warning}` : ''}
+        </Alert>
+      ) : null}
+
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          variant="secondary"
+          disabled={!settings || testBusy || busy}
+          onClick={testJplSettings}
+        >
+          {testBusy ? 'Testing…' : 'Test JPL settings'}
+        </Button>
         <Button disabled={!canSave} onClick={save}>
           {busy ? 'Saving…' : 'Save forecourt settings'}
         </Button>

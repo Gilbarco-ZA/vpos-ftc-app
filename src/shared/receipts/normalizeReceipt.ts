@@ -28,6 +28,9 @@ export type NormalizedReceipt = {
     attendant?: string
     scuId?: string
     cuInvoiceNo?: string
+    offlinePending?: boolean
+    isOfflineFiscalization?: boolean
+    fiscalizationStatus?: string
   }
   buyer?: {
     name?: string
@@ -196,24 +199,50 @@ export const normalizeReceipt = (opts: {
     titleOverride,
     branding,
   } = opts
-  const parsed = safeParse(raw)
-  if (!parsed) return null
-
-  const extractedReceipt = extractReceipt(parsed)
-  const hasFallbackReceiptContext = Boolean(
-    parsed?.ok === true ||
-    parsed?.success === true ||
+  const transactionStatus = String(transaction?.status ?? '')
+    .trim()
+    .toUpperCase()
+  const hasFiscalReference = Boolean(
     pickFirst(
-      parsed?.reference,
-      parsed?.details?.reference,
       transaction?.fiscalization_reference,
       transaction?.fiscalizationReference,
-    ) ||
+    ),
+  )
+  const isFinalFiscalized = Boolean(
+    hasFiscalReference ||
     transaction?.fiscalized_at ||
     transaction?.fiscalizedAt ||
-    String(transaction?.status ?? '')
-      .trim()
-      .toUpperCase() === 'FISCALIZED',
+    ['FISCALIZED', 'PRINTED', 'REPRINTED', 'CREDITED'].includes(
+      transactionStatus,
+    ),
+  )
+  const isOfflineFiscalization = Boolean(
+    !isFinalFiscalized &&
+    ['ALLOCATED', 'FISCALIZING', 'FAILED'].includes(transactionStatus),
+  )
+  const parsed = safeParse(raw) ?? {}
+
+  const extractedReceipt = extractReceipt(parsed)
+  const fiscalReference = pickFirst(
+    parsed?.reference,
+    parsed?.details?.reference,
+    transaction?.fiscalization_reference,
+    transaction?.fiscalizationReference,
+  )
+  const isOfflinePending =
+    !fiscalReference &&
+    ['ALLOCATED', 'FISCALIZING', 'FAILED', 'PENDING'].includes(
+      transactionStatus,
+    )
+  const hasFallbackReceiptContext = Boolean(
+    isOfflinePending ||
+    parsed?.ok === true ||
+    parsed?.success === true ||
+    fiscalReference ||
+    transaction?.fiscalized_at ||
+    transaction?.fiscalizedAt ||
+    isFinalFiscalized ||
+    isOfflineFiscalization,
   )
   if (
     extractedReceipt &&
@@ -348,7 +377,9 @@ export const normalizeReceipt = (opts: {
 
   return {
     header: {
-      title: titleOverride || 'NORMAL SALES RECEIPT',
+      title:
+        titleOverride ||
+        (isOfflinePending ? 'OFFLINE RECEIPT' : 'NORMAL SALES RECEIPT'),
       stationName,
       stationId: toStringSafe(
         transaction?.station_id ?? transaction?.stationId,
@@ -424,6 +455,9 @@ export const normalizeReceipt = (opts: {
         receipt?.device_id,
         receipt?.deviceId,
       ),
+      isOfflineFiscalization,
+      offlinePending: isOfflinePending,
+      fiscalizationStatus: transactionStatus || undefined,
       cuInvoiceNo: pickFirst(
         parsed?.cu_invoice_no,
         parsed?.cuInvoiceNo,

@@ -1,5 +1,6 @@
 export * from './get-credit-note-details'
 export * from './get-latest-transaction-receipt'
+export * from './get-or-create-latest-transaction-receipt'
 export * from './get-transaction-details'
 export * from './get-transaction-editable-lines'
 export * from './get-transaction-invoice-payload'

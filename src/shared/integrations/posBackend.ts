@@ -27,16 +27,10 @@ export async function getEffectivePosBackend(
   const explicit = raw != null && String(raw).trim() !== ''
   if (explicit) return normalizeBackend(raw)
 
-  const dbFirst =
-    String(process.env.VPOS_DB_FIRST).toLowerCase() === '1' ||
-    String(process.env.VPOS_DB_FIRST ?? 'true').toLowerCase() === 'true'
-
-  if (dbFirst) return 'none'
-
-  const hasJpl = Boolean((cfg as any)?.integrations?.jpl?.host)
-  if (hasJpl) return 'jpl'
-
-  return 'none'
+  const hasJpl = Boolean(
+    String((cfg as any)?.integrations?.jpl?.host ?? '').trim(),
+  )
+  return hasJpl ? 'jpl' : 'none'
 }
 
 export async function assertPosBackendAllowed(

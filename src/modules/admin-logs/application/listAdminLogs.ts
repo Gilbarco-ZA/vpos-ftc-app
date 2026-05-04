@@ -1,5 +1,5 @@
 import type { LogType } from '@/src/shared/logs/service'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { listLogs } from '@/src/shared/logs/service'
 

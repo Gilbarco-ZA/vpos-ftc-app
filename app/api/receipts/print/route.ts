@@ -7,8 +7,11 @@ import { requireCsrfFromParts } from '@/src/shared/security/csrf'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import { runPosControlCommand } from '@/src/modules/pos/application/runPosControlCommand'
+import { parsePrinterDeviceConfig } from '@/src/modules/printing/infrastructure/printerConfig'
+import { printJobsRepo } from '@/src/modules/printing/infrastructure/printJobsRepo'
+import { resolvePrinterForTransaction } from '@/src/modules/printing/infrastructure/resolvePrinterForTransaction'
 import { markTransactionReceiptPrinted } from '@/src/modules/transactions/application/commands'
-import { getLatestTransactionReceipt } from '@/src/modules/transactions/application/queries'
+import { getOrCreateLatestTransactionReceipt } from '@/src/modules/transactions/application/queries'
 
 export const POST = async (req: Request) => {
   let user: SessionUser | null = null
@@ -29,17 +32,42 @@ export const POST = async (req: Request) => {
 
     if (!transactionId) return fail('transactionId is required', 400)
 
-    const receipt = await getLatestTransactionReceipt(
+    const receipt = await getOrCreateLatestTransactionReceipt(
       user.stationId,
       transactionId,
     )
     if (!receipt) return fail('Receipt not found for transaction', 404)
+
+    const pumpNumber = await printJobsRepo.getTransactionPumpNumber(
+      user.stationId,
+      transactionId,
+    )
+
+    const resolvedPrinter = await resolvePrinterForTransaction({
+      stationId: user.stationId,
+      transactionId,
+      pumpNumberHint: pumpNumber,
+    })
+
+    if (!resolvedPrinter) {
+      return fail(
+        'No printer is configured for this station. Set one up in Admin → Printers and enable it.',
+        409,
+        undefined,
+        { code: 'NO_PRINTER_CONFIGURED' },
+      )
+    }
 
     const printPayload = {
       type: 'receipt',
       copies: 1,
       correlationId: uuidv4(),
       idempotencyKey: `doms-receipt:${transactionId}:${receipt.id}:${isReprint ? 'reprint' : 'initial'}`,
+      printerKey: resolvedPrinter.deviceKey || undefined,
+      printerIP: resolvedPrinter.config.host,
+      port: resolvedPrinter.config.port,
+      width: resolvedPrinter.config.width,
+      pumpNumber: pumpNumber ?? undefined,
       data: {
         source: 'vpos.transaction-receipt',
         transactionId,
@@ -48,6 +76,7 @@ export const POST = async (req: Request) => {
         isReprint,
         htmlContent: receipt.html_content,
         plainTextContent: receipt.plain_text_content ?? '',
+        pumpNumber: pumpNumber ?? undefined,
       },
     }
 

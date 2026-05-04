@@ -16,6 +16,9 @@ export const FORECOURT_RUNTIME_KV_KEYS = {
   JPL_UNSOLICITED_MFDR_FLAGS: 'env:JPL_UNSOLICITED_MFDR_FLAGS',
   JPL_STATUS_UPDATE_CODE: 'env:JPL_STATUS_UPDATE_CODE',
   JPL_BOOTSTRAP_SNAPSHOT_ENABLED: 'env:JPL_BOOTSTRAP_SNAPSHOT_ENABLED',
+  JPL_INTEGRATION_SCOPE: 'env:JPL_INTEGRATION_SCOPE',
+  JPL_TLS_REQUIRED: 'env:JPL_TLS_REQUIRED',
+  JPL_OPTIONAL_PROTOCOL_FAMILIES: 'env:JPL_OPTIONAL_PROTOCOL_FAMILIES',
 
   // Buffer health thresholds (DB override)
   BUFFER_WARN_DEPTH_SUP: 'env:BUFFER_WARN_DEPTH_SUP',
@@ -53,6 +56,57 @@ export const normalizeBooleanFlag = (value: unknown, fallback: boolean) => {
   if (['1', 'true', 'yes', 'on', 'enabled'].includes(raw)) return true
   if (['0', 'false', 'no', 'off', 'disabled'].includes(raw)) return false
   return fallback
+}
+
+export const DEFAULT_JPL_OPTIONAL_PROTOCOL_FAMILIES = [
+  'price-poles',
+  'wash',
+  'digital-io',
+  'serial-server',
+  'sensors',
+  'vending',
+] as const
+
+export type JplOptionalProtocolFamily =
+  (typeof DEFAULT_JPL_OPTIONAL_PROTOCOL_FAMILIES)[number]
+
+const JPL_OPTIONAL_PROTOCOL_FAMILY_ALIASES: Record<
+  string,
+  JplOptionalProtocolFamily
+> = {
+  'price-pole': 'price-poles',
+  'price-poles': 'price-poles',
+  pp: 'price-poles',
+  wash: 'wash',
+  'car-wash': 'wash',
+  'digital-io': 'digital-io',
+  dio: 'digital-io',
+  diop: 'digital-io',
+  'serial-server': 'serial-server',
+  serial: 'serial-server',
+  sensors: 'sensors',
+  sensor: 'sensors',
+  vending: 'vending',
+  vm: 'vending',
+}
+
+export const normalizeProtocolFamilyList = (
+  value: unknown,
+  fallback: readonly JplOptionalProtocolFamily[] = DEFAULT_JPL_OPTIONAL_PROTOCOL_FAMILIES,
+): JplOptionalProtocolFamily[] => {
+  const raw = parseCsvStringList(value)
+  if (!raw.length) return [...fallback]
+
+  const normalized = raw
+    .map(
+      (entry) =>
+        JPL_OPTIONAL_PROTOCOL_FAMILY_ALIASES[
+          entry.trim().toLowerCase().replace(/_/g, '-')
+        ],
+    )
+    .filter(Boolean) as JplOptionalProtocolFamily[]
+
+  return [...new Set(normalized)]
 }
 
 export const toInt = (value: unknown, fallback: number) => {

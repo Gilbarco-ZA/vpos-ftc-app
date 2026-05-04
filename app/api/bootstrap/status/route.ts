@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { ensureBootstrapReady } from '@/src/platform/bootstrap/runtime'
 import { queryOne } from '@/src/platform/db/postgres'

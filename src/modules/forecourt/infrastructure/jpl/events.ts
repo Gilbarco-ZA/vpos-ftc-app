@@ -58,9 +58,9 @@ export const handleNormalizedPumpStatus = async (
 ) => {
   const fpId = Number(pumpStatus?.fpId)
   if (!Number.isFinite(fpId)) return
-  const pumpNumber = fpId
 
-  const mapping = mappings.get(pumpNumber)
+  const mapping = mappings.get(fpId)
+  const pumpNumber = mapping?.pumpNumber ?? fpId
   const payload = pumpStatus?.data ?? {}
   const nozzleNumber = extractNozzleNumber(payload)
   const state = mapJplMainState(
@@ -127,7 +127,9 @@ export const handleNormalizedTransactions = async (
         continue
       }
 
-      const pumpNumber = fpId
+      const mapping = mappings.get(fpId)
+      const pumpNumber = mapping?.pumpNumber ?? fpId
+      const domsFpId = fpId
       const transSeqNo = resolveTransSeqNo(tx)
       if (transSeqNo == null || !Number.isFinite(transSeqNo)) {
         logger.debug('[JPL]', {
@@ -154,18 +156,20 @@ export const handleNormalizedTransactions = async (
           ? ingestJplSupervisedTransaction
           : ingestJplUnsupervisedTransaction
 
-      const dedupeKey = `${stationId}:${sourceMode}:${pumpNumber}:${transSeqNo}`
+      const dedupeKey = `${stationId}:${sourceMode}:${domsFpId}:${transSeqNo}`
       if (seen.has(dedupeKey)) {
         logger.debug('[JPL]', {
           msg: 'skip tx: deduped',
           dedupeKey,
           sourceMode,
           pumpNumber,
+          domsFpId,
           transSeqNo,
         })
         results.push({
           sourceMode,
           pumpNumber,
+          domsFpId,
           transSeqNo,
           lockId,
           persisted: true,
@@ -175,7 +179,6 @@ export const handleNormalizedTransactions = async (
       }
       seen.add(dedupeKey)
 
-      const mapping = mappings.get(pumpNumber)
       const cfg = getForecourtRuntimeConfig()
       const stationDecimals = await getStationDecimalSettingsCached(stationId)
       const resolvedVolume = resolveTransactionVolume(
@@ -191,11 +194,10 @@ export const handleNormalizedTransactions = async (
 
       if (!mapping) {
         logger.debug('[JPL]', {
-          msg: 'mapping missing for pump -> ingest minimal',
+          msg: 'mapping missing for DOMS fpId -> ingest minimal',
+          fpId: domsFpId,
           pumpNumber,
-          availableMappingKeys: Array.from(mappings.keys()).sort(
-            (a, b) => a - b,
-          ),
+          availableDomsFpIds: Array.from(mappings.keys()).sort((a, b) => a - b),
           transSeqNo,
           lockId,
         })
@@ -204,6 +206,7 @@ export const handleNormalizedTransactions = async (
           stationId,
           sourceMode,
           pumpNumber,
+          domsFpId,
           transSeqNo,
           lockId,
           nozzleId: null,
@@ -217,6 +220,7 @@ export const handleNormalizedTransactions = async (
         results.push({
           sourceMode,
           pumpNumber,
+          domsFpId,
           transSeqNo,
           lockId,
           persisted: Boolean(persistedId),
@@ -239,6 +243,7 @@ export const handleNormalizedTransactions = async (
         logger.debug('[JPL]', {
           msg: 'no nozzle in mapping -> ingest minimal',
           pumpNumber,
+          domsFpId,
           transSeqNo,
           lockId,
           nozzleNumber,
@@ -249,6 +254,7 @@ export const handleNormalizedTransactions = async (
           stationId,
           sourceMode,
           pumpNumber,
+          domsFpId,
           transSeqNo,
           lockId,
           nozzleId: null,
@@ -264,6 +270,7 @@ export const handleNormalizedTransactions = async (
         results.push({
           sourceMode,
           pumpNumber,
+          domsFpId,
           transSeqNo,
           lockId,
           persisted: Boolean(persistedId),
@@ -278,6 +285,7 @@ export const handleNormalizedTransactions = async (
         msg: 'ingest tx',
         sourceMode,
         pumpNumber,
+        domsFpId,
         transSeqNo,
         lockId,
         nozzleId: nozzle.nozzleId,
@@ -290,6 +298,7 @@ export const handleNormalizedTransactions = async (
         stationId,
         sourceMode,
         pumpNumber,
+        domsFpId,
         transSeqNo,
         lockId,
         nozzleId: nozzle.nozzleId,
@@ -303,6 +312,7 @@ export const handleNormalizedTransactions = async (
       results.push({
         sourceMode,
         pumpNumber,
+        domsFpId,
         transSeqNo,
         lockId,
         persisted: Boolean(persistedId),

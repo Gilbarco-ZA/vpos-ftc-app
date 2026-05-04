@@ -221,6 +221,7 @@ export const stationSettingsSchema = z.object({
   unallocatedHandling: z.enum(['anonymous', 'placeholder']).optional(),
   fiscalizationEngine: z.enum(['TZ', 'KE', 'mock']).optional(),
   autoFiscalizeEnabled: z.boolean().optional(),
+  autoPrintReceipts: z.boolean().optional(),
   syncEnabled: z.boolean().optional(),
   syncTime: z
     .string()

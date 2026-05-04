@@ -189,6 +189,33 @@ const statusVariantForLevel = (
   return 'success'
 }
 
+const labelForLevel = (summary: TankSummary) => {
+  if (summary.currentVolumeLitres > summary.capacityLitres)
+    return 'Over capacity'
+  if (
+    summary.criticalLevelLitres !== null &&
+    summary.currentVolumeLitres <= summary.criticalLevelLitres
+  ) {
+    return 'Critical'
+  }
+  if (
+    summary.lowLevelLitres !== null &&
+    summary.currentVolumeLitres <= summary.lowLevelLitres
+  ) {
+    return 'Low'
+  }
+  return 'Healthy'
+}
+
+const progressClassForLevel = (
+  variant: ReturnType<typeof statusVariantForLevel>,
+) => {
+  if (variant === 'success') return 'bg-[var(--status-success-text)]'
+  if (variant === 'warn') return 'bg-[var(--status-warn-text)]'
+  if (variant === 'error') return 'bg-[var(--status-error-text)]'
+  return 'bg-[var(--text-muted)]'
+}
+
 export default function TankLevelsPageClient({
   createdByName,
 }: {
@@ -424,6 +451,7 @@ export default function TankLevelsPageClient({
                         ),
                       )
                     : 0
+                const levelVariant = statusVariantForLevel(tank)
                 return (
                   <div
                     key={tank.tankId}
@@ -438,17 +466,8 @@ export default function TankLevelsPageClient({
                           {tank.productName} ({tank.productCode})
                         </div>
                       </div>
-                      <Badge variant={statusVariantForLevel(tank)}>
-                        {tank.currentVolumeLitres > tank.capacityLitres
-                          ? 'Over capacity'
-                          : tank.criticalLevelLitres !== null &&
-                              tank.currentVolumeLitres <=
-                                tank.criticalLevelLitres
-                            ? 'Critical'
-                            : tank.lowLevelLitres !== null &&
-                                tank.currentVolumeLitres <= tank.lowLevelLitres
-                              ? 'Low'
-                              : 'Healthy'}
+                      <Badge variant={levelVariant}>
+                        {labelForLevel(tank)}
                       </Badge>
                     </div>
 
@@ -463,7 +482,7 @@ export default function TankLevelsPageClient({
                       </div>
                       <div className="h-2 rounded-full bg-[var(--surface-hover)]">
                         <div
-                          className="h-2 rounded-full bg-[var(--brand-primary)]"
+                          className={`h-2 rounded-full ${progressClassForLevel(levelVariant)}`}
                           style={{ width: `${percent}%` }}
                         />
                       </div>

@@ -138,3 +138,56 @@ test('SupervisorRuntime restart is single-flight under lock', async () => {
 	const meta = await kvGet<any>('station-1', 'vpos.supervisor.meta')
 	assert.ok(meta?.lastRestartAt)
 })
+
+test('SupervisorRuntime reloadConfig works without a custom withLock dependency', async () => {
+	const store: KvStore = new Map()
+	const queries: string[] = []
+	const kvKey = (stationId: string, key: string) => `${stationId}:${key}`
+
+	const kvGet = async <T>(stationId: string, key: string): Promise<T | null> => {
+		return (store.get(kvKey(stationId, key)) as T) ?? null
+	}
+
+	const kvSet = async <T>(stationId: string, key: string, value: T): Promise<void> => {
+		store.set(kvKey(stationId, key), value)
+	}
+
+	const getRuntimeState = async (stationId: string) => {
+		return (
+			(await kvGet<any>(stationId, 'vpos.runtime.state')) ?? {
+				status: 'IDLE',
+				updatedAt: new Date().toISOString()
+			}
+		)
+	}
+
+	const setRuntimeState = async (stationId: string, patch: Record<string, any>) => {
+		const current = await getRuntimeState(stationId)
+		const next = {
+			...current,
+			...patch,
+			updatedAt: new Date().toISOString()
+		}
+		await kvSet(stationId, 'vpos.runtime.state', next)
+		return next
+	}
+
+	const runtime = new SupervisorRuntime('station-1', {
+		query: (async (sql: string) => {
+			queries.push(sql)
+			return { rows: [], rowCount: 0 }
+		}) as any,
+		kvGet,
+		kvSet,
+		getSystemConfiguration: (async () => ({
+			processes: { process: { api: { enabled: true } } }
+		})) as any,
+		getRuntimeState: getRuntimeState as any,
+		setRuntimeState: setRuntimeState as any
+	})
+
+	const result = await runtime.reloadConfig()
+	assert.equal(result.ok, true)
+	assert.ok(queries.some((sql) => sql.includes('pg_advisory_lock')))
+	assert.ok(queries.some((sql) => sql.includes('pg_advisory_unlock')))
+})

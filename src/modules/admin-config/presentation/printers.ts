@@ -59,13 +59,13 @@ export type PrinterConfig = {
 
 export const defaultPrinterConfig = (): PrinterConfig => ({
   id: '0',
-  name: 'Printer 1',
+  name: 'Receipt printer',
   connectionType: 'TCP',
   connection: {
-    host: '192.168.1.109',
+    host: '',
     port: 9100,
   },
-  type: 'Epson',
+  type: 'Epson compatible',
   driver: 'generic',
   driverConfig: {
     width: 42,
@@ -76,10 +76,7 @@ export const defaultPrinterConfig = (): PrinterConfig => ({
     printToConsole: true,
     skipPrinter: false,
   },
-  fpIds: [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 19,
-    22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-  ],
+  fpIds: [],
   eptId: 1,
   heartbeatOn: false,
   execTime: 20000,
@@ -92,12 +89,17 @@ export const defaultPrinterConfig = (): PrinterConfig => ({
   operatorPassword: '000000',
   orderNo: '12',
   stationDetails: {
-    name: 'Test Station',
-    contactName: 'Default Contact',
-    contactNumber: 'Default Number',
-    contactEmail: 'default@email.com',
+    name: '',
+    contactName: '',
+    contactNumber: '',
+    contactEmail: '',
   },
 })
+
+const toFiniteNumber = (value: unknown): number | null => {
+  const n = Number(String(value ?? '').trim())
+  return Number.isFinite(n) ? n : null
+}
 
 export function parseFpIds(text: string): number[] {
   const parts = (text || '')
@@ -109,7 +111,22 @@ export function parseFpIds(text: string): number[] {
     const n = Number(p)
     if (Number.isFinite(n)) out.push(n)
   }
-  return Array.from(new Set(out))
+  return Array.from(new Set(out)).sort((a, b) => a - b)
+}
+
+export function normalizeAssignedFpIds(value: unknown): number[] {
+  if (Array.isArray(value)) {
+    return Array.from(
+      new Set(
+        value
+          .map((item) => toFiniteNumber(item))
+          .filter((item): item is number => item != null && item > 0),
+      ),
+    ).sort((a, b) => a - b)
+  }
+
+  if (typeof value === 'string') return parseFpIds(value)
+  return []
 }
 
 export function migrateOldPrinterShape(cfg: any): PrinterConfig {
@@ -129,15 +146,46 @@ export function migrateOldPrinterShape(cfg: any): PrinterConfig {
     ...cfg,
     connectionType,
     connection: {
-      host: cfg?.host,
-      port: Number(cfg?.port ?? 9100),
-      usbPath: cfg?.usbPath,
-      serialPath: cfg?.serialPath,
-      baudRate: cfg?.baudRate,
+      host: cfg?.connection?.host ?? cfg?.host,
+      port: Number(cfg?.connection?.port ?? cfg?.port ?? 9100),
+      usbPath: cfg?.connection?.usbPath ?? cfg?.usbPath,
+      serialPath: cfg?.connection?.serialPath ?? cfg?.serialPath,
+      baudRate: cfg?.connection?.baudRate ?? cfg?.baudRate,
     },
   }
 
   return migrated
+}
+
+export function normalizePrinterConfig(cfg: any): PrinterConfig {
+  const base = defaultPrinterConfig()
+  const migrated = migrateOldPrinterShape(cfg ?? {}) || {}
+  const assignedFpIds = normalizeAssignedFpIds(
+    migrated?.fpIds ?? migrated?.assignedPumpIds ?? migrated?.pumpIds,
+  )
+
+  return {
+    ...base,
+    ...migrated,
+    connectionType:
+      migrated?.connectionType === 'USB' ||
+      migrated?.connectionType === 'SERIAL'
+        ? migrated.connectionType
+        : 'TCP',
+    connection: {
+      ...base.connection,
+      ...(migrated?.connection ?? {}),
+    },
+    driverConfig: {
+      ...base.driverConfig,
+      ...(migrated?.driverConfig ?? {}),
+    },
+    fpIds: assignedFpIds,
+    stationDetails: {
+      ...base.stationDetails,
+      ...(migrated?.stationDetails ?? {}),
+    },
+  }
 }
 
 export function normalizeDeviceRow(r: any): DeviceRow {
@@ -149,4 +197,37 @@ export function normalizeDeviceRow(r: any): DeviceRow {
     schemaVersion: Number(r?.schemaVersion ?? r?.schema_version ?? 1),
     configJson: cfg,
   }
+}
+
+export function getPrinterDisplayName(
+  deviceKey: string,
+  printer: PrinterConfig | null | undefined,
+) {
+  const name = String(printer?.name ?? '').trim()
+  return name || deviceKey || 'Printer'
+}
+
+export function summarizeAssignedPumps(fpIds: number[] | null | undefined) {
+  const ids = normalizeAssignedFpIds(fpIds ?? [])
+  if (!ids.length)
+    return 'No specific pumps assigned. Used only as a fallback printer.'
+  if (ids.length === 1) return `Assigned to pump ${ids[0]}.`
+  if (ids.length <= 6) return `Assigned to pumps ${ids.join(', ')}.`
+  return `Assigned to ${ids.length} pumps (${ids.slice(0, 6).join(', ')} +${ids.length - 6} more).`
+}
+
+export function buildPrinterConnectionPayload(printer: PrinterConfig) {
+  return {
+    printerKey: String(printer?.id ?? '').trim() || undefined,
+    printerIP: String(printer?.connection?.host ?? '').trim() || undefined,
+    port: Number(printer?.connection?.port ?? 9100),
+    width: Number(printer?.driverConfig?.width ?? 42),
+  }
+}
+
+export function matchesAssignedPump(
+  printer: PrinterConfig | null | undefined,
+  pumpId: number,
+) {
+  return normalizeAssignedFpIds(printer?.fpIds ?? []).includes(Number(pumpId))
 }

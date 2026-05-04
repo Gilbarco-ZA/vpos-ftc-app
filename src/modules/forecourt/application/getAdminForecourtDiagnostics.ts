@@ -1,5 +1,7 @@
 import { getForecourtAdapterDiagnostics } from '@/src/shared/forecourt/admin'
 
+import { getReplayStatusSummary } from '@/src/modules/forecourt/infrastructure/jpl/transactionService'
+
 import {
   getLastForecourtEventByType,
   getLastJplReceipt,
@@ -23,6 +25,7 @@ export async function getAdminForecourtDiagnostics(stationId: string) {
     txCreatedLastHour,
     txStatusCounts,
     nonFiscalized,
+    replayStatus,
   ] = await Promise.all([
     getForecourtConnectionStatus(stationId),
     listForecourtEventCounts(stationId),
@@ -39,6 +42,7 @@ export async function getAdminForecourtDiagnostics(stationId: string) {
     getTransactionsCreatedLastHour(stationId),
     listTransactionStatusCounts(stationId),
     getNonFiscalizedTransactionCount(stationId),
+    getReplayStatusSummary(stationId),
   ])
 
   return {
@@ -56,5 +60,6 @@ export async function getAdminForecourtDiagnostics(stationId: string) {
       byStatus: txStatusCounts,
       nonFiscalizedCount: nonFiscalized?.cnt ?? 0,
     },
+    replay: replayStatus,
   }
 }

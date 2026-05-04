@@ -108,6 +108,7 @@ export const AdminBrandingForm = () => {
     >
       <CsrfBootstrap onToken={setCsrfToken} />
       <CsrfHiddenInput token={csrfToken} />
+      <input type="hidden" name="logoPath" value={initial?.logo_path ?? ''} />
 
       {error ? <Alert variant={STATUS_VARIANT.ERROR}>{error}</Alert> : null}
 

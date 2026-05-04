@@ -16,8 +16,8 @@ export const generateSessionToken = async (): Promise<string> => {
   return res.toString('hex')
 }
 
-const isHttpsRequest = (): boolean => {
-  const h = headers()
+const isHttpsRequest = async (): Promise<boolean> => {
+  const h = await headers()
   const proto = h.get('x-forwarded-proto') ?? ''
   const xfSsl = (h.get('x-forwarded-ssl') ?? '').toLowerCase()
   return proto.toLowerCase() === 'https' || xfSsl === 'on'
@@ -94,10 +94,11 @@ export const setSessionCookie = async (
   token: string,
   expiresAt: Date,
 ): Promise<void> => {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
+  const secure = await isHttpsRequest()
   cookieStore.set(getSessionCookieName(), token, {
     httpOnly: true,
-    secure: isHttpsRequest(),
+    secure,
     sameSite: 'lax',
     expires: expiresAt,
     path: '/',
@@ -105,11 +106,11 @@ export const setSessionCookie = async (
 }
 
 export const getSessionCookie = async (): Promise<string | null> => {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   return cookieStore.get(getSessionCookieName())?.value || null
 }
 
 export const clearSessionCookie = async (): Promise<void> => {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   cookieStore.delete(getSessionCookieName())
 }

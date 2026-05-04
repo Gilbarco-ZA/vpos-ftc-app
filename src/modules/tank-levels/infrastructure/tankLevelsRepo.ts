@@ -9,11 +9,14 @@ import {
   buildGeneratedDocumentId,
   formatDateOnly,
   mapMovementRow,
+  normalizeOutboundStockInDocumentId,
   normalizeStockInType,
   toFiniteNumber,
   toIso,
 } from '@/src/shared/tank-levels/helpers'
 import { uuidv4 } from '@/src/shared/utils/uuid'
+
+import { resolveDeductionProxyStatusForFiscalizedTransaction } from '../application/deductionProxyStatus'
 
 const resolveExistingTable = async (tables: string[]) => {
   const checks = tables
@@ -26,7 +29,7 @@ const resolveExistingTable = async (tables: string[]) => {
     `SELECT CASE ${checks} ELSE NULL END AS table_name`,
     tables.map((table) => `public.${table}`),
   )
-  return row?.table_name ? row.table_name.replace(/^public\./, '') : null
+  return row?.table_name ? row.table_name.replace(/^public\./, '') : null;
 }
 
 const getTankInventoryTable = async () => {
@@ -51,6 +54,66 @@ const toTrimmed = (value: unknown): string | null => {
   if (value == null) return null
   const trimmed = String(value).trim()
   return trimmed ? trimmed : null
+}
+
+const roundMoney = (value: number | null | undefined) => {
+  const num = Number(value ?? 0)
+  if (!Number.isFinite(num)) return 0
+  return Number(num.toFixed(2))
+}
+
+const normalizeTaxRatePercent = (value: unknown): number | null => {
+  const rate = toFiniteNumber(value)
+  if (rate == null || !Number.isFinite(rate) || rate < 0) return null
+  return rate <= 1 ? roundMoney(rate * 100) : roundMoney(rate)
+}
+
+const resolveStockInTaxes = (input: {
+  taxCode?: unknown
+  extTaxCode?: unknown
+  taxRate?: unknown
+  unitPrice?: number | null
+  quantityLitres?: number | null
+}) => {
+  const rawTaxCode =
+    toUpperTrimmed(input.extTaxCode) ?? toUpperTrimmed(input.taxCode)
+  const taxRatePercent = normalizeTaxRatePercent(input.taxRate)
+  const quantityLitres = Number(input.quantityLitres ?? 0)
+  const unitPriceGross = toFiniteNumber(input.unitPrice, 0) ?? 0
+  const grossTotal = roundMoney(unitPriceGross * quantityLitres)
+
+  if (!rawTaxCode && (taxRatePercent == null || taxRatePercent <= 0)) {
+    return {
+      productUnitPrice: roundMoney(unitPriceGross),
+      productPriceExtension: grossTotal,
+      productNetTotal: grossTotal,
+      taxes: [],
+    }
+  }
+
+  const safeTaxCode = rawTaxCode ?? 'VAT'
+  const rateDecimal = (taxRatePercent ?? 0) / 100
+  const divisor = 1 + rateDecimal
+  const productUnitPrice =
+    divisor > 0
+      ? roundMoney(unitPriceGross / divisor)
+      : roundMoney(unitPriceGross)
+  const productNetTotal = roundMoney(productUnitPrice * quantityLitres)
+  const taxAmount = roundMoney(grossTotal - productNetTotal)
+
+  return {
+    productUnitPrice,
+    productPriceExtension: productNetTotal,
+    productNetTotal,
+    taxes: [
+      {
+        type: safeTaxCode,
+        rate: taxRatePercent ?? 0,
+        base: productNetTotal,
+        amount: taxAmount,
+      },
+    ],
+  }
 }
 
 export async function listTankOptionsRepo(
@@ -146,118 +209,111 @@ export async function getTankLevelsSnapshotRepo(
   stationId: string,
 ): Promise<TankLevelSummary[]> {
   const movementTable = await getTankInventoryTable()
-  const tankLevelsAvailable = await hasTankLevelsTable()
 
-  if (!tankLevelsAvailable) {
-    const movementSummarySelects = movementTable
-      ? `COALESCE(t.manual_volume_litres, t.live_volume_litres, 0)
-                + COALESCE(tm.movement_balance_litres, 0) AS current_volume_litres,
-              COALESCE(tm.movement_balance_litres, 0) AS movement_balance_litres,
-              tm.last_stock_count_at, tm.last_delivery_at, tm.last_deduction_at,
-              COALESCE(tm.proxy_pending_count, 0) AS proxy_pending_count,
-              COALESCE(tm.proxy_failed_count, 0) AS proxy_failed_count`
-      : `COALESCE(t.manual_volume_litres, t.live_volume_litres, 0) AS current_volume_litres,
-              0 AS movement_balance_litres,
-              NULL::timestamptz AS last_stock_count_at,
-              NULL::timestamptz AS last_delivery_at,
-              NULL::timestamptz AS last_deduction_at,
-              0 AS proxy_pending_count,
-              0 AS proxy_failed_count`
-
-    const movementSummaryJoin = movementTable
-      ? `
+  const movementSummaryJoin = movementTable
+    ? `
        LEFT JOIN (
+         WITH latest_stock_count AS (
+           SELECT DISTINCT ON (tank_id)
+             tank_id,
+             quantity_litres AS stock_count_litres,
+             effective_at AS stock_count_at,
+             created_at AS stock_count_created_at
+           FROM ${movementTable}
+           WHERE station_id = $1
+             AND movement_type = 'STOCK_IN'
+             AND stock_in_type = 'StockCount'
+           ORDER BY tank_id, effective_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+         )
          SELECT
-           tank_id,
+           m.tank_id,
+           lsc.stock_count_litres,
+           lsc.stock_count_at,
            COALESCE(
              SUM(
                CASE
-                 WHEN movement_type = 'STOCK_IN' THEN quantity_litres
-                 WHEN movement_type = 'DEDUCTION' THEN -quantity_litres
+                 WHEN lsc.tank_id IS NOT NULL AND m.movement_type = 'STOCK_IN' AND m.stock_in_type = 'StockCount' THEN 0
+                 WHEN lsc.tank_id IS NOT NULL
+                   AND (
+                     m.effective_at < lsc.stock_count_at
+                     OR (
+                       m.effective_at = lsc.stock_count_at
+                       AND COALESCE(m.created_at, m.effective_at) <= COALESCE(lsc.stock_count_created_at, lsc.stock_count_at)
+                     )
+                   ) THEN 0
+                 WHEN m.movement_type = 'STOCK_IN' THEN m.quantity_litres
+                 WHEN m.movement_type = 'DEDUCTION' THEN -m.quantity_litres
                  ELSE 0
                END
              ),
              0
            ) AS movement_balance_litres,
-           MAX(CASE WHEN stock_in_type = 'StockCount' THEN effective_at END) AS last_stock_count_at,
-           MAX(CASE WHEN stock_in_type = 'Delivery' THEN effective_at END) AS last_delivery_at,
-           MAX(CASE WHEN movement_type = 'DEDUCTION' THEN effective_at END) AS last_deduction_at,
-           COUNT(*) FILTER (WHERE proxy_status = 'PENDING')::int AS proxy_pending_count,
-           COUNT(*) FILTER (WHERE proxy_status = 'FAILED')::int AS proxy_failed_count
-         FROM ${movementTable}
-         WHERE station_id = $1
-         GROUP BY tank_id
+           MAX(CASE WHEN m.stock_in_type = 'StockCount' THEN m.effective_at END) AS last_stock_count_at,
+           MAX(CASE WHEN m.stock_in_type = 'Delivery' THEN m.effective_at END) AS last_delivery_at,
+           MAX(CASE WHEN m.movement_type = 'DEDUCTION' THEN m.effective_at END) AS last_deduction_at,
+           COUNT(*) FILTER (WHERE m.proxy_status = 'PENDING')::int AS proxy_pending_count,
+           COUNT(*) FILTER (WHERE m.proxy_status = 'FAILED')::int AS proxy_failed_count
+         FROM ${movementTable} m
+         LEFT JOIN latest_stock_count lsc ON lsc.tank_id = m.tank_id
+         WHERE m.station_id = $1
+         GROUP BY m.tank_id, lsc.stock_count_litres, lsc.stock_count_at, lsc.stock_count_created_at
        ) tm ON tm.tank_id = t.id`
-      : ''
+    : ''
 
-    const rows = await queryAll<any>(
-      `SELECT t.id AS tank_id, t.code AS tank_code, t.name AS tank_name, t.status,
-              p.id AS product_id, p.product_name, p.product_code,
-              t.capacity_litres, t.low_level_litres, t.critical_level_litres,
-              t.live_volume_litres, t.live_volume_updated_at,
-              t.manual_volume_litres, t.manual_volume_recorded_at,
-              CASE
-                WHEN t.manual_volume_litres IS NOT NULL THEN 'manual'
-                WHEN t.live_volume_litres IS NOT NULL THEN 'live'
-                ELSE 'none'
-              END AS baseline_source,
-              COALESCE(t.manual_volume_litres, t.live_volume_litres, 0) AS baseline_litres,
-              ${movementSummarySelects}
-         FROM tanks t
-         LEFT JOIN products p ON p.id = t.product_id AND p.station_id = t.station_id
-         ${movementSummaryJoin}
-        WHERE t.station_id = $1
-        ORDER BY t.name ASC`,
-      [stationId],
-    )
-
-    return rows.map((row) => ({
-      tankId: String(row.tank_id),
-      tankCode: String(row.tank_code ?? ''),
-      tankName: String(row.tank_name ?? ''),
-      status: String(row.status ?? 'ACTIVE'),
-      productId: String(row.product_id ?? ''),
-      productName: String(row.product_name ?? ''),
-      productCode: String(row.product_code ?? ''),
-      capacityLitres: Number(row.capacity_litres ?? 0),
-      lowLevelLitres: toFiniteNumber(row.low_level_litres),
-      criticalLevelLitres: toFiniteNumber(row.critical_level_litres),
-      liveVolumeLitres: toFiniteNumber(row.live_volume_litres),
-      liveVolumeUpdatedAt: toIso(row.live_volume_updated_at),
-      manualVolumeLitres: toFiniteNumber(row.manual_volume_litres),
-      manualVolumeRecordedAt: toIso(row.manual_volume_recorded_at),
-      baselineSource: String(row.baseline_source ?? 'none') as any,
-      baselineLitres: Number(row.baseline_litres ?? 0),
-      currentVolumeLitres: Number(row.current_volume_litres ?? 0),
-      movementBalanceLitres: Number(row.movement_balance_litres ?? 0),
-      lastStockCountAt: toIso(row.last_stock_count_at),
-      lastDeliveryAt: toIso(row.last_delivery_at),
-      lastDeductionAt: toIso(row.last_deduction_at),
-      proxyPendingCount: Number(row.proxy_pending_count ?? 0),
-      proxyFailedCount: Number(row.proxy_failed_count ?? 0),
-    }))
-  }
+  const movementSummarySelects = movementTable
+    ? `CASE
+          WHEN tm.stock_count_litres IS NOT NULL THEN 'stock_count'
+          WHEN t.manual_volume_litres IS NOT NULL THEN 'manual'
+          WHEN t.live_volume_litres IS NOT NULL THEN 'live'
+          ELSE 'none'
+        END AS baseline_source,
+        COALESCE(
+          tm.stock_count_litres,
+          t.manual_volume_litres,
+          t.live_volume_litres,
+          0
+        ) AS baseline_litres,
+        COALESCE(
+          tm.stock_count_litres,
+          t.manual_volume_litres,
+          t.live_volume_litres,
+          0
+        ) + COALESCE(tm.movement_balance_litres, 0) AS current_volume_litres,
+        COALESCE(tm.movement_balance_litres, 0) AS movement_balance_litres,
+        tm.last_stock_count_at,
+        tm.last_delivery_at,
+        tm.last_deduction_at,
+        COALESCE(tm.proxy_pending_count, 0) AS proxy_pending_count,
+        COALESCE(tm.proxy_failed_count, 0) AS proxy_failed_count`
+    : `CASE
+          WHEN t.manual_volume_litres IS NOT NULL THEN 'manual'
+          WHEN t.live_volume_litres IS NOT NULL THEN 'live'
+          ELSE 'none'
+        END AS baseline_source,
+        COALESCE(t.manual_volume_litres, t.live_volume_litres, 0) AS baseline_litres,
+        COALESCE(t.manual_volume_litres, t.live_volume_litres, 0) AS current_volume_litres,
+        0 AS movement_balance_litres,
+        NULL::timestamptz AS last_stock_count_at,
+        NULL::timestamptz AS last_delivery_at,
+        NULL::timestamptz AS last_deduction_at,
+        0 AS proxy_pending_count,
+        0 AS proxy_failed_count`
 
   const rows = await queryAll<any>(
     `SELECT t.id AS tank_id, t.code AS tank_code, t.name AS tank_name, t.status,
             p.id AS product_id, p.product_name, p.product_code,
             t.capacity_litres, t.low_level_litres, t.critical_level_litres,
-            tl.live_volume_litres, tl.live_volume_updated_at,
-            tl.manual_volume_litres, tl.manual_volume_recorded_at,
-            COALESCE(tl.baseline_source, 'none') AS baseline_source,
-            COALESCE(tl.baseline_litres, COALESCE(tl.manual_volume_litres, tl.live_volume_litres, 0)) AS baseline_litres,
-            COALESCE(tl.current_volume_litres, COALESCE(tl.manual_volume_litres, tl.live_volume_litres, 0)) AS current_volume_litres,
-            COALESCE(tl.movement_balance_litres, 0) AS movement_balance_litres,
-            tl.last_stock_count_at, tl.last_delivery_at, tl.last_deduction_at,
-            COALESCE(tl.proxy_pending_count, 0) AS proxy_pending_count,
-            COALESCE(tl.proxy_failed_count, 0) AS proxy_failed_count
+            t.live_volume_litres, t.live_volume_updated_at,
+            t.manual_volume_litres, t.manual_volume_recorded_at,
+            ${movementSummarySelects}
        FROM tanks t
        LEFT JOIN products p ON p.id = t.product_id AND p.station_id = t.station_id
-       LEFT JOIN tank_levels tl ON tl.tank_id = t.id
+       ${movementSummaryJoin}
       WHERE t.station_id = $1
       ORDER BY t.name ASC`,
     [stationId],
   )
+
   return rows.map((row) => ({
     tankId: String(row.tank_id),
     tankCode: String(row.tank_code ?? ''),
@@ -319,8 +375,10 @@ export async function createStockEntryRepo(input: {
   }
 
   const stockInType = normalizeStockInType(input.stockInType)
-  const documentId =
-    toTrimmed(input.documentId) || buildGeneratedDocumentId(stockInType)
+  const documentId = normalizeOutboundStockInDocumentId(
+    toTrimmed(input.documentId) || buildGeneratedDocumentId(stockInType),
+    stockInType,
+  )
   const supplierInvoiceNumber =
     toUpperTrimmed(input.supplierInvoiceNumber) ?? documentId.toUpperCase()
   const effectiveAt = input.effectiveAt || new Date().toISOString()
@@ -374,8 +432,15 @@ export async function sendMovementToProxyRepo(
             p.id AS product_id,
             COALESCE(p.ext_product_id, p.product_id, p.product_code) AS external_product_id,
             COALESCE(p.ext_product_code, p.product_code) AS external_product_code,
+            COALESCE(p.ext_product_class_code, p.product_class_code) AS external_product_class_code,
+            COALESCE(p.ext_product_type_code, p.product_type_code) AS external_product_type_code,
             COALESCE(p.ext_description, p.product_name, t.name) AS product_description,
-            COALESCE(p.ext_unit_of_measure, p.unit_of_measure, 'LTR') AS unit_of_measure
+            COALESCE(p.ext_unit_of_measure, p.unit_of_measure, 'LTR') AS unit_of_measure,
+            COALESCE(p.ext_unit_of_packaging, p.unit_of_packaging, '00') AS unit_of_packaging,
+            COALESCE(p.ext_hazardous_indicator, p.hazardous_indicator, FALSE) AS hazardous_indicator,
+            COALESCE(p.ext_tax_code, p.tax_code) AS tax_code,
+            p.ext_tax_code AS ext_tax_code,
+            p.tax_rate AS tax_rate
        FROM ${movementTable} tim
        INNER JOIN tanks t
           ON t.id = tim.tank_id
@@ -394,34 +459,37 @@ export async function sendMovementToProxyRepo(
   }
 
   const quantityLitres = Number(movement.quantity_litres ?? 0)
-  const unitPrice = toFiniteNumber(movement.unit_price)
-  const totalCost =
-    unitPrice == null ? null : Number((unitPrice * quantityLitres).toFixed(2))
+  const unitPrice =
+    movement.unit_price == null ? null : toFiniteNumber(movement.unit_price)
+  const taxProfile = resolveStockInTaxes({
+    taxCode: movement.tax_code,
+    extTaxCode: movement.ext_tax_code,
+    taxRate: movement.tax_rate,
+    unitPrice,
+    quantityLitres,
+  })
 
-  const payload = {
-    documentId: String(movement.document_id ?? movementId),
-    productId:
-      movement.external_product_id ??
-      movement.product_id ??
-      movement.external_product_code ??
-      null,
+  const stockInRequest = {
+    documentId: normalizeOutboundStockInDocumentId(
+      movement.document_id ?? movementId,
+      movement.stock_in_type,
+    ),
     stockInType: normalizeStockInType(movement.stock_in_type),
-    quantity: quantityLitres,
-    unitCost: unitPrice,
-    totalCost,
-    transactionDate:
-      movement.effective_at ?? movement.created_at ?? new Date().toISOString(),
-    purchaseDate:
+    purchaseDate: formatDateOnly(
       movement.purchase_date ??
-      formatDateOnly(
-        movement.effective_at ?? movement.created_at ?? new Date(),
-      ),
+        movement.effective_at ??
+        movement.created_at ??
+        new Date(),
+    ),
     createdByName: movement.created_by_name ?? null,
-    supplierName: movement.supplier_name ?? null,
     supplierPin: movement.supplier_pin ?? null,
+    supplierName: movement.supplier_name ?? null,
     supplierInvoiceNumber:
       toUpperTrimmed(movement.supplier_invoice_number) ??
-      String(movement.document_id ?? movementId).toUpperCase(),
+      normalizeOutboundStockInDocumentId(
+        movement.document_id ?? movementId,
+        movement.stock_in_type,
+      ).toUpperCase(),
     items: [
       {
         product: {
@@ -431,32 +499,44 @@ export async function sendMovementToProxyRepo(
             movement.external_product_code ??
             null,
           productCode: movement.external_product_code ?? null,
+          productClassCode: movement.external_product_class_code ?? null,
+          productTypeCode: movement.external_product_type_code ?? null,
           description:
             movement.product_description ??
             movement.tank_name ??
             'Tank movement',
           quantity: quantityLitres,
           unitOfMeasure: movement.unit_of_measure ?? 'LTR',
-          unitPrice: unitPrice ?? 0,
-          priceExtension: totalCost ?? 0,
-          netTotal: totalCost ?? 0,
+          unitOfPackaging: movement.unit_of_packaging ?? '00',
+          unitPrice: taxProfile.productUnitPrice,
+          priceExtension: taxProfile.productPriceExtension,
+          netTotal: taxProfile.productNetTotal,
+          hazardousIndicator:
+            movement.hazardous_indicator == null
+              ? null
+              : Boolean(movement.hazardous_indicator),
         },
         discounts: [],
-        taxes: [],
+        taxes: taxProfile.taxes,
       },
     ],
   }
 
-  const res = await submitStockInToProxy(stationId, payload, {
-    idempotencyKey: `${stationId}:tank-movement:${movementId}`,
-  })
+  const res = await submitStockInToProxy(
+    stationId,
+    { stockIn: [stockInRequest] },
+    {
+      idempotencyKey: `${stationId}:tank-movement:${movementId}`,
+    },
+  )
 
   if (!res.ok) {
     await query(
       `UPDATE ${movementTable}
-          SET proxy_status = 'FAILED'
+          SET proxy_status = 'FAILED',
+              proxy_response = $3::jsonb
         WHERE station_id = $1 AND id = $2`,
-      [stationId, movementId],
+      [stationId, movementId, JSON.stringify(res.data ?? {})],
     )
     throw new Error(
       `Proxy submit failed: ${res.status} ${JSON.stringify(res.data ?? {})}`,
@@ -465,9 +545,11 @@ export async function sendMovementToProxyRepo(
 
   await query(
     `UPDATE ${movementTable}
-        SET proxy_status = 'SENT', proxy_sent_at = NOW()
+        SET proxy_status = 'SENT',
+            proxy_sent_at = NOW(),
+            proxy_response = $3::jsonb
       WHERE station_id = $1 AND id = $2`,
-    [stationId, movementId],
+    [stationId, movementId, JSON.stringify(res.data ?? {})],
   )
 
   return { success: true, movementId, proxy: res.data ?? null }
@@ -596,7 +678,8 @@ export async function syncDeductionForTransactionRepo(
               product_id = $4,
               document_id = $5,
               quantity_litres = $6,
-              effective_at = $7::timestamptz
+              effective_at = $7::timestamptz,
+              proxy_status = $8
         WHERE station_id = $1
           AND source_transaction_id = $2
           AND movement_type = 'DEDUCTION'`,
@@ -608,6 +691,7 @@ export async function syncDeductionForTransactionRepo(
         `TXN-${transactionId}`,
         quantityLitres,
         effectiveAt,
+        resolveDeductionProxyStatusForFiscalizedTransaction(),
       ],
     )
     return { success: true, movementId: existing.id, created: false }
@@ -618,7 +702,7 @@ export async function syncDeductionForTransactionRepo(
      id, station_id, tank_id, product_id, movement_type, document_id, quantity_litres,
      effective_at, source_transaction_id, proxy_status, created_at
     )
-    VALUES ($1, $2, $3, $4, 'DEDUCTION', $5, $6, $7::timestamptz, $8, 'PENDING', NOW())
+    VALUES ($1, $2, $3, $4, 'DEDUCTION', $5, $6, $7::timestamptz, $8, $9, NOW())
     RETURNING *`,
     [
       uuidv4(),
@@ -629,6 +713,7 @@ export async function syncDeductionForTransactionRepo(
       quantityLitres,
       effectiveAt,
       transactionId,
+      resolveDeductionProxyStatusForFiscalizedTransaction(),
     ],
   )
   return { success: true, movementId: movement?.id ?? null, created: true }
@@ -651,26 +736,93 @@ export async function restoreDeductionForCreditedTransactionRepo(
 }
 
 export function buildStockInPayloadForMovement(movement: any) {
-  const documentId = String(movement.documentId ?? movement.document_id ?? '')
+  const documentId = normalizeOutboundStockInDocumentId(
+    movement.documentId ?? movement.document_id ?? '',
+    movement.stockInType ?? movement.stock_in_type,
+  )
+  const quantityLitres = Number(
+    movement.quantityLitres ?? movement.quantity_litres ?? 0,
+  )
+  const unitPriceValue = movement.unitPrice ?? movement.unit_price
+  const unitPrice =
+    unitPriceValue == null ? null : toFiniteNumber(unitPriceValue, 0)
+  const taxProfile = resolveStockInTaxes({
+    taxCode: movement.taxCode ?? movement.tax_code,
+    extTaxCode: movement.extTaxCode ?? movement.ext_tax_code,
+    taxRate: movement.taxRate ?? movement.tax_rate,
+    unitPrice,
+    quantityLitres,
+  })
 
   return {
-    DocumentId: documentId,
-    PurchaseDate:
-      movement.purchaseDate ??
-      movement.purchase_date ??
-      formatDateOnly(new Date()),
-    StockInType: normalizeStockInType(
-      movement.stockInType ?? movement.stock_in_type,
-    ),
-    QuantityLitres: Number(
-      movement.quantityLitres ?? movement.quantity_litres ?? 0,
-    ),
-    UnitPrice: toFiniteNumber(movement.unitPrice ?? movement.unit_price),
-    SupplierName: movement.supplierName ?? movement.supplier_name ?? null,
-    SupplierPin: movement.supplierPin ?? movement.supplier_pin ?? null,
-    SupplierInvoiceNumber:
-      toUpperTrimmed(
-        movement.supplierInvoiceNumber ?? movement.supplier_invoice_number,
-      ) ?? documentId.toUpperCase(),
+    stockIn: [
+      {
+        documentId,
+        purchaseDate: formatDateOnly(
+          movement.purchaseDate ?? movement.purchase_date ?? new Date(),
+        ),
+        stockInType: normalizeStockInType(
+          movement.stockInType ?? movement.stock_in_type,
+        ),
+        createdByName:
+          movement.createdByName ?? movement.created_by_name ?? null,
+        supplierName: movement.supplierName ?? movement.supplier_name ?? null,
+        supplierPin: movement.supplierPin ?? movement.supplier_pin ?? null,
+        supplierInvoiceNumber:
+          toUpperTrimmed(
+            movement.supplierInvoiceNumber ?? movement.supplier_invoice_number,
+          ) ?? documentId.toUpperCase(),
+        items: [
+          {
+            product: {
+              productId:
+                movement.productId ??
+                movement.product_id ??
+                movement.external_product_id ??
+                movement.productCode ??
+                movement.product_code ??
+                movement.external_product_code ??
+                null,
+              productCode:
+                movement.productCode ??
+                movement.product_code ??
+                movement.external_product_code ??
+                null,
+              productClassCode:
+                movement.productClassCode ??
+                movement.product_class_code ??
+                movement.external_product_class_code ??
+                null,
+              productTypeCode:
+                movement.productTypeCode ??
+                movement.product_type_code ??
+                movement.external_product_type_code ??
+                null,
+              description:
+                movement.description ??
+                movement.productDescription ??
+                movement.product_description ??
+                movement.tankName ??
+                movement.tank_name ??
+                'Tank movement',
+              quantity: quantityLitres,
+              unitOfMeasure:
+                movement.unitOfMeasure ?? movement.unit_of_measure ?? 'LTR',
+              unitOfPackaging:
+                movement.unitOfPackaging ?? movement.unit_of_packaging ?? '00',
+              unitPrice: taxProfile.productUnitPrice,
+              priceExtension: taxProfile.productPriceExtension,
+              netTotal: taxProfile.productNetTotal,
+              hazardousIndicator:
+                movement.hazardousIndicator ??
+                movement.hazardous_indicator ??
+                null,
+            },
+            discounts: [],
+            taxes: taxProfile.taxes,
+          },
+        ],
+      },
+    ],
   }
 }

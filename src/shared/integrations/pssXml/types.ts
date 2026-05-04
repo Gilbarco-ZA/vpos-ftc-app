@@ -24,10 +24,18 @@ export type PssXmlGradeOption = {
   id: string
   gradeId?: string | null
   tankId?: string | null
+  parts?: string | null
 }
 
 export type PssXmlFuellingPoint = {
   id: string
+  /** DOMS/PSS port number used for transport grouping. Not unique enough to identify a pump by itself. */
+  pssPortNo?: number | null
+  /** TCP/IP endpoint used to reach the dispenser controller. Transport only; do not use as pump identity. */
+  ipAddress?: string | null
+  tcpUdpPortNo?: number | null
+  /** Stable per-controller sub-address used by DOMS to differentiate fuelling points sharing an IP. */
+  deviceSubAddress?: number | null
   /** grade options correspond to hoses/nozzles on the fuelling point */
   gradeOptions: PssXmlGradeOption[]
 }
@@ -55,4 +63,10 @@ export type PssXmlIdMap = {
 
   /** PSS Tank ID -> tanks.id (uuid) */
   tankDbIdByTankId: Record<string, string>
+
+  /** PSS FuellingPoint ID -> pumps.id (uuid) */
+  pumpDbIdByFpId?: Record<string, string>
+
+  /** PSS FuellingPoint ID + GradeOption ID -> nozzles.id (uuid) */
+  nozzleDbIdByFpIdGradeOptionId?: Record<string, string>
 }

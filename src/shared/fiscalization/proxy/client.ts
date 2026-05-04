@@ -37,7 +37,7 @@ async function baseUrl(stationId: string) {
       '',
   ).trim()
   if (!raw) throw new Error('VPOS_PROXY_URL is not configured')
-  return raw.replace(/\/+$/, '')
+  return raw.replace(/\/+$/, '');
 }
 
 async function basePath(stationId: string) {
@@ -46,7 +46,7 @@ async function basePath(stationId: string) {
   ).trim()
   if (!raw) return ''
   const p = raw.startsWith('/') ? raw : `/${raw}`
-  return p.replace(/\/+$/, '')
+  return p.replace(/\/+$/, '');
 }
 
 export async function submitInvoiceToProxy(

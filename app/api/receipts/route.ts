@@ -1,6 +1,6 @@
 import type { NormalizedReceipt } from '@/src/shared/receipts/normalizeReceipt'
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import {
   queryAll as pgAll,

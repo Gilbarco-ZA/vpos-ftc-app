@@ -3,6 +3,7 @@ import { renderEscpos } from '@/src/shared/printers/escposRenderer'
 import { escposTcpPrintText } from '@/src/modules/printing/infrastructure/escposTcp'
 import { parsePrinterDeviceConfig } from '@/src/modules/printing/infrastructure/printerConfig'
 import { sendEscposRaw } from '@/src/modules/printing/infrastructure/receiptPrinter'
+import { resolvePrinterForTransaction } from '@/src/modules/printing/infrastructure/resolvePrinterForTransaction'
 import {
   makeWidthRuler,
   wrapTextToWidth,
@@ -20,12 +21,19 @@ type PrinterConfig = {
   timeoutMs?: number
 }
 
-async function getDefaultPrinterConfig(
-  stationId: string,
-): Promise<PrinterConfig | null> {
-  const row = await printJobsRepo.getDefaultPrinterConfigRow(stationId)
-  if (!row) return null
-  const parsed = parsePrinterDeviceConfig(row.config_json || {})
+const toFiniteNumber = (value: unknown): number | null => {
+  const n = Number(String(value ?? '').trim())
+  return Number.isFinite(n) ? n : null
+}
+
+const toConnectionPrinter = (
+  parsed: {
+    host: string
+    port?: number
+    width?: number
+    timeoutMs?: number
+  } | null,
+): PrinterConfig | null => {
   if (!parsed?.host) return null
   return {
     ip: parsed.host,
@@ -33,6 +41,104 @@ async function getDefaultPrinterConfig(
     width: parsed.width,
     timeoutMs: parsed.timeoutMs,
   }
+}
+
+async function getDefaultPrinterConfig(
+  stationId: string,
+): Promise<PrinterConfig | null> {
+  const row = await printJobsRepo.getDefaultPrinterConfigRow(stationId)
+  if (!row) return null
+  return toConnectionPrinter(parsePrinterDeviceConfig(row.config_json || {}))
+}
+
+function extractTransactionId(payload: any): string | null {
+  const candidates = [
+    payload?.transactionId,
+    payload?.sourceTransactionId,
+    payload?.state?.transactionId,
+    payload?.printable?.transactionId,
+    payload?.data?.transactionId,
+    payload?.data?.receipt?.transactionId,
+    payload?.receipt?.transactionId,
+  ]
+
+  for (const candidate of candidates) {
+    const value = String(candidate ?? '').trim()
+    if (value) return value
+  }
+
+  return null
+}
+
+function extractPumpNumberFromPayload(payload: any): number | null {
+  const candidates = [
+    payload?.pumpNumber,
+    payload?.pump_number,
+    payload?.fpId,
+    payload?.FpId,
+    payload?.state?.pumpNumber,
+    payload?.state?.pump_number,
+    payload?.state?.fpId,
+    payload?.data?.pumpNumber,
+    payload?.data?.pump_number,
+    payload?.data?.fpId,
+    payload?.data?.receipt?.pump_number,
+    payload?.data?.receipt?.pumpNumber,
+    payload?.receipt?.pump_number,
+    payload?.receipt?.pumpNumber,
+    payload?.printable?.pumpNumber,
+    payload?.printable?.pump_number,
+    payload?.printable?.fpId,
+    payload?.printable?.receipt?.pump_number,
+    payload?.printable?.receipt?.pumpNumber,
+  ]
+
+  for (const candidate of candidates) {
+    const numeric = toFiniteNumber(candidate)
+    if (numeric != null && numeric > 0) return numeric
+  }
+
+  return null
+}
+
+async function resolveJobPumpNumber(job: PrintJobRow): Promise<number | null> {
+  const fromPayload = extractPumpNumberFromPayload(job.payload)
+  if (fromPayload != null) return fromPayload
+
+  const transactionId =
+    String(job.source_transaction_id ?? '').trim() ||
+    extractTransactionId(job.payload)
+  if (!transactionId) return null
+
+  return await printJobsRepo.getTransactionPumpNumber(
+    job.station_id,
+    transactionId,
+  )
+}
+
+async function resolveAssignedPrinterConfig(job: PrintJobRow) {
+  const explicitPrinterKey = String(
+    job.payload?.printerKey ??
+      job.payload?.printer_key ??
+      job.payload?.deviceKey ??
+      '',
+  ).trim()
+
+  const pumpNumberHint =
+    extractPumpNumberFromPayload(job.payload) ??
+    (await resolveJobPumpNumber(job))
+
+  const resolved = await resolvePrinterForTransaction({
+    stationId: job.station_id,
+    transactionId:
+      String(job.source_transaction_id ?? '').trim() ||
+      extractTransactionId(job.payload),
+    explicitPrinterKey,
+    pumpNumberHint,
+  })
+
+  if (!resolved) return null
+  return toConnectionPrinter(resolved.config)
 }
 
 async function printText(
@@ -80,7 +186,10 @@ export async function handlePrintJob(job: PrintJobRow) {
   if (payloadIp) {
     printer = { ip: payloadIp, port: payloadPort, width: payloadWidth }
   } else {
-    printer = await getDefaultPrinterConfig(job.station_id)
+    printer = await resolveAssignedPrinterConfig(job)
+    if (!printer) {
+      printer = await getDefaultPrinterConfig(job.station_id)
+    }
     if (printer && payloadWidth) printer.width = payloadWidth
   }
 

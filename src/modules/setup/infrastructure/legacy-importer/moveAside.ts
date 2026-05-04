@@ -5,7 +5,7 @@ export type MoveAsideResult = { movedTo: string }
 
 export function makeRunId() {
   // safe-ish folder name
-  return new Date().toISOString().replace(/[:.]/g, '-')
+  return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
 export async function ensureMoveAsideDirs(root: string, runId: string) {

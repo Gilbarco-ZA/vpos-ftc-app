@@ -2,7 +2,7 @@ import { fiscalInboxRepository } from '@/src/modules/fiscal-inbox/infrastructure
 
 function csvEscape(value: unknown) {
   const s = value === null || value === undefined ? '' : String(value)
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s
 }
 

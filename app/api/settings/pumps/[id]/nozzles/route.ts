@@ -32,14 +32,14 @@ const ensureTank = async (stationId: string, tankId: string) => {
   return row?.id ?? null
 }
 
-export const GET = async (_req: Request, ctx: { params: { id: string } }) => {
+export const GET = async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
     if (!user) {
       return await serverError('User not found')
     }
-    const pumpId = String(ctx.params.id || '').trim()
+    const pumpId = String((await ctx.params).id || '').trim()
     if (!pumpId) return badRequest('Pump id is required')
 
     const pump = await ensurePump(user.stationId, pumpId)
@@ -80,14 +80,14 @@ export const GET = async (_req: Request, ctx: { params: { id: string } }) => {
   }
 }
 
-export const POST = async (req: Request, ctx: { params: { id: string } }) => {
+export const POST = async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
     if (!user) {
       return await serverError('User not found')
     }
-    const pumpId = String(ctx.params.id || '').trim()
+    const pumpId = String((await ctx.params).id || '').trim()
     if (!pumpId) return badRequest('Pump id is required')
 
     const body = await readBody(req)
@@ -140,14 +140,14 @@ export const POST = async (req: Request, ctx: { params: { id: string } }) => {
   }
 }
 
-export const PUT = async (req: Request, ctx: { params: { id: string } }) => {
+export const PUT = async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
     if (!user) {
       return await serverError('User not found')
     }
-    const pumpId = String(ctx.params.id || '').trim()
+    const pumpId = String((await ctx.params).id || '').trim()
     if (!pumpId) return badRequest('Pump id is required')
 
     const body = await readBody(req)
@@ -204,14 +204,14 @@ export const PUT = async (req: Request, ctx: { params: { id: string } }) => {
   }
 }
 
-export const DELETE = async (req: Request, ctx: { params: { id: string } }) => {
+export const DELETE = async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
     if (!user) {
       return await serverError('User not found')
     }
-    const pumpId = String(ctx.params.id || '').trim()
+    const pumpId = String((await ctx.params).id || '').trim()
     if (!pumpId) return badRequest('Pump id is required')
 
     const body = await readBody(req)

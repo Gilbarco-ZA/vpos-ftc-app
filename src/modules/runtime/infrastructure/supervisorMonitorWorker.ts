@@ -65,7 +65,9 @@ export function startSupervisorMonitorWorker(
 
         const status = await supervisor
           .getStatus()
-          .catch(() => ({ processes: {} }) as any)
+          .catch(() => (({
+          processes: {}
+        }) as any))
         const processes = status.processes ?? {}
 
         await safeAsync(

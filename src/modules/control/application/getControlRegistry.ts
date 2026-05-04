@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { getControlRegistryPayload } from '@/src/shared/control/registry'
 

@@ -30,6 +30,24 @@ export type JplPumpErrorDiagnostic = {
   pumpProtocolId?: string
   pumpErrorCode?: string
   severity?: 'warning' | 'error'
+  category?: string
+  operatorMessage?: string
+  recommendedAction?: string
+  needsAdminIntervention?: boolean
+}
+
+export type JplTransactionCheckpoint = {
+  sourceMode: 'supervised' | 'unsupervised'
+  fpId: number
+  transSeqNo: number
+  lifecycleStage?: string
+  lockId?: string | null
+  ownerPosId?: string | null
+  blockedByForeignPos?: boolean
+  readAttempts?: number
+  clearAttempts?: number
+  updatedAt?: string
+  lastError?: string | null
 }
 
 export type JplBufferSeverity = 'ok' | 'warn' | 'critical'
@@ -189,6 +207,7 @@ export type JplHealth = {
     unsupervised: JplReplayCapability
   }
   pendingReplayClears?: JplPendingReplayClear[]
+  transactionCheckpoints?: JplTransactionCheckpoint[]
 }
 
 export type PosCommand =
@@ -227,6 +246,10 @@ export type PosCommand =
   | { type: 'GET_ALL_TG_DATA'; payload?: any }
   | { type: 'GET_TG_STATUS'; payload?: any }
   | { type: 'GET_SITE_DELIVERY_STATUS'; payload?: any }
+  | { type: 'OPEN_TANK_CONTROLLER'; payload?: any }
+  | { type: 'CLOSE_TANK_CONTROLLER'; payload?: any }
+  | { type: 'START_DELIVERY_PROCESS'; payload?: any }
+  | { type: 'STOP_DELIVERY_PROCESS'; payload?: any }
   | { type: 'GET_TRANSACTION_BUFFER_STATUS'; payload?: any }
   | { type: 'CHANGE_DYNAMIC_TANK_DATA'; payload?: any }
   | { type: 'GET_TG_ERROR_MSG'; payload?: any }
@@ -348,4 +371,5 @@ export type PosCommandResult = {
     unsupervised: JplReplayCapability
   }
   pendingReplayClears?: JplPendingReplayClear[]
+  transactionCheckpoints?: JplTransactionCheckpoint[]
 }

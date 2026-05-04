@@ -9,6 +9,8 @@ export const POST = defineMutationRoute<Record<string, unknown>>({
   roles: ['tenant', 'manager', 'administrator'],
   csrf: false,
   handler: async (_req, { user, body }) => {
-    return await runPosDomsCommand(user.stationId, 'changeGradePrices', body)
+    return await runPosDomsCommand(user.stationId, 'changeGradePrices', body, {
+      userId: user.id,
+    })
   },
 })

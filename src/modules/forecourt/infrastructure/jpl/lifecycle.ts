@@ -1,11 +1,11 @@
 import '@/src/modules/forecourt/infrastructure/jpl/globals'
 
-import {
-  createForecourt,
-  forecourtLogon,
-  JplClient,
-  TransactionBufferWatcher,
-} from '@gilbarcoafs/doms-pos-jpl'
+import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
+import type {
+  RequestDispatchMode,
+  RequestDispatchPolicy,
+} from '@/src/shared/forecourt/runtimeConfig'
+import type { JplClient } from '@gilbarcoafs/doms-pos-jpl'
 
 import {
   normalizeTgDataPayload,
@@ -33,22 +33,35 @@ import {
   normalizeJplCommandAction,
 } from '@/src/modules/forecourt/infrastructure/jpl/protocol/commands'
 import {
+  normalizeDigitalIoStatusPayload,
   normalizeFpErrorPayload,
   normalizeFpFuellingDataPayload,
   normalizeFpInfoPayload,
   normalizeFpStatusPayload,
+  normalizePpErrorPayload,
+  normalizePpStatusPayload,
+  normalizeSensorStatusPayload,
   normalizeSiteDeliveryStatusPayload,
   normalizeTankDeliveryDataPayload,
   normalizeTgStatusPayload,
+  normalizeVendingErrorPayload,
+  normalizeVendingStatusPayload,
+  normalizeWashErrorPayload,
+  normalizeWashStatusPayload,
 } from '@/src/modules/forecourt/infrastructure/jpl/protocol/normalize'
 import {
-  createCorrelationId,
   mapRejectEnvelope,
   normalizeJplInboundEnvelope,
   validateJplOutboundMessage,
 } from '@/src/modules/forecourt/infrastructure/jpl/protocol/schema'
+import { getJplPumpMappings } from '@/src/modules/forecourt/infrastructure/jpl/pumpMappings'
 import { reconcileTransactionBuffersOnStartup } from '@/src/modules/forecourt/infrastructure/jpl/replay'
 import { resolveStationId } from '@/src/modules/forecourt/infrastructure/jpl/station'
+
+const domsJpl =
+  (DomsPosJpl as any).createForecourt || (DomsPosJpl as any).JplClient
+    ? (DomsPosJpl as any)
+    : ((DomsPosJpl as any).default ?? (DomsPosJpl as any))
 
 const RECONNECT_BASE_MS = 1_000
 const RECONNECT_MAX_MS = 30_000
@@ -125,6 +138,11 @@ const clearConnectionMonitors = () => {
     clearInterval(globalThis.__jplTcpHealthTimer)
     globalThis.__jplTcpHealthTimer = undefined
   }
+  if (globalThis.__jplTcpFallbackPollTimer) {
+    clearInterval(globalThis.__jplTcpFallbackPollTimer)
+    globalThis.__jplTcpFallbackPollTimer = undefined
+  }
+  globalThis.__jplTcpFallbackPollInFlight = false
 }
 
 const nowMs = () => Date.now()
@@ -171,6 +189,93 @@ const isVersionAtLeast = (candidate: string, minimum: string) => {
   return true
 }
 
+const resolveRequestDispatchPolicy = (
+  client: JplClient,
+  cfg = getForecourtRuntimeConfig(),
+): RequestDispatchPolicy => {
+  const candidate = (client as any)?.opts?.requestDispatchPolicy
+  if (
+    candidate === 'correlation-required' ||
+    candidate === 'auto' ||
+    candidate === 'strict-single-flight-when-uncorrelated'
+  ) {
+    return candidate
+  }
+  return cfg.jplRequestDispatchPolicy ?? 'auto'
+}
+
+const resolveCorrelationSupport = (client: JplClient): boolean | null => {
+  const value = (client as any)?.getServerSupportsCorrelationIds?.()
+  return value === true ? true : value === false ? false : null
+}
+
+const resolveRequestDispatchMode = (
+  client: JplClient,
+  cfg = getForecourtRuntimeConfig(),
+): RequestDispatchMode => {
+  const direct = (client as any)?.getRequestDispatchMode?.()
+  if (direct === 'correlated-concurrent' || direct === 'strict-single-flight') {
+    return direct
+  }
+
+  const dispatcherMode = (client as any)?.requestDispatcher?.getDispatchMode?.()
+  if (
+    dispatcherMode === 'correlated-concurrent' ||
+    dispatcherMode === 'strict-single-flight'
+  ) {
+    return dispatcherMode
+  }
+
+  const correlationSupport = resolveCorrelationSupport(client)
+  const policy = resolveRequestDispatchPolicy(client, cfg)
+
+  if (policy === 'correlation-required') {
+    return correlationSupport === true
+      ? 'correlated-concurrent'
+      : 'strict-single-flight'
+  }
+
+  return correlationSupport === true
+    ? 'correlated-concurrent'
+    : 'strict-single-flight'
+}
+
+const buildProtocolCapabilityPatch = (
+  client: JplClient,
+  stationId: string,
+  secureMode: boolean,
+) => {
+  const version = (client as any)?.getServerJplVersion?.() ?? undefined
+  const correlationSupport = resolveCorrelationSupport(client)
+  const requestDispatchPolicy = resolveRequestDispatchPolicy(client)
+  const requestDispatchMode = resolveRequestDispatchMode(client)
+
+  const correlationCapability =
+    correlationSupport === true
+      ? 'supported'
+      : correlationSupport === false
+        ? 'unsupported'
+        : 'unknown'
+
+  const requestMode =
+    requestDispatchMode === 'correlated-concurrent'
+      ? 'correlated'
+      : 'single-flight-fallback'
+
+  return {
+    welcomeVersion: version,
+    secureMode,
+    protocolVersion: version,
+    correlationSupport,
+    correlationCapability,
+    requestDispatchPolicy,
+    requestDispatchMode,
+    requestMode,
+    lastLifecycleEventAt: nowMs(),
+    stationId,
+  }
+}
+
 const buildRejectError = (response: any, request?: any) => {
   const normalizedResponse = normalizeJplInboundEnvelope(response)
   const mappedReject = mapRejectEnvelope(normalizedResponse)
@@ -215,6 +320,190 @@ const recordReject = (stationId: string, response: any, request?: any) => {
     message: error.message,
   })
   return error
+}
+
+const redactAccessCode = (value: unknown) => {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  const [password] = text.split(',')
+  return `${password || 'POS'},***`
+}
+
+const isInvalidFcAccessCodeError = (error: unknown) => {
+  const err = error as any
+  const raw = err?.raw ?? err?.response ?? undefined
+  const data = raw?.data ?? {}
+  const rejectCode = String(
+    err?.rejectCode?.value ??
+      err?.rejectCode ??
+      data?.RejectCode?.value ??
+      data?.RejectCode?.enum?.access_error ??
+      '',
+  )
+    .trim()
+    .toUpperCase()
+  const searchable = [
+    err?.message,
+    err?.rejectInfoText,
+    err?.rejectInfo,
+    data?.RejectInfoText,
+    data?.RejectInfo,
+    rejectCode,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    rejectCode === '03H' ||
+    searchable.includes('access_error') ||
+    searchable.includes('fc_access_code') ||
+    searchable.includes('fcaccesscode') ||
+    searchable.includes('access code')
+  )
+}
+
+const buildLogonEnvelopeForAccessCode = (args: {
+  accessCode: string
+  countryCode: string
+  posVersionId: string
+}) => {
+  const builder = domsJpl.buildFcLogonEnvelope
+  if (typeof builder === 'function') {
+    return builder({
+      variant: '01H',
+      accessCode: args.accessCode,
+      countryCode: args.countryCode,
+      posVersionId: args.posVersionId,
+    })
+  }
+
+  return {
+    name: 'FcLogon_req',
+    subCode: '01H',
+    data: {
+      FcAccessCode: args.accessCode,
+      CountryCode: args.countryCode,
+      PosVersionId: args.posVersionId,
+    },
+  }
+}
+
+const setClientLogonAccessCode = (args: {
+  client: JplClient
+  accessCode: string
+  countryCode: string
+  posVersionId: string
+}) => {
+  const existing = (args.client as any).__forecourtLogonEnvelope
+  if (existing?.data) {
+    existing.data.FcAccessCode = args.accessCode
+    existing.data.CountryCode = args.countryCode
+    existing.data.PosVersionId = args.posVersionId
+    if (!existing.data.FcLogonPars) existing.data.FcLogonPars = {}
+    ;(args.client as any).__forecourtLogonEnvelope = existing
+    return
+  }
+
+  ;(args.client as any).__forecourtLogonEnvelope =
+    buildLogonEnvelopeForAccessCode(args)
+}
+
+const orderAccessCodeCandidates = (candidates: readonly string[]) => {
+  const accepted = String(globalThis.__jplTcpAcceptedAccessCode ?? '').trim()
+  const normalized = candidates
+    .map((candidate) => String(candidate ?? '').trim())
+    .filter(Boolean)
+  if (!accepted) return normalized
+
+  const matchingIndex = normalized.findIndex(
+    (candidate) => candidate.toUpperCase() === accepted.toUpperCase(),
+  )
+  if (matchingIndex <= 0) return normalized
+
+  return [
+    normalized[matchingIndex],
+    ...normalized.slice(0, matchingIndex),
+    ...normalized.slice(matchingIndex + 1),
+  ]
+}
+
+const logonWithAccessCodeFallbacks = async (args: {
+  client: JplClient
+  stationId: string
+  host: string
+  port: number
+  countryCode: string
+  posVersionId: string
+  accessCodes: readonly string[]
+}) => {
+  const candidates = orderAccessCodeCandidates(args.accessCodes)
+  let lastError: unknown
+
+  for (let index = 0; index < candidates.length; index += 1) {
+    const accessCode = candidates[index]
+    setClientLogonAccessCode({
+      client: args.client,
+      accessCode,
+      countryCode: args.countryCode,
+      posVersionId: args.posVersionId,
+    })
+
+    try {
+      const response = await domsJpl.forecourtLogon(args.client)
+      globalThis.__jplTcpAcceptedAccessCode = accessCode
+      if (index > 0) {
+        logger.warn('[jplTcp] logon succeeded with FcAccessCode fallback', {
+          stationId: args.stationId,
+          host: args.host,
+          port: args.port,
+          accessCode: redactAccessCode(accessCode),
+          fallbackIndex: index,
+        })
+        writeJplTrafficLog(args.stationId, 'info', 'logon:fallback_ok', {
+          accessCode: redactAccessCode(accessCode),
+          fallbackIndex: index,
+        })
+      }
+      return { response, accessCode, fallbackIndex: index }
+    } catch (error) {
+      lastError = error
+      if (
+        !isInvalidFcAccessCodeError(error) ||
+        index === candidates.length - 1
+      ) {
+        throw error
+      }
+
+      globalThis.__jplTcpAcceptedAccessCode = candidates[index + 1]
+
+      logger.warn(
+        '[jplTcp] FcAccessCode rejected; retrying conservative logon',
+        {
+          stationId: args.stationId,
+          host: args.host,
+          port: args.port,
+          accessCode: redactAccessCode(accessCode),
+          nextAccessCode: redactAccessCode(candidates[index + 1]),
+          fallbackIndex: index + 1,
+          error: serializeError(error),
+        },
+      )
+      writeJplTrafficLog(
+        args.stationId,
+        'error',
+        'logon:access_code_rejected',
+        {
+          accessCode: redactAccessCode(accessCode),
+          nextAccessCode: redactAccessCode(candidates[index + 1]),
+          fallbackIndex: index + 1,
+          error: serializeError(error),
+        },
+      )
+    }
+  }
+
+  throw lastError ?? new Error('JPL logon failed')
 }
 
 const updateAdapterSnapshotState = (
@@ -275,6 +564,38 @@ const updateAdapterSnapshotState = (
   }
   if (messageName === 'TankDeliveryData_resp') {
     rememberTankDeliveryData(stationId, payload ?? null, subCode)
+    return
+  }
+  if (messageName === 'PpStatus_resp') {
+    rememberPpStatus(stationId, payload ?? null, subCode)
+    return
+  }
+  if (messageName === 'PpErrorMsg_resp') {
+    rememberPpError(stationId, payload ?? null, subCode)
+    return
+  }
+  if (messageName === 'WpStatus_resp') {
+    rememberWashStatus(stationId, payload ?? null, subCode)
+    return
+  }
+  if (messageName === 'WpErrorMsg_resp') {
+    rememberWashError(stationId, payload ?? null, subCode)
+    return
+  }
+  if (messageName === 'DiopStatus_resp') {
+    rememberDigitalIoStatus(stationId, payload ?? null, subCode)
+    return
+  }
+  if (messageName === 'SensorStatus_resp') {
+    rememberSensorStatus(stationId, payload ?? null, subCode)
+    return
+  }
+  if (messageName === 'VmStatus_resp') {
+    rememberVendingStatus(stationId, payload ?? null, subCode)
+    return
+  }
+  if (messageName === 'VmErrorMsg_resp') {
+    rememberVendingError(stationId, payload ?? null, subCode)
     return
   }
 }
@@ -446,6 +767,136 @@ const rememberTankDeliveryData = (
     32,
   )
   syncAdapterState(stationId, { lastTankDeliveryData: next })
+}
+
+const rememberPpStatus = (
+  stationId: string,
+  payload: any,
+  subCode?: string,
+) => {
+  const state = getJplAdapterState()
+  const normalized = normalizePpStatusPayload(payload, subCode)
+  const next = upsertSnapshotByKey(
+    state.lastPpStatuses,
+    'ppId',
+    { ppId: normalized.ppId, subCode, normalized, payload, at: nowMs() },
+    32,
+  )
+  syncAdapterState(stationId, { lastPpStatuses: next })
+}
+
+const rememberPpError = (stationId: string, payload: any, subCode?: string) => {
+  const state = getJplAdapterState()
+  const normalized = normalizePpErrorPayload(payload, subCode)
+  const next = upsertSnapshotByKey(
+    state.lastPpErrors,
+    'ppId',
+    { ppId: normalized.ppId, subCode, normalized, payload, at: nowMs() },
+    32,
+  )
+  syncAdapterState(stationId, { lastPpErrors: next })
+}
+
+const rememberWashStatus = (
+  stationId: string,
+  payload: any,
+  subCode?: string,
+) => {
+  const state = getJplAdapterState()
+  const normalized = normalizeWashStatusPayload(payload, subCode)
+  const next = upsertSnapshotByKey(
+    state.lastWashStatuses,
+    'wpId',
+    { wpId: normalized.wpId, subCode, normalized, payload, at: nowMs() },
+    32,
+  )
+  syncAdapterState(stationId, { lastWashStatuses: next })
+}
+
+const rememberWashError = (
+  stationId: string,
+  payload: any,
+  subCode?: string,
+) => {
+  const state = getJplAdapterState()
+  const normalized = normalizeWashErrorPayload(payload, subCode)
+  const next = upsertSnapshotByKey(
+    state.lastWashErrors,
+    'wpId',
+    { wpId: normalized.wpId, subCode, normalized, payload, at: nowMs() },
+    32,
+  )
+  syncAdapterState(stationId, { lastWashErrors: next })
+}
+
+const rememberDigitalIoStatus = (
+  stationId: string,
+  payload: any,
+  subCode?: string,
+) => {
+  const state = getJplAdapterState()
+  const normalized = normalizeDigitalIoStatusPayload(payload, subCode)
+  const next = upsertSnapshotByKey(
+    state.lastDigitalIoStatuses,
+    'diopId',
+    { diopId: normalized.diopId, subCode, normalized, payload, at: nowMs() },
+    64,
+  )
+  syncAdapterState(stationId, { lastDigitalIoStatuses: next })
+}
+
+const rememberSensorStatus = (
+  stationId: string,
+  payload: any,
+  subCode?: string,
+) => {
+  const state = getJplAdapterState()
+  const normalized = normalizeSensorStatusPayload(payload, subCode)
+  const next = upsertSnapshotByKey(
+    state.lastSensorStatuses,
+    'sensorId',
+    {
+      sensorId: normalized.sensorId,
+      subCode,
+      normalized,
+      payload,
+      at: nowMs(),
+    },
+    64,
+  )
+  syncAdapterState(stationId, { lastSensorStatuses: next })
+}
+
+const rememberVendingStatus = (
+  stationId: string,
+  payload: any,
+  subCode?: string,
+) => {
+  const state = getJplAdapterState()
+  const normalized = normalizeVendingStatusPayload(payload, subCode)
+  const next = upsertSnapshotByKey(
+    state.lastVendingStatuses,
+    'vmId',
+    { vmId: normalized.vmId, subCode, normalized, payload, at: nowMs() },
+    32,
+  )
+  syncAdapterState(stationId, { lastVendingStatuses: next })
+}
+
+const rememberVendingError = (
+  stationId: string,
+  payload: any,
+  subCode?: string,
+) => {
+  const state = getJplAdapterState()
+  const normalized = normalizeVendingErrorPayload(payload, subCode)
+  const next = upsertSnapshotByKey(
+    state.lastVendingErrors,
+    'vmId',
+    { vmId: normalized.vmId, subCode, normalized, payload, at: nowMs() },
+    32,
+  )
+  syncAdapterState(stationId, { lastVendingErrors: next })
 }
 
 const normalizeBackOfficeRecordResponse = (
@@ -680,6 +1131,174 @@ const runStartupSnapshot = async (client: JplClient, stationId: string) => {
       })
     }
   }
+}
+
+const routePolledEnvelope = async (
+  stationId: string,
+  response: any,
+  source: string,
+) => {
+  const inbound = normalizeJplInboundEnvelope(response)
+  const name = String(inbound?.name ?? '').trim()
+  if (!name || name === 'heartbeat' || name === 'jpl') return
+
+  if (name === 'RejectMessage_resp') {
+    recordReject(stationId, inbound)
+    return
+  }
+
+  const subCode = String(inbound?.subCode ?? '').trim()
+  let eventType = subCode ? `${name}_${subCode}` : name
+  if (
+    (name === 'FpSupTransBufStatus_resp' ||
+      name === 'FpUnSupTransBufStatus_resp') &&
+    subCode === '00H'
+  ) {
+    eventType = `${name}_03H`
+  }
+
+  const payload = inbound?.data ?? {}
+  updateAdapterSnapshotState(stationId, name, payload, subCode || undefined)
+  markMessageSeen(stationId, {
+    lastCorrelationId: inbound?.correlationId ?? undefined,
+  })
+  writeJplTrafficLog(stationId, 'recv', eventType, {
+    source,
+    correlationId: inbound?.correlationId ?? null,
+    payload,
+  })
+  pushForecourtLiveEvent('jpl.poll', {
+    action: eventType,
+    stationId,
+    source,
+    correlationId: inbound?.correlationId ?? null,
+    payload: payload ?? null,
+  })
+
+  if (await dispatchMultiMessage(stationId, eventType, payload)) return
+
+  await persistJplEventOnce({
+    stationId,
+    eventType,
+    payload,
+    occurredAt: (payload as any)?.at ?? nowMs(),
+  }).catch((err) => logger.error('[jplTcp] poll persist error', { error: err }))
+
+  await handleJplEvent(eventType, payload)
+}
+
+const resolvePollFpIds = async (stationId: string) => {
+  const mappings = await getJplPumpMappings(stationId)
+  const ids = Array.from(mappings.keys())
+    .filter((value) => Number.isFinite(Number(value)) && Number(value) > 0)
+    .map((value) => String(Math.trunc(Number(value))).padStart(2, '0'))
+  return ids.length ? ids : ['00']
+}
+
+const pollJplLiveState = async (args: {
+  client: JplClient
+  stationId: string
+}) => {
+  const { client, stationId } = args
+  if (globalThis.__jplTcpClient !== client) return
+  if (globalThis.__jplTcpFallbackPollInFlight) return
+  globalThis.__jplTcpFallbackPollInFlight = true
+
+  try {
+    const fpIds = await resolvePollFpIds(stationId)
+
+    try {
+      await routePolledEnvelope(
+        stationId,
+        await (client as any).request({
+          name: 'FpStatus_req',
+          subCode: '00H',
+          data: { FpId: '00' },
+        }),
+        'fallback-poll:fp-status',
+      )
+    } catch (error) {
+      logger.debug('[jplTcp] fallback FpStatus poll failed', {
+        stationId,
+        error: serializeError(error),
+      })
+    }
+
+    for (const fpId of fpIds) {
+      for (const request of [
+        {
+          name: 'FpSupTransBufStatus_req',
+          subCode: '00H',
+          data: { FpId: fpId },
+        },
+        {
+          name: 'FpUnSupTransBufStatus_req',
+          subCode: '00H',
+          data: { FpId: fpId },
+        },
+      ]) {
+        if (globalThis.__jplTcpClient !== client) return
+        try {
+          await routePolledEnvelope(
+            stationId,
+            await (client as any).request(request),
+            `fallback-poll:${request.name}:${fpId}`,
+          )
+        } catch (error) {
+          logger.debug('[jplTcp] fallback transaction-buffer poll failed', {
+            stationId,
+            fpId,
+            request: request.name,
+            error: serializeError(error),
+          })
+        }
+      }
+    }
+  } finally {
+    globalThis.__jplTcpFallbackPollInFlight = false
+  }
+}
+
+const startJplFallbackPolling = (args: {
+  client: JplClient
+  stationId: string
+}) => {
+  if (globalThis.__jplTcpFallbackPollTimer) {
+    clearInterval(globalThis.__jplTcpFallbackPollTimer)
+    globalThis.__jplTcpFallbackPollTimer = undefined
+  }
+
+  const cfg = getForecourtRuntimeConfig()
+  const heartbeatMs = Math.max(
+    5_000,
+    Number(cfg.jplHeartbeatIntervalMs || 15_000),
+  )
+  const intervalMs = Math.max(
+    3_000,
+    Math.min(10_000, Math.trunc(heartbeatMs / 2)),
+  )
+
+  void pollJplLiveState(args).catch((error) =>
+    logger.debug('[jplTcp] initial fallback poll failed', {
+      stationId: args.stationId,
+      error: serializeError(error),
+    }),
+  )
+
+  globalThis.__jplTcpFallbackPollTimer = setInterval(() => {
+    void pollJplLiveState(args).catch((error) =>
+      logger.debug('[jplTcp] fallback poll failed', {
+        stationId: args.stationId,
+        error: serializeError(error),
+      }),
+    )
+  }, intervalMs)
+  globalThis.__jplTcpFallbackPollTimer.unref?.()
+
+  syncAdapterState(args.stationId, {
+    liveFallbackPollIntervalMs: intervalMs,
+    lastLifecycleEventAt: nowMs(),
+  } as any)
 }
 
 const dispatchMultiMessage = async (
@@ -929,6 +1548,14 @@ const attachJplProtocolListeners = (args: {
       name !== 'PosConnectionStatus_resp' &&
       name !== 'PssPeripheralsStatus_resp' &&
       name !== 'FcInstallStatus_resp' &&
+      name !== 'PpStatus_resp' &&
+      name !== 'PpErrorMsg_resp' &&
+      name !== 'WpStatus_resp' &&
+      name !== 'WpErrorMsg_resp' &&
+      name !== 'DiopStatus_resp' &&
+      name !== 'SensorStatus_resp' &&
+      name !== 'VmStatus_resp' &&
+      name !== 'VmErrorMsg_resp' &&
       name !== 'MultiMessage_resp' &&
       name !== 'heartbeat'
     ) {
@@ -955,8 +1582,10 @@ const attachJplProtocolListeners = (args: {
     }
   })
 
-  const txWatcher = new TransactionBufferWatcher(client, { strict: false })
-  globalThis.__jplTcpTxBufferWatcher = txWatcher
+  const txWatcher = new domsJpl.TransactionBufferWatcher(client, {
+    strict: false,
+  })
+  globalThis.__jplTcpTxBufferWatcher = txWatcher as any
   txWatcher.start()
 
   const onSup = (e: any) => {
@@ -1062,27 +1691,6 @@ const startConnectionMonitors = (args: {
     deadConnectionTimeoutMs: deadTimeoutMs,
   })
 
-  globalThis.__jplTcpHeartbeatTimer = setInterval(() => {
-    if (globalThis.__jplTcpClient !== client) return
-    const state = getJplAdapterState()
-    const lastOutbound = Math.max(
-      Number(state.lastRequestAt ?? 0),
-      Number(state.lastHeartbeatSentAt ?? 0),
-    )
-    if (lastOutbound && nowMs() - lastOutbound < heartbeatMs - 250) return
-
-    void (client as any)
-      .request({ name: 'heartbeat', subCode: '00H', data: {} })
-      .catch((error: unknown) => {
-        logger.warn('[jplTcp] heartbeat failed', {
-          stationId,
-          error: serializeError(error),
-        })
-        onConnectionLost('heartbeat_failed', error)
-      })
-  }, heartbeatMs)
-  globalThis.__jplTcpHeartbeatTimer.unref?.()
-
   globalThis.__jplTcpHealthTimer = setInterval(
     () => {
       if (globalThis.__jplTcpClient !== client) return
@@ -1115,11 +1723,16 @@ export const startJplTcpAdapter = async () => {
   const cfg = getForecourtRuntimeConfig()
   const bootstrap = buildJplBootstrapConfig(cfg)
   const accessCode = bootstrap.accessCode
+  const accessCodeCandidates = bootstrap.accessCodeFallbacks ?? [accessCode]
+  let activeAccessCode = accessCode
   const countryCode = bootstrap.countryCode
   const posVersionId = bootstrap.posVersionId
 
-  const { client, bus } = createForecourt({
-    client: bootstrap.clientOptions as any,
+  const { client, bus } = domsJpl.createForecourt({
+    client: {
+      ...(bootstrap.clientOptions as any),
+      requestDispatchPolicy: cfg.jplRequestDispatchPolicy,
+    } as any,
     logon: bootstrap.logonOptions,
     features: bootstrap.features,
   })
@@ -1133,10 +1746,7 @@ export const startJplTcpAdapter = async () => {
 
   const originalRequest = client.request.bind(client)
   ;(client as any).request = async (message: any, ...rest: any[]) => {
-    const requestEnvelope = validateJplOutboundMessage({
-      ...(message ?? {}),
-      correlationId: message?.correlationId ?? createCorrelationId(),
-    })
+    const requestEnvelope = validateJplOutboundMessage(message ?? {})
     const reqName = String(requestEnvelope?.name ?? 'unknown')
     const reqSubCode = String(requestEnvelope?.subCode ?? '').trim()
     const reqEvent = reqSubCode ? `${reqName}_${reqSubCode}` : reqName
@@ -1158,7 +1768,7 @@ export const startJplTcpAdapter = async () => {
     })
     try {
       const response = normalizeJplInboundEnvelope(
-        await originalRequest(requestEnvelope, ...rest),
+        await originalRequest(requestEnvelope as any, ...rest),
       )
       const respName = String(response?.name ?? `${reqName}_resp`)
       const respSubCode = String(response?.subCode ?? '').trim()
@@ -1204,6 +1814,29 @@ export const startJplTcpAdapter = async () => {
     }
   }
 
+  const onSend = (message: any) => {
+    const requestEnvelope = validateJplOutboundMessage(message ?? {})
+    const reqName = String(requestEnvelope?.name ?? 'unknown')
+    const reqSubCode = String(requestEnvelope?.subCode ?? '').trim()
+    const reqEvent = reqSubCode ? `${reqName}_${reqSubCode}` : reqName
+
+    markRequestSent(stationId, {
+      lastCorrelationId: requestEnvelope.correlationId,
+      lastHeartbeatSentAt: reqName === 'heartbeat' ? nowMs() : undefined,
+    })
+
+    writeJplTrafficLog(stationId, 'send', reqEvent, {
+      correlationId: requestEnvelope.correlationId,
+      payload: requestEnvelope?.data ?? requestEnvelope,
+    })
+    pushForecourtLiveEvent('jpl.send', {
+      action: reqEvent,
+      stationId,
+      correlationId: requestEnvelope.correlationId,
+      payload: requestEnvelope?.data ?? requestEnvelope ?? null,
+    })
+  }
+
   try {
     const onError = (e: any) => {
       logger.error('[jplTcp] client error', { error: serializeError(e) })
@@ -1219,6 +1852,7 @@ export const startJplTcpAdapter = async () => {
     }
 
     client.on('error', onError)
+    client.on('send', onSend)
     ;(client as any).on?.('close', onClose)
     ;(client as any).on?.('disconnect', onDisconnect)
 
@@ -1227,6 +1861,11 @@ export const startJplTcpAdapter = async () => {
     globalThis.__jplTcpProtocolDisposers.push(() => {
       try {
         client.off('error', onError)
+      } catch {
+        // ignore
+      }
+      try {
+        client.off('send', onSend)
       } catch {
         // ignore
       }
@@ -1282,7 +1921,7 @@ export const startJplTcpAdapter = async () => {
       globalThis.__jplTcpProtocolDisposers || []
     globalThis.__jplTcpProtocolDisposers.push(() => {
       try {
-        busUnsubscribe()
+        ;(busUnsubscribe as any)()
       } catch {
         // ignore
       }
@@ -1313,7 +1952,12 @@ export const startJplTcpAdapter = async () => {
           lastError: supported
             ? undefined
             : `Unsupported JPL version ${version}; expected >= ${cfg.jplExpectedMinVersion}`,
-        })
+          ...(buildProtocolCapabilityPatch(
+            globalThis.__jplTcpClient ?? client,
+            stationId,
+            Number(cfg.jplPort) === 8889,
+          ) as any),
+        } as any)
         if (!supported) {
           logger.warn('[jplTcp] unsupported JPL version banner', {
             stationId,
@@ -1407,12 +2051,36 @@ export const startJplTcpAdapter = async () => {
       posVersionId,
       posId: bootstrap.posId,
     })
-    await forecourtLogon(client)
+    const logonResult = await logonWithAccessCodeFallbacks({
+      client,
+      stationId,
+      host: cfg.jplHost,
+      port: cfg.jplPort,
+      countryCode,
+      posVersionId,
+      accessCodes: accessCodeCandidates,
+    })
+    activeAccessCode = logonResult.accessCode
+    const requestedStatusUpdateCode = Number(cfg.jplStatusUpdateCode ?? 3)
+    const effectiveStatusUpdateCode = Number(bootstrap.statusUpdateCode ?? 3)
+    if (
+      Number.isFinite(requestedStatusUpdateCode) &&
+      requestedStatusUpdateCode !== effectiveStatusUpdateCode
+    ) {
+      logger.warn(
+        '[jplTcp] overriding disabled status update mode to keep unsolicited updates enabled',
+        {
+          stationId,
+          requestedStatusUpdateCode,
+          effectiveStatusUpdateCode,
+        },
+      )
+    }
     try {
       await (client as any).request({
         name: 'change_FcStatusUpdateMode_req',
         subCode: '00H',
-        data: { StatusUpdateCode: Number(bootstrap.statusUpdateCode ?? 3) },
+        data: { StatusUpdateCode: effectiveStatusUpdateCode },
       })
     } catch (error) {
       logger.warn(
@@ -1429,17 +2097,19 @@ export const startJplTcpAdapter = async () => {
     }
     pushForecourtLiveEvent('jpl.info', { action: 'logon:ok', stationId })
     writeJplTrafficLog(stationId, 'info', 'logon:ok', {
-      accessCode,
+      accessCode: activeAccessCode,
       countryCode,
       posVersionId,
       posId: bootstrap.posId,
       statusUpdateCode: bootstrap.statusUpdateCode,
       bootstrapSnapshotEnabled: bootstrap.bootstrapSnapshotEnabled,
+      integrationScope: bootstrap.integrationScope,
+      tlsRequired: bootstrap.tlsRequired,
+      optionalProtocolFamilies: bootstrap.optionalProtocolFamilies,
+      features: bootstrap.features,
     })
   } catch (err: any) {
-    const redactedAccessCode = accessCode
-      ? `${String(accessCode).slice(0, 4)}***`
-      : null
+    const redactedAccessCode = redactAccessCode(activeAccessCode || accessCode)
     logger.error('[JPL-ADAPTER] connect/logon failed', {
       host: cfg.jplHost,
       port: cfg.jplPort,
@@ -1451,7 +2121,7 @@ export const startJplTcpAdapter = async () => {
     })
 
     onConnectionLost('connect/logon_failed', err)
-    throw err
+    return
   }
 
   clearReconnectTimer()
@@ -1476,7 +2146,12 @@ export const startJplTcpAdapter = async () => {
     heartbeatIntervalMs: cfg.jplHeartbeatIntervalMs,
     deadConnectionTimeoutMs: cfg.jplDeadConnectionTimeoutMs,
     welcomeVersion: st.welcomeVersion,
-  })
+    ...(buildProtocolCapabilityPatch(
+      client,
+      stationId,
+      bootstrap.secureMode,
+    ) as any),
+  } as any)
 
   pushForecourtLiveEvent('jpl.lifecycle', {
     action: 'online',
@@ -1484,6 +2159,9 @@ export const startJplTcpAdapter = async () => {
     secureMode: bootstrap.secureMode,
     posId: bootstrap.posId,
     version: st.welcomeVersion ?? null,
+    correlationSupport: resolveCorrelationSupport(client),
+    requestDispatchPolicy: resolveRequestDispatchPolicy(client, cfg),
+    requestDispatchMode: resolveRequestDispatchMode(client, cfg),
   })
 
   globalThis.__jplTcpClient = client
@@ -1491,6 +2169,7 @@ export const startJplTcpAdapter = async () => {
 
   startConnectionMonitors({ client, stationId, onConnectionLost })
   attachJplProtocolListeners({ client, stationId })
+  startJplFallbackPolling({ client, stationId })
   attachProcessHandlers(client)
   globalThis.__jplPumpMappingsCache = undefined
 

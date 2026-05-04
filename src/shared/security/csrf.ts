@@ -12,13 +12,13 @@ const CSRF_DISABLED = true
  * NOTE: Must be called only from a Route Handler or Server Action,
  * because it mutates cookies().
  */
-export const ensureCsrfCookie = (): string => {
+export const ensureCsrfCookie = async (): Promise<string> => {
   // TEMP (testing): allow disabling CSRF entirely.
   // When disabled we still return a token string so client code that expects a
   // token (e.g. disables submit buttons until one is present) can continue.
   if (CSRF_DISABLED) return 'csrf-disabled'
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const existing = cookieStore.get(CSRF_COOKIE)?.value
   if (existing) return existing
 
@@ -34,13 +34,13 @@ export const ensureCsrfCookie = (): string => {
   return token
 }
 
-export const requireCsrfFromParts = (parts: {
+export const requireCsrfFromParts = async (parts: {
   headerToken?: string | null
   bodyToken?: string | null
-}): void => {
+}): Promise<void> => {
   if (CSRF_DISABLED) return
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const cookieToken = cookieStore.get(CSRF_COOKIE)?.value
   const presented = parts.headerToken || parts.bodyToken
 
@@ -59,7 +59,7 @@ export const requireCsrfFromParts = (parts: {
 export const getCsrfToken = async (): Promise<string> => {
   if (CSRF_DISABLED) return 'csrf-disabled'
 
-  const h = headers()
+  const h = await headers()
   const origin = h.get('origin') ?? `http://${h.get('host')}`
   const res = await fetch(new URL('/api/security/csrf', origin), {
     cache: 'no-store',

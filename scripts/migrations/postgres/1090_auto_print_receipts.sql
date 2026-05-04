@@ -1,0 +1,2 @@
+ALTER TABLE station_settings
+  ADD COLUMN IF NOT EXISTS auto_print_receipts BOOLEAN NOT NULL DEFAULT FALSE;

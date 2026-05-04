@@ -24,5 +24,5 @@ export async function resolveProxyBase(stationId: string) {
       (await kvGet<string>(normalizedStationId, 'proxy.url')) ||
       process.env.VPOS_PROXY_URL ||
       'http://127.0.0.1:5555',
-  ).replace(/\/+$/, '')
+  ).replace(/\/+$/, '');
 }

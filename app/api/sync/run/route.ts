@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { requireAuth } from '@/src/shared/auth'
 import { requireCsrfFromParts } from '@/src/shared/security/csrf'

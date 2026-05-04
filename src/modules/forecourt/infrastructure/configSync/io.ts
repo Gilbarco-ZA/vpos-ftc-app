@@ -56,10 +56,15 @@ export async function readSnapshotFromDomsJson(
     throw new Error('JPL is not configured')
   }
 
-  return await jplRequest(stationId, cfg.snapshotPath, {
-    method: cfg.snapshotMethod ?? 'POST',
-    body: cfg.snapshotBody ?? undefined,
-  })
+  return await jplRequest(
+    stationId,
+    cfg.snapshotPath,
+    {
+      method: cfg.snapshotMethod ?? 'POST',
+      body: cfg.snapshotBody ?? undefined,
+    },
+    { accessMode: 'forecourt' },
+  )
 }
 
 export async function readSnapshotFromDomsXml(
@@ -76,7 +81,12 @@ export async function readTankStatusFromDoms(
   cfg: ForecourtSyncIoConfig,
 ) {
   if (!cfg.tankStatusPath) return null
-  return await jplRequest(stationId, cfg.tankStatusPath, {
-    method: cfg.tankStatusMethod ?? 'GET',
-  })
+  return await jplRequest(
+    stationId,
+    cfg.tankStatusPath,
+    {
+      method: cfg.tankStatusMethod ?? 'GET',
+    },
+    { accessMode: 'forecourt' },
+  )
 }

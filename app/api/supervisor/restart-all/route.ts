@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { defineMutationRoute } from '@/src/shared/http/defineRoute'
 

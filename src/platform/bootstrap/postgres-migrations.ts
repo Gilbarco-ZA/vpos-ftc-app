@@ -135,7 +135,7 @@ const runMigrations = async (): Promise<void> => {
 }
 
 const canonicalizeLf = (value: string): string => {
-  return value.replace(/\r\n/g, '\n')
+  return value.replace(/\r\n/g, '\n');
 }
 
 const hashString = (value: string): string => {

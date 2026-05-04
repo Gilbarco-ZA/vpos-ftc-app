@@ -14,6 +14,8 @@ export type IngestJplTransactionArgs = {
   sourceMode?: 'supervised' | 'unsupervised'
   stationId: string
   pumpNumber: number
+  /** DOMS/JPL FuellingPoint ID. Defaults to pumpNumber for legacy stations. */
+  domsFpId?: number | null
   transSeqNo: number
   lockId?: string | number | null
   nozzleId?: string | null
@@ -42,6 +44,7 @@ function buildJplPayloadHash(payload: Record<string, unknown>): string {
 async function ingestJplTransaction(args: IngestJplTransactionArgs) {
   const stationId = String(args.stationId)
   const pumpNumber = Number(args.pumpNumber)
+  const domsFpId = numOrNull(args.domsFpId) ?? pumpNumber
   const transSeqNo = Number(args.transSeqNo)
   if (!Number.isFinite(pumpNumber) || !Number.isFinite(transSeqNo)) return null
 
@@ -59,6 +62,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
   const jplPayload = {
     sourceMode,
     pumpNumber,
+    domsFpId,
     transSeqNo,
     lockId,
     nozzleId: strOrNull(args.nozzleId),
@@ -114,7 +118,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
         posReference,
         linkingWindowSeconds,
         sourceMode,
-        pumpNumber,
+        domsFpId,
         transSeqNo,
         lockId ?? 'na',
         JSON.stringify(jplPayload),
@@ -139,6 +143,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
       id: row?.id,
       stationId,
       pumpNumber,
+      domsFpId,
       transSeqNo,
       lockId: lockId ?? 'na',
       totalAmount,
@@ -155,6 +160,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
       msg: 'failed to upsert transaction',
       stationId,
       pumpNumber,
+      domsFpId,
       transSeqNo,
       lockId: lockId ?? 'na',
       totalAmount,

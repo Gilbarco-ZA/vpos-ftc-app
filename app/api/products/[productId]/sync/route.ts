@@ -14,10 +14,8 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const POST = async (
-  req: Request,
-  { params }: { params: { productId: string } },
-) => {
+export const POST = async (req: Request, props: { params: Promise<{ productId: string }> }) => {
+  const params = await props.params;
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])

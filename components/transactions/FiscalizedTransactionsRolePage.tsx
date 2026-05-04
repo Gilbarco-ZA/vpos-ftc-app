@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
@@ -31,12 +32,9 @@ const readParam = (params: SearchParams, key: string) => {
   return value ?? ''
 }
 
-const authHeaders = () => {
-  const store = cookies()
-  const cookie = store
-    .getAll()
-    .map((item) => `${item.name}=${item.value}`)
-    .join('; ')
+const authHeaders = async () => {
+  const store = await cookies()
+  const cookie = store.toString()
   return cookie ? { cookie } : undefined
 }
 
@@ -54,7 +52,7 @@ const loadManagerTransactions = async (opts: {
 
   const res = await fetch(`/api/transactions?${params.toString()}`, {
     cache: 'no-store',
-    headers: authHeaders() ?? undefined,
+    headers: await authHeaders(),
   })
   if (!res.ok) return { items: [], total: 0, page: 1, pageSize: 50 }
   const body = await res.json().catch(() => ({}))

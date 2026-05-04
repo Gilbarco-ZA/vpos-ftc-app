@@ -3,6 +3,8 @@ import {
   mapJplMainState,
 } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
 
+import { derivePumpErrorGuidance } from '@/src/modules/forecourt/infrastructure/jpl/dispense'
+
 const asObject = (value: any) =>
   value && typeof value === 'object' ? value : {}
 
@@ -259,6 +261,18 @@ export const normalizeFpErrorPayload = (payload: any, subCode?: string) => {
     data?.FpErrorCode?.value ?? data?.FpErrorCode,
   )
   const errorName = enumLabel(data?.FpErrorCode)
+  const severity = warningFpErrorCodes.has(
+    String(errorValue ?? '').padStart(2, '0'),
+  )
+    ? 'warning'
+    : 'error'
+  const guidance = derivePumpErrorGuidance({
+    errorCode: errorValue,
+    errorName,
+    pumpErrorCode: stringOrUndefined(data?.PumpErrorCode),
+    severity,
+  })
+
   return {
     fpId: stringOrUndefined(data?.FpId),
     subCode: stringOrUndefined(subCode),
@@ -267,9 +281,149 @@ export const normalizeFpErrorPayload = (payload: any, subCode?: string) => {
     errorDateAndTime: stringOrUndefined(data?.FpErrorDateAndTime),
     pumpProtocolId: stringOrUndefined(data?.PumpProtocolId),
     pumpErrorCode: stringOrUndefined(data?.PumpErrorCode),
-    severity: warningFpErrorCodes.has(String(errorValue ?? '').padStart(2, '0'))
-      ? 'warning'
-      : 'error',
+    severity,
+    guidance,
+    raw: data,
+  }
+}
+
+export const normalizePpStatusPayload = (payload: any, subCode?: string) => {
+  const data = asObject(payload)
+  const subStates = asObject(data?.PpSubStates)
+  return {
+    ppId: stringOrUndefined(data?.PpId),
+    subCode: stringOrUndefined(subCode),
+    mainState:
+      enumLabel(data?.PpMainState) ??
+      stringOrUndefined(data?.PpMainState?.value),
+    flags: {
+      online: bitValue(subStates, 'PricePoleOnline'),
+      errorActive: bitValue(subStates, 'PricePoleErrorActive'),
+    },
+    raw: data,
+  }
+}
+
+export const normalizePpErrorPayload = (payload: any, subCode?: string) => {
+  const data = asObject(payload)
+  return {
+    ppId: stringOrUndefined(data?.PpId),
+    subCode: stringOrUndefined(subCode),
+    errorCode: stringOrUndefined(data?.PpErrorCode?.value ?? data?.PpErrorCode),
+    errorName: enumLabel(data?.PpErrorCode),
+    errorDateAndTime: stringOrUndefined(data?.PpErrorDateAndTime),
+    raw: data,
+  }
+}
+
+export const normalizeWashStatusPayload = (payload: any, subCode?: string) => {
+  const data = asObject(payload)
+  const subStates = asObject(data?.WpSubStates)
+  return {
+    wpId: stringOrUndefined(data?.WpId),
+    subCode: stringOrUndefined(subCode),
+    smId: stringOrUndefined(data?.WpSmId),
+    lockId: stringOrUndefined(data?.WpLockId),
+    washId: stringOrUndefined(data?.FcWashId),
+    mainState:
+      enumLabel(data?.WpMainState) ??
+      stringOrUndefined(data?.WpMainState?.value),
+    flags: {
+      lockedByPos: bitValue(subStates, 'Locked_by_POS'),
+      haltedByPss: bitValue(subStates, 'Halted_By_PSS'),
+      online: bitValue(subStates, 'Online'),
+      stopped: bitValue(subStates, 'Stopped'),
+      freeBuffer:
+        bitValue(subStates, 'Free-buffer') || bitValue(subStates, 'FreeBuffer'),
+      errorState:
+        bitValue(subStates, 'Error-State') || bitValue(subStates, 'ErrorState'),
+      emergencyStopped: bitValue(subStates, 'Emergency_Stopped'),
+      machineUndefined: bitValue(subStates, 'Machine_in_undefined_state'),
+    },
+    additional: data?.AdditionalWpStatusPars ?? null,
+    unsupervisedBuffer: data?.WpTransInUnsBuffer ?? null,
+    raw: data,
+  }
+}
+
+export const normalizeWashErrorPayload = (payload: any, subCode?: string) => {
+  const data = asObject(payload)
+  return {
+    wpId: stringOrUndefined(data?.WpId),
+    subCode: stringOrUndefined(subCode),
+    errorCode: stringOrUndefined(data?.WpErrorCode?.value ?? data?.WpErrorCode),
+    errorName: enumLabel(data?.WpErrorCode),
+    errorDateAndTime: stringOrUndefined(data?.WpErrorDateAndTime),
+    raw: data,
+  }
+}
+
+export const normalizeDigitalIoStatusPayload = (
+  payload: any,
+  subCode?: string,
+) => {
+  const data = asObject(payload)
+  const parameters = data?.DiopStatusParameters ?? data?.DiopStatusPars ?? null
+  return {
+    diopId: stringOrUndefined(data?.DiopId),
+    subCode: stringOrUndefined(subCode),
+    parameters,
+    raw: data,
+  }
+}
+
+export const normalizeSensorStatusPayload = (
+  payload: any,
+  subCode?: string,
+) => {
+  const data = asObject(payload)
+  return {
+    sensorId: stringOrUndefined(data?.SensorId),
+    subCode: stringOrUndefined(subCode),
+    mainState:
+      enumLabel(data?.SensorMainState) ??
+      stringOrUndefined(data?.SensorMainState?.value),
+    status: data?.SensorStatus ?? data?.SensorStatusParameters ?? null,
+    alarms: data?.SensorAlarms ?? data?.SensorAlarmStatus ?? null,
+    raw: data,
+  }
+}
+
+export const normalizeVendingStatusPayload = (
+  payload: any,
+  subCode?: string,
+) => {
+  const data = asObject(payload)
+  const subStates = asObject(data?.VmSubStates)
+  return {
+    vmId: stringOrUndefined(data?.VmId),
+    subCode: stringOrUndefined(subCode),
+    mainState:
+      enumLabel(data?.VmMainState) ??
+      stringOrUndefined(data?.VmMainState?.value),
+    flags: {
+      online:
+        bitValue(subStates, 'VendingMachineOnline') ||
+        bitValue(subStates, 'Online'),
+      errorActive:
+        bitValue(subStates, 'VendingMachineErrorActive') ||
+        bitValue(subStates, 'ErrorActive'),
+    },
+    raw: data,
+  }
+}
+
+export const normalizeVendingErrorPayload = (
+  payload: any,
+  subCode?: string,
+) => {
+  const data = asObject(payload)
+  return {
+    vmId: stringOrUndefined(data?.VmId),
+    subCode: stringOrUndefined(subCode),
+    errorCode: stringOrUndefined(data?.VmErrorCode?.value ?? data?.VmErrorCode),
+    errorName: enumLabel(data?.VmErrorCode),
+    errorDateAndTime: stringOrUndefined(data?.VmErrorDateAndTime),
     raw: data,
   }
 }

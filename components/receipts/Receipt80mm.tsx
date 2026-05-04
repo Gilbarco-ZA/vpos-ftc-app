@@ -161,6 +161,11 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
         <div className="text-sm font-semibold uppercase tracking-wide text-black">
           {receipt.header.title}
         </div>
+        {receipt.meta.isOfflineFiscalization || receipt.meta.offlinePending ? (
+          <div className="mt-2 rounded border border-black px-2 py-1 text-center text-xs font-bold uppercase tracking-wide text-black">
+            Offline receipt - pending fiscalization
+          </div>
+        ) : null}
         <div className="mt-2 space-y-0.5 text-xs text-black">
           {receipt.header.companyName && (
             <div>{receipt.header.companyName}</div>
@@ -203,6 +208,14 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
               <span className="text-right">{receipt.meta.documentNumber}</span>
             </div>
           )}
+          {receipt.meta.isOfflineFiscalization ? (
+            <div className="flex justify-between gap-3 font-semibold">
+              <span>Fiscal status</span>
+              <span className="text-right">
+                {receipt.meta.fiscalizationStatus || 'OFFLINE'}
+              </span>
+            </div>
+          ) : null}
           {receipt.meta.fiscalReference && (
             <div className="flex justify-between gap-3">
               <span>Fiscal Ref</span>

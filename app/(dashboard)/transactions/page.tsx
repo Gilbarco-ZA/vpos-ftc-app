@@ -7,11 +7,12 @@ import { NonFiscalizedTransactionsRolePage } from '@/components/transactions/Non
 
 export const dynamic = 'force-dynamic'
 
-const TransactionsPage = async ({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>
-}) => {
+const TransactionsPage = async (
+  props: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>
+  }
+) => {
+  const searchParams = await props.searchParams;
   const user = await requireAuth(['tenant', 'manager', 'administrator'])
 
   const statusParam = searchParams.status

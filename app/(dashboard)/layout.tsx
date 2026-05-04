@@ -2,13 +2,62 @@ import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 
 import { getCurrentUser } from '@/src/shared/auth'
-import { getBrandingSettings } from '@/src/shared/branding/settings'
+import {
+  getBrandingSettings,
+  resolveBrandForegroundColor,
+} from '@/src/shared/branding/settings'
 
 import { MobileNav } from '@/components/layout/mobile-nav'
 import { RuntimeNotifications } from '@/components/layout/RuntimeNotifications'
 import { Sidebar } from '@/components/layout/sidebar'
 import { StationConfigGuard } from '@/components/layout/StationConfigGuard'
 import { Topbar } from '@/components/layout/topbar'
+
+const hexToRgb = (value?: string | null) => {
+  const hex = String(value ?? '')
+    .trim()
+    .replace(/^#/, '')
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null
+  return {
+    r: Number.parseInt(hex.slice(0, 2), 16),
+    g: Number.parseInt(hex.slice(2, 4), 16),
+    b: Number.parseInt(hex.slice(4, 6), 16),
+  }
+}
+
+const foregroundForHex = (value?: string | null) => {
+  const rgb = hexToRgb(value)
+  if (!rgb) return '#ffffff'
+  const yiq = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000
+  return yiq >= 150 ? '#111827' : '#ffffff'
+}
+
+const rgbaForHex = (value: string | null | undefined, alpha: number) => {
+  const rgb = hexToRgb(value)
+  if (!rgb) return undefined
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`
+}
+
+const buildBrandStyle = (
+  primary?: string | null,
+  secondary?: string | null,
+) => {
+  const style: Record<string, string> = {}
+  if (primary) {
+    style['--brand-primary'] = primary
+    style['--brand-primary-foreground'] = foregroundForHex(primary)
+    style['--brand-accent'] = primary
+    style['--auth-accent-top'] = primary
+    const focus = rgbaForHex(primary, 0.35)
+    if (focus) style['--border-focus'] = focus
+  }
+  if (secondary) {
+    style['--brand-secondary'] = secondary
+    style['--brand-secondary-foreground'] = foregroundForHex(secondary)
+    style['--auth-accent-bottom'] = secondary
+  }
+  return style
+}
 
 const DashboardLayout = async ({ children }: { children: ReactNode }) => {
   const user = await getCurrentUser()
@@ -20,18 +69,12 @@ const DashboardLayout = async ({ children }: { children: ReactNode }) => {
   const brandSecondary = (branding as any)?.secondary_color || undefined
   const stationDisplayName = (branding as any)?.station_display_name || null
   const brandLogoPath = (branding as any)?.logo_path || null
+  const brandStyle = buildBrandStyle(brandPrimary, brandSecondary)
 
   return (
     <div
       className="min-h-screen bg-[var(--surface-page)]"
-      style={
-        {
-          ...(brandPrimary ? { ['--brand-primary' as any]: brandPrimary } : {}),
-          ...(brandSecondary
-            ? { ['--brand-secondary' as any]: brandSecondary }
-            : {}),
-        } as any
-      }
+      style={brandStyle as any}
     >
       <div className="flex min-h-screen">
         <div className="no-print hidden xl:block">

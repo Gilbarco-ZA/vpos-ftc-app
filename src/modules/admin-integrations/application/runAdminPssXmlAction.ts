@@ -1,5 +1,5 @@
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { kvSet, PSS_XML_KEYS } from '@/src/shared/integrations/pssXml'
 

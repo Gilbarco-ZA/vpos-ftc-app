@@ -42,17 +42,41 @@ export const getJplPumpMappings = async (
     for (const row of rows) {
       if (!Number.isFinite(row.pump_number ?? NaN)) continue
       const pumpNumber = Number(row.pump_number)
-      if (!map.has(pumpNumber)) {
-        map.set(pumpNumber, { pumpNumber, nozzles: [] })
+      const domsFpId = Number.isFinite(row.doms_fp_id ?? NaN)
+        ? Number(row.doms_fp_id)
+        : null
+      const deviceSubAddress = Number.isFinite(
+        row.doms_device_sub_address ?? NaN,
+      )
+        ? Number(row.doms_device_sub_address)
+        : null
+      const mapKey = domsFpId ?? pumpNumber
+
+      if (!map.has(mapKey)) {
+        map.set(mapKey, {
+          pumpNumber,
+          domsFpId,
+          deviceSubAddress,
+          nozzles: [],
+        })
       }
 
       if (row.nozzle_id && Number.isFinite(row.nozzle_number ?? NaN)) {
         const nozzleNumber = Number(row.nozzle_number)
-        map.get(pumpNumber)?.nozzles.push({
+        const domsGradeOptionId = Number.isFinite(
+          row.doms_grade_option_id ?? NaN,
+        )
+          ? Number(row.doms_grade_option_id)
+          : null
+
+        map.get(mapKey)?.nozzles.push({
           nozzleId: row.nozzle_id,
           nozzleNumber,
           fuelType: row.product_name ?? row.product_code ?? null,
           productCode: row.product_code ?? null,
+          domsGradeOptionId,
+          domsGradeId: row.doms_grade_id ?? null,
+          domsTankId: row.doms_tank_id ?? null,
         })
       }
     }

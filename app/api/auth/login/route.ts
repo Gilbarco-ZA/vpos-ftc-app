@@ -1,5 +1,5 @@
 import type { User } from '@/src/shared/types'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { wantsHtmlRedirect } from '@/src/platform/web/api/request'
 import { fail, ok, serverError } from '@/src/platform/web/api/response'

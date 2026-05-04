@@ -98,7 +98,7 @@ export const formatState = (state: string) => {
     case PUMP_NOZZLE_STATE.DISPENSING_PAUSED:
       return 'DISPENSING PAUSED'
     default:
-      return state.replace(/_/g, ' ').toUpperCase()
+      return state.replace(/_/g, ' ').toUpperCase();
   }
 }
 

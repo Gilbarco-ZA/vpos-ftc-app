@@ -3,6 +3,7 @@ import type {
   PosCommand,
   PosCommandResult,
 } from '@/src/platform/integrations/jpl/types'
+import type { JplAccessMode } from '@/src/shared/integrations/jplAccess'
 
 import { getJplConfig } from '@/src/platform/integrations/jpl/config'
 import {
@@ -18,10 +19,14 @@ import {
   getJplAdapterState,
   setJplAdapterState,
 } from '@/src/shared/forecourt/jplState'
-import { assertPosBackendAllowed } from '@/src/shared/integrations/posBackend'
+import { assertJplAccessAllowed } from '@/src/shared/integrations/jplAccess'
 import { logger } from '@/src/shared/utils/logger'
 
-import { buildJplCommandRequest } from '@/src/modules/forecourt/infrastructure/jpl/protocol/commands'
+import { buildFpStatusSubCodePreference } from '@/src/modules/forecourt/infrastructure/jpl/dispense'
+import {
+  buildJplCommandRequest,
+  describeJplAuthorizeRequest,
+} from '@/src/modules/forecourt/infrastructure/jpl/protocol/commands'
 import {
   normalizeFpErrorPayload,
   normalizeFpFuellingDataPayload,
@@ -64,6 +69,13 @@ function enqueueApc1<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 const ZERO_FC_DATE_TIME = '00000000000000'
+
+async function assertJplAccessAllowedForMode(
+  stationId: string,
+  accessMode: JplAccessMode = 'pos',
+) {
+  await assertJplAccessAllowed(stationId, accessMode)
+}
 const ID_ZERO = '00'
 const CURRENT_PRICE_SET_TYPE = '00H'
 const PENDING_PRICE_SET_TYPE = '01H'
@@ -703,12 +715,9 @@ async function readFpStatus(
   fpId: string,
   preferredSubCode?: string,
 ) {
-  const requested = String(preferredSubCode ?? '03H')
-    .trim()
-    .toUpperCase()
-  const variants = [requested, '03H', '01H', '00H']
-    .filter((value, index, list) => list.indexOf(value) === index)
-    .map((subCode) => ({ subCode, data: { FpId: fpId } }))
+  const variants = buildFpStatusSubCodePreference(preferredSubCode).map(
+    (subCode) => ({ subCode, data: { FpId: fpId } }),
+  )
   const result = await requestWithSubCodeFallback(client, {
     name: 'FpStatus_req',
     variants,
@@ -901,6 +910,24 @@ async function clearTankDeliveryData(
     timeoutMs,
     timeoutMessage: 'Timed out clearing tank delivery data',
   })
+}
+
+async function sendSimpleWetstockCommand(
+  client: any,
+  timeoutMs: number,
+  action: string,
+  payload: Record<string, unknown>,
+  timeoutMessage: string,
+) {
+  const request = buildJplCommandRequest(action, payload)
+  if (!request) throw new Error(`Unable to build ${action} request`)
+  const response = await requestWithTimeout(
+    client,
+    request,
+    timeoutMs,
+    timeoutMessage,
+  )
+  return { request, response }
 }
 
 function isUnknownSubCodeError(
@@ -1293,8 +1320,11 @@ const mergePriceBank = (base: PriceBank, entries: PriceEntry[]): PriceBank => {
   }
 }
 
-export async function jplHealth(stationId: string): Promise<JplHealth> {
-  await assertPosBackendAllowed(stationId, ['jpl'])
+export async function jplHealth(
+  stationId: string,
+  options: { accessMode?: JplAccessMode } = {},
+): Promise<JplHealth> {
+  await assertJplAccessAllowedForMode(stationId, options.accessMode ?? 'pos')
   const state = getJplGatewayState()
 
   const gatewayState: any = getJplGatewayState() as any
@@ -1348,8 +1378,9 @@ export async function jplHealth(stationId: string): Promise<JplHealth> {
 export async function jplSendPosCommand(
   stationId: string,
   cmd: PosCommand,
+  options: { accessMode?: JplAccessMode } = {},
 ): Promise<PosCommandResult> {
-  await assertPosBackendAllowed(stationId, ['jpl'])
+  await assertJplAccessAllowedForMode(stationId, options.accessMode ?? 'pos')
 
   const gw = getJplGatewayState()
   if (!gw.started) {
@@ -1412,6 +1443,7 @@ export async function jplSendPosCommand(
             pumpErrorDiagnostics: gatewayState.pumpErrorDiagnostics ?? [],
             replayCapabilities: replayStatus.replayCapabilities,
             pendingReplayClears: replayStatus.pendingReplayClears,
+            transactionCheckpoints: replayStatus.transactionCheckpoints ?? [],
             pumpStatuses: gatewayState.pumpStatuses ?? [],
             fpInfo: gatewayState.fpInfo ?? [],
             fuellingData: gatewayState.fuellingData ?? [],
@@ -1558,40 +1590,105 @@ export async function jplSendPosCommand(
       if (cmd.type === 'PRESET_FUEL_AUTH') {
         const payload = (cmd as any).payload ?? {}
         const { pumpId, nozzleId } = resolvePumpNozzle(payload)
+        const request = buildJplCommandRequest('PRESET_FUEL_AUTH', {
+          ...payload,
+          pumpNumber: pumpId,
+          posId,
+        })
+        if (!request)
+          throw new Error('Unable to build preset authorize request')
         const response = await requestWithTimeout(
           client,
-          {
-            name: 'authorize_Fp_req',
-            subCode: '01H',
-            data: {
-              FpId: toId2(pumpId),
-              PosId: posId,
-              PresetType:
-                String(
-                  pick(payload, ['presetType', 'PresetType']) ?? '00H',
-                ).trim() || '00H',
-              VoidPresetLimit: String(
-                pick(payload, ['voidPresetLimit', 'VoidPresetLimit']) ?? '0',
-              ),
-              VolumePresetLimit: String(
-                pick(payload, ['volumePresetLimit', 'VolumePresetLimit']) ??
-                  '0',
-              ),
-              MoneyPresetLimit: String(
-                pick(payload, ['moneyPresetLimit', 'MoneyPresetLimit']) ?? '0',
-              ),
-              FloorPresetLimit: String(
-                pick(payload, ['floorPresetLimit', 'FloorPresetLimit']) ?? '0',
-              ),
-            },
-          },
+          request,
           timeoutMs,
           'Timed out sending preset authorize command',
         )
         return {
           ok: true,
           accepted: true,
-          data: { pumpId, nozzleId, response },
+          data: {
+            pumpId,
+            nozzleId,
+            response,
+            ...describeJplAuthorizeRequest('PRESET_FUEL_AUTH', payload),
+          },
+        }
+      }
+
+      if (cmd.type === 'OPEN_TANK_CONTROLLER') {
+        const payload = (cmd as any).payload ?? {}
+        const tankId = toId2String(
+          pick(payload, ['tankId', 'TankId', 'tgId', 'TgId']),
+          '',
+        )
+        if (!tankId) throw new Error('TankId is required')
+        const result = await sendSimpleWetstockCommand(
+          client,
+          timeoutMs,
+          'OPEN_TANK_CONTROLLER',
+          { ...payload, tankId, posId },
+          `Timed out opening tank controller ${tankId}`,
+        )
+        return {
+          ok: true,
+          accepted: true,
+          data: { tankId, response: result.response },
+        }
+      }
+
+      if (cmd.type === 'CLOSE_TANK_CONTROLLER') {
+        const payload = (cmd as any).payload ?? {}
+        const tankId = toId2String(
+          pick(payload, ['tankId', 'TankId', 'tgId', 'TgId']),
+          ID_ZERO,
+        )
+        const result = await sendSimpleWetstockCommand(
+          client,
+          timeoutMs,
+          'CLOSE_TANK_CONTROLLER',
+          { ...payload, tankId },
+          `Timed out closing tank controller ${tankId}`,
+        )
+        return {
+          ok: true,
+          accepted: true,
+          data: { tankId, response: result.response },
+        }
+      }
+
+      if (cmd.type === 'START_DELIVERY_PROCESS') {
+        const payload = (cmd as any).payload ?? {}
+        const tankId = toId2String(pick(payload, ['tankId', 'TankId']), '')
+        if (!tankId) throw new Error('TankId is required')
+        const result = await sendSimpleWetstockCommand(
+          client,
+          timeoutMs,
+          'START_DELIVERY_PROCESS',
+          { ...payload, tankId, posId },
+          `Timed out starting delivery process for tank ${tankId}`,
+        )
+        return {
+          ok: true,
+          accepted: true,
+          data: { tankId, response: result.response },
+        }
+      }
+
+      if (cmd.type === 'STOP_DELIVERY_PROCESS') {
+        const payload = (cmd as any).payload ?? {}
+        const tankId = toId2String(pick(payload, ['tankId', 'TankId']), '')
+        if (!tankId) throw new Error('TankId is required')
+        const result = await sendSimpleWetstockCommand(
+          client,
+          timeoutMs,
+          'STOP_DELIVERY_PROCESS',
+          { ...payload, tankId, posId },
+          `Timed out stopping delivery process for tank ${tankId}`,
+        )
+        return {
+          ok: true,
+          accepted: true,
+          data: { tankId, response: result.response },
         }
       }
 
@@ -1644,7 +1741,12 @@ export async function jplSendPosCommand(
         return {
           ok: true,
           accepted: true,
-          data: { pumpId, nozzleId, response },
+          data: {
+            pumpId,
+            nozzleId,
+            response,
+            ...describeJplAuthorizeRequest('EXTENDED_FUEL_AUTH', payload),
+          },
         }
       }
 
@@ -1667,7 +1769,12 @@ export async function jplSendPosCommand(
         return {
           ok: true,
           accepted: true,
-          data: { pumpId, nozzleId, response },
+          data: {
+            pumpId,
+            nozzleId,
+            response,
+            ...describeJplAuthorizeRequest('PREPARE_TRANSACTION', payload),
+          },
         }
       }
 
@@ -1943,7 +2050,15 @@ export async function jplSendPosCommand(
           timeoutMs,
           'Timed out sending authorize command',
         )
-        return { ok: true, accepted: true, data: { pumpId, nozzleId } }
+        return {
+          ok: true,
+          accepted: true,
+          data: {
+            pumpId,
+            nozzleId,
+            ...describeJplAuthorizeRequest('AUTHORIZE_FP', payload),
+          },
+        }
       }
 
       if (cmd.type === 'CLOSE_FPS') {
@@ -2107,7 +2222,7 @@ export async function jplSendPosCommand(
 
         if (!tgIds.length) {
           throw new Error(
-            'No configured JPL tank ids found. Set jplTankId (or numeric tank code) for each tank in tank settings.',
+            'No configured DOMS tank ids found. Set domsTankId (or numeric tank code) for each tank in tank settings.',
           )
         }
 
@@ -2141,6 +2256,31 @@ export async function jplSendPosCommand(
           throw new Error(firstError)
         }
 
+        let tankStatusSnapshot: any = null
+        try {
+          const statusResult = await requestWithSubCodeFallback(client, {
+            name: 'TgStatus_req',
+            variants: [
+              { subCode: '02H', data: { TgId: ID_ZERO } },
+              { subCode: '01H', data: { TgId: ID_ZERO } },
+              { subCode: '00H', data: { TgId: ID_ZERO } },
+            ],
+            timeoutMs,
+            timeoutMessage: 'Timed out requesting tank status snapshot',
+          })
+          tankStatusSnapshot = {
+            response: statusResult.response,
+            usedSubCode: statusResult.usedSubCode,
+          }
+          rememberGatewaySnapshot(
+            'TgStatus_resp',
+            statusResult.response,
+            statusResult.usedSubCode,
+          )
+        } catch (error) {
+          tankStatusSnapshot = { error: getProtocolErrorText(error) }
+        }
+
         return {
           ok: true,
           accepted: true,
@@ -2149,6 +2289,7 @@ export async function jplSendPosCommand(
             responses,
             normalized,
             errors,
+            tankStatusSnapshot,
           },
         }
       }
@@ -2559,6 +2700,35 @@ export async function jplSendPosCommand(
           }
         }
 
+        const normalizedDeliveries = deliveries
+          .map((entry) => ({
+            tgId: entry.tgId,
+            normalized: normalizeTankDeliveryDataPayload(entry.response, '00H'),
+            response: entry.response,
+          }))
+          .filter((entry) => Boolean(entry.normalized?.tgId))
+
+        const checkpointSummary = normalizedDeliveries
+          .map((entry) => {
+            const normalized = entry.normalized
+            const deliveryReportSeqNo = String(
+              normalized?.deliveryReportSeqNo ?? '',
+            ).trim()
+            const tankDeliverySeqNo = String(
+              normalized?.tankDeliverySeqNo ?? '',
+            ).trim()
+            if (!deliveryReportSeqNo || !tankDeliverySeqNo) return null
+            return {
+              tgId: String(normalized?.tgId ?? '')
+                .trim()
+                .padStart(2, '0'),
+              deliveryReportSeqNo,
+              tankDeliverySeqNo,
+              clearStatus: 'pending_clear',
+            }
+          })
+          .filter(Boolean)
+
         return {
           ok: true,
           accepted: true,
@@ -2569,6 +2739,8 @@ export async function jplSendPosCommand(
             tgStatusSubCode,
             tgIds: uniqueTgIds,
             deliveries,
+            normalizedDeliveries,
+            checkpointSummary,
             errors,
           },
         }

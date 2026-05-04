@@ -11,6 +11,12 @@ const code1Schema = z
   .regex(/^[0-9A-F]{2}H$/i, 'Expected CODE1 string')
   .transform((value) => value.toUpperCase())
 
+const code2Schema = z
+  .string()
+  .trim()
+  .regex(/^[0-9A-F]{4}H$/i, 'Expected CODE2 string')
+  .transform((value) => value.toUpperCase())
+
 const nameSchema = z.string().trim().min(1)
 const objectDataSchema = z.record(z.any())
 
@@ -243,6 +249,147 @@ const supportedRequestSchemas = {
       })
       .passthrough(),
   }),
+
+  clear_InstallData_req: requestEnvelopeSchema.extend({
+    name: z.literal('clear_InstallData_req'),
+    subCode: z.literal('01H'),
+    data: z
+      .object({ ExtendedInstallMsgCode: code2Schema, FcDeviceId: id2Schema })
+      .passthrough(),
+  }),
+  PpStatus_req: requestEnvelopeSchema.extend({
+    name: z.literal('PpStatus_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ PpId: id2Schema }).passthrough(),
+  }),
+  open_Pp_req: requestEnvelopeSchema.extend({
+    name: z.literal('open_Pp_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        PpId: id2Schema,
+        PosId: id2Schema,
+        PpOperationModeNo: z.number().int().nonnegative(),
+      })
+      .passthrough(),
+  }),
+  close_Pp_req: requestEnvelopeSchema.extend({
+    name: z.literal('close_Pp_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ PpId: id2Schema }).passthrough(),
+  }),
+  PpErrorMsg_req: requestEnvelopeSchema.extend({
+    name: z.literal('PpErrorMsg_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ PpId: id2Schema }).passthrough(),
+  }),
+  clear_PpError_req: requestEnvelopeSchema.extend({
+    name: z.literal('clear_PpError_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ PpId: id2Schema, PpErrorCode: z.string().trim().min(2) }),
+  }),
+  reset_Pp_req: requestEnvelopeSchema.extend({
+    name: z.literal('reset_Pp_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ PpId: id2Schema }).passthrough(),
+  }),
+  WpStatus_req: requestEnvelopeSchema.extend({
+    name: z.literal('WpStatus_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema }).passthrough(),
+  }),
+  prepare_WpAuth_req: requestEnvelopeSchema.extend({
+    name: z.literal('prepare_WpAuth_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema, PosId: id2Schema }).passthrough(),
+  }),
+  authorize_Wp_req: requestEnvelopeSchema.extend({
+    name: z.literal('authorize_Wp_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema, PosId: id2Schema }).passthrough(),
+  }),
+  cancel_WpAuth_req: requestEnvelopeSchema.extend({
+    name: z.literal('cancel_WpAuth_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema, PosId: id2Schema }).passthrough(),
+  }),
+  stop_Wp_req: requestEnvelopeSchema.extend({
+    name: z.literal('stop_Wp_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema, PosId: id2Schema }).passthrough(),
+  }),
+  cancel_WpStop_req: requestEnvelopeSchema.extend({
+    name: z.literal('cancel_WpStop_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema, PosId: id2Schema }).passthrough(),
+  }),
+  WpErrorMsg_req: requestEnvelopeSchema.extend({
+    name: z.literal('WpErrorMsg_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema }).passthrough(),
+  }),
+  clear_WpError_req: requestEnvelopeSchema.extend({
+    name: z.literal('clear_WpError_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema, WpErrorCode: z.string().trim().min(2) }),
+  }),
+  reset_Wp_req: requestEnvelopeSchema.extend({
+    name: z.literal('reset_Wp_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2Schema }).passthrough(),
+  }),
+  DiopStatus_req: requestEnvelopeSchema.extend({
+    name: z.literal('DiopStatus_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ DiopId: id2Schema }).passthrough(),
+  }),
+  change_DiopOutput_req: requestEnvelopeSchema.extend({
+    name: z.literal('change_DiopOutput_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({ DiopId: id2Schema, DiopControl: code1Schema })
+      .passthrough(),
+  }),
+  SensorStatus_req: requestEnvelopeSchema.extend({
+    name: z.literal('SensorStatus_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ SensorId: id2Schema }).passthrough(),
+  }),
+  VmStatus_req: requestEnvelopeSchema.extend({
+    name: z.literal('VmStatus_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ VmId: id2Schema }).passthrough(),
+  }),
+  open_Vm_req: requestEnvelopeSchema.extend({
+    name: z.literal('open_Vm_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ VmId: id2Schema }).passthrough(),
+  }),
+  close_Vm_req: requestEnvelopeSchema.extend({
+    name: z.literal('close_Vm_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ VmId: id2Schema }).passthrough(),
+  }),
+  VmDrystockTotals_req: requestEnvelopeSchema.extend({
+    name: z.literal('VmDrystockTotals_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ VmId: id2Schema }).passthrough(),
+  }),
+  VmErrorMsg_req: requestEnvelopeSchema.extend({
+    name: z.literal('VmErrorMsg_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ VmId: id2Schema }).passthrough(),
+  }),
+  clear_VmError_req: requestEnvelopeSchema.extend({
+    name: z.literal('clear_VmError_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ VmId: id2Schema, VmErrorCode: z.string().trim().min(2) }),
+  }),
+  reset_Vm_req: requestEnvelopeSchema.extend({
+    name: z.literal('reset_Vm_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ VmId: id2Schema }).passthrough(),
+  }),
   FcInstallStatus_req: requestEnvelopeSchema.extend({
     name: z.literal('FcInstallStatus_req'),
     subCode: z.literal('00H'),
@@ -265,6 +412,45 @@ const supportedRequestSchemas = {
     name: z.literal('TgErrorMsg_req'),
     subCode: z.literal('00H'),
     data: z.object({ TgId: id2Schema }),
+  }),
+
+  open_TankController_req: requestEnvelopeSchema.extend({
+    name: z.literal('open_TankController_req'),
+    subCode: z.literal('00H'),
+    data: z.object({
+      TankId: id2Schema,
+      PosId: id2Schema,
+      TankOperationModeNo: z.number().int().min(0).max(255),
+    }),
+  }),
+  close_TankController_req: requestEnvelopeSchema.extend({
+    name: z.literal('close_TankController_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ TankId: id2Schema }).passthrough(),
+  }),
+  start_DeliveryProcess_req: requestEnvelopeSchema.extend({
+    name: z.literal('start_DeliveryProcess_req'),
+    subCode: z.literal('00H'),
+    data: z.object({
+      TankId: id2Schema,
+      PosId: id2Schema,
+      FcProductId: id2Schema,
+      StartDeliveryProcessPars: z
+        .object({
+          FcProductName: z.string().optional(),
+          TankControlSmId: id2Schema.optional(),
+        })
+        .passthrough()
+        .optional(),
+    }),
+  }),
+  stop_DeliveryProcess_req: requestEnvelopeSchema.extend({
+    name: z.literal('stop_DeliveryProcess_req'),
+    subCode: z.literal('00H'),
+    data: z.object({
+      TankId: id2Schema,
+      PosId: id2Schema,
+    }),
   }),
   SiteDeliveryStatus_req: requestEnvelopeSchema.extend({
     name: z.literal('SiteDeliveryStatus_req'),

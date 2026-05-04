@@ -28,10 +28,43 @@ export function normalizeStockInType(
     : 'StockCount'
 }
 
+export const KENYA_DELIVERY_DOCUMENT_ID_MAX = 2147483647
+
+export function normalizeDeliveryDocumentId(
+  value?: string | number | null,
+): string {
+  const trimmed = String(value ?? '').trim()
+  if (/^\d+$/.test(trimmed)) {
+    const parsed = Number(trimmed)
+    if (
+      Number.isSafeInteger(parsed) &&
+      parsed > 0 &&
+      parsed <= KENYA_DELIVERY_DOCUMENT_ID_MAX
+    ) {
+      return String(parsed)
+    }
+  }
+
+  return String(
+    Math.min(Math.floor(Date.now() / 1000), KENYA_DELIVERY_DOCUMENT_ID_MAX),
+  )
+}
+
+export function normalizeOutboundStockInDocumentId(
+  value: string | number | null | undefined,
+  stockInType?: string | null,
+): string {
+  return normalizeStockInType(stockInType) === 'Delivery'
+    ? normalizeDeliveryDocumentId(value)
+    : String(value ?? '').trim() || buildGeneratedDocumentId('StockCount')
+}
+
 export function buildGeneratedDocumentId(value?: string | null): string {
   const type = normalizeStockInType(value)
-  const prefix = type === 'Delivery' ? 'DEL' : 'SC'
-  return `${prefix}-${Date.now().toString(36).toUpperCase()}`
+  if (type === 'Delivery') {
+    return normalizeDeliveryDocumentId(null)
+  }
+  return `SC-${Date.now().toString(36).toUpperCase()}`
 }
 
 export function mapMovementRow(

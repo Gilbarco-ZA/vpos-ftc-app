@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link'
 
 import { PageHeader } from '@/components/layout/page-header'
@@ -34,11 +34,12 @@ async function apiGet(path: string) {
   return res.json()
 }
 
-export default function FiscalInboxByRequestIdPage({
-  params,
-}: {
-  params: { requestId: string }
-}) {
+export default function FiscalInboxByRequestIdPage(
+  props: {
+    params: Promise<{ requestId: string }>
+  }
+) {
+  const params = use(props.params);
   const requestId = decodeURIComponent(params.requestId)
   const [stationId, setStationId] = useState('')
   const [data, setData] = useState<{ items: Row[]; count: number } | null>(null)

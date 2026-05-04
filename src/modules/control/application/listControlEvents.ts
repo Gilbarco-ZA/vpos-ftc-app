@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
 
 import { listControlEventsRepo } from '@/src/modules/control/infrastructure/controlEventsRepo'
 

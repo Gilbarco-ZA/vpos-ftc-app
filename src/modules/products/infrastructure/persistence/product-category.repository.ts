@@ -1,5 +1,7 @@
 import { query, queryAll, queryOne } from '@/src/platform/db/postgres/query'
 
+import { normalizeProductCategoryImagePath } from '@/src/modules/products/infrastructure/storage/product-category-image.storage'
+
 export type ProductCategoryRecord = {
   id: string
   stationId: string
@@ -24,10 +26,11 @@ export const mapProductCategoryRow = (
   name: String(row.name ?? ''),
   description: row.description == null ? null : String(row.description),
   icon: row.icon == null ? null : String(row.icon),
-  imagePath:
+  imagePath: normalizeProductCategoryImagePath(
     row.image_path == null && row.imagePath == null
       ? null
       : String(row.image_path ?? row.imagePath),
+  ),
   sortOrder: Number(row.sort_order ?? row.sortOrder ?? 0),
   isActive: Boolean(row.is_active ?? row.isActive ?? true),
   productCount:

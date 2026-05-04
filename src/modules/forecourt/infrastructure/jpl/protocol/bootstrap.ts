@@ -1,12 +1,20 @@
+import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
 import type { ForecourtRuntimeConfig } from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 
 export const DEFAULT_JPL_REQUIRED_FLAGS = [
+  'UNSO_INSTSTA_1',
   'UNSO_TRBUFSTA_3',
   'UNSO_TGSTA_1',
   'UNSO_DELIVSTA_1',
+  'UNSO_PRISTA_1',
 ] as const
 
 export const DEFAULT_JPL_MFDR_FLAGS = ['UNSO_FPSTA_3'] as const
+
+export const CONSERVATIVE_JPL_REQUIRED_FLAGS = [
+  'UNSO_TRBUFSTA_3',
+  'UNSO_INSTSTA_1',
+] as const
 
 export type BuildJplAccessCodeOptions = {
   baseAccessCode?: string
@@ -15,6 +23,18 @@ export type BuildJplAccessCodeOptions = {
   requiredFlags?: readonly string[]
   mfdrFlags?: readonly string[]
 }
+
+const buildFcAccessCode = (DomsPosJpl as any).buildFcAccessCode as
+  | ((input: {
+      password?: string
+      rejectInfo?: boolean
+      flags?: Array<string | { flag: string; mfdr?: string | number }>
+    }) => string)
+  | undefined
+
+const buildMfdrUnsolFlag = (DomsPosJpl as any).buildMfdrUnsolFlag as
+  | ((flag: string, mfdr?: string | number) => string)
+  | undefined
 
 const toCanonicalToken = (value: unknown) => String(value ?? '').trim()
 
@@ -59,6 +79,17 @@ export const normalizeJplPosId = (
   return String(numeric).padStart(2, '0')
 }
 
+const tokenMatches = (candidate: string, token: string) => {
+  const left = candidate.toUpperCase()
+  const right = token.toUpperCase()
+  return left === right || left.startsWith(`${right}:`)
+}
+
+const formatMfdrToken = (flag: string, drSeconds: number) => {
+  if (buildMfdrUnsolFlag) return buildMfdrUnsolFlag(flag, drSeconds)
+  return `${toCanonicalToken(flag)}:MFDR=${String(drSeconds).padStart(2, '0')}`
+}
+
 export const buildJplAccessCode = (options: BuildJplAccessCodeOptions) => {
   const {
     baseAccessCode,
@@ -69,49 +100,122 @@ export const buildJplAccessCode = (options: BuildJplAccessCodeOptions) => {
   } = options
 
   const tokens = tokenizeAccessCode(baseAccessCode)
+  const [passwordToken, ...flagTokens] = tokens.length > 0 ? tokens : ['POS']
+  const effectivePassword = passwordToken || 'POS'
   const effectiveDr =
     Number.isFinite(Number(drSeconds)) && Number(drSeconds) > 0
       ? Math.trunc(Number(drSeconds))
       : 5
 
-  const hasToken = (token: string) =>
-    tokens.some((candidate) => candidate.toUpperCase() === token.toUpperCase())
-
-  const findTokenIndex = (prefix: string) =>
-    tokens.findIndex((candidate) =>
-      candidate.toUpperCase().startsWith(prefix.toUpperCase()),
-    )
+  const workingFlags = [...flagTokens]
 
   const upsertPlainToken = (token: string) => {
     const canonical = toCanonicalToken(token)
     if (!canonical) return
-    if (!hasToken(canonical)) tokens.push(canonical)
+    if (workingFlags.some((candidate) => tokenMatches(candidate, canonical))) {
+      return
+    }
+    workingFlags.push(canonical)
   }
 
-  const upsertMfdrToken = (prefix: string) => {
-    const canonical = toCanonicalToken(prefix)
+  const upsertMfdrToken = (flag: string) => {
+    const canonical = toCanonicalToken(flag)
     if (!canonical) return
-    const index = findTokenIndex(canonical)
-    if (index < 0) {
-      tokens.push(`${canonical}:MFDR=${effectiveDr}`)
+    const mfdrToken = formatMfdrToken(canonical, effectiveDr)
+    const existingIndex = workingFlags.findIndex((candidate) =>
+      tokenMatches(candidate, canonical),
+    )
+
+    if (existingIndex >= 0) {
+      workingFlags[existingIndex] = mfdrToken
       return
     }
 
-    const existing = tokens[index]
-    if (/MFDR=/i.test(existing)) return
-    tokens[index] = `${existing}:MFDR=${effectiveDr}`
+    workingFlags.push(mfdrToken)
   }
 
   if (ensureRi) upsertPlainToken('RI')
   for (const flag of requiredFlags) upsertPlainToken(flag)
   for (const flag of mfdrFlags) upsertMfdrToken(flag)
 
-  return tokens.join(',')
+  if (buildFcAccessCode) {
+    return buildFcAccessCode({
+      password: effectivePassword,
+      rejectInfo: false,
+      flags: workingFlags,
+    })
+  }
+
+  return [effectivePassword, ...workingFlags].join(',')
 }
+
+const uniqueAccessCodes = (values: string[]) => {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const value of values) {
+    const normalized = String(value ?? '').trim()
+    if (!normalized) continue
+    const key = normalized.toUpperCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(normalized)
+  }
+  return out
+}
+
+const passwordOnlyAccessCode = (baseAccessCode: unknown) => {
+  const [password] = tokenizeAccessCode(baseAccessCode)
+  return password || 'POS'
+}
+
+export const buildJplAccessCodeFallbacks = (
+  options: BuildJplAccessCodeOptions,
+) => {
+  const passwordOnly = passwordOnlyAccessCode(options.baseAccessCode)
+
+  const primary = buildJplAccessCode(options)
+  const conservative = buildJplAccessCode({
+    baseAccessCode: passwordOnly,
+    drSeconds: options.drSeconds,
+    ensureRi: true,
+    requiredFlags: CONSERVATIVE_JPL_REQUIRED_FLAGS,
+    mfdrFlags:
+      options.mfdrFlags && options.mfdrFlags.length > 0
+        ? options.mfdrFlags
+        : DEFAULT_JPL_MFDR_FLAGS,
+  })
+  const rejectInfoOnly = buildJplAccessCode({
+    baseAccessCode: passwordOnly,
+    ensureRi: true,
+    requiredFlags: [],
+    mfdrFlags: [],
+  })
+  const barePassword = buildJplAccessCode({
+    baseAccessCode: passwordOnly,
+    ensureRi: false,
+    requiredFlags: [],
+    mfdrFlags: [],
+  })
+
+  return uniqueAccessCodes([
+    primary,
+    conservative,
+    rejectInfoOnly,
+    barePassword,
+  ])
+}
+
+export const isJplProtocolFamilyEnabled = (
+  cfg: ForecourtRuntimeConfig,
+  family: string,
+) =>
+  (cfg.jplOptionalProtocolFamilies ?? [])
+    .map((entry) => String(entry).trim().toLowerCase())
+    .includes(family.trim().toLowerCase())
 
 export const buildJplBootstrapConfig = (cfg: ForecourtRuntimeConfig) => {
   const posId = normalizeJplPosId(cfg.jplPosId, '01')
-  const accessCode = buildJplAccessCode({
+  const accessCodeOptions: BuildJplAccessCodeOptions = {
     baseAccessCode: cfg.jplAccessCode,
     drSeconds: cfg.jplUnsolicitedDrSeconds,
     requiredFlags:
@@ -122,20 +226,46 @@ export const buildJplBootstrapConfig = (cfg: ForecourtRuntimeConfig) => {
       cfg.jplUnsolicitedMfdrFlags?.length > 0
         ? cfg.jplUnsolicitedMfdrFlags
         : DEFAULT_JPL_MFDR_FLAGS,
-  })
+  }
+  const accessCode = buildJplAccessCode(accessCodeOptions)
+  const accessCodeFallbacks = buildJplAccessCodeFallbacks(accessCodeOptions)
+  const heartbeatIdleMs = Math.max(
+    5_000,
+    Number(cfg.jplHeartbeatIntervalMs || 15_000),
+  )
+  const inboundSilenceMs = Math.max(
+    heartbeatIdleMs + 5_000,
+    Number(cfg.jplDeadConnectionTimeoutMs || 30_000),
+  )
+  const requestedStatusUpdateCode = Number(cfg.jplStatusUpdateCode ?? 3)
+  const hasUnsolicitedSubscriptions =
+    (cfg.jplUnsolicitedFlags?.length ?? 0) > 0 ||
+    (cfg.jplUnsolicitedMfdrFlags?.length ?? 0) > 0
+  const statusUpdateCode =
+    hasUnsolicitedSubscriptions &&
+    (!Number.isFinite(requestedStatusUpdateCode) ||
+      requestedStatusUpdateCode <= 0)
+      ? 3
+      : requestedStatusUpdateCode
 
   return {
     posId,
-    secureMode: Number(cfg.jplPort) === 8889,
+    secureMode: Boolean(cfg.jplTlsRequired) || Number(cfg.jplPort) === 8889,
+    tlsRequired: Boolean(cfg.jplTlsRequired),
+    integrationScope: cfg.jplIntegrationScope,
+    optionalProtocolFamilies: [...(cfg.jplOptionalProtocolFamilies ?? [])],
     accessCode,
+    accessCodeFallbacks,
     countryCode: String(cfg.jplCountryCode ?? '').trim() || '1',
     posVersionId: String(cfg.jplPosVersionId ?? '').trim() || '470-02-1.08',
-    statusUpdateCode: Number(cfg.jplStatusUpdateCode ?? 3),
+    statusUpdateCode,
     bootstrapSnapshotEnabled: Boolean(cfg.jplBootstrapSnapshotEnabled ?? true),
     clientOptions: {
       host: cfg.jplHost,
       port: cfg.jplPort,
       strictProtocolValidation: true,
+      heartbeatIdleMs,
+      inboundSilenceMs,
     },
     logonOptions: {
       accessCode,
@@ -145,9 +275,9 @@ export const buildJplBootstrapConfig = (cfg: ForecourtRuntimeConfig) => {
     },
     features: {
       wetstock: true,
-      ept: true,
-      wash: true,
-      vending: true,
+      ept: false,
+      wash: isJplProtocolFamilyEnabled(cfg, 'wash'),
+      vending: isJplProtocolFamilyEnabled(cfg, 'vending'),
     },
   }
 }

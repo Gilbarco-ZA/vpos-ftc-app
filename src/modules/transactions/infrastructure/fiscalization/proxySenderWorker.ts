@@ -9,6 +9,7 @@ import {
 } from '@/src/shared/proxy/client'
 import { mapFiscalReceipt } from '@/src/shared/receipts/mapFiscalReceipt'
 import { getRuntimeBus } from '@/src/shared/runtime/bus'
+import { enqueueFiscalInboxReviewFailure } from '@/src/shared/runtime/fiscalInbox'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { getUserDisplayName } from '@/src/shared/server/users'
 import { getStationId } from '@/src/shared/utils/getStationId'
@@ -945,6 +946,31 @@ export async function sendClaimedTransactionToProxy(input: {
           fiscalDocumentId: docId,
           fiscalizationResponse: res.data ?? {},
         })
+        await enqueueFiscalInboxReviewFailure({
+          stationId,
+          topic: 'external_fiscalization',
+          requestId: `proxy-fiscalization-review:${txn.id}`,
+          error:
+            extractFailureMessage(res.data) || 'Proxy fiscalization failed',
+          message: {
+            type: 'proxyFiscalizationReviewRequired',
+            stationId,
+            transactionId: String(txn.id),
+            documentId: docId,
+            documentNumber: docNo,
+            response: res.data ?? null,
+            at: Date.now(),
+          },
+        }).catch((err) => {
+          logger.error(
+            `[${WORKER_NAME}] failed to enqueue fiscal inbox review`,
+            {
+              stationId,
+              transactionId: String(txn.id),
+              error: String((err as any)?.message || err),
+            },
+          )
+        })
       } else if (hasFinalPayload) {
         await markTransactionFiscalized({
           stationId,
@@ -1070,6 +1096,27 @@ export async function sendClaimedTransactionToProxy(input: {
       incrementRetryCount: true,
       fiscalDocumentId: docId,
     }).catch(() => {})
+    await enqueueFiscalInboxReviewFailure({
+      stationId,
+      topic: 'external_fiscalization',
+      requestId: `proxy-fiscalization-review:${txn.id}`,
+      error: e,
+      message: {
+        type: 'proxyFiscalizationReviewRequired',
+        stationId,
+        transactionId: String(txn.id),
+        documentId: docId,
+        trigger,
+        error: String(e?.message || e),
+        at: Date.now(),
+      },
+    }).catch((err) => {
+      logger.error(`[${WORKER_NAME}] failed to enqueue fiscal inbox review`, {
+        stationId,
+        transactionId: String(txn.id),
+        error: String((err as any)?.message || err),
+      })
+    })
 
     return { ok: false as const, error: String(e?.message || e) }
   }

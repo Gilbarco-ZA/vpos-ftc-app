@@ -107,7 +107,7 @@ var require_main = __commonJS({
     var fs19 = require("fs");
     var path20 = require("path");
     var os2 = require("os");
-    var crypto10 = require("crypto");
+    var crypto11 = require("crypto");
     var packageJson = require_package();
     var version = packageJson.version;
     var LINE = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/mg;
@@ -326,7 +326,7 @@ var require_main = __commonJS({
       const authTag = ciphertext.subarray(-16);
       ciphertext = ciphertext.subarray(12, -16);
       try {
-        const aesgcm = crypto10.createDecipheriv("aes-256-gcm", key, nonce);
+        const aesgcm = crypto11.createDecipheriv("aes-256-gcm", key, nonce);
         aesgcm.setAuthTag(authTag);
         return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
       } catch (error) {
@@ -32907,7 +32907,7 @@ var require_winston2 = __commonJS({
 var require_object_hash = __commonJS({
   "node_modules/object-hash/index.js"(exports2, module2) {
     "use strict";
-    var crypto10 = require("crypto");
+    var crypto11 = require("crypto");
     exports2 = module2.exports = objectHash;
     function objectHash(object, options) {
       options = applyDefaults(object, options);
@@ -32925,7 +32925,7 @@ var require_object_hash = __commonJS({
     exports2.keysMD5 = function(object) {
       return objectHash(object, { algorithm: "md5", encoding: "hex", excludeValues: true });
     };
-    var hashes = crypto10.getHashes ? crypto10.getHashes().slice() : ["sha1", "md5"];
+    var hashes = crypto11.getHashes ? crypto11.getHashes().slice() : ["sha1", "md5"];
     hashes.push("passthrough");
     var encodings = ["buffer", "hex", "binary", "base64"];
     function applyDefaults(object, sourceOptions) {
@@ -32971,7 +32971,7 @@ var require_object_hash = __commonJS({
     function hash(object, options) {
       var hashingStream;
       if (options.algorithm !== "passthrough") {
-        hashingStream = crypto10.createHash(options.algorithm);
+        hashingStream = crypto11.createHash(options.algorithm);
       } else {
         hashingStream = new PassThrough();
       }
@@ -37288,7 +37288,7 @@ var require_FileStreamRotator = __commonJS({
     var fs19 = require("fs");
     var path20 = require("path");
     var moment = require_moment();
-    var crypto10 = require("crypto");
+    var crypto11 = require("crypto");
     var EventEmitter = require("events");
     var FileStreamRotator = {};
     module2.exports = FileStreamRotator;
@@ -37417,7 +37417,7 @@ var require_FileStreamRotator = __commonJS({
       }
     };
     function removeFile(file, verbose) {
-      if (file.hash === crypto10.createHash(file.hashType).update(file.name + "LOG_FILE" + file.date).digest("hex")) {
+      if (file.hash === crypto11.createHash(file.hashType).update(file.name + "LOG_FILE" + file.date).digest("hex")) {
         try {
           if (fs19.existsSync(file.name)) {
             fs19.unlinkSync(file.name);
@@ -37483,7 +37483,7 @@ var require_FileStreamRotator = __commonJS({
         audit.files.push({
           date: time,
           name: logfile,
-          hash: crypto10.createHash(audit.hashType).update(logfile + "LOG_FILE" + time).digest("hex")
+          hash: crypto11.createHash(audit.hashType).update(logfile + "LOG_FILE" + time).digest("hex")
         });
         if (audit.keep.days) {
           var oldestDate = moment().subtract(audit.keep.amount, "days").valueOf();
@@ -57907,10 +57907,7 @@ var require_json2 = __commonJS({
       var index = str.indexOf(char);
       var partial = "";
       if (index !== -1) {
-        partial = str.substring(0, index) + JSON_SYNTAX_CHAR;
-        for (var i = index + 1; i < str.length; i++) {
-          partial += JSON_SYNTAX_CHAR;
-        }
+        partial = str.substring(0, index) + new Array(str.length - index + 1).join(JSON_SYNTAX_CHAR);
       }
       try {
         JSON.parse(partial);
@@ -58685,9 +58682,8 @@ var require_side_channel_list = __commonJS({
           }
         },
         "delete": function(key) {
-          var root = $o && $o.next;
           var deletedNode = listDelete($o, key);
-          if (deletedNode && root && root === deletedNode) {
+          if (deletedNode && $o && !$o.next) {
             $o = void 0;
           }
           return !!deletedNode;
@@ -59703,9 +59699,9 @@ var require_side_channel = __commonJS({
   }
 });
 
-// node_modules/qs/lib/formats.js
+// node_modules/body-parser/node_modules/qs/lib/formats.js
 var require_formats = __commonJS({
-  "node_modules/qs/lib/formats.js"(exports2, module2) {
+  "node_modules/body-parser/node_modules/qs/lib/formats.js"(exports2, module2) {
     "use strict";
     var replace = String.prototype.replace;
     var percentTwenties = /%20/g;
@@ -59729,9 +59725,9 @@ var require_formats = __commonJS({
   }
 });
 
-// node_modules/qs/lib/utils.js
+// node_modules/body-parser/node_modules/qs/lib/utils.js
 var require_utils4 = __commonJS({
-  "node_modules/qs/lib/utils.js"(exports2, module2) {
+  "node_modules/body-parser/node_modules/qs/lib/utils.js"(exports2, module2) {
     "use strict";
     var formats = require_formats();
     var getSideChannel = require_side_channel();
@@ -59798,6 +59794,8 @@ var require_utils4 = __commonJS({
             var newIndex = getMaxIndex(target) + 1;
             target[newIndex] = source;
             setMaxIndex(target, newIndex);
+          } else if (options && options.strictMerge) {
+            return [target, source];
           } else if (options && (options.plainObjects || options.allowPrototypes) || !has.call(Object.prototype, source)) {
             target[source] = true;
           }
@@ -59991,9 +59989,9 @@ var require_utils4 = __commonJS({
   }
 });
 
-// node_modules/qs/lib/stringify.js
+// node_modules/body-parser/node_modules/qs/lib/stringify.js
 var require_stringify = __commonJS({
-  "node_modules/qs/lib/stringify.js"(exports2, module2) {
+  "node_modules/body-parser/node_modules/qs/lib/stringify.js"(exports2, module2) {
     "use strict";
     var getSideChannel = require_side_channel();
     var utils = require_utils4();
@@ -60274,9 +60272,9 @@ var require_stringify = __commonJS({
   }
 });
 
-// node_modules/qs/lib/parse.js
+// node_modules/body-parser/node_modules/qs/lib/parse.js
 var require_parse2 = __commonJS({
-  "node_modules/qs/lib/parse.js"(exports2, module2) {
+  "node_modules/body-parser/node_modules/qs/lib/parse.js"(exports2, module2) {
     "use strict";
     var utils = require_utils4();
     var has = Object.prototype.hasOwnProperty;
@@ -60301,6 +60299,7 @@ var require_parse2 = __commonJS({
       parseArrays: true,
       plainObjects: false,
       strictDepth: false,
+      strictMerge: true,
       strictNullHandling: false,
       throwOnLimitExceeded: false
     };
@@ -60327,9 +60326,9 @@ var require_parse2 = __commonJS({
       var limit = options.parameterLimit === Infinity ? void 0 : options.parameterLimit;
       var parts = cleanStr.split(
         options.delimiter,
-        options.throwOnLimitExceeded ? limit + 1 : limit
+        options.throwOnLimitExceeded && typeof limit !== "undefined" ? limit + 1 : limit
       );
-      if (options.throwOnLimitExceeded && parts.length > limit) {
+      if (options.throwOnLimitExceeded && typeof limit !== "undefined" && parts.length > limit) {
         throw new RangeError("Parameter limit exceeded. Only " + limit + " parameter" + (limit === 1 ? "" : "s") + " allowed.");
       }
       var skipIndex = -1;
@@ -60389,7 +60388,7 @@ var require_parse2 = __commonJS({
         }
         if (key !== null) {
           var existing = has.call(obj, key);
-          if (existing && options.duplicates === "combine") {
+          if (existing && (options.duplicates === "combine" || part.indexOf("[]=") > -1)) {
             obj[key] = utils.combine(
               obj[key],
               val,
@@ -60546,6 +60545,7 @@ var require_parse2 = __commonJS({
         parseArrays: opts.parseArrays !== false,
         plainObjects: typeof opts.plainObjects === "boolean" ? opts.plainObjects : defaults2.plainObjects,
         strictDepth: typeof opts.strictDepth === "boolean" ? !!opts.strictDepth : defaults2.strictDepth,
+        strictMerge: typeof opts.strictMerge === "boolean" ? !!opts.strictMerge : defaults2.strictMerge,
         strictNullHandling: typeof opts.strictNullHandling === "boolean" ? opts.strictNullHandling : defaults2.strictNullHandling,
         throwOnLimitExceeded: typeof opts.throwOnLimitExceeded === "boolean" ? opts.throwOnLimitExceeded : false
       };
@@ -60571,9 +60571,9 @@ var require_parse2 = __commonJS({
   }
 });
 
-// node_modules/qs/lib/index.js
+// node_modules/body-parser/node_modules/qs/lib/index.js
 var require_lib2 = __commonJS({
-  "node_modules/qs/lib/index.js"(exports2, module2) {
+  "node_modules/body-parser/node_modules/qs/lib/index.js"(exports2, module2) {
     "use strict";
     var stringify = require_stringify();
     var parse = require_parse2();
@@ -60704,14 +60704,14 @@ var require_urlencoded = __commonJS({
     }
     function parameterCount(body, limit) {
       var count = 0;
-      var index = 0;
-      while ((index = body.indexOf("&", index)) !== -1) {
+      var index = -1;
+      do {
         count++;
-        index++;
-        if (count === limit) {
+        if (count > limit) {
           return void 0;
         }
-      }
+        index = body.indexOf("&", index + 1);
+      } while (index !== -1);
       return count;
     }
     function parser(name) {
@@ -62103,6 +62103,7 @@ var require_path_to_regexp = __commonJS({
           }
           pos = offset + match.length;
           if (match === "*") {
+            backtrack = "";
             extraOffset += 3;
             return "(.*)";
           }
@@ -62123,6 +62124,7 @@ var require_path_to_regexp = __commonJS({
             offset: offset + extraOffset
           });
           var result = "(?:" + format2 + slash + capture + (star ? "((?:[/" + format2 + "].+?)?)" : "") + ")" + optional;
+          backtrack = "";
           extraOffset += result.length - match.length;
           return result;
         }
@@ -62818,13 +62820,896 @@ var require_init = __commonJS({
   }
 });
 
+// node_modules/qs/lib/formats.js
+var require_formats2 = __commonJS({
+  "node_modules/qs/lib/formats.js"(exports2, module2) {
+    "use strict";
+    var replace = String.prototype.replace;
+    var percentTwenties = /%20/g;
+    var Format = {
+      RFC1738: "RFC1738",
+      RFC3986: "RFC3986"
+    };
+    module2.exports = {
+      "default": Format.RFC3986,
+      formatters: {
+        RFC1738: function(value) {
+          return replace.call(value, percentTwenties, "+");
+        },
+        RFC3986: function(value) {
+          return String(value);
+        }
+      },
+      RFC1738: Format.RFC1738,
+      RFC3986: Format.RFC3986
+    };
+  }
+});
+
+// node_modules/qs/lib/utils.js
+var require_utils5 = __commonJS({
+  "node_modules/qs/lib/utils.js"(exports2, module2) {
+    "use strict";
+    var formats = require_formats2();
+    var getSideChannel = require_side_channel();
+    var has = Object.prototype.hasOwnProperty;
+    var isArray = Array.isArray;
+    var overflowChannel = getSideChannel();
+    var markOverflow = function markOverflow2(obj, maxIndex) {
+      overflowChannel.set(obj, maxIndex);
+      return obj;
+    };
+    var isOverflow = function isOverflow2(obj) {
+      return overflowChannel.has(obj);
+    };
+    var getMaxIndex = function getMaxIndex2(obj) {
+      return overflowChannel.get(obj);
+    };
+    var setMaxIndex = function setMaxIndex2(obj, maxIndex) {
+      overflowChannel.set(obj, maxIndex);
+    };
+    var hexTable = (function() {
+      var array = [];
+      for (var i = 0; i < 256; ++i) {
+        array[array.length] = "%" + ((i < 16 ? "0" : "") + i.toString(16)).toUpperCase();
+      }
+      return array;
+    })();
+    var compactQueue = function compactQueue2(queue2) {
+      while (queue2.length > 1) {
+        var item = queue2.pop();
+        var obj = item.obj[item.prop];
+        if (isArray(obj)) {
+          var compacted = [];
+          for (var j = 0; j < obj.length; ++j) {
+            if (typeof obj[j] !== "undefined") {
+              compacted[compacted.length] = obj[j];
+            }
+          }
+          item.obj[item.prop] = compacted;
+        }
+      }
+    };
+    var arrayToObject = function arrayToObject2(source, options) {
+      var obj = options && options.plainObjects ? { __proto__: null } : {};
+      for (var i = 0; i < source.length; ++i) {
+        if (typeof source[i] !== "undefined") {
+          obj[i] = source[i];
+        }
+      }
+      return obj;
+    };
+    var merge = function merge2(target, source, options) {
+      if (!source) {
+        return target;
+      }
+      if (typeof source !== "object" && typeof source !== "function") {
+        if (isArray(target)) {
+          var nextIndex = target.length;
+          if (options && typeof options.arrayLimit === "number" && nextIndex > options.arrayLimit) {
+            return markOverflow(arrayToObject(target.concat(source), options), nextIndex);
+          }
+          target[nextIndex] = source;
+        } else if (target && typeof target === "object") {
+          if (isOverflow(target)) {
+            var newIndex = getMaxIndex(target) + 1;
+            target[newIndex] = source;
+            setMaxIndex(target, newIndex);
+          } else if (options && (options.plainObjects || options.allowPrototypes) || !has.call(Object.prototype, source)) {
+            target[source] = true;
+          }
+        } else {
+          return [target, source];
+        }
+        return target;
+      }
+      if (!target || typeof target !== "object") {
+        if (isOverflow(source)) {
+          var sourceKeys = Object.keys(source);
+          var result = options && options.plainObjects ? { __proto__: null, 0: target } : { 0: target };
+          for (var m = 0; m < sourceKeys.length; m++) {
+            var oldKey = parseInt(sourceKeys[m], 10);
+            result[oldKey + 1] = source[sourceKeys[m]];
+          }
+          return markOverflow(result, getMaxIndex(source) + 1);
+        }
+        var combined = [target].concat(source);
+        if (options && typeof options.arrayLimit === "number" && combined.length > options.arrayLimit) {
+          return markOverflow(arrayToObject(combined, options), combined.length - 1);
+        }
+        return combined;
+      }
+      var mergeTarget = target;
+      if (isArray(target) && !isArray(source)) {
+        mergeTarget = arrayToObject(target, options);
+      }
+      if (isArray(target) && isArray(source)) {
+        source.forEach(function(item, i) {
+          if (has.call(target, i)) {
+            var targetItem = target[i];
+            if (targetItem && typeof targetItem === "object" && item && typeof item === "object") {
+              target[i] = merge2(targetItem, item, options);
+            } else {
+              target[target.length] = item;
+            }
+          } else {
+            target[i] = item;
+          }
+        });
+        return target;
+      }
+      return Object.keys(source).reduce(function(acc, key) {
+        var value = source[key];
+        if (has.call(acc, key)) {
+          acc[key] = merge2(acc[key], value, options);
+        } else {
+          acc[key] = value;
+        }
+        if (isOverflow(source) && !isOverflow(acc)) {
+          markOverflow(acc, getMaxIndex(source));
+        }
+        if (isOverflow(acc)) {
+          var keyNum = parseInt(key, 10);
+          if (String(keyNum) === key && keyNum >= 0 && keyNum > getMaxIndex(acc)) {
+            setMaxIndex(acc, keyNum);
+          }
+        }
+        return acc;
+      }, mergeTarget);
+    };
+    var assign = function assignSingleSource(target, source) {
+      return Object.keys(source).reduce(function(acc, key) {
+        acc[key] = source[key];
+        return acc;
+      }, target);
+    };
+    var decode = function(str, defaultDecoder, charset) {
+      var strWithoutPlus = str.replace(/\+/g, " ");
+      if (charset === "iso-8859-1") {
+        return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
+      }
+      try {
+        return decodeURIComponent(strWithoutPlus);
+      } catch (e) {
+        return strWithoutPlus;
+      }
+    };
+    var limit = 1024;
+    var encode = function encode2(str, defaultEncoder, charset, kind, format2) {
+      if (str.length === 0) {
+        return str;
+      }
+      var string = str;
+      if (typeof str === "symbol") {
+        string = Symbol.prototype.toString.call(str);
+      } else if (typeof str !== "string") {
+        string = String(str);
+      }
+      if (charset === "iso-8859-1") {
+        return escape(string).replace(/%u[0-9a-f]{4}/gi, function($0) {
+          return "%26%23" + parseInt($0.slice(2), 16) + "%3B";
+        });
+      }
+      var out = "";
+      for (var j = 0; j < string.length; j += limit) {
+        var segment = string.length >= limit ? string.slice(j, j + limit) : string;
+        var arr = [];
+        for (var i = 0; i < segment.length; ++i) {
+          var c = segment.charCodeAt(i);
+          if (c === 45 || c === 46 || c === 95 || c === 126 || c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || format2 === formats.RFC1738 && (c === 40 || c === 41)) {
+            arr[arr.length] = segment.charAt(i);
+            continue;
+          }
+          if (c < 128) {
+            arr[arr.length] = hexTable[c];
+            continue;
+          }
+          if (c < 2048) {
+            arr[arr.length] = hexTable[192 | c >> 6] + hexTable[128 | c & 63];
+            continue;
+          }
+          if (c < 55296 || c >= 57344) {
+            arr[arr.length] = hexTable[224 | c >> 12] + hexTable[128 | c >> 6 & 63] + hexTable[128 | c & 63];
+            continue;
+          }
+          i += 1;
+          c = 65536 + ((c & 1023) << 10 | segment.charCodeAt(i) & 1023);
+          arr[arr.length] = hexTable[240 | c >> 18] + hexTable[128 | c >> 12 & 63] + hexTable[128 | c >> 6 & 63] + hexTable[128 | c & 63];
+        }
+        out += arr.join("");
+      }
+      return out;
+    };
+    var compact2 = function compact3(value) {
+      var queue2 = [{ obj: { o: value }, prop: "o" }];
+      var refs = [];
+      for (var i = 0; i < queue2.length; ++i) {
+        var item = queue2[i];
+        var obj = item.obj[item.prop];
+        var keys = Object.keys(obj);
+        for (var j = 0; j < keys.length; ++j) {
+          var key = keys[j];
+          var val = obj[key];
+          if (typeof val === "object" && val !== null && refs.indexOf(val) === -1) {
+            queue2[queue2.length] = { obj, prop: key };
+            refs[refs.length] = val;
+          }
+        }
+      }
+      compactQueue(queue2);
+      return value;
+    };
+    var isRegExp = function isRegExp2(obj) {
+      return Object.prototype.toString.call(obj) === "[object RegExp]";
+    };
+    var isBuffer = function isBuffer2(obj) {
+      if (!obj || typeof obj !== "object") {
+        return false;
+      }
+      return !!(obj.constructor && obj.constructor.isBuffer && obj.constructor.isBuffer(obj));
+    };
+    var combine = function combine2(a, b, arrayLimit, plainObjects) {
+      if (isOverflow(a)) {
+        var newIndex = getMaxIndex(a) + 1;
+        a[newIndex] = b;
+        setMaxIndex(a, newIndex);
+        return a;
+      }
+      var result = [].concat(a, b);
+      if (result.length > arrayLimit) {
+        return markOverflow(arrayToObject(result, { plainObjects }), result.length - 1);
+      }
+      return result;
+    };
+    var maybeMap = function maybeMap2(val, fn) {
+      if (isArray(val)) {
+        var mapped = [];
+        for (var i = 0; i < val.length; i += 1) {
+          mapped[mapped.length] = fn(val[i]);
+        }
+        return mapped;
+      }
+      return fn(val);
+    };
+    module2.exports = {
+      arrayToObject,
+      assign,
+      combine,
+      compact: compact2,
+      decode,
+      encode,
+      isBuffer,
+      isOverflow,
+      isRegExp,
+      markOverflow,
+      maybeMap,
+      merge
+    };
+  }
+});
+
+// node_modules/qs/lib/stringify.js
+var require_stringify2 = __commonJS({
+  "node_modules/qs/lib/stringify.js"(exports2, module2) {
+    "use strict";
+    var getSideChannel = require_side_channel();
+    var utils = require_utils5();
+    var formats = require_formats2();
+    var has = Object.prototype.hasOwnProperty;
+    var arrayPrefixGenerators = {
+      brackets: function brackets(prefix) {
+        return prefix + "[]";
+      },
+      comma: "comma",
+      indices: function indices(prefix, key) {
+        return prefix + "[" + key + "]";
+      },
+      repeat: function repeat(prefix) {
+        return prefix;
+      }
+    };
+    var isArray = Array.isArray;
+    var push = Array.prototype.push;
+    var pushToArray = function(arr, valueOrArray) {
+      push.apply(arr, isArray(valueOrArray) ? valueOrArray : [valueOrArray]);
+    };
+    var toISO = Date.prototype.toISOString;
+    var defaultFormat = formats["default"];
+    var defaults2 = {
+      addQueryPrefix: false,
+      allowDots: false,
+      allowEmptyArrays: false,
+      arrayFormat: "indices",
+      charset: "utf-8",
+      charsetSentinel: false,
+      commaRoundTrip: false,
+      delimiter: "&",
+      encode: true,
+      encodeDotInKeys: false,
+      encoder: utils.encode,
+      encodeValuesOnly: false,
+      filter: void 0,
+      format: defaultFormat,
+      formatter: formats.formatters[defaultFormat],
+      // deprecated
+      indices: false,
+      serializeDate: function serializeDate(date) {
+        return toISO.call(date);
+      },
+      skipNulls: false,
+      strictNullHandling: false
+    };
+    var isNonNullishPrimitive = function isNonNullishPrimitive2(v) {
+      return typeof v === "string" || typeof v === "number" || typeof v === "boolean" || typeof v === "symbol" || typeof v === "bigint";
+    };
+    var sentinel = {};
+    var stringify = function stringify2(object, prefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, encoder, filter, sort, allowDots, serializeDate, format2, formatter, encodeValuesOnly, charset, sideChannel) {
+      var obj = object;
+      var tmpSc = sideChannel;
+      var step = 0;
+      var findFlag = false;
+      while ((tmpSc = tmpSc.get(sentinel)) !== void 0 && !findFlag) {
+        var pos = tmpSc.get(object);
+        step += 1;
+        if (typeof pos !== "undefined") {
+          if (pos === step) {
+            throw new RangeError("Cyclic object value");
+          } else {
+            findFlag = true;
+          }
+        }
+        if (typeof tmpSc.get(sentinel) === "undefined") {
+          step = 0;
+        }
+      }
+      if (typeof filter === "function") {
+        obj = filter(prefix, obj);
+      } else if (obj instanceof Date) {
+        obj = serializeDate(obj);
+      } else if (generateArrayPrefix === "comma" && isArray(obj)) {
+        obj = utils.maybeMap(obj, function(value2) {
+          if (value2 instanceof Date) {
+            return serializeDate(value2);
+          }
+          return value2;
+        });
+      }
+      if (obj === null) {
+        if (strictNullHandling) {
+          return encoder && !encodeValuesOnly ? encoder(prefix, defaults2.encoder, charset, "key", format2) : prefix;
+        }
+        obj = "";
+      }
+      if (isNonNullishPrimitive(obj) || utils.isBuffer(obj)) {
+        if (encoder) {
+          var keyValue = encodeValuesOnly ? prefix : encoder(prefix, defaults2.encoder, charset, "key", format2);
+          return [formatter(keyValue) + "=" + formatter(encoder(obj, defaults2.encoder, charset, "value", format2))];
+        }
+        return [formatter(prefix) + "=" + formatter(String(obj))];
+      }
+      var values = [];
+      if (typeof obj === "undefined") {
+        return values;
+      }
+      var objKeys;
+      if (generateArrayPrefix === "comma" && isArray(obj)) {
+        if (encodeValuesOnly && encoder) {
+          obj = utils.maybeMap(obj, encoder);
+        }
+        objKeys = [{ value: obj.length > 0 ? obj.join(",") || null : void 0 }];
+      } else if (isArray(filter)) {
+        objKeys = filter;
+      } else {
+        var keys = Object.keys(obj);
+        objKeys = sort ? keys.sort(sort) : keys;
+      }
+      var encodedPrefix = encodeDotInKeys ? String(prefix).replace(/\./g, "%2E") : String(prefix);
+      var adjustedPrefix = commaRoundTrip && isArray(obj) && obj.length === 1 ? encodedPrefix + "[]" : encodedPrefix;
+      if (allowEmptyArrays && isArray(obj) && obj.length === 0) {
+        return adjustedPrefix + "[]";
+      }
+      for (var j = 0; j < objKeys.length; ++j) {
+        var key = objKeys[j];
+        var value = typeof key === "object" && key && typeof key.value !== "undefined" ? key.value : obj[key];
+        if (skipNulls && value === null) {
+          continue;
+        }
+        var encodedKey = allowDots && encodeDotInKeys ? String(key).replace(/\./g, "%2E") : String(key);
+        var keyPrefix = isArray(obj) ? typeof generateArrayPrefix === "function" ? generateArrayPrefix(adjustedPrefix, encodedKey) : adjustedPrefix : adjustedPrefix + (allowDots ? "." + encodedKey : "[" + encodedKey + "]");
+        sideChannel.set(object, step);
+        var valueSideChannel = getSideChannel();
+        valueSideChannel.set(sentinel, sideChannel);
+        pushToArray(values, stringify2(
+          value,
+          keyPrefix,
+          generateArrayPrefix,
+          commaRoundTrip,
+          allowEmptyArrays,
+          strictNullHandling,
+          skipNulls,
+          encodeDotInKeys,
+          generateArrayPrefix === "comma" && encodeValuesOnly && isArray(obj) ? null : encoder,
+          filter,
+          sort,
+          allowDots,
+          serializeDate,
+          format2,
+          formatter,
+          encodeValuesOnly,
+          charset,
+          valueSideChannel
+        ));
+      }
+      return values;
+    };
+    var normalizeStringifyOptions = function normalizeStringifyOptions2(opts) {
+      if (!opts) {
+        return defaults2;
+      }
+      if (typeof opts.allowEmptyArrays !== "undefined" && typeof opts.allowEmptyArrays !== "boolean") {
+        throw new TypeError("`allowEmptyArrays` option can only be `true` or `false`, when provided");
+      }
+      if (typeof opts.encodeDotInKeys !== "undefined" && typeof opts.encodeDotInKeys !== "boolean") {
+        throw new TypeError("`encodeDotInKeys` option can only be `true` or `false`, when provided");
+      }
+      if (opts.encoder !== null && typeof opts.encoder !== "undefined" && typeof opts.encoder !== "function") {
+        throw new TypeError("Encoder has to be a function.");
+      }
+      var charset = opts.charset || defaults2.charset;
+      if (typeof opts.charset !== "undefined" && opts.charset !== "utf-8" && opts.charset !== "iso-8859-1") {
+        throw new TypeError("The charset option must be either utf-8, iso-8859-1, or undefined");
+      }
+      var format2 = formats["default"];
+      if (typeof opts.format !== "undefined") {
+        if (!has.call(formats.formatters, opts.format)) {
+          throw new TypeError("Unknown format option provided.");
+        }
+        format2 = opts.format;
+      }
+      var formatter = formats.formatters[format2];
+      var filter = defaults2.filter;
+      if (typeof opts.filter === "function" || isArray(opts.filter)) {
+        filter = opts.filter;
+      }
+      var arrayFormat;
+      if (opts.arrayFormat in arrayPrefixGenerators) {
+        arrayFormat = opts.arrayFormat;
+      } else if ("indices" in opts) {
+        arrayFormat = opts.indices ? "indices" : "repeat";
+      } else {
+        arrayFormat = defaults2.arrayFormat;
+      }
+      if ("commaRoundTrip" in opts && typeof opts.commaRoundTrip !== "boolean") {
+        throw new TypeError("`commaRoundTrip` must be a boolean, or absent");
+      }
+      var allowDots = typeof opts.allowDots === "undefined" ? opts.encodeDotInKeys === true ? true : defaults2.allowDots : !!opts.allowDots;
+      return {
+        addQueryPrefix: typeof opts.addQueryPrefix === "boolean" ? opts.addQueryPrefix : defaults2.addQueryPrefix,
+        allowDots,
+        allowEmptyArrays: typeof opts.allowEmptyArrays === "boolean" ? !!opts.allowEmptyArrays : defaults2.allowEmptyArrays,
+        arrayFormat,
+        charset,
+        charsetSentinel: typeof opts.charsetSentinel === "boolean" ? opts.charsetSentinel : defaults2.charsetSentinel,
+        commaRoundTrip: !!opts.commaRoundTrip,
+        delimiter: typeof opts.delimiter === "undefined" ? defaults2.delimiter : opts.delimiter,
+        encode: typeof opts.encode === "boolean" ? opts.encode : defaults2.encode,
+        encodeDotInKeys: typeof opts.encodeDotInKeys === "boolean" ? opts.encodeDotInKeys : defaults2.encodeDotInKeys,
+        encoder: typeof opts.encoder === "function" ? opts.encoder : defaults2.encoder,
+        encodeValuesOnly: typeof opts.encodeValuesOnly === "boolean" ? opts.encodeValuesOnly : defaults2.encodeValuesOnly,
+        filter,
+        format: format2,
+        formatter,
+        serializeDate: typeof opts.serializeDate === "function" ? opts.serializeDate : defaults2.serializeDate,
+        skipNulls: typeof opts.skipNulls === "boolean" ? opts.skipNulls : defaults2.skipNulls,
+        sort: typeof opts.sort === "function" ? opts.sort : null,
+        strictNullHandling: typeof opts.strictNullHandling === "boolean" ? opts.strictNullHandling : defaults2.strictNullHandling
+      };
+    };
+    module2.exports = function(object, opts) {
+      var obj = object;
+      var options = normalizeStringifyOptions(opts);
+      var objKeys;
+      var filter;
+      if (typeof options.filter === "function") {
+        filter = options.filter;
+        obj = filter("", obj);
+      } else if (isArray(options.filter)) {
+        filter = options.filter;
+        objKeys = filter;
+      }
+      var keys = [];
+      if (typeof obj !== "object" || obj === null) {
+        return "";
+      }
+      var generateArrayPrefix = arrayPrefixGenerators[options.arrayFormat];
+      var commaRoundTrip = generateArrayPrefix === "comma" && options.commaRoundTrip;
+      if (!objKeys) {
+        objKeys = Object.keys(obj);
+      }
+      if (options.sort) {
+        objKeys.sort(options.sort);
+      }
+      var sideChannel = getSideChannel();
+      for (var i = 0; i < objKeys.length; ++i) {
+        var key = objKeys[i];
+        var value = obj[key];
+        if (options.skipNulls && value === null) {
+          continue;
+        }
+        pushToArray(keys, stringify(
+          value,
+          key,
+          generateArrayPrefix,
+          commaRoundTrip,
+          options.allowEmptyArrays,
+          options.strictNullHandling,
+          options.skipNulls,
+          options.encodeDotInKeys,
+          options.encode ? options.encoder : null,
+          options.filter,
+          options.sort,
+          options.allowDots,
+          options.serializeDate,
+          options.format,
+          options.formatter,
+          options.encodeValuesOnly,
+          options.charset,
+          sideChannel
+        ));
+      }
+      var joined = keys.join(options.delimiter);
+      var prefix = options.addQueryPrefix === true ? "?" : "";
+      if (options.charsetSentinel) {
+        if (options.charset === "iso-8859-1") {
+          prefix += "utf8=%26%2310003%3B&";
+        } else {
+          prefix += "utf8=%E2%9C%93&";
+        }
+      }
+      return joined.length > 0 ? prefix + joined : "";
+    };
+  }
+});
+
+// node_modules/qs/lib/parse.js
+var require_parse3 = __commonJS({
+  "node_modules/qs/lib/parse.js"(exports2, module2) {
+    "use strict";
+    var utils = require_utils5();
+    var has = Object.prototype.hasOwnProperty;
+    var isArray = Array.isArray;
+    var defaults2 = {
+      allowDots: false,
+      allowEmptyArrays: false,
+      allowPrototypes: false,
+      allowSparse: false,
+      arrayLimit: 20,
+      charset: "utf-8",
+      charsetSentinel: false,
+      comma: false,
+      decodeDotInKeys: false,
+      decoder: utils.decode,
+      delimiter: "&",
+      depth: 5,
+      duplicates: "combine",
+      ignoreQueryPrefix: false,
+      interpretNumericEntities: false,
+      parameterLimit: 1e3,
+      parseArrays: true,
+      plainObjects: false,
+      strictDepth: false,
+      strictNullHandling: false,
+      throwOnLimitExceeded: false
+    };
+    var interpretNumericEntities = function(str) {
+      return str.replace(/&#(\d+);/g, function($0, numberStr) {
+        return String.fromCharCode(parseInt(numberStr, 10));
+      });
+    };
+    var parseArrayValue = function(val, options, currentArrayLength) {
+      if (val && typeof val === "string" && options.comma && val.indexOf(",") > -1) {
+        return val.split(",");
+      }
+      if (options.throwOnLimitExceeded && currentArrayLength >= options.arrayLimit) {
+        throw new RangeError("Array limit exceeded. Only " + options.arrayLimit + " element" + (options.arrayLimit === 1 ? "" : "s") + " allowed in an array.");
+      }
+      return val;
+    };
+    var isoSentinel = "utf8=%26%2310003%3B";
+    var charsetSentinel = "utf8=%E2%9C%93";
+    var parseValues = function parseQueryStringValues(str, options) {
+      var obj = { __proto__: null };
+      var cleanStr = options.ignoreQueryPrefix ? str.replace(/^\?/, "") : str;
+      cleanStr = cleanStr.replace(/%5B/gi, "[").replace(/%5D/gi, "]");
+      var limit = options.parameterLimit === Infinity ? void 0 : options.parameterLimit;
+      var parts = cleanStr.split(
+        options.delimiter,
+        options.throwOnLimitExceeded ? limit + 1 : limit
+      );
+      if (options.throwOnLimitExceeded && parts.length > limit) {
+        throw new RangeError("Parameter limit exceeded. Only " + limit + " parameter" + (limit === 1 ? "" : "s") + " allowed.");
+      }
+      var skipIndex = -1;
+      var i;
+      var charset = options.charset;
+      if (options.charsetSentinel) {
+        for (i = 0; i < parts.length; ++i) {
+          if (parts[i].indexOf("utf8=") === 0) {
+            if (parts[i] === charsetSentinel) {
+              charset = "utf-8";
+            } else if (parts[i] === isoSentinel) {
+              charset = "iso-8859-1";
+            }
+            skipIndex = i;
+            i = parts.length;
+          }
+        }
+      }
+      for (i = 0; i < parts.length; ++i) {
+        if (i === skipIndex) {
+          continue;
+        }
+        var part = parts[i];
+        var bracketEqualsPos = part.indexOf("]=");
+        var pos = bracketEqualsPos === -1 ? part.indexOf("=") : bracketEqualsPos + 1;
+        var key;
+        var val;
+        if (pos === -1) {
+          key = options.decoder(part, defaults2.decoder, charset, "key");
+          val = options.strictNullHandling ? null : "";
+        } else {
+          key = options.decoder(part.slice(0, pos), defaults2.decoder, charset, "key");
+          if (key !== null) {
+            val = utils.maybeMap(
+              parseArrayValue(
+                part.slice(pos + 1),
+                options,
+                isArray(obj[key]) ? obj[key].length : 0
+              ),
+              function(encodedVal) {
+                return options.decoder(encodedVal, defaults2.decoder, charset, "value");
+              }
+            );
+          }
+        }
+        if (val && options.interpretNumericEntities && charset === "iso-8859-1") {
+          val = interpretNumericEntities(String(val));
+        }
+        if (part.indexOf("[]=") > -1) {
+          val = isArray(val) ? [val] : val;
+        }
+        if (options.comma && isArray(val) && val.length > options.arrayLimit) {
+          if (options.throwOnLimitExceeded) {
+            throw new RangeError("Array limit exceeded. Only " + options.arrayLimit + " element" + (options.arrayLimit === 1 ? "" : "s") + " allowed in an array.");
+          }
+          val = utils.combine([], val, options.arrayLimit, options.plainObjects);
+        }
+        if (key !== null) {
+          var existing = has.call(obj, key);
+          if (existing && options.duplicates === "combine") {
+            obj[key] = utils.combine(
+              obj[key],
+              val,
+              options.arrayLimit,
+              options.plainObjects
+            );
+          } else if (!existing || options.duplicates === "last") {
+            obj[key] = val;
+          }
+        }
+      }
+      return obj;
+    };
+    var parseObject = function(chain, val, options, valuesParsed) {
+      var currentArrayLength = 0;
+      if (chain.length > 0 && chain[chain.length - 1] === "[]") {
+        var parentKey = chain.slice(0, -1).join("");
+        currentArrayLength = Array.isArray(val) && val[parentKey] ? val[parentKey].length : 0;
+      }
+      var leaf = valuesParsed ? val : parseArrayValue(val, options, currentArrayLength);
+      for (var i = chain.length - 1; i >= 0; --i) {
+        var obj;
+        var root = chain[i];
+        if (root === "[]" && options.parseArrays) {
+          if (utils.isOverflow(leaf)) {
+            obj = leaf;
+          } else {
+            obj = options.allowEmptyArrays && (leaf === "" || options.strictNullHandling && leaf === null) ? [] : utils.combine(
+              [],
+              leaf,
+              options.arrayLimit,
+              options.plainObjects
+            );
+          }
+        } else {
+          obj = options.plainObjects ? { __proto__: null } : {};
+          var cleanRoot = root.charAt(0) === "[" && root.charAt(root.length - 1) === "]" ? root.slice(1, -1) : root;
+          var decodedRoot = options.decodeDotInKeys ? cleanRoot.replace(/%2E/g, ".") : cleanRoot;
+          var index = parseInt(decodedRoot, 10);
+          var isValidArrayIndex = !isNaN(index) && root !== decodedRoot && String(index) === decodedRoot && index >= 0 && options.parseArrays;
+          if (!options.parseArrays && decodedRoot === "") {
+            obj = { 0: leaf };
+          } else if (isValidArrayIndex && index < options.arrayLimit) {
+            obj = [];
+            obj[index] = leaf;
+          } else if (isValidArrayIndex && options.throwOnLimitExceeded) {
+            throw new RangeError("Array limit exceeded. Only " + options.arrayLimit + " element" + (options.arrayLimit === 1 ? "" : "s") + " allowed in an array.");
+          } else if (isValidArrayIndex) {
+            obj[index] = leaf;
+            utils.markOverflow(obj, index);
+          } else if (decodedRoot !== "__proto__") {
+            obj[decodedRoot] = leaf;
+          }
+        }
+        leaf = obj;
+      }
+      return leaf;
+    };
+    var splitKeyIntoSegments = function splitKeyIntoSegments2(givenKey, options) {
+      var key = options.allowDots ? givenKey.replace(/\.([^.[]+)/g, "[$1]") : givenKey;
+      if (options.depth <= 0) {
+        if (!options.plainObjects && has.call(Object.prototype, key)) {
+          if (!options.allowPrototypes) {
+            return;
+          }
+        }
+        return [key];
+      }
+      var brackets = /(\[[^[\]]*])/;
+      var child = /(\[[^[\]]*])/g;
+      var segment = brackets.exec(key);
+      var parent = segment ? key.slice(0, segment.index) : key;
+      var keys = [];
+      if (parent) {
+        if (!options.plainObjects && has.call(Object.prototype, parent)) {
+          if (!options.allowPrototypes) {
+            return;
+          }
+        }
+        keys[keys.length] = parent;
+      }
+      var i = 0;
+      while ((segment = child.exec(key)) !== null && i < options.depth) {
+        i += 1;
+        var segmentContent = segment[1].slice(1, -1);
+        if (!options.plainObjects && has.call(Object.prototype, segmentContent)) {
+          if (!options.allowPrototypes) {
+            return;
+          }
+        }
+        keys[keys.length] = segment[1];
+      }
+      if (segment) {
+        if (options.strictDepth === true) {
+          throw new RangeError("Input depth exceeded depth option of " + options.depth + " and strictDepth is true");
+        }
+        keys[keys.length] = "[" + key.slice(segment.index) + "]";
+      }
+      return keys;
+    };
+    var parseKeys = function parseQueryStringKeys(givenKey, val, options, valuesParsed) {
+      if (!givenKey) {
+        return;
+      }
+      var keys = splitKeyIntoSegments(givenKey, options);
+      if (!keys) {
+        return;
+      }
+      return parseObject(keys, val, options, valuesParsed);
+    };
+    var normalizeParseOptions = function normalizeParseOptions2(opts) {
+      if (!opts) {
+        return defaults2;
+      }
+      if (typeof opts.allowEmptyArrays !== "undefined" && typeof opts.allowEmptyArrays !== "boolean") {
+        throw new TypeError("`allowEmptyArrays` option can only be `true` or `false`, when provided");
+      }
+      if (typeof opts.decodeDotInKeys !== "undefined" && typeof opts.decodeDotInKeys !== "boolean") {
+        throw new TypeError("`decodeDotInKeys` option can only be `true` or `false`, when provided");
+      }
+      if (opts.decoder !== null && typeof opts.decoder !== "undefined" && typeof opts.decoder !== "function") {
+        throw new TypeError("Decoder has to be a function.");
+      }
+      if (typeof opts.charset !== "undefined" && opts.charset !== "utf-8" && opts.charset !== "iso-8859-1") {
+        throw new TypeError("The charset option must be either utf-8, iso-8859-1, or undefined");
+      }
+      if (typeof opts.throwOnLimitExceeded !== "undefined" && typeof opts.throwOnLimitExceeded !== "boolean") {
+        throw new TypeError("`throwOnLimitExceeded` option must be a boolean");
+      }
+      var charset = typeof opts.charset === "undefined" ? defaults2.charset : opts.charset;
+      var duplicates = typeof opts.duplicates === "undefined" ? defaults2.duplicates : opts.duplicates;
+      if (duplicates !== "combine" && duplicates !== "first" && duplicates !== "last") {
+        throw new TypeError("The duplicates option must be either combine, first, or last");
+      }
+      var allowDots = typeof opts.allowDots === "undefined" ? opts.decodeDotInKeys === true ? true : defaults2.allowDots : !!opts.allowDots;
+      return {
+        allowDots,
+        allowEmptyArrays: typeof opts.allowEmptyArrays === "boolean" ? !!opts.allowEmptyArrays : defaults2.allowEmptyArrays,
+        allowPrototypes: typeof opts.allowPrototypes === "boolean" ? opts.allowPrototypes : defaults2.allowPrototypes,
+        allowSparse: typeof opts.allowSparse === "boolean" ? opts.allowSparse : defaults2.allowSparse,
+        arrayLimit: typeof opts.arrayLimit === "number" ? opts.arrayLimit : defaults2.arrayLimit,
+        charset,
+        charsetSentinel: typeof opts.charsetSentinel === "boolean" ? opts.charsetSentinel : defaults2.charsetSentinel,
+        comma: typeof opts.comma === "boolean" ? opts.comma : defaults2.comma,
+        decodeDotInKeys: typeof opts.decodeDotInKeys === "boolean" ? opts.decodeDotInKeys : defaults2.decodeDotInKeys,
+        decoder: typeof opts.decoder === "function" ? opts.decoder : defaults2.decoder,
+        delimiter: typeof opts.delimiter === "string" || utils.isRegExp(opts.delimiter) ? opts.delimiter : defaults2.delimiter,
+        // eslint-disable-next-line no-implicit-coercion, no-extra-parens
+        depth: typeof opts.depth === "number" || opts.depth === false ? +opts.depth : defaults2.depth,
+        duplicates,
+        ignoreQueryPrefix: opts.ignoreQueryPrefix === true,
+        interpretNumericEntities: typeof opts.interpretNumericEntities === "boolean" ? opts.interpretNumericEntities : defaults2.interpretNumericEntities,
+        parameterLimit: typeof opts.parameterLimit === "number" ? opts.parameterLimit : defaults2.parameterLimit,
+        parseArrays: opts.parseArrays !== false,
+        plainObjects: typeof opts.plainObjects === "boolean" ? opts.plainObjects : defaults2.plainObjects,
+        strictDepth: typeof opts.strictDepth === "boolean" ? !!opts.strictDepth : defaults2.strictDepth,
+        strictNullHandling: typeof opts.strictNullHandling === "boolean" ? opts.strictNullHandling : defaults2.strictNullHandling,
+        throwOnLimitExceeded: typeof opts.throwOnLimitExceeded === "boolean" ? opts.throwOnLimitExceeded : false
+      };
+    };
+    module2.exports = function(str, opts) {
+      var options = normalizeParseOptions(opts);
+      if (str === "" || str === null || typeof str === "undefined") {
+        return options.plainObjects ? { __proto__: null } : {};
+      }
+      var tempObj = typeof str === "string" ? parseValues(str, options) : str;
+      var obj = options.plainObjects ? { __proto__: null } : {};
+      var keys = Object.keys(tempObj);
+      for (var i = 0; i < keys.length; ++i) {
+        var key = keys[i];
+        var newObj = parseKeys(key, tempObj[key], options, typeof str === "string");
+        obj = utils.merge(obj, newObj, options);
+      }
+      if (options.allowSparse === true) {
+        return obj;
+      }
+      return utils.compact(obj);
+    };
+  }
+});
+
+// node_modules/qs/lib/index.js
+var require_lib3 = __commonJS({
+  "node_modules/qs/lib/index.js"(exports2, module2) {
+    "use strict";
+    var stringify = require_stringify2();
+    var parse = require_parse3();
+    var formats = require_formats2();
+    module2.exports = {
+      formats,
+      parse,
+      stringify
+    };
+  }
+});
+
 // node_modules/express/lib/middleware/query.js
 var require_query = __commonJS({
   "node_modules/express/lib/middleware/query.js"(exports2, module2) {
     "use strict";
     var merge = require_utils_merge();
     var parseUrl = require_parseurl();
-    var qs = require_lib2();
+    var qs = require_lib3();
     module2.exports = function query3(options) {
       var opts = merge({}, options);
       var queryparse = qs.parse;
@@ -63518,14 +64403,14 @@ var require_etag = __commonJS({
   "node_modules/etag/index.js"(exports2, module2) {
     "use strict";
     module2.exports = etag;
-    var crypto10 = require("crypto");
+    var crypto11 = require("crypto");
     var Stats = require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto10.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto11.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -65144,7 +66029,7 @@ var require_proxy_addr = __commonJS({
 });
 
 // node_modules/express/lib/utils.js
-var require_utils5 = __commonJS({
+var require_utils6 = __commonJS({
   "node_modules/express/lib/utils.js"(exports2) {
     "use strict";
     var Buffer2 = require_safe_buffer().Buffer;
@@ -65155,7 +66040,7 @@ var require_utils5 = __commonJS({
     var mime = require_send().mime;
     var etag = require_etag();
     var proxyaddr = require_proxy_addr();
-    var qs = require_lib2();
+    var qs = require_lib3();
     var querystring = require("querystring");
     exports2.etag = createETagGenerator({ weak: false });
     exports2.wetag = createETagGenerator({ weak: true });
@@ -65292,9 +66177,9 @@ var require_application = __commonJS({
     var debug = require_src3()("express:application");
     var View = require_view();
     var http2 = require("http");
-    var compileETag = require_utils5().compileETag;
-    var compileQueryParser = require_utils5().compileQueryParser;
-    var compileTrust = require_utils5().compileTrust;
+    var compileETag = require_utils6().compileETag;
+    var compileQueryParser = require_utils6().compileQueryParser;
+    var compileTrust = require_utils6().compileTrust;
     var deprecate = require_depd()("express");
     var flatten = require_array_flatten();
     var merge = require_utils_merge();
@@ -66301,11 +67186,11 @@ var require_request = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto10 = require("crypto");
+    var crypto11 = require("crypto");
     exports2.sign = function(val, secret) {
       if ("string" !== typeof val) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val + "." + crypto10.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+      return val + "." + crypto11.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
     };
     exports2.unsign = function(val, secret) {
       if ("string" !== typeof val) throw new TypeError("Signed cookie string must be provided.");
@@ -66314,7 +67199,7 @@ var require_cookie_signature = __commonJS({
       return sha1(mac) == sha1(val) ? str : false;
     };
     function sha1(str) {
-      return crypto10.createHash("sha1").update(str).digest("hex");
+      return crypto11.createHash("sha1").update(str).digest("hex");
     }
   }
 });
@@ -66569,15 +67454,15 @@ var require_response = __commonJS({
     var encodeUrl = require_encodeurl();
     var escapeHtml = require_escape_html();
     var http2 = require("http");
-    var isAbsolute = require_utils5().isAbsolute;
+    var isAbsolute = require_utils6().isAbsolute;
     var onFinished = require_on_finished();
     var path20 = require("path");
     var statuses = require_statuses();
     var merge = require_utils_merge();
     var sign = require_cookie_signature().sign;
-    var normalizeType = require_utils5().normalizeType;
-    var normalizeTypes = require_utils5().normalizeTypes;
-    var setCharset = require_utils5().setCharset;
+    var normalizeType = require_utils6().normalizeType;
+    var normalizeTypes = require_utils6().normalizeTypes;
+    var setCharset = require_utils6().setCharset;
     var cookie = require_cookie();
     var send = require_send();
     var extname = path20.extname;
@@ -75777,7 +76662,7 @@ var require_server = __commonJS({
 });
 
 // node_modules/@gilbarcoafs/vpos-common/dist/utils/index.js
-var require_utils6 = __commonJS({
+var require_utils7 = __commonJS({
   "node_modules/@gilbarcoafs/vpos-common/dist/utils/index.js"(exports2) {
     "use strict";
     var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
@@ -75836,7 +76721,7 @@ var require_dist3 = __commonJS({
     __exportStar(require_promise(), exports2);
     __exportStar(require_sequence(), exports2);
     __exportStar(require_server(), exports2);
-    __exportStar(require_utils6(), exports2);
+    __exportStar(require_utils7(), exports2);
     __exportStar(require_watchdog(), exports2);
   }
 });
@@ -76841,7 +77726,7 @@ var require_defaults = __commonJS({
 });
 
 // node_modules/pg/lib/utils.js
-var require_utils7 = __commonJS({
+var require_utils8 = __commonJS({
   "node_modules/pg/lib/utils.js"(exports2, module2) {
     "use strict";
     var defaults2 = require_defaults();
@@ -77088,7 +77973,7 @@ var require_utils_webcrypto = __commonJS({
 });
 
 // node_modules/pg/lib/crypto/utils.js
-var require_utils8 = __commonJS({
+var require_utils9 = __commonJS({
   "node_modules/pg/lib/crypto/utils.js"(exports2, module2) {
     "use strict";
     var useLegacyCrypto = parseInt(process.versions && process.versions.node && process.versions.node.split(".")[0]) < 15;
@@ -77217,7 +78102,7 @@ var require_cert_signatures = __commonJS({
 var require_sasl = __commonJS({
   "node_modules/pg/lib/crypto/sasl.js"(exports2, module2) {
     "use strict";
-    var crypto10 = require_utils8();
+    var crypto11 = require_utils9();
     var { signatureAlgorithmHashFromCertificate } = require_cert_signatures();
     function startSession(mechanisms, stream) {
       const candidates = ["SCRAM-SHA-256"];
@@ -77229,7 +78114,7 @@ var require_sasl = __commonJS({
       if (mechanism === "SCRAM-SHA-256-PLUS" && typeof stream.getPeerCertificate !== "function") {
         throw new Error("SASL: Mechanism SCRAM-SHA-256-PLUS requires a certificate");
       }
-      const clientNonce = crypto10.randomBytes(18).toString("base64");
+      const clientNonce = crypto11.randomBytes(18).toString("base64");
       const gs2Header = mechanism === "SCRAM-SHA-256-PLUS" ? "p=tls-server-end-point" : stream ? "y" : "n";
       return {
         mechanism,
@@ -77264,20 +78149,20 @@ var require_sasl = __commonJS({
         const peerCert = stream.getPeerCertificate().raw;
         let hashName = signatureAlgorithmHashFromCertificate(peerCert);
         if (hashName === "MD5" || hashName === "SHA-1") hashName = "SHA-256";
-        const certHash = await crypto10.hashByName(hashName, peerCert);
+        const certHash = await crypto11.hashByName(hashName, peerCert);
         const bindingData = Buffer.concat([Buffer.from("p=tls-server-end-point,,"), Buffer.from(certHash)]);
         channelBinding = bindingData.toString("base64");
       }
       const clientFinalMessageWithoutProof = "c=" + channelBinding + ",r=" + sv.nonce;
       const authMessage = clientFirstMessageBare + "," + serverFirstMessage + "," + clientFinalMessageWithoutProof;
       const saltBytes = Buffer.from(sv.salt, "base64");
-      const saltedPassword = await crypto10.deriveKey(password, saltBytes, sv.iteration);
-      const clientKey = await crypto10.hmacSha256(saltedPassword, "Client Key");
-      const storedKey = await crypto10.sha256(clientKey);
-      const clientSignature = await crypto10.hmacSha256(storedKey, authMessage);
+      const saltedPassword = await crypto11.deriveKey(password, saltBytes, sv.iteration);
+      const clientKey = await crypto11.hmacSha256(saltedPassword, "Client Key");
+      const storedKey = await crypto11.sha256(clientKey);
+      const clientSignature = await crypto11.hmacSha256(storedKey, authMessage);
       const clientProof = xorBuffers(Buffer.from(clientKey), Buffer.from(clientSignature)).toString("base64");
-      const serverKey = await crypto10.hmacSha256(saltedPassword, "Server Key");
-      const serverSignatureBytes = await crypto10.hmacSha256(serverKey, authMessage);
+      const serverKey = await crypto11.hmacSha256(saltedPassword, "Server Key");
+      const serverSignatureBytes = await crypto11.hmacSha256(serverKey, authMessage);
       session.message = "SASLResponse";
       session.serverSignature = Buffer.from(serverSignatureBytes).toString("base64");
       session.response = clientFinalMessageWithoutProof + ",p=" + clientProof;
@@ -77838,7 +78723,7 @@ var require_query2 = __commonJS({
     "use strict";
     var { EventEmitter } = require("events");
     var Result2 = require_result();
-    var utils = require_utils7();
+    var utils = require_utils8();
     var Query2 = class extends EventEmitter {
       constructor(config, values, callback) {
         super();
@@ -79414,7 +80299,7 @@ var require_helper = __commonJS({
 });
 
 // node_modules/pgpass/lib/index.js
-var require_lib3 = __commonJS({
+var require_lib4 = __commonJS({
   "node_modules/pgpass/lib/index.js"(exports2, module2) {
     "use strict";
     var path20 = require("path");
@@ -79439,7 +80324,7 @@ var require_client2 = __commonJS({
   "node_modules/pg/lib/client.js"(exports2, module2) {
     "use strict";
     var EventEmitter = require("events").EventEmitter;
-    var utils = require_utils7();
+    var utils = require_utils8();
     var nodeUtils = require("util");
     var sasl = require_sasl();
     var TypeOverrides2 = require_type_overrides();
@@ -79447,7 +80332,7 @@ var require_client2 = __commonJS({
     var Query2 = require_query2();
     var defaults2 = require_defaults();
     var Connection2 = require_connection();
-    var crypto10 = require_utils8();
+    var crypto11 = require_utils9();
     var activeQueryDeprecationNotice = nodeUtils.deprecate(
       () => {
       },
@@ -79656,7 +80541,7 @@ var require_client2 = __commonJS({
           cb();
         } else {
           try {
-            const pgPass = require_lib3();
+            const pgPass = require_lib4();
             pgPass(this.connectionParameters, (pass) => {
               if (void 0 !== pass) {
                 pgPassDeprecationNotice();
@@ -79677,7 +80562,7 @@ var require_client2 = __commonJS({
       _handleAuthMD5Password(msg) {
         this._getPassword(async () => {
           try {
-            const hashedPassword = await crypto10.postgresMd5PasswordHash(this.user, this.password, msg.salt);
+            const hashedPassword = await crypto11.postgresMd5PasswordHash(this.user, this.password, msg.salt);
             this.connection.password(hashedPassword);
           } catch (e) {
             this.emit("error", e);
@@ -80083,7 +80968,7 @@ var require_pg_pool = __commonJS({
         this.options.maxLifetimeSeconds = this.options.maxLifetimeSeconds || 0;
         this.log = this.options.log || function() {
         };
-        this.Client = this.options.Client || Client2 || require_lib4().Client;
+        this.Client = this.options.Client || Client2 || require_lib5().Client;
         this.Promise = this.options.Promise || global.Promise;
         if (typeof this.options.idleTimeoutMillis === "undefined") {
           this.options.idleTimeoutMillis = 1e4;
@@ -80409,7 +81294,7 @@ var require_query3 = __commonJS({
     "use strict";
     var EventEmitter = require("events").EventEmitter;
     var util4 = require("util");
-    var utils = require_utils7();
+    var utils = require_utils8();
     var NativeQuery = module2.exports = function(config, values, callback) {
       EventEmitter.call(this);
       config = utils.normalizeQueryConfig(config, values, callback);
@@ -80793,18 +81678,18 @@ var require_native = __commonJS({
 });
 
 // node_modules/pg/lib/index.js
-var require_lib4 = __commonJS({
+var require_lib5 = __commonJS({
   "node_modules/pg/lib/index.js"(exports2, module2) {
     "use strict";
     var Client2 = require_client2();
     var defaults2 = require_defaults();
     var Connection2 = require_connection();
     var Result2 = require_result();
-    var utils = require_utils7();
+    var utils = require_utils8();
     var Pool2 = require_pg_pool();
     var TypeOverrides2 = require_type_overrides();
     var { DatabaseError: DatabaseError2 } = require_dist4();
-    var { escapeIdentifier: escapeIdentifier2, escapeLiteral: escapeLiteral2 } = require_utils7();
+    var { escapeIdentifier: escapeIdentifier2, escapeLiteral: escapeLiteral2 } = require_utils8();
     var poolFactory = (Client3) => {
       return class BoundPool extends Pool2 {
         constructor(options) {
@@ -80862,7 +81747,7 @@ var require_lib4 = __commonJS({
 var import_lib, Client, Pool, Connection, types, Query, DatabaseError, escapeIdentifier, escapeLiteral, Result, TypeOverrides, defaults;
 var init_esm2 = __esm({
   "node_modules/pg/esm/index.mjs"() {
-    import_lib = __toESM(require_lib4(), 1);
+    import_lib = __toESM(require_lib5(), 1);
     Client = import_lib.default.Client;
     Pool = import_lib.default.Pool;
     Connection = import_lib.default.Connection;
@@ -81330,14 +82215,14 @@ var init_core = __esm({
     };
     query = async (text, params) => {
       return executeQuery(
-        (activePool, sql3, values) => activePool.query(sql3, values),
+        (activePool, sql4, values) => activePool.query(sql4, values),
         text,
         params
       );
     };
     queryUnobserved = async (text, params) => {
       return executeQuery(
-        (activePool, sql3, values) => activePool.query(sql3, values),
+        (activePool, sql4, values) => activePool.query(sql4, values),
         text,
         params,
         { observe: false }
@@ -85662,6 +86547,76 @@ var init_zod = __esm({
   }
 });
 
+// src/shared/config/schema.ts
+var loggerParamsSchema, pluginDefinitionSchema, healthCheckSchema, memoryLimitsSchema, processDefinitionSchema, processesConfigSchema, supervisorConfigSchema, configParamsSchema, systemConfigSchema;
+var init_schema = __esm({
+  "src/shared/config/schema.ts"() {
+    "use strict";
+    init_zod();
+    loggerParamsSchema = external_exports.object({
+      label: external_exports.string(),
+      level: external_exports.string(),
+      console: external_exports.boolean()
+    });
+    pluginDefinitionSchema = external_exports.object({
+      name: external_exports.string(),
+      enabled: external_exports.boolean().default(true),
+      config: external_exports.record(external_exports.any()).default({})
+    });
+    healthCheckSchema = external_exports.object({
+      enabled: external_exports.boolean().optional(),
+      interval: external_exports.number().optional(),
+      timeout: external_exports.number().optional()
+    }).passthrough();
+    memoryLimitsSchema = external_exports.object({
+      maxHeapSizeMB: external_exports.number().optional(),
+      maxRssSizeMB: external_exports.number().optional(),
+      maxOldSpaceSizeMB: external_exports.number().optional()
+    }).passthrough();
+    processDefinitionSchema = external_exports.object({
+      name: external_exports.string().optional(),
+      path: external_exports.string().optional(),
+      enabled: external_exports.boolean().optional(),
+      required: external_exports.boolean().optional(),
+      autoRestart: external_exports.boolean().optional(),
+      allowedToStop: external_exports.boolean().optional(),
+      startupOrder: external_exports.number().optional(),
+      debug: external_exports.boolean().optional(),
+      debugPort: external_exports.number().optional(),
+      loggerParams: loggerParamsSchema.partial().optional(),
+      maxRestarts: external_exports.number().optional(),
+      restartDelay: external_exports.number().optional(),
+      startupTimeout: external_exports.number().optional(),
+      healthCheck: healthCheckSchema.optional(),
+      memoryLimits: memoryLimitsSchema.optional(),
+      config: external_exports.record(external_exports.any()).default({}),
+      plugins: external_exports.array(pluginDefinitionSchema).default([])
+    }).passthrough();
+    processesConfigSchema = external_exports.object({
+      loggerParams: loggerParamsSchema,
+      process: external_exports.record(processDefinitionSchema)
+    }).passthrough();
+    supervisorConfigSchema = external_exports.object({
+      loggerParams: loggerParamsSchema,
+      restartDelay: external_exports.number(),
+      maxRestarts: external_exports.number(),
+      healthCheckInterval: external_exports.number(),
+      startupTimeout: external_exports.number()
+    }).passthrough();
+    configParamsSchema = external_exports.object({
+      country: external_exports.string(),
+      timezone: external_exports.string(),
+      language: external_exports.string(),
+      rtl: external_exports.boolean()
+    }).passthrough();
+    systemConfigSchema = external_exports.object({
+      config: configParamsSchema,
+      supervisor: supervisorConfigSchema,
+      processes: processesConfigSchema
+    }).passthrough();
+  }
+});
+
 // src/shared/errors/index.ts
 var init_errors3 = __esm({
   "src/shared/errors/index.ts"() {
@@ -85781,8 +86736,8 @@ var init_session = __esm({
       const res = await randomBytesAsync(32);
       return res.toString("hex");
     };
-    isHttpsRequest = () => {
-      const h = (0, import_headers.headers)();
+    isHttpsRequest = async () => {
+      const h = await (0, import_headers.headers)();
       const proto = h.get("x-forwarded-proto") ?? "";
       const xfSsl = (h.get("x-forwarded-ssl") ?? "").toLowerCase();
       return proto.toLowerCase() === "https" || xfSsl === "on";
@@ -85839,21 +86794,22 @@ var init_session = __esm({
       return result.rowCount || 0;
     };
     setSessionCookie = async (token, expiresAt) => {
-      const cookieStore = (0, import_headers.cookies)();
+      const cookieStore = await (0, import_headers.cookies)();
+      const secure = await isHttpsRequest();
       cookieStore.set(getSessionCookieName(), token, {
         httpOnly: true,
-        secure: isHttpsRequest(),
+        secure,
         sameSite: "lax",
         expires: expiresAt,
         path: "/"
       });
     };
     getSessionCookie = async () => {
-      const cookieStore = (0, import_headers.cookies)();
+      const cookieStore = await (0, import_headers.cookies)();
       return cookieStore.get(getSessionCookieName())?.value || null;
     };
     clearSessionCookie = async () => {
-      const cookieStore = (0, import_headers.cookies)();
+      const cookieStore = await (0, import_headers.cookies)();
       cookieStore.delete(getSessionCookieName());
     };
   }
@@ -86473,6 +87429,457 @@ var init_numbers = __esm({
       return n == null ? fallback : n;
     };
     toBoolean = (value) => value === true || String(value ?? "").trim().toLowerCase() === "true";
+  }
+});
+
+// src/platform/config/deep-merge.ts
+function isPlainObject(value) {
+  if (!value || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+function deepMerge(base, override) {
+  if (Array.isArray(base) || Array.isArray(override)) {
+    return override ?? base;
+  }
+  if (isPlainObject(base) && isPlainObject(override)) {
+    const out = { ...base };
+    for (const [k, v] of Object.entries(override)) {
+      if (k in out) out[k] = deepMerge(out[k], v);
+      else out[k] = v;
+    }
+    return out;
+  }
+  return override ?? base;
+}
+var init_deep_merge = __esm({
+  "src/platform/config/deep-merge.ts"() {
+    "use strict";
+  }
+});
+
+// src/shared/utils/safeAsync.ts
+async function safeAsync(promise, context2) {
+  try {
+    return await promise;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(context2 ?? "safeAsync", { error: message });
+    return null;
+  }
+}
+var init_safeAsync = __esm({
+  "src/shared/utils/safeAsync.ts"() {
+    "use strict";
+    init_logger();
+  }
+});
+
+// src/shared/config/defaults.ts
+async function getStationConfigDefaults(country, schemaVersion) {
+  const row = await safeAsync(
+    queryOne(
+      `${DEFAULTS_SELECT_SQL}
+       WHERE country = $1 AND schema_version = $2`,
+      [
+        requireNonEmptyString(country, "country").trim().toUpperCase(),
+        requireNonEmptyString(schemaVersion, "schemaVersion")
+      ]
+    ),
+    "defaults.getStationConfigDefaults"
+  );
+  if (!row) return null;
+  return toCamelCase(row);
+}
+var DEFAULTS_SELECT_SQL;
+var init_defaults = __esm({
+  "src/shared/config/defaults.ts"() {
+    "use strict";
+    init_postgres();
+    init_inputs();
+    init_safeAsync();
+    DEFAULTS_SELECT_SQL = `SELECT id, country, schema_version, config_json, created_at, updated_at
+       FROM station_config_defaults`;
+  }
+});
+
+// src/platform/config/defaults.ts
+var init_defaults2 = __esm({
+  "src/platform/config/defaults.ts"() {
+    "use strict";
+    init_defaults();
+  }
+});
+
+// src/platform/config/effective.ts
+function upsertPlugin(cfg, processType, pluginName, enabled, configJson) {
+  const p = cfg.processes?.process?.[processType];
+  if (!p) return;
+  const plugins = Array.isArray(p.plugins) ? p.plugins : [];
+  const idx = plugins.findIndex((x) => x?.name === pluginName);
+  const next2 = {
+    name: pluginName,
+    enabled: enabled !== false,
+    config: configJson ?? {}
+  };
+  if (idx >= 0) plugins[idx] = { ...plugins[idx], ...next2 };
+  else plugins.push(next2);
+  p.plugins = plugins;
+}
+async function getEffectiveSystemConfiguration(stationId2) {
+  let station = await getStationConfig(stationId2);
+  if (!station) {
+    await bootstrapStationConfig(stationId2);
+    station = await getStationConfig(stationId2);
+  }
+  if (!station) {
+    throw new Error(`Station config not found for station_id: ${stationId2}`);
+  }
+  const stationCfg = station.configJson;
+  const country = String(stationCfg?.config?.country || "US").trim().toUpperCase();
+  const defaults2 = await getStationConfigDefaults(
+    country,
+    station.schemaVersion || "vpos-app-1"
+  );
+  const base = defaults2?.configJson ? deepMerge(defaults2.configJson, stationCfg) : stationCfg;
+  const pluginRows = await queryAll(
+    `
+    SELECT process_type, plugin_name, enabled, config_json
+    FROM plugin_configs
+    WHERE station_id = $1
+    ORDER BY process_type, plugin_name
+    `,
+    [stationId2]
+  );
+  for (const r of pluginRows) {
+    upsertPlugin(base, r.process_type, r.plugin_name, r.enabled, r.config_json);
+  }
+  const deviceRows = await queryAll(
+    `
+    SELECT device_type, device_key, enabled, config_json
+    FROM device_configs
+    WHERE station_id = $1
+    ORDER BY device_type, device_key
+    `,
+    [stationId2]
+  );
+  const devices = {};
+  for (const r of deviceRows) {
+    if (!devices[r.device_type]) devices[r.device_type] = {};
+    devices[r.device_type][r.device_key] = {
+      enabled: r.enabled !== false,
+      config: r.config_json ?? {}
+    };
+  }
+  ;
+  base.devices = devices;
+  const validated = systemConfigSchema.parse(base);
+  const ss = await safeAsync(
+    queryOne(
+      `SELECT linking_window_seconds,
+            unallocated_handling,
+            fiscalization_engine,
+            auto_fiscalize_enabled,
+            auto_print_receipts,
+            sync_enabled,
+            sync_time,
+            sync_timezone,
+            proxy_url,
+            proxy_base_path,
+            vat_rate_tz,
+            vat_rate_ke,
+            vat_rate_default
+     FROM station_settings
+     WHERE station_id = $1`,
+      [stationId2]
+    ),
+    "effective.stationSettings"
+  );
+  validated.stationSettings = ss ? {
+    linkingWindowSeconds: ss.linking_window_seconds,
+    unallocatedHandling: ss.unallocated_handling,
+    fiscalizationEngine: ss.fiscalization_engine,
+    autoFiscalizeEnabled: ss.auto_fiscalize_enabled,
+    autoPrintReceipts: ss.auto_print_receipts,
+    syncEnabled: ss.sync_enabled,
+    syncTime: ss.sync_time,
+    syncTimezone: ss.sync_timezone,
+    proxyUrl: ss.proxy_url,
+    proxyBasePath: ss.proxy_base_path,
+    vatRateTz: ss.vat_rate_tz != null ? Number(ss.vat_rate_tz) : null,
+    vatRateKe: ss.vat_rate_ke != null ? Number(ss.vat_rate_ke) : null,
+    vatRateDefault: ss.vat_rate_default != null ? Number(ss.vat_rate_default) : null
+  } : null;
+  return validated;
+}
+var init_effective = __esm({
+  "src/platform/config/effective.ts"() {
+    "use strict";
+    init_deep_merge();
+    init_defaults2();
+    init_loader();
+    init_postgres();
+    init_schema();
+    init_safeAsync();
+  }
+});
+
+// src/platform/config/loader.ts
+async function getSystemConfiguration(stationId2) {
+  return await getEffectiveSystemConfiguration(stationId2);
+}
+var import_crypto3, fs12, import_path13, DEFAULT_SCHEMA_VERSION, DEFAULT_API_HOST, DEFAULT_API_PORT, normalizeCountry, configLooksUninitialized, pickLanguage, buildConfigFromStationKv, getStationConfig, saveStationConfig, bootstrapStationConfig, importConfigFromJson, validateStationConfig, normalizeConfigPayload, portRaw, port, buildMinimalConfig, findConfigJsonPath, resolveCandidatePaths, exists, hashString2, logConfigImport;
+var init_loader = __esm({
+  "src/platform/config/loader.ts"() {
+    "use strict";
+    import_crypto3 = require("crypto");
+    fs12 = __toESM(require("fs/promises"));
+    import_path13 = __toESM(require("path"));
+    init_deep_merge();
+    init_defaults2();
+    init_effective();
+    init_station_kv();
+    init_postgres();
+    init_schema();
+    init_uuid();
+    DEFAULT_SCHEMA_VERSION = "vpos-app-1";
+    DEFAULT_API_HOST = "127.0.0.1";
+    DEFAULT_API_PORT = 4101;
+    normalizeCountry = (value) => String(value || "").trim().toUpperCase();
+    configLooksUninitialized = (cfg) => {
+      const c = cfg.configJson?.config;
+      const country = String(c?.country || "");
+      const timezone = String(c?.timezone || "");
+      return !country || !timezone || country === "US" && timezone === "UTC";
+    };
+    pickLanguage = (_country) => "en";
+    buildConfigFromStationKv = async (stationId2) => {
+      try {
+        const site = await kvGet(stationId2, "site.profile");
+        if (!site || typeof site !== "object") return null;
+        const dev = await kvGet(stationId2, "vpos.device.data") || await kvGet(stationId2, "vpos.device.registration") || null;
+        const minimal = buildMinimalConfig();
+        const country = normalizeCountry(String(site.country || ""));
+        const timezone = String(site.timezone || "").trim();
+        const next2 = {
+          ...minimal,
+          config: {
+            ...minimal.config,
+            country: country || minimal.config?.country,
+            timezone: timezone || minimal.config?.timezone,
+            language: pickLanguage(country),
+            rtl: false
+          }
+        };
+        if (dev?.deviceId) {
+          next2.config.deviceId = dev.deviceId;
+          if (dev.deviceName) next2.config.deviceName = dev.deviceName;
+        }
+        return validateStationConfig(next2);
+      } catch {
+        return null;
+      }
+    };
+    getStationConfig = async (stationId2) => {
+      const row = await queryOne(
+        `SELECT station_id, schema_version, config_json, created_at, updated_at
+     FROM station_config
+     WHERE station_id = $1`,
+        [stationId2]
+      );
+      if (!row) return null;
+      return toCamelCase(row);
+    };
+    saveStationConfig = async (stationId2, configJson, schemaVersion = DEFAULT_SCHEMA_VERSION) => {
+      await query(
+        `INSERT INTO station_config (station_id, schema_version, config_json)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (station_id)
+     DO UPDATE SET schema_version = EXCLUDED.schema_version,
+                   config_json = EXCLUDED.config_json,
+                   updated_at = NOW()`,
+        [stationId2, schemaVersion, configJson]
+      );
+      const id = uuidv4();
+      await query(
+        `INSERT INTO station_config_versions (id, station_id, schema_version, config_json, created_by)
+      VALUES ($1, $2, $3, $4, $5)`,
+        [id, stationId2, schemaVersion, configJson, "bootstrap"]
+      );
+    };
+    bootstrapStationConfig = async (stationId2) => {
+      const existing = await getStationConfig(stationId2);
+      if (existing) return existing;
+      const fromKv = await buildConfigFromStationKv(stationId2);
+      if (existing && fromKv && configLooksUninitialized(existing)) {
+        await saveStationConfig(stationId2, fromKv, DEFAULT_SCHEMA_VERSION);
+        const repaired = await getStationConfig(stationId2);
+        if (repaired) return repaired;
+      }
+      if (existing) return existing;
+      if (fromKv) {
+        await saveStationConfig(stationId2, fromKv, DEFAULT_SCHEMA_VERSION);
+        const created2 = await getStationConfig(stationId2);
+        if (created2) return created2;
+      }
+      const candidatePath = await findConfigJsonPath();
+      if (candidatePath) {
+        const imported = await importConfigFromJson(stationId2, candidatePath);
+        if (imported) return imported;
+      }
+      let seedCountry = "US";
+      try {
+        const site = await kvGet(stationId2, "site.profile");
+        if (site?.country) seedCountry = normalizeCountry(String(site.country));
+      } catch {
+      }
+      const minimalConfig = buildMinimalConfig();
+      const defaults2 = await getStationConfigDefaults(
+        seedCountry,
+        DEFAULT_SCHEMA_VERSION
+      );
+      const seeded = defaults2?.configJson ? deepMerge(minimalConfig, defaults2.configJson) : minimalConfig;
+      await saveStationConfig(stationId2, seeded, DEFAULT_SCHEMA_VERSION);
+      const created = await getStationConfig(stationId2);
+      if (!created) throw new Error("Failed to create minimal station_config row");
+      return created;
+    };
+    importConfigFromJson = async (stationId2, configPath) => {
+      try {
+        const raw = await fs12.readFile(configPath, "utf-8");
+        const parsed = JSON.parse(raw);
+        const configJson = normalizeConfigPayload(parsed);
+        const checksum = hashString2(raw);
+        await saveStationConfig(stationId2, configJson, DEFAULT_SCHEMA_VERSION);
+        await logConfigImport(stationId2, configPath, checksum, "IMPORTED", null);
+        return await getStationConfig(stationId2);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await logConfigImport(
+          stationId2,
+          configPath,
+          hashString2(configPath),
+          "FAILED",
+          message
+        );
+        return null;
+      }
+    };
+    validateStationConfig = (input) => {
+      return systemConfigSchema.parse(input);
+    };
+    normalizeConfigPayload = (input) => {
+      if (typeof input === "object" && input !== null && "data" in input) {
+        return validateStationConfig(
+          input.data
+        );
+      }
+      return validateStationConfig(input);
+    };
+    portRaw = process.env.VPOS_API_PORT;
+    port = portRaw ? Number(portRaw) : DEFAULT_API_PORT;
+    if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+      throw new Error(`Invalid VPOS_API_PORT="${portRaw}"`);
+    }
+    buildMinimalConfig = () => {
+      return {
+        config: {
+          country: "US",
+          timezone: "UTC",
+          language: "en",
+          rtl: false
+        },
+        supervisor: {
+          loggerParams: {
+            label: "VPOS-PSS-SUPERVISOR",
+            level: "warn",
+            console: false
+          },
+          restartDelay: 5e3,
+          maxRestarts: 5,
+          healthCheckInterval: 5e3,
+          startupTimeout: 6e4
+        },
+        processes: {
+          loggerParams: {
+            label: "VPOS-PSS-PROCESS",
+            level: "warn",
+            console: false
+          },
+          process: {
+            api: {
+              name: "VPOS API Module",
+              enabled: true,
+              required: true,
+              autoRestart: true,
+              allowedToStop: false,
+              startupOrder: 0,
+              debug: false,
+              debugPort: 9229,
+              config: {
+                port,
+                host: process.env.VPOS_API_HOST || DEFAULT_API_HOST
+              },
+              plugins: [
+                {
+                  name: "supervisor",
+                  enabled: true,
+                  config: {}
+                },
+                {
+                  name: "config",
+                  enabled: true,
+                  config: {}
+                }
+              ]
+            }
+          }
+        }
+      };
+    };
+    findConfigJsonPath = async () => {
+      const candidates = resolveCandidatePaths();
+      for (const candidate of candidates) {
+        if (await exists(candidate)) {
+          return candidate;
+        }
+      }
+      return null;
+    };
+    resolveCandidatePaths = () => {
+      const candidates = [];
+      const envPath = process.env.VPOS_CONFIG_PATH;
+      const envDir = process.env.VPOS_CONFIG_DIR;
+      if (envPath) candidates.push(envPath);
+      if (envDir) {
+        candidates.push(import_path13.default.join(envDir, "vpos.config.json"));
+        candidates.push(import_path13.default.join(envDir, "config.json"));
+      }
+      const cwd = process.cwd();
+      candidates.push(import_path13.default.join(cwd, "vpos.config.json"));
+      candidates.push(import_path13.default.join(cwd, "config.json"));
+      candidates.push(import_path13.default.join(cwd, "vpos.config.example.json"));
+      return candidates;
+    };
+    exists = async (candidate) => {
+      try {
+        await fs12.access(candidate);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    hashString2 = (value) => {
+      return (0, import_crypto3.createHash)("sha256").update(value).digest("hex");
+    };
+    logConfigImport = async (stationId2, sourcePath, sourceChecksum, status, message) => {
+      const id = uuidv4();
+      await query(
+        `INSERT INTO config_imports (id, station_id, source_path, source_checksum, status, message)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, stationId2, sourcePath, sourceChecksum, status, message]
+      );
+    };
   }
 });
 
@@ -91145,7 +92552,7 @@ var require_dom_parser = __commonJS({
 });
 
 // node_modules/@xmldom/xmldom/lib/index.js
-var require_lib5 = __commonJS({
+var require_lib6 = __commonJS({
   "node_modules/@xmldom/xmldom/lib/index.js"(exports2) {
     var dom = require_dom();
     exports2.DOMImplementation = dom.DOMImplementation;
@@ -91304,6 +92711,21 @@ var init_client2 = __esm({
   }
 });
 
+// src/shared/config/loader.ts
+var getSystemConfiguration2;
+var init_loader2 = __esm({
+  "src/shared/config/loader.ts"() {
+    "use strict";
+    init_loader();
+    init_inputs();
+    getSystemConfiguration2 = async (stationId2) => {
+      return await getSystemConfiguration(
+        requireNonEmptyString(stationId2, "stationId")
+      );
+    };
+  }
+});
+
 // src/shared/forecourt/jplState.ts
 function ensureGlobals() {
   const g = globalThis;
@@ -91368,7 +92790,7 @@ var init_liveEvents = __esm({
 });
 
 // src/shared/forecourt/runtimeConfigShared.ts
-var FORECOURT_RUNTIME_KV_KEYS, normalizeJplOperationMode, parseCsvStringList, normalizeBooleanFlag, toInt2, normalizeForecourtHost, normalizeForecourtPort;
+var FORECOURT_RUNTIME_KV_KEYS, normalizeJplOperationMode, parseCsvStringList, normalizeBooleanFlag, DEFAULT_JPL_OPTIONAL_PROTOCOL_FAMILIES, JPL_OPTIONAL_PROTOCOL_FAMILY_ALIASES, normalizeProtocolFamilyList, toInt2, normalizeForecourtHost, normalizeForecourtPort;
 var init_runtimeConfigShared = __esm({
   "src/shared/forecourt/runtimeConfigShared.ts"() {
     "use strict";
@@ -91388,6 +92810,9 @@ var init_runtimeConfigShared = __esm({
       JPL_UNSOLICITED_MFDR_FLAGS: "env:JPL_UNSOLICITED_MFDR_FLAGS",
       JPL_STATUS_UPDATE_CODE: "env:JPL_STATUS_UPDATE_CODE",
       JPL_BOOTSTRAP_SNAPSHOT_ENABLED: "env:JPL_BOOTSTRAP_SNAPSHOT_ENABLED",
+      JPL_INTEGRATION_SCOPE: "env:JPL_INTEGRATION_SCOPE",
+      JPL_TLS_REQUIRED: "env:JPL_TLS_REQUIRED",
+      JPL_OPTIONAL_PROTOCOL_FAMILIES: "env:JPL_OPTIONAL_PROTOCOL_FAMILIES",
       // Buffer health thresholds (DB override)
       BUFFER_WARN_DEPTH_SUP: "env:BUFFER_WARN_DEPTH_SUP",
       BUFFER_CRIT_DEPTH_SUP: "env:BUFFER_CRIT_DEPTH_SUP",
@@ -91411,6 +92836,38 @@ var init_runtimeConfigShared = __esm({
       if (["0", "false", "no", "off", "disabled"].includes(raw)) return false;
       return fallback;
     };
+    DEFAULT_JPL_OPTIONAL_PROTOCOL_FAMILIES = [
+      "price-poles",
+      "wash",
+      "digital-io",
+      "serial-server",
+      "sensors",
+      "vending"
+    ];
+    JPL_OPTIONAL_PROTOCOL_FAMILY_ALIASES = {
+      "price-pole": "price-poles",
+      "price-poles": "price-poles",
+      pp: "price-poles",
+      wash: "wash",
+      "car-wash": "wash",
+      "digital-io": "digital-io",
+      dio: "digital-io",
+      diop: "digital-io",
+      "serial-server": "serial-server",
+      serial: "serial-server",
+      sensors: "sensors",
+      sensor: "sensors",
+      vending: "vending",
+      vm: "vending"
+    };
+    normalizeProtocolFamilyList = (value, fallback = DEFAULT_JPL_OPTIONAL_PROTOCOL_FAMILIES) => {
+      const raw = parseCsvStringList(value);
+      if (!raw.length) return [...fallback];
+      const normalized = raw.map(
+        (entry) => JPL_OPTIONAL_PROTOCOL_FAMILY_ALIASES[entry.trim().toLowerCase().replace(/_/g, "-")]
+      ).filter(Boolean);
+      return [...new Set(normalized)];
+    };
     toInt2 = (value, fallback) => {
       const n = typeof value === "number" ? value : Number(String(value ?? ""));
       return Number.isFinite(n) ? Math.trunc(n) : fallback;
@@ -91428,13 +92885,34 @@ var init_runtimeConfigShared = __esm({
 });
 
 // src/modules/forecourt/infrastructure/runtimeConfig.ts
-var resolveFromEnv, setRuntimeConfig, isSameConfig, getForecourtRuntimeConfig, loadForecourtRuntimeConfigFromDb, subscribeForecourtRuntimeConfig;
+var EXTRA_REQUEST_POLICY_KEY, normalizeRequestDispatchPolicy, resolveFromEnv, setRuntimeConfig, isSameConfig, getForecourtRuntimeConfig, loadForecourtRuntimeConfigFromDb, subscribeForecourtRuntimeConfig;
 var init_runtimeConfig = __esm({
   "src/modules/forecourt/infrastructure/runtimeConfig.ts"() {
     "use strict";
     init_runtimeConfigShared();
     init_stationKv();
     init_logger();
+    EXTRA_REQUEST_POLICY_KEY = "JPL_REQUEST_DISPATCH_POLICY";
+    normalizeRequestDispatchPolicy = (value, fallback = "auto") => {
+      const normalized = String(value ?? "").trim().toLowerCase();
+      switch (normalized) {
+        case "correlation-required":
+          return "correlation-required";
+        case "strict-single-flight-when-uncorrelated":
+          return "strict-single-flight-when-uncorrelated";
+        case "auto":
+          return "auto";
+        case "":
+          return fallback;
+        default:
+          logger.warn("[forecourt-config]", {
+            msg: "invalid JPL request dispatch policy; using fallback",
+            value,
+            fallback
+          });
+          return fallback;
+      }
+    };
     resolveFromEnv = () => {
       const jplOperationMode = normalizeJplOperationMode(
         process.env.JPL_OPERATION_MODE
@@ -91468,7 +92946,7 @@ var init_runtimeConfig = __esm({
         process.env.JPL_EXPECTED_MIN_VERSION || "470-02-1.07"
       );
       const jplUnsolicitedFlags = parseCsvStringList(
-        process.env.JPL_UNSOLICITED_FLAGS || "UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1"
+        process.env.JPL_UNSOLICITED_FLAGS || "UNSO_INSTSTA_1,UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1,UNSO_PRISTA_1"
       );
       const jplUnsolicitedMfdrFlags = parseCsvStringList(
         process.env.JPL_UNSOLICITED_MFDR_FLAGS || "UNSO_FPSTA_3"
@@ -91477,6 +92955,20 @@ var init_runtimeConfig = __esm({
       const jplBootstrapSnapshotEnabled = normalizeBooleanFlag(
         process.env.JPL_BOOTSTRAP_SNAPSHOT_ENABLED,
         true
+      );
+      const jplRequestDispatchPolicy = normalizeRequestDispatchPolicy(
+        process.env.JPL_REQUEST_DISPATCH_POLICY,
+        "auto"
+      );
+      const jplIntegrationScope = String(
+        process.env.JPL_INTEGRATION_SCOPE || "dispense_wetstock_first_release"
+      ).trim().toLowerCase();
+      const jplTlsRequired = normalizeBooleanFlag(
+        process.env.JPL_TLS_REQUIRED,
+        false
+      );
+      const jplOptionalProtocolFamilies = normalizeProtocolFamilyList(
+        process.env.JPL_OPTIONAL_PROTOCOL_FAMILIES
       );
       return {
         mode: "jpl_tcp",
@@ -91495,6 +92987,10 @@ var init_runtimeConfig = __esm({
         jplUnsolicitedMfdrFlags,
         jplStatusUpdateCode,
         jplBootstrapSnapshotEnabled,
+        jplRequestDispatchPolicy,
+        jplIntegrationScope,
+        jplTlsRequired,
+        jplOptionalProtocolFamilies,
         bufferWarnDepthSup: toInt2(process.env.BUFFER_WARN_DEPTH_SUP, 2),
         bufferCritDepthSup: toInt2(process.env.BUFFER_CRIT_DEPTH_SUP, 5),
         bufferWarnAgeMinSup: toInt2(process.env.BUFFER_WARN_AGE_MIN_SUP, 5),
@@ -91523,7 +93019,7 @@ var init_runtimeConfig = __esm({
     };
     isSameConfig = (a, b) => {
       if (!a) return false;
-      return a.mode === b.mode && a.jplOperationMode === b.jplOperationMode && a.jplHost === b.jplHost && a.jplPort === b.jplPort && a.jplPosId === b.jplPosId && a.jplAccessCode === b.jplAccessCode && a.jplCountryCode === b.jplCountryCode && a.jplPosVersionId === b.jplPosVersionId && a.jplUnsolicitedDrSeconds === b.jplUnsolicitedDrSeconds && a.jplHeartbeatIntervalMs === b.jplHeartbeatIntervalMs && a.jplDeadConnectionTimeoutMs === b.jplDeadConnectionTimeoutMs && a.jplExpectedMinVersion === b.jplExpectedMinVersion && JSON.stringify(a.jplUnsolicitedFlags) === JSON.stringify(b.jplUnsolicitedFlags) && JSON.stringify(a.jplUnsolicitedMfdrFlags) === JSON.stringify(b.jplUnsolicitedMfdrFlags) && a.jplStatusUpdateCode === b.jplStatusUpdateCode && a.jplBootstrapSnapshotEnabled === b.jplBootstrapSnapshotEnabled && a.bufferWarnDepthSup === b.bufferWarnDepthSup && a.bufferCritDepthSup === b.bufferCritDepthSup && a.bufferWarnAgeMinSup === b.bufferWarnAgeMinSup && a.bufferCritAgeMinSup === b.bufferCritAgeMinSup && a.bufferWarnDepthUnsup === b.bufferWarnDepthUnsup && a.bufferCritDepthUnsup === b.bufferCritDepthUnsup && a.bufferWarnAgeMinUnsup === b.bufferWarnAgeMinUnsup && a.bufferCritAgeMinUnsup === b.bufferCritAgeMinUnsup;
+      return a.mode === b.mode && a.jplOperationMode === b.jplOperationMode && a.jplHost === b.jplHost && a.jplPort === b.jplPort && a.jplPosId === b.jplPosId && a.jplAccessCode === b.jplAccessCode && a.jplCountryCode === b.jplCountryCode && a.jplPosVersionId === b.jplPosVersionId && a.jplUnsolicitedDrSeconds === b.jplUnsolicitedDrSeconds && a.jplHeartbeatIntervalMs === b.jplHeartbeatIntervalMs && a.jplDeadConnectionTimeoutMs === b.jplDeadConnectionTimeoutMs && a.jplExpectedMinVersion === b.jplExpectedMinVersion && JSON.stringify(a.jplUnsolicitedFlags) === JSON.stringify(b.jplUnsolicitedFlags) && JSON.stringify(a.jplUnsolicitedMfdrFlags) === JSON.stringify(b.jplUnsolicitedMfdrFlags) && a.jplStatusUpdateCode === b.jplStatusUpdateCode && a.jplBootstrapSnapshotEnabled === b.jplBootstrapSnapshotEnabled && a.jplRequestDispatchPolicy === b.jplRequestDispatchPolicy && a.jplIntegrationScope === b.jplIntegrationScope && a.jplTlsRequired === b.jplTlsRequired && JSON.stringify(a.jplOptionalProtocolFamilies) === JSON.stringify(b.jplOptionalProtocolFamilies) && a.bufferWarnDepthSup === b.bufferWarnDepthSup && a.bufferCritDepthSup === b.bufferCritDepthSup && a.bufferWarnAgeMinSup === b.bufferWarnAgeMinSup && a.bufferCritAgeMinSup === b.bufferCritAgeMinSup && a.bufferWarnDepthUnsup === b.bufferWarnDepthUnsup && a.bufferCritDepthUnsup === b.bufferCritDepthUnsup && a.bufferWarnAgeMinUnsup === b.bufferWarnAgeMinUnsup && a.bufferCritAgeMinUnsup === b.bufferCritAgeMinUnsup;
     };
     getForecourtRuntimeConfig = () => {
       if (globalThis.__forecourtRuntimeConfig) {
@@ -91552,6 +93048,10 @@ var init_runtimeConfig = __esm({
         FORECOURT_RUNTIME_KV_KEYS.JPL_UNSOLICITED_MFDR_FLAGS,
         FORECOURT_RUNTIME_KV_KEYS.JPL_STATUS_UPDATE_CODE,
         FORECOURT_RUNTIME_KV_KEYS.JPL_BOOTSTRAP_SNAPSHOT_ENABLED,
+        EXTRA_REQUEST_POLICY_KEY,
+        FORECOURT_RUNTIME_KV_KEYS.JPL_INTEGRATION_SCOPE,
+        FORECOURT_RUNTIME_KV_KEYS.JPL_TLS_REQUIRED,
+        FORECOURT_RUNTIME_KV_KEYS.JPL_OPTIONAL_PROTOCOL_FAMILIES,
         FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_DEPTH_SUP,
         FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_DEPTH_SUP,
         FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_AGE_MIN_SUP,
@@ -91578,6 +93078,10 @@ var init_runtimeConfig = __esm({
         jplUnsolicitedMfdrFlags,
         jplStatusUpdateCode,
         jplBootstrapSnapshotEnabled,
+        jplRequestDispatchPolicy,
+        jplIntegrationScope,
+        jplTlsRequired,
+        jplOptionalProtocolFamilies,
         bufferWarnDepthSup,
         bufferCritDepthSup,
         bufferWarnAgeMinSup,
@@ -91607,6 +93111,16 @@ var init_runtimeConfig = __esm({
           jplBootstrapSnapshotEnabled,
           base.jplBootstrapSnapshotEnabled
         ) : base.jplBootstrapSnapshotEnabled,
+        jplRequestDispatchPolicy: normalizeRequestDispatchPolicy(
+          jplRequestDispatchPolicy,
+          base.jplRequestDispatchPolicy
+        ),
+        jplIntegrationScope: jplIntegrationScope != null && String(jplIntegrationScope).trim().length ? String(jplIntegrationScope).trim().toLowerCase() : base.jplIntegrationScope,
+        jplTlsRequired: jplTlsRequired != null ? normalizeBooleanFlag(jplTlsRequired, base.jplTlsRequired ?? false) : base.jplTlsRequired ?? false,
+        jplOptionalProtocolFamilies: jplOptionalProtocolFamilies != null ? normalizeProtocolFamilyList(
+          jplOptionalProtocolFamilies,
+          base.jplOptionalProtocolFamilies
+        ) : base.jplOptionalProtocolFamilies,
         bufferWarnDepthSup: bufferWarnDepthSup != null ? toInt2(bufferWarnDepthSup, base.bufferWarnDepthSup) : base.bufferWarnDepthSup,
         bufferCritDepthSup: bufferCritDepthSup != null ? toInt2(bufferCritDepthSup, base.bufferCritDepthSup) : base.bufferCritDepthSup,
         bufferWarnAgeMinSup: bufferWarnAgeMinSup != null ? toInt2(bufferWarnAgeMinSup, base.bufferWarnAgeMinSup) : base.bufferWarnAgeMinSup,
@@ -91633,715 +93147,29 @@ var init_runtimeConfig = __esm({
   }
 });
 
-// src/modules/forecourt/infrastructure/jpl/protocol/bootstrap.ts
-var DEFAULT_JPL_REQUIRED_FLAGS, DEFAULT_JPL_MFDR_FLAGS, toCanonicalToken, tokenizeAccessCode, normalizeJplPosId, buildJplAccessCode, buildJplBootstrapConfig;
-var init_bootstrap = __esm({
-  "src/modules/forecourt/infrastructure/jpl/protocol/bootstrap.ts"() {
+// src/shared/forecourt/runtime.ts
+function getForecourtRuntimeConfig2() {
+  return getForecourtRuntimeConfig();
+}
+async function loadForecourtRuntimeConfigFromDb2(stationId2) {
+  return await loadForecourtRuntimeConfigFromDb(
+    requireNonEmptyString(stationId2, "stationId")
+  );
+}
+function startForecourtRuntimeConfigWatcher(stationId2) {
+  const stop = subscribeForecourtRuntimeConfig(() => {
+  });
+  void loadForecourtRuntimeConfigFromDb(stationId2).catch(() => {
+  });
+  return stop;
+}
+var init_runtime = __esm({
+  "src/shared/forecourt/runtime.ts"() {
     "use strict";
-    DEFAULT_JPL_REQUIRED_FLAGS = [
-      "UNSO_TRBUFSTA_3",
-      "UNSO_TGSTA_1",
-      "UNSO_DELIVSTA_1"
-    ];
-    DEFAULT_JPL_MFDR_FLAGS = ["UNSO_FPSTA_3"];
-    toCanonicalToken = (value) => String(value ?? "").trim();
-    tokenizeAccessCode = (value) => String(value ?? "").split(",").map((token) => token.trim()).filter(Boolean);
-    normalizeJplPosId = (value, fallback = "01", options = {}) => {
-      const allowZero = Boolean(options.allowZero);
-      const raw = String(value ?? "").trim();
-      const fallbackRaw = String(fallback ?? "01").trim() || "01";
-      const chosen = raw || fallbackRaw;
-      if (!/^\d{1,2}$/.test(chosen)) {
-        throw new Error("JPL POS ID must be a 1-2 digit numeric string");
-      }
-      const numeric = Math.trunc(Number(chosen));
-      if (!Number.isFinite(numeric)) {
-        throw new Error("JPL POS ID must be numeric");
-      }
-      if (!allowZero && numeric === 0) {
-        throw new Error(
-          "JPL POS ID 00 is reserved and cannot be used by a POS client"
-        );
-      }
-      if (numeric < 0 || numeric > 89) {
-        throw new Error("JPL POS ID must be between 01 and 89 for real POS clients");
-      }
-      return String(numeric).padStart(2, "0");
-    };
-    buildJplAccessCode = (options) => {
-      const {
-        baseAccessCode,
-        drSeconds = 5,
-        ensureRi = true,
-        requiredFlags = DEFAULT_JPL_REQUIRED_FLAGS,
-        mfdrFlags = DEFAULT_JPL_MFDR_FLAGS
-      } = options;
-      const tokens = tokenizeAccessCode(baseAccessCode);
-      const effectiveDr = Number.isFinite(Number(drSeconds)) && Number(drSeconds) > 0 ? Math.trunc(Number(drSeconds)) : 5;
-      const hasToken = (token) => tokens.some((candidate) => candidate.toUpperCase() === token.toUpperCase());
-      const findTokenIndex = (prefix) => tokens.findIndex(
-        (candidate) => candidate.toUpperCase().startsWith(prefix.toUpperCase())
-      );
-      const upsertPlainToken = (token) => {
-        const canonical = toCanonicalToken(token);
-        if (!canonical) return;
-        if (!hasToken(canonical)) tokens.push(canonical);
-      };
-      const upsertMfdrToken = (prefix) => {
-        const canonical = toCanonicalToken(prefix);
-        if (!canonical) return;
-        const index = findTokenIndex(canonical);
-        if (index < 0) {
-          tokens.push(`${canonical}:MFDR=${effectiveDr}`);
-          return;
-        }
-        const existing = tokens[index];
-        if (/MFDR=/i.test(existing)) return;
-        tokens[index] = `${existing}:MFDR=${effectiveDr}`;
-      };
-      if (ensureRi) upsertPlainToken("RI");
-      for (const flag of requiredFlags) upsertPlainToken(flag);
-      for (const flag of mfdrFlags) upsertMfdrToken(flag);
-      return tokens.join(",");
-    };
-    buildJplBootstrapConfig = (cfg) => {
-      const posId = normalizeJplPosId(cfg.jplPosId, "01");
-      const accessCode = buildJplAccessCode({
-        baseAccessCode: cfg.jplAccessCode,
-        drSeconds: cfg.jplUnsolicitedDrSeconds,
-        requiredFlags: cfg.jplUnsolicitedFlags?.length > 0 ? cfg.jplUnsolicitedFlags : DEFAULT_JPL_REQUIRED_FLAGS,
-        mfdrFlags: cfg.jplUnsolicitedMfdrFlags?.length > 0 ? cfg.jplUnsolicitedMfdrFlags : DEFAULT_JPL_MFDR_FLAGS
-      });
-      return {
-        posId,
-        secureMode: Number(cfg.jplPort) === 8889,
-        accessCode,
-        countryCode: String(cfg.jplCountryCode ?? "").trim() || "1",
-        posVersionId: String(cfg.jplPosVersionId ?? "").trim() || "470-02-1.08",
-        statusUpdateCode: Number(cfg.jplStatusUpdateCode ?? 3),
-        bootstrapSnapshotEnabled: Boolean(cfg.jplBootstrapSnapshotEnabled ?? true),
-        clientOptions: {
-          host: cfg.jplHost,
-          port: cfg.jplPort,
-          strictProtocolValidation: true
-        },
-        logonOptions: {
-          accessCode,
-          countryCode: String(cfg.jplCountryCode ?? "").trim() || "1",
-          posVersionId: String(cfg.jplPosVersionId ?? "").trim() || "470-02-1.08",
-          includeDefaultUnsolFlags: false
-        },
-        features: {
-          wetstock: true,
-          ept: true,
-          wash: true,
-          vending: true
-        }
-      };
-    };
-  }
-});
-
-// src/modules/forecourt/infrastructure/jpl/globals.ts
-var init_globals = __esm({
-  "src/modules/forecourt/infrastructure/jpl/globals.ts"() {
-    "use strict";
-  }
-});
-
-// src/shared/status.ts
-var PUMP_NOZZLE_STATE;
-var init_status2 = __esm({
-  "src/shared/status.ts"() {
-    "use strict";
-    PUMP_NOZZLE_STATE = {
-      IDLE: "idle",
-      AUTH: "auth",
-      PREAUTHORIZED: "preauthorized",
-      CALLING: "calling",
-      STARTING: "starting",
-      NOZZLE_UP: "nozzle_up",
-      NOZZLE_DOWN: "nozzle_down",
-      DISPENSING: "dispensing",
-      DISPENSING_PAUSED: "dispensing_paused",
-      ERROR: "error",
-      CLOSED: "closed",
-      UNAVAILABLE: "unavailable",
-      UNCONFIGURED: "unconfigured"
-    };
-  }
-});
-
-// src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers.ts
-var import_util4, serializeError, serializeForLog, padId2, mapJplMainState, extractNozzleNumber, extractSubCode, eventTypeFromDomainEvent, unwrapMultiMessage, resolveTransSeqNo, toJplDecimalString, firstNonBlank, leftPadDigits, getSupervisedTxClearFields;
-var init_jplTcpAdapter_helpers = __esm({
-  "src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers.ts"() {
-    "use strict";
-    import_util4 = __toESM(require("util"));
-    init_status2();
-    serializeError = (err) => {
-      if (!err) return { message: "" };
-      if (err instanceof Error) {
-        const anyErr = err;
-        return {
-          name: err.name,
-          message: err.message,
-          stack: err.stack,
-          code: anyErr.code,
-          errno: anyErr.errno,
-          syscall: anyErr.syscall,
-          address: anyErr.address,
-          port: anyErr.port,
-          cause: anyErr.cause ? String(anyErr.cause) : void 0
-        };
-      }
-      if (typeof err === "object") {
-        const anyErr = err;
-        return {
-          message: anyErr?.message ? String(anyErr.message) : String(err),
-          stack: anyErr?.stack ? String(anyErr.stack) : void 0,
-          code: anyErr?.code,
-          errno: anyErr?.errno,
-          syscall: anyErr?.syscall,
-          address: anyErr?.address,
-          port: anyErr?.port
-        };
-      }
-      return { message: String(err) };
-    };
-    serializeForLog = (value) => {
-      if (typeof value === "string") return value;
-      if (value instanceof Error)
-        return value.stack || `${value.name}: ${value.message}`;
-      return import_util4.default.inspect(value, {
-        depth: 8,
-        colors: false,
-        maxArrayLength: 200,
-        breakLength: 140,
-        compact: false
-      });
-    };
-    padId2 = (value) => {
-      const n = Number(value);
-      if (!Number.isFinite(n) || n < 0) return String(value ?? "");
-      const s = String(Math.trunc(n));
-      return s.length >= 2 ? s : s.padStart(2, "0");
-    };
-    mapJplMainState = (value) => {
-      const unwrap = (v) => {
-        if (v == null) return "";
-        if (typeof v === "object") {
-          const enumObj = v.enum;
-          const vv = v.value;
-          if (enumObj && typeof enumObj === "object") {
-            if (typeof vv === "string") {
-              const matchKey = Object.keys(enumObj).find((k) => enumObj[k] === vv);
-              if (matchKey) return matchKey;
-            }
-            const keys = Object.keys(enumObj);
-            if (keys.length) return keys[0];
-          }
-          if (typeof vv === "string") return vv;
-        }
-        return String(v);
-      };
-      const raw = unwrap(value).trim().toLowerCase();
-      if (!raw) return PUMP_NOZZLE_STATE.IDLE;
-      if (raw.includes("unconfigured")) return PUMP_NOZZLE_STATE.UNCONFIGURED;
-      if (raw.includes("unavailable")) return PUMP_NOZZLE_STATE.UNAVAILABLE;
-      if (raw.includes("closed")) return PUMP_NOZZLE_STATE.CLOSED;
-      if (raw.includes("error")) return PUMP_NOZZLE_STATE.ERROR;
-      if (raw.includes("terminated") || raw.includes("final") || raw.includes("stopped"))
-        return PUMP_NOZZLE_STATE.NOZZLE_DOWN;
-      if (raw.includes("preauthorized") || raw.includes("authorized"))
-        return PUMP_NOZZLE_STATE.PREAUTHORIZED;
-      if (raw.includes("calling") || raw === "call")
-        return PUMP_NOZZLE_STATE.CALLING;
-      if (raw.includes("starting")) return PUMP_NOZZLE_STATE.STARTING;
-      if (raw.includes("fuelling_paused") || raw.includes("fueling_paused") || raw.includes("dispensing_paused")) {
-        return PUMP_NOZZLE_STATE.DISPENSING_PAUSED;
-      }
-      if (raw.includes("fuelling") || raw.includes("fueling") || raw.includes("dispens")) {
-        return PUMP_NOZZLE_STATE.DISPENSING;
-      }
-      if (raw.includes("idle")) {
-        return PUMP_NOZZLE_STATE.IDLE;
-      }
-      if (/^[0-9a-f]{2}h$/.test(raw)) return PUMP_NOZZLE_STATE.IDLE;
-      return raw;
-    };
-    extractNozzleNumber = (payload) => {
-      const v = payload?.NozzleNumber ?? payload?.nozzleNumber ?? payload?.NozzleNo ?? payload?.nozzleNo ?? payload?.Nozzle ?? payload?.nozzle;
-      const n = Number(v);
-      return Number.isFinite(n) ? Math.trunc(n) : null;
-    };
-    extractSubCode = (payload) => {
-      const v = payload?.SubCode ?? payload?.subCode ?? payload?.subcode;
-      if (!v) return null;
-      const s = String(v).trim();
-      return s ? s : null;
-    };
-    eventTypeFromDomainEvent = (evt) => {
-      const base = String(evt?.name ?? "").trim();
-      const sc = extractSubCode(evt?.payload);
-      if (!sc) return base;
-      if (base.endsWith(`_${sc}`)) return base;
-      if (base.includes("_resp_") || base.includes("_req_")) return base;
-      return `${base}_${sc}`;
-    };
-    unwrapMultiMessage = (eventType, payload) => {
-      if (!payload || typeof payload !== "object") return null;
-      const isMulti = eventType.startsWith("MultiMessage_resp") || eventType.startsWith("MultiMessage_") || payload?.MultiMessage != null || Array.isArray(payload?.messages) || Array.isArray(payload?.Messages) || Array.isArray(payload?.Message);
-      if (!isMulti) return null;
-      const candidates = [];
-      if (Array.isArray(payload?.messages)) candidates.push(...payload.messages);
-      if (Array.isArray(payload?.Messages)) candidates.push(...payload.Messages);
-      if (Array.isArray(payload?.Message)) candidates.push(...payload.Message);
-      if (Array.isArray(payload?.MultiMessage))
-        candidates.push(...payload.MultiMessage);
-      if (Array.isArray(payload?.Msgs)) candidates.push(...payload.Msgs);
-      const decoded = [];
-      for (const m of candidates) {
-        const name = m?.name ?? m?.Name ?? m?.MsgName ?? m?.msgName;
-        const subCode = m?.subCode ?? m?.SubCode ?? m?.subcode;
-        const data = m?.data ?? m?.Data ?? m?.payload ?? m?.Payload ?? m;
-        if (name) {
-          decoded.push({
-            __eventType: `${String(name)}_${String(subCode ?? "").trim()}`,
-            payload: data
-          });
-        } else if (data && typeof data === "object" && (data.name || data.Name)) {
-          decoded.push({
-            __eventType: `${String(data.name ?? data.Name)}_${String(data.subCode ?? data.SubCode ?? "").trim()}`,
-            payload: data.data ?? data.Data ?? {}
-          });
-        }
-      }
-      return decoded.length ? decoded : null;
-    };
-    resolveTransSeqNo = (tx) => {
-      const candidates = [
-        tx?.transSeqNo,
-        tx?.transSeq,
-        tx?.sequenceNo,
-        tx?.raw?.TransSeqNo,
-        tx?.raw?.TransSeqNo_e,
-        tx?.raw?.TransSeqNo_E,
-        tx?.raw?.TransInSupBuffer?.[0]?.TransSeqNo,
-        tx?.raw?.TransInUnSupBuffer?.[0]?.TransSeqNo,
-        tx?.raw?.TransInSupBuffer?.[0]?.TransSeqNo_e,
-        tx?.raw?.TransInUnSupBuffer?.[0]?.TransSeqNo_e,
-        tx?.item?.TransSeqNo,
-        tx?.transaction?.TransSeqNo,
-        tx?.transaction?.transSeqNo
-      ];
-      for (const v of candidates) {
-        if (v == null) continue;
-        const n = Number(v);
-        if (Number.isFinite(n)) return n;
-      }
-      return null;
-    };
-    toJplDecimalString = (value, fallback = "0") => {
-      if (value == null) return fallback;
-      const s = String(value).trim();
-      return s.length > 0 ? s : fallback;
-    };
-    firstNonBlank = (...values) => {
-      for (const value of values) {
-        if (value == null) continue;
-        const s = String(value).trim();
-        if (s) return s;
-      }
-      return null;
-    };
-    leftPadDigits = (value, length, fallback = "0") => {
-      const s = toJplDecimalString(value, fallback).replace(/\D/g, "");
-      return (s || fallback).padStart(length, "0");
-    };
-    getSupervisedTxClearFields = (txData) => {
-      const tp = txData?.TransPars ?? txData?.transPars ?? {};
-      const volE = firstNonBlank(
-        tp?.Vol_e,
-        txData?.Vol_e,
-        tp?.Volume_e,
-        txData?.Volume_e
-      );
-      const moneyE = firstNonBlank(
-        tp?.Money_e,
-        txData?.Money_e,
-        tp?.MoneyDue_e,
-        txData?.MoneyDue_e
-      );
-      const volStd = firstNonBlank(tp?.Vol, txData?.Vol, tp?.Volume, txData?.Volume);
-      const moneyStd = firstNonBlank(
-        tp?.Money,
-        txData?.Money,
-        tp?.MoneyDue,
-        txData?.MoneyDue
-      );
-      return {
-        Vol_e: volE ? String(volE) : leftPadDigits(volStd, 10, "0"),
-        Money_e: moneyE ? String(moneyE) : leftPadDigits(moneyStd, 10, "0")
-      };
-    };
-  }
-});
-
-// src/shared/forecourt/adapters/jplTcpAdapter.helpers.ts
-var init_jplTcpAdapter_helpers2 = __esm({
-  "src/shared/forecourt/adapters/jplTcpAdapter.helpers.ts"() {
-    "use strict";
-    init_jplTcpAdapter_helpers();
-  }
-});
-
-// src/shared/forecourt/runtimeConfig.ts
-var init_runtimeConfig2 = __esm({
-  "src/shared/forecourt/runtimeConfig.ts"() {
-    "use strict";
+    init_jplState();
+    init_inputs();
+    init_liveEvents();
     init_runtimeConfig();
-  }
-});
-
-// src/modules/forecourt/infrastructure/jpl/protocol/normalize.ts
-var asObject, enumLabel, bitValue, stringOrUndefined, arrayOfStrings, normalizeFpStatusPayload, normalizeFpInfoPayload, normalizeFpFuellingDataPayload, normalizeTgStatusPayload, normalizeSiteDeliveryStatusPayload, normalizeTankDeliveryDataPayload, warningFpErrorCodes, normalizeFpErrorPayload;
-var init_normalize = __esm({
-  "src/modules/forecourt/infrastructure/jpl/protocol/normalize.ts"() {
-    "use strict";
-    init_jplTcpAdapter_helpers2();
-    asObject = (value) => value && typeof value === "object" ? value : {};
-    enumLabel = (value) => {
-      if (!value || typeof value !== "object") return void 0;
-      const entries = Object.entries(value?.enum ?? {});
-      if (!entries.length) return void 0;
-      return String(entries[0]?.[0] ?? "").trim() || void 0;
-    };
-    bitValue = (value, key) => Boolean(value?.bits?.[key] ?? value?.[key]);
-    stringOrUndefined = (value) => {
-      const text = String(value ?? "").trim();
-      return text || void 0;
-    };
-    arrayOfStrings = (value) => Array.isArray(value) ? value.map((entry) => stringOrUndefined(entry?.value ?? entry)).filter(Boolean) : [];
-    normalizeFpStatusPayload = (payload, subCode) => {
-      const data = asObject(payload);
-      const supplementary = asObject(data?.FpSupplStatusPars);
-      const subStates = asObject(data?.FpSubStates);
-      const subStates2 = asObject(supplementary?.FpSubStates2);
-      const subStates3 = asObject(supplementary?.FpSubStates3);
-      const subStates4 = asObject(supplementary?.FpSubStates4);
-      return {
-        fpId: stringOrUndefined(data?.FpId),
-        subCode: stringOrUndefined(subCode),
-        smId: stringOrUndefined(data?.SmId),
-        mainState: enumLabel(data?.FpMainState) ?? stringOrUndefined(data?.FpMainState?.value),
-        nozzleState: mapJplMainState(data?.FpMainState),
-        lockId: stringOrUndefined(data?.FpLockId),
-        gradeId: stringOrUndefined(data?.FcGradeId),
-        nozzleId: stringOrUndefined(supplementary?.NozzleId),
-        nozzleNumber: extractNozzleNumber(supplementary) ?? extractNozzleNumber(data),
-        operationModeNo: data?.FpOperationModeNo,
-        availableGrades: arrayOfStrings(supplementary?.FpAvailableGrades),
-        availableSms: arrayOfStrings(supplementary?.FpAvailableSms),
-        permittedGrades: arrayOfStrings(supplementary?.FpPermittedGrades),
-        descriptor: {
-          isCarWashMachine: bitValue(data?.FpDescriptor, "FpIsACarWashMachine"),
-          isScreenWashDispenser: bitValue(
-            data?.FpDescriptor,
-            "FpIsAScreenWashDispenser"
-          )
-        },
-        flags: {
-          isLockedByPos: bitValue(subStates, "IsLockedByPos"),
-          isSupervised: bitValue(subStates, "IsSupervised"),
-          isOnline: bitValue(subStates, "IsOnline"),
-          isEstopped: bitValue(subStates, "IsEstopped"),
-          hasFreeBuffer: bitValue(subStates, "HasFreeBuffer"),
-          isInErrorState: bitValue(subStates, "IsInErrorState"),
-          hasActiveGrades: bitValue(subStates, "HasActiveGrades"),
-          isPreset: bitValue(subStates, "IsPreset"),
-          pumpTotalsReady: bitValue(subStates2, "pump_totals_ready"),
-          vrmAlarm: bitValue(
-            subStates2,
-            "VRM_alarm_on_one_or_more_nozzles_(timer_running)"
-          ),
-          vrmError: bitValue(subStates2, "VRM_error_on_one_or_more_nozzles"),
-          pumpInManualMode: bitValue(subStates2, "Pump_in_manual_mode"),
-          pricesLocked: bitValue(subStates2, "Prices_locked"),
-          nozzleHasTagReader: bitValue(subStates2, "Nozzle_has_a_tag_reader"),
-          fuellingHalted: bitValue(subStates2, "Fuelling_halted"),
-          totalsInSync: bitValue(subStates2, "totals_in_sync"),
-          presetReached: bitValue(subStates4, "Preset_reached_in_fuelling"),
-          fuellingWithoutProgress: bitValue(
-            subStates4,
-            "Fuelling_without_progress"
-          ),
-          doorAlarm: bitValue(subStates4, "Door_alarm")
-        },
-        supplementary: {
-          subStates2: supplementary?.FpSubStates2,
-          subStates3: supplementary?.FpSubStates3,
-          subStates4: supplementary?.FpSubStates4,
-          currentFlowRate: supplementary?.CurrentFlowRate,
-          currentFuelTemperature: supplementary?.CurrentFuelTemperature,
-          fuellingDataVol_e: stringOrUndefined(supplementary?.FuellingDataVol_e),
-          fuellingDataMon_e: stringOrUndefined(supplementary?.FuellingDataMon_e),
-          attendantAccountId: stringOrUndefined(supplementary?.AttendantAccountId),
-          pgId: stringOrUndefined(supplementary?.PgId),
-          nozzleTagReaderId: stringOrUndefined(supplementary?.NozzleTagReaderId),
-          rawSubStates3: supplementary?.FpSubStates3
-        },
-        raw: data
-      };
-    };
-    normalizeFpInfoPayload = (payload, subCode) => {
-      const data = asObject(payload);
-      const items = asObject(data?.FpInfoItems);
-      return {
-        fpId: stringOrUndefined(data?.FpId),
-        subCode: stringOrUndefined(subCode),
-        gradePrices: Array.isArray(items?.FpGradePrices) ? items.FpGradePrices : [],
-        gradePricesExtended: Array.isArray(items?.FpGradePrices_e) ? items.FpGradePrices_e : [],
-        transReturnData: Array.isArray(items?.FpTransReturnData) ? items.FpTransReturnData : [],
-        transReturnData2: Array.isArray(items?.FpTransReturnData2) ? items.FpTransReturnData2 : [],
-        raw: data
-      };
-    };
-    normalizeFpFuellingDataPayload = (payload, subCode) => {
-      const data = asObject(payload);
-      return {
-        fpId: stringOrUndefined(data?.FpId),
-        subCode: stringOrUndefined(subCode),
-        volume: stringOrUndefined(data?.Vol),
-        money: stringOrUndefined(data?.Money),
-        volumeExtended: stringOrUndefined(data?.Vol_e),
-        moneyExtended: stringOrUndefined(data?.Money_e),
-        raw: data
-      };
-    };
-    normalizeTgStatusPayload = (payload, subCode) => {
-      const data = asObject(payload);
-      const subStates = asObject(data?.TgSubStates);
-      const alarmStatus = asObject(data?.TgAlarmStatus);
-      return {
-        tgId: stringOrUndefined(data?.TgId),
-        subCode: stringOrUndefined(subCode),
-        mainState: enumLabel(data?.TgMainState) ?? stringOrUndefined(data?.TgMainState?.value),
-        flags: {
-          online: bitValue(subStates, "TankGaugeOnline") || bitValue(subStates, "TankGaugeOnLine"),
-          alarmActive: bitValue(subStates, "TankGaugeAlarmActive"),
-          errorActive: bitValue(subStates, "TankGaugeErrorActive"),
-          ticketedDeliveryInProgress: bitValue(
-            subStates,
-            "TicketedDeliveryInProgress"
-          ),
-          ticketedDeliveryDataReady: bitValue(
-            subStates,
-            "TicketedDeliveryDataReady"
-          ),
-          deliveryInProgress: bitValue(subStates, "DeliveryInProgress"),
-          deliveryDataReady: bitValue(subStates, "DeliveryDataReady") || bitValue(subStates, "DelvieryDataReady"),
-          allInventoryDataReady: bitValue(
-            subStates,
-            "AllAvailableInventoryDataReady"
-          )
-        },
-        alarms: {
-          highLevel: bitValue(alarmStatus, "HighLevelAlarm"),
-          highHighLevel: bitValue(alarmStatus, "HighHighLevelAlarm"),
-          lowLevel: bitValue(alarmStatus, "LowLevelAlarm"),
-          lowLowLevel: bitValue(alarmStatus, "LowLowLevelAlarm"),
-          highWater: bitValue(alarmStatus, "HighWaterAlarm"),
-          tankLeak: bitValue(alarmStatus, "TankLeakAlarm"),
-          tankDataMissing: bitValue(alarmStatus, "TankDataMissingAlarm"),
-          highHighWater: bitValue(alarmStatus, "HighHighWaterAlarm"),
-          ticketedDeliveryDataLost: bitValue(
-            alarmStatus,
-            "TicketedDeliveryDataLost"
-          ),
-          deliveryDataLost: bitValue(alarmStatus, "DeliveryDataLost"),
-          otherAlarm: bitValue(alarmStatus, "OtherAlarm")
-        },
-        raw: data
-      };
-    };
-    normalizeSiteDeliveryStatusPayload = (payload, subCode) => {
-      const data = asObject(payload);
-      const flags = asObject(data?.DeliveryStatusFlags);
-      return {
-        subCode: stringOrUndefined(subCode),
-        deliveryReportSeqNo: stringOrUndefined(data?.DeliveryReportSeqNo),
-        flags: {
-          siteDeliveryStartingMarked: bitValue(flags, "SiteDeliveryStartingMarked") || bitValue(flags, "SiteDeliveryStartMarked"),
-          siteDeliveryInProgress: bitValue(flags, "SiteDeliveryInProgress"),
-          siteDeliveryFinishingMarked: bitValue(flags, "SiteDeliveryFinishingMarked") || bitValue(flags, "SiteDeliveryFinishedMarked"),
-          siteDeliveryDataReady: bitValue(flags, "SiteDeliveryDataIsReady"),
-          siteTicketedDeliveryDataReady: bitValue(
-            flags,
-            "SiteTicketedDeliveryDataIsReady"
-          ),
-          siteTicketedDeliveryInProgress: bitValue(
-            flags,
-            "SiteTicketedDeliveryInProgress"
-          )
-        },
-        tgIds: arrayOfStrings(data?.TgId),
-        tankDeliveries: arrayOfStrings(data?.TankDeliveries),
-        tankTicketedDeliveries: arrayOfStrings(data?.TankTicketedDeliveries),
-        raw: data
-      };
-    };
-    normalizeTankDeliveryDataPayload = (payload, subCode) => {
-      const data = asObject(payload);
-      const items = asObject(data?.TankDeliveryDataItems);
-      return {
-        tgId: stringOrUndefined(data?.TgId),
-        posId: stringOrUndefined(data?.PosId),
-        subCode: stringOrUndefined(subCode),
-        deliveryReportSeqNo: stringOrUndefined(data?.DeliveryReportSeqNo) ?? stringOrUndefined(items?.DeliveryReportSeqNo),
-        tankDeliverySeqNo: stringOrUndefined(items?.TankDeliverySeqNo),
-        productCode: stringOrUndefined(items?.TgProductCode),
-        deliveredVol: stringOrUndefined(items?.TankDeliveredVol),
-        deliveredTcVol: stringOrUndefined(items?.TankDeliveredTcVol),
-        deliveredMass: stringOrUndefined(items?.TankDeliveredMass),
-        startDateAndTime: stringOrUndefined(items?.TankDeliveryStartDateAndTime),
-        stopDateAndTime: stringOrUndefined(items?.TankDeliveryStopDateAndTime),
-        raw: data
-      };
-    };
-    warningFpErrorCodes = /* @__PURE__ */ new Set(["49", "50", "51", "52"]);
-    normalizeFpErrorPayload = (payload, subCode) => {
-      const data = asObject(payload);
-      const errorValue = stringOrUndefined(
-        data?.FpErrorCode?.value ?? data?.FpErrorCode
-      );
-      const errorName = enumLabel(data?.FpErrorCode);
-      return {
-        fpId: stringOrUndefined(data?.FpId),
-        subCode: stringOrUndefined(subCode),
-        errorCode: errorValue,
-        errorName,
-        errorDateAndTime: stringOrUndefined(data?.FpErrorDateAndTime),
-        pumpProtocolId: stringOrUndefined(data?.PumpProtocolId),
-        pumpErrorCode: stringOrUndefined(data?.PumpErrorCode),
-        severity: warningFpErrorCodes.has(String(errorValue ?? "").padStart(2, "0")) ? "warning" : "error",
-        raw: data
-      };
-    };
-  }
-});
-
-// src/modules/forecourt/infrastructure/jpl/replayState.ts
-var ensureReplayLocks, withReplayLock, getInFlightReplayKeys, beginReplayKey, endReplayKey, getReplayCapabilities, markReplayCapability, canAttemptReplay;
-var init_replayState = __esm({
-  "src/modules/forecourt/infrastructure/jpl/replayState.ts"() {
-    "use strict";
-    ensureReplayLocks = () => {
-      if (!globalThis.__jplReplayLocks) {
-        globalThis.__jplReplayLocks = /* @__PURE__ */ new Map();
-      }
-      return globalThis.__jplReplayLocks;
-    };
-    withReplayLock = async (key, fn) => {
-      const locks = ensureReplayLocks();
-      const prev = locks.get(key) ?? Promise.resolve();
-      let release;
-      const current = new Promise((resolve) => {
-        release = resolve;
-      });
-      locks.set(
-        key,
-        prev.catch(() => {
-        }).then(() => current)
-      );
-      await prev;
-      try {
-        await fn();
-      } finally {
-        release();
-        if (locks.get(key) === current) {
-          locks.delete(key);
-        }
-      }
-    };
-    getInFlightReplayKeys = () => {
-      if (!globalThis.__jplInFlightReplayKeys) {
-        globalThis.__jplInFlightReplayKeys = /* @__PURE__ */ new Set();
-      }
-      return globalThis.__jplInFlightReplayKeys;
-    };
-    beginReplayKey = (key) => {
-      const s = getInFlightReplayKeys();
-      if (s.has(key)) return false;
-      s.add(key);
-      return true;
-    };
-    endReplayKey = (key) => {
-      getInFlightReplayKeys().delete(key);
-    };
-    getReplayCapabilities = () => {
-      if (!globalThis.__jplReplayCapabilities) {
-        globalThis.__jplReplayCapabilities = {
-          supervised: "unknown",
-          unsupervised: "unknown"
-        };
-      }
-      return globalThis.__jplReplayCapabilities;
-    };
-    markReplayCapability = (mode, value) => {
-      const caps = getReplayCapabilities();
-      caps[mode] = value;
-    };
-    canAttemptReplay = (mode) => {
-      const caps = getReplayCapabilities();
-      return caps[mode] !== "denied";
-    };
-  }
-});
-
-// src/modules/forecourt/infrastructure/repositories/fuelStationsRepo.ts
-var fuelStationsRepo;
-var init_fuelStationsRepo = __esm({
-  "src/modules/forecourt/infrastructure/repositories/fuelStationsRepo.ts"() {
-    "use strict";
-    init_postgres();
-    fuelStationsRepo = {
-      async getActiveStationId() {
-        const row = await queryOne(
-          "SELECT id FROM fuel_stations WHERE is_active = TRUE ORDER BY created_at ASC LIMIT 1"
-        );
-        return row?.id ?? null;
-      },
-      async getCountryById(stationId2) {
-        const row = await queryOne(
-          "SELECT country FROM fuel_stations WHERE id = $1",
-          [stationId2]
-        );
-        return row?.country ?? null;
-      },
-      async getSummaryById(stationId2) {
-        return await queryOne(
-          "SELECT id, name, address, city, country, phone, email FROM fuel_stations WHERE id = $1",
-          [stationId2]
-        );
-      }
-    };
-  }
-});
-
-// src/modules/forecourt/infrastructure/jpl/station.ts
-var resolveStationId;
-var init_station = __esm({
-  "src/modules/forecourt/infrastructure/jpl/station.ts"() {
-    "use strict";
-    init_getStationId();
-    init_uuid();
-    init_fuelStationsRepo();
-    resolveStationId = async () => {
-      const envStation = getStationId();
-      if (envStation && isUuid(envStation)) return envStation;
-      return await fuelStationsRepo.getActiveStationId();
-    };
   }
 });
 
@@ -92487,13 +93315,26 @@ var require_socket_connection = __commonJS({
             return;
           yield new Promise((resolve, reject) => {
             var _a, _b;
-            const onError = (err) => reject(err);
             const common = {
               host: this.opts.host,
               port: this.opts.port
             };
-            const sock = ((_a = this.opts.tls) === null || _a === void 0 ? void 0 : _a.enabled) === true ? tls_1.default.connect(Object.assign(Object.assign({}, common), { rejectUnauthorized: (_b = this.opts.tls.rejectUnauthorized) !== null && _b !== void 0 ? _b : true, servername: this.opts.tls.servername })) : net_1.default.connect(common);
+            if (((_a = this.opts.tls) === null || _a === void 0 ? void 0 : _a.enabled) === true) {
+              const sock2 = tls_1.default.connect(Object.assign(Object.assign({}, common), { rejectUnauthorized: (_b = this.opts.tls.rejectUnauthorized) !== null && _b !== void 0 ? _b : true, servername: this.opts.tls.servername, ca: this.opts.tls.ca, cert: this.opts.tls.cert, key: this.opts.tls.key, minVersion: this.opts.tls.minVersion }));
+              this.socket = sock2;
+              const onError2 = (error) => reject(error);
+              sock2.once("error", onError2);
+              sock2.once("secureConnect", () => {
+                sock2.off("error", onError2);
+                this.wireSocket(sock2);
+                this.emit("connect");
+                resolve();
+              });
+              return;
+            }
+            const sock = net_1.default.connect(common);
             this.socket = sock;
+            const onError = (error) => reject(error);
             sock.once("error", onError);
             sock.once("connect", () => {
               sock.off("error", onError);
@@ -92531,12 +93372,12 @@ var require_socket_connection = __commonJS({
             try {
               const parsed = JSON.parse(frame.toString("utf8"));
               this.emit("message", parsed);
-            } catch (err) {
-              this.emit("error", new Error(`Malformed JSON frame: ${err.message}`));
+            } catch (error) {
+              this.emit("error", new Error(`Malformed JSON frame: ${error.message}`));
             }
           }
         });
-        sock.on("error", (err) => this.emit("error", err));
+        sock.on("error", (error) => this.emit("error", error));
         sock.on("close", () => this.emit("close"));
       }
     };
@@ -95615,7 +96456,7 @@ var require_data = __commonJS({
 });
 
 // node_modules/fast-uri/lib/utils.js
-var require_utils9 = __commonJS({
+var require_utils10 = __commonJS({
   "node_modules/fast-uri/lib/utils.js"(exports2, module2) {
     "use strict";
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
@@ -95875,7 +96716,7 @@ var require_utils9 = __commonJS({
 var require_schemes = __commonJS({
   "node_modules/fast-uri/lib/schemes.js"(exports2, module2) {
     "use strict";
-    var { isUUID } = require_utils9();
+    var { isUUID } = require_utils10();
     var URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
     var supportedSchemeNames = (
       /** @type {const} */
@@ -96085,7 +96926,7 @@ var require_schemes = __commonJS({
 var require_fast_uri = __commonJS({
   "node_modules/fast-uri/index.js"(exports2, module2) {
     "use strict";
-    var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizeComponentEncoding, isIPv4, nonSimpleDomain } = require_utils9();
+    var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizeComponentEncoding, isIPv4, nonSimpleDomain } = require_utils10();
     var { SCHEMES, getSchemeHandler } = require_schemes();
     function normalize(uri, options) {
       if (typeof uri === "string") {
@@ -99572,7 +100413,7 @@ var require__ = __commonJS({
 });
 
 // node_modules/ajv-formats/dist/formats.js
-var require_formats2 = __commonJS({
+var require_formats3 = __commonJS({
   "node_modules/ajv-formats/dist/formats.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -100100,7 +100941,7 @@ var require_dist5 = __commonJS({
   "node_modules/ajv-formats/dist/index.js"(exports2, module2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var formats_1 = require_formats2();
+    var formats_1 = require_formats3();
     var limit_1 = require_limit();
     var codegen_1 = require_codegen();
     var fullName = new codegen_1.Name("fullFormats");
@@ -100208,51 +101049,1606 @@ var require_envelope_schema = __commonJS({
   }
 });
 
-// node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-schema/schemas/fc-logon-req-01h.schema.json
-var require_fc_logon_req_01h_schema = __commonJS({
-  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-schema/schemas/fc-logon-req-01h.schema.json"(exports2, module2) {
+// node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-schema/schemas/core/doms-jpl-core.schema.json
+var require_doms_jpl_core_schema = __commonJS({
+  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-schema/schemas/core/doms-jpl-core.schema.json"(exports2, module2) {
     module2.exports = {
-      $id: "https://schemas.dearx/jpl/fc-logon-req-01h.schema.json",
       $schema: "https://json-schema.org/draft/2020-12/schema",
-      title: "FcLogon_req (SUBC 01H)",
+      $id: "https://schemas.dearx/jpl/core/doms-jpl-core.schema.json",
+      title: "DOMS JPL Core Schema Pack",
       type: "object",
-      additionalProperties: false,
-      required: ["name", "subCode", "data"],
-      properties: {
-        name: { const: "FcLogon_req" },
-        subCode: { const: "01H" },
-        data: {
+      $defs: {
+        CODE1: {
+          type: "string",
+          pattern: "^[0-9A-F]{2}H$"
+        },
+        CODE2: {
+          type: "string",
+          pattern: "^[0-9A-F]{4}H$"
+        },
+        ID2: {
+          type: "string",
+          pattern: "^\\d{1,2}$"
+        },
+        ID2_OR_ZERO: {
+          type: "string",
+          pattern: "^\\d{1,2}$"
+        },
+        DEC4: {
+          type: "string",
+          pattern: "^\\d{1,4}$"
+        },
+        FC_DATE_AND_TIME: {
+          type: "string",
+          pattern: "^\\d{14}$"
+        },
+        FC_DATE_AND_TIME_OR_ZERO: {
+          type: "string",
+          pattern: "^(\\d{14}|0{14})$"
+        },
+        ENUM_RESPONSE: {
           type: "object",
-          additionalProperties: false,
-          required: ["FcAccessCode", "CountryCode", "PosVersionId", "FcLogonPars"],
+          required: ["value"],
           properties: {
-            FcAccessCode: { type: "string", minLength: 1 },
-            CountryCode: { type: "string", minLength: 1 },
-            PosVersionId: { type: "string", minLength: 1 },
-            FcLogonPars: {
+            value: {
+              type: ["string", "integer"]
+            },
+            enum: {
               type: "object",
-              additionalProperties: false,
+              additionalProperties: {
+                type: ["string", "integer"]
+              }
+            }
+          },
+          additionalProperties: true
+        },
+        BIT_FLAGS_RESPONSE: {
+          type: "object",
+          required: ["value"],
+          properties: {
+            value: {
+              type: "integer"
+            },
+            bits: {
+              type: "object",
+              additionalProperties: {
+                type: "integer"
+              }
+            }
+          },
+          additionalProperties: true
+        },
+        REQUEST_ENVELOPE_BASE: {
+          type: "object",
+          required: ["name", "subCode", "data"],
+          properties: {
+            name: {
+              type: "string"
+            },
+            subCode: {
+              $ref: "#/$defs/CODE1"
+            },
+            data: {
+              type: "object"
+            },
+            correlationId: {
+              type: "string",
+              minLength: 1
+            }
+          },
+          additionalProperties: false
+        },
+        RESPONSE_ENVELOPE_BASE: {
+          type: "object",
+          required: ["name", "subCode", "solicited", "data"],
+          properties: {
+            name: {
+              type: "string"
+            },
+            subCode: {
+              $ref: "#/$defs/CODE1"
+            },
+            solicited: {
+              type: "boolean"
+            },
+            data: {
+              type: "object"
+            },
+            correlationId: {
+              type: "string",
+              minLength: 1
+            }
+          },
+          additionalProperties: true
+        },
+        HeartbeatRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "heartbeat request",
+          type: "object",
+          properties: {
+            name: {
+              const: "heartbeat"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        HeartbeatResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "heartbeat response",
+          type: "object",
+          properties: {
+            name: {
+              const: "heartbeat"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        JplBannerResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "jpl version banner",
+          type: "object",
+          properties: {
+            name: {
+              const: "jpl"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
               properties: {
-                UnsolMsgList: {
+                version: {
+                  type: "string"
+                }
+              },
+              required: ["version"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        RejectResponse01: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "reject response",
+          type: "object",
+          properties: {
+            name: {
+              enum: ["RejectMessage_resp", "Reject_resp"]
+            },
+            subCode: {
+              type: "string",
+              pattern: "^[0-9A-F]{2,4}H$"
+            },
+            data: {
+              type: "object",
+              properties: {
+                RejectedExtendedMsgCode: {
+                  $ref: "#/$defs/CODE2"
+                },
+                RejectedMsgSubc: {
+                  $ref: "#/$defs/CODE1"
+                },
+                RejectCode: {
+                  $ref: "#/$defs/ENUM_RESPONSE"
+                },
+                RejectInfo: {
+                  type: "string"
+                },
+                RejectInfoText: {
+                  type: "string"
+                }
+              },
+              required: ["RejectCode"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        MultiMessageResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "multi-message response",
+          type: "object",
+          properties: {
+            name: {
+              const: "MultiMessage_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                messages: {
                   type: "array",
                   items: {
-                    type: "object",
-                    additionalProperties: false,
-                    required: ["ExtMsgCode"],
-                    properties: {
-                      ExtMsgCode: { type: "string", minLength: 1 },
-                      MsgSubc: {
-                        type: "string",
-                        pattern: "^[0-9A-F]{2,4}H$"
+                    $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+                  }
+                }
+              },
+              required: ["messages"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FcLogonRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcLogon request 00H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcLogon_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FcAccessCode: {
+                  type: "string"
+                },
+                CountryCode: {
+                  type: "string",
+                  pattern: "^\\d{4}$"
+                },
+                PosVersionId: {
+                  type: "string"
+                }
+              },
+              required: ["FcAccessCode", "CountryCode", "PosVersionId"],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcLogonResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcLogon response 00H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcLogon_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                CountryCode: {
+                  type: "string",
+                  pattern: "^\\d{4}$"
+                },
+                FcHwType: {
+                  type: "integer"
+                },
+                FcHwVersionNo: {
+                  type: "string"
+                },
+                FcSwType: {
+                  type: "integer"
+                },
+                FcSwVersionNo: {
+                  type: "string"
+                },
+                FcSwDate: {
+                  type: "string"
+                },
+                FcSwBlocks: {
+                  type: "array"
+                }
+              },
+              required: ["CountryCode"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FcLogonRequest01: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcLogon request 01H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcLogon_req"
+            },
+            subCode: {
+              const: "01H"
+            },
+            data: {
+              type: "object",
+              additionalProperties: false,
+              required: [
+                "FcAccessCode",
+                "CountryCode",
+                "PosVersionId",
+                "FcLogonPars"
+              ],
+              properties: {
+                FcAccessCode: {
+                  type: "string",
+                  minLength: 1
+                },
+                CountryCode: {
+                  type: "string",
+                  minLength: 1
+                },
+                PosVersionId: {
+                  type: "string",
+                  minLength: 1
+                },
+                FcLogonPars: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    UnsolMsgList: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["ExtMsgCode"],
+                        properties: {
+                          ExtMsgCode: {
+                            type: "string",
+                            minLength: 1
+                          },
+                          MsgSubc: {
+                            $ref: "#/$defs/CODE1"
+                          }
+                        }
                       }
                     }
                   }
                 }
               }
             }
-          }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcStatusRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcStatus request",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcStatus_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcStatusResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcStatus response",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcStatus_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FcStatus1Flags: {
+                  $ref: "#/$defs/BIT_FLAGS_RESPONSE"
+                },
+                FcStatus2Flags: {
+                  $ref: "#/$defs/BIT_FLAGS_RESPONSE"
+                }
+              },
+              required: [],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        ChangeFcStatusUpdateModeRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "change_FcStatusUpdateMode request",
+          type: "object",
+          properties: {
+            name: {
+              const: "change_FcStatusUpdateMode_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                StatusUpdateCode: {
+                  type: "integer",
+                  minimum: 0
+                }
+              },
+              required: ["StatusUpdateCode"],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcInstallStatusRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcInstallStatus request 00H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcInstallStatus_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcInstallStatusRequest02: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcInstallStatus request 02H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcInstallStatus_req"
+            },
+            subCode: {
+              const: "02H"
+            },
+            data: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcInstallStatusResponse02: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcInstallStatus response 02H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcInstallStatus_resp"
+            },
+            subCode: {
+              const: "02H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                InstalledFcDeviceGroups: {
+                  type: "array"
+                },
+                InstalledFcEquipmentTypes: {
+                  type: "array"
+                }
+              },
+              required: [],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FcPriceSetStatusRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcPriceSetStatus request 00H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcPriceSetStatus_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcPriceSetStatusResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcPriceSetStatus response 00H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcPriceSetStatus_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FcPriceSetId: {
+                  type: "string"
+                },
+                FcPriceSetDateAndTime: {
+                  $ref: "#/$defs/FC_DATE_AND_TIME"
+                }
+              },
+              required: ["FcPriceSetId", "FcPriceSetDateAndTime"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FcPriceSetStatusRequest01: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcPriceSetStatus request 01H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcPriceSetStatus_req"
+            },
+            subCode: {
+              const: "01H"
+            },
+            data: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcPriceSetStatusResponse01: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcPriceSetStatus response 01H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcPriceSetStatus_resp"
+            },
+            subCode: {
+              const: "01H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FcPriceSetId: {
+                  type: "string"
+                },
+                FcPriceSetDateAndTime: {
+                  $ref: "#/$defs/FC_DATE_AND_TIME"
+                },
+                FcPendingPriceSet: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      FcPriceSetId: {
+                        type: "string"
+                      },
+                      PriceSetActivationDateAndTime: {
+                        $ref: "#/$defs/FC_DATE_AND_TIME"
+                      }
+                    },
+                    required: ["FcPriceSetId", "PriceSetActivationDateAndTime"],
+                    additionalProperties: true
+                  }
+                }
+              },
+              required: ["FcPriceSetId", "FcPriceSetDateAndTime"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FcOperationModeStatusRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcOperationModeStatus request",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcOperationModeStatus_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {},
+              required: [],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FcOperationModeStatusResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FcOperationModeStatus response",
+          type: "object",
+          properties: {
+            name: {
+              const: "FcOperationModeStatus_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FcOperationModeNo: {
+                  type: "integer"
+                },
+                FcOperationModeDateAndTime: {
+                  $ref: "#/$defs/FC_DATE_AND_TIME"
+                }
+              },
+              required: ["FcOperationModeNo", "FcOperationModeDateAndTime"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FpStatusRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FpStatus request 00H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FpStatus_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  $ref: "#/$defs/ID2_OR_ZERO"
+                }
+              },
+              required: ["FpId"],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FpStatusResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FpStatus response 00H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FpStatus_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  type: "string"
+                },
+                SmId: {
+                  type: "string"
+                },
+                FpMainState: {
+                  $ref: "#/$defs/ENUM_RESPONSE"
+                },
+                FpSubStates: {
+                  $ref: "#/$defs/BIT_FLAGS_RESPONSE"
+                },
+                FpLockId: {
+                  type: "string"
+                }
+              },
+              required: ["FpId"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FpStatusRequest03: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FpStatus request 03H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FpStatus_req"
+            },
+            subCode: {
+              const: "03H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  $ref: "#/$defs/ID2_OR_ZERO"
+                }
+              },
+              required: ["FpId"],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FpStatusResponse03: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FpStatus response 03H",
+          type: "object",
+          properties: {
+            name: {
+              const: "FpStatus_resp"
+            },
+            subCode: {
+              const: "03H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  type: "string"
+                },
+                SmId: {
+                  type: "string"
+                },
+                FpMainState: {
+                  $ref: "#/$defs/ENUM_RESPONSE"
+                },
+                FpSubStates: {
+                  $ref: "#/$defs/BIT_FLAGS_RESPONSE"
+                },
+                FpLockId: {
+                  type: "string"
+                },
+                FcGradeId: {
+                  type: "string"
+                },
+                FpSupplStatusPars: {
+                  type: "object"
+                }
+              },
+              required: ["FpId"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FpFuellingDataRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FpFuellingData request",
+          type: "object",
+          properties: {
+            name: {
+              const: "FpFuellingData_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  $ref: "#/$defs/ID2"
+                }
+              },
+              required: ["FpId"],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FpFuellingDataResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FpFuellingData response",
+          type: "object",
+          properties: {
+            name: {
+              const: "FpFuellingData_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  type: "string"
+                },
+                Vol: {
+                  type: "string"
+                },
+                Money: {
+                  type: "string"
+                }
+              },
+              required: ["FpId"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        FpSupTransRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "FpSupTrans request",
+          type: "object",
+          properties: {
+            name: {
+              const: "FpSupTrans_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  $ref: "#/$defs/ID2"
+                },
+                TransSeqNo: {
+                  $ref: "#/$defs/DEC4"
+                },
+                PosId: {
+                  $ref: "#/$defs/ID2_OR_ZERO"
+                },
+                TransParId: {
+                  type: "array",
+                  items: {
+                    type: "string"
+                  }
+                }
+              },
+              required: ["FpId", "TransSeqNo", "PosId", "TransParId"],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        FpSupTransResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "FpSupTrans response",
+          type: "object",
+          properties: {
+            name: {
+              const: "FpSupTrans_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  type: "string"
+                },
+                TransSeqNo: {
+                  type: "string"
+                },
+                TransPars: {
+                  type: "object"
+                }
+              },
+              required: ["FpId", "TransSeqNo"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        ClearFpSupTransRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "clear_FpSupTrans request",
+          type: "object",
+          properties: {
+            name: {
+              const: "clear_FpSupTrans_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  $ref: "#/$defs/ID2"
+                },
+                PosId: {
+                  $ref: "#/$defs/ID2_OR_ZERO"
+                },
+                TransSeqNo: {
+                  $ref: "#/$defs/DEC4"
+                }
+              },
+              required: ["FpId", "PosId", "TransSeqNo"],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        ClearFpSupTransResponse00: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "clear_FpSupTrans response",
+          type: "object",
+          properties: {
+            name: {
+              const: "clear_FpSupTrans_resp"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FpId: {
+                  type: "string"
+                }
+              },
+              required: [],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        ChangeFcPriceSetRequest03: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "change_FcPriceSet request 03H",
+          type: "object",
+          properties: {
+            name: {
+              const: "change_FcPriceSet_req"
+            },
+            subCode: {
+              const: "03H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                UserId: {
+                  type: "string"
+                },
+                FcPriceSetId: {
+                  type: "string"
+                },
+                FcPriceGroupId: {
+                  type: "array",
+                  items: {
+                    type: "string"
+                  }
+                },
+                FcGradeId: {
+                  type: "array",
+                  items: {
+                    type: "string"
+                  }
+                },
+                FcPriceGroups: {
+                  type: "array",
+                  items: {
+                    type: "array",
+                    items: {
+                      type: "string"
+                    }
+                  }
+                },
+                PriceSetActivationDateAndTime: {
+                  $ref: "#/$defs/FC_DATE_AND_TIME_OR_ZERO"
+                }
+              },
+              required: [
+                "UserId",
+                "FcPriceSetId",
+                "FcPriceGroupId",
+                "FcGradeId",
+                "FcPriceGroups",
+                "PriceSetActivationDateAndTime"
+              ],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        ChangeFcPriceSetResponse03: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "change_FcPriceSet response 03H",
+          type: "object",
+          properties: {
+            name: {
+              const: "change_FcPriceSet_resp"
+            },
+            subCode: {
+              const: "03H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FcPriceSetId: {
+                  type: "string"
+                }
+              },
+              required: ["FcPriceSetId"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        ChangeFcPriceSetRequest04: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "change_FcPriceSet request 04H",
+          type: "object",
+          properties: {
+            name: {
+              const: "change_FcPriceSet_req"
+            },
+            subCode: {
+              const: "04H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                UserId: {
+                  type: "string"
+                },
+                FcPriceSetId: {
+                  type: "string"
+                },
+                FcPriceGroupId: {
+                  type: "array",
+                  items: {
+                    type: "string"
+                  }
+                },
+                FcGradeId: {
+                  type: "array",
+                  items: {
+                    type: "string"
+                  }
+                },
+                FcPriceGroups: {
+                  type: "array",
+                  items: {
+                    type: "array",
+                    items: {
+                      type: "string"
+                    }
+                  }
+                },
+                PriceSetActivationDateAndTime: {
+                  $ref: "#/$defs/FC_DATE_AND_TIME_OR_ZERO"
+                }
+              },
+              required: [
+                "UserId",
+                "FcPriceSetId",
+                "FcPriceGroupId",
+                "FcGradeId",
+                "FcPriceGroups",
+                "PriceSetActivationDateAndTime"
+              ],
+              additionalProperties: false
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        ChangeFcPriceSetResponse04: {
+          allOf: [
+            {
+              $ref: "#/$defs/RESPONSE_ENVELOPE_BASE"
+            }
+          ],
+          title: "change_FcPriceSet response 04H",
+          type: "object",
+          properties: {
+            name: {
+              const: "change_FcPriceSet_resp"
+            },
+            subCode: {
+              const: "04H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                FcPriceSetId: {
+                  type: "string"
+                }
+              },
+              required: ["FcPriceSetId"],
+              additionalProperties: true
+            },
+            solicited: {
+              type: "boolean"
+            }
+          },
+          required: ["name", "subCode", "solicited", "data"],
+          additionalProperties: true
+        },
+        MultiMessageRequest00: {
+          allOf: [
+            {
+              $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+            }
+          ],
+          title: "multi-message request",
+          type: "object",
+          properties: {
+            name: {
+              const: "MultiMessage_req"
+            },
+            subCode: {
+              const: "00H"
+            },
+            data: {
+              type: "object",
+              properties: {
+                messages: {
+                  type: "array",
+                  items: {
+                    $ref: "#/$defs/REQUEST_ENVELOPE_BASE"
+                  }
+                }
+              },
+              required: ["messages"],
+              additionalProperties: false
+            },
+            correlationId: {
+              type: "string",
+              minLength: 1
+            }
+          },
+          required: ["name", "subCode", "data"],
+          additionalProperties: false
+        },
+        HeartbeatReq: {
+          $ref: "#/$defs/HeartbeatRequest00"
+        },
+        HeartbeatResp: {
+          $ref: "#/$defs/HeartbeatResponse00"
+        },
+        VersionBannerResp: {
+          $ref: "#/$defs/JplBannerResponse00"
+        },
+        RejectResp: {
+          $ref: "#/$defs/RejectResponse01"
+        },
+        RejectMessageResp: {
+          $ref: "#/$defs/RejectResponse01"
+        },
+        MultiMessageReq: {
+          $ref: "#/$defs/MultiMessageRequest00"
+        },
+        MultiMessageResp: {
+          $ref: "#/$defs/MultiMessageResponse00"
+        },
+        FcLogonReq00H: {
+          $ref: "#/$defs/FcLogonRequest00"
+        },
+        FcLogonResp00H: {
+          $ref: "#/$defs/FcLogonResponse00"
+        },
+        FcLogonReq01H: {
+          $ref: "#/$defs/FcLogonRequest01"
+        },
+        FcStatusReq: {
+          $ref: "#/$defs/FcStatusRequest00"
+        },
+        FcStatusResp: {
+          $ref: "#/$defs/FcStatusResponse00"
+        },
+        ChangeFcStatusUpdateModeReq: {
+          $ref: "#/$defs/ChangeFcStatusUpdateModeRequest00"
+        },
+        FcInstallStatusReq00H: {
+          $ref: "#/$defs/FcInstallStatusRequest00"
+        },
+        FcInstallStatusReq02H: {
+          $ref: "#/$defs/FcInstallStatusRequest02"
+        },
+        FcInstallStatusResp02H: {
+          $ref: "#/$defs/FcInstallStatusResponse02"
+        },
+        FcPriceSetStatusReq00H: {
+          $ref: "#/$defs/FcPriceSetStatusRequest00"
+        },
+        FcPriceSetStatusResp00H: {
+          $ref: "#/$defs/FcPriceSetStatusResponse00"
+        },
+        FcPriceSetStatusReq01H: {
+          $ref: "#/$defs/FcPriceSetStatusRequest01"
+        },
+        FcPriceSetStatusResp01H: {
+          $ref: "#/$defs/FcPriceSetStatusResponse01"
+        },
+        FcOperationModeStatusReq: {
+          $ref: "#/$defs/FcOperationModeStatusRequest00"
+        },
+        FcOperationModeStatusResp: {
+          $ref: "#/$defs/FcOperationModeStatusResponse00"
+        },
+        FpStatusReq00H: {
+          $ref: "#/$defs/FpStatusRequest00"
+        },
+        FpStatusResp00H: {
+          $ref: "#/$defs/FpStatusResponse00"
+        },
+        FpStatusReq03H: {
+          $ref: "#/$defs/FpStatusRequest03"
+        },
+        FpStatusResp03H: {
+          $ref: "#/$defs/FpStatusResponse03"
+        },
+        FpFuellingDataReq: {
+          $ref: "#/$defs/FpFuellingDataRequest00"
+        },
+        FpFuellingDataResp: {
+          $ref: "#/$defs/FpFuellingDataResponse00"
+        },
+        FpSupTransReq: {
+          $ref: "#/$defs/FpSupTransRequest00"
+        },
+        FpSupTransResp: {
+          $ref: "#/$defs/FpSupTransResponse00"
+        },
+        ClearFpSupTransReq: {
+          $ref: "#/$defs/ClearFpSupTransRequest00"
+        },
+        ClearFpSupTransResp: {
+          $ref: "#/$defs/ClearFpSupTransResponse00"
+        },
+        ChangeFcPriceSetReq03H: {
+          $ref: "#/$defs/ChangeFcPriceSetRequest03"
+        },
+        ChangeFcPriceSetResp03H: {
+          $ref: "#/$defs/ChangeFcPriceSetResponse03"
+        },
+        ChangeFcPriceSetReq04H: {
+          $ref: "#/$defs/ChangeFcPriceSetRequest04"
+        },
+        ChangeFcPriceSetResp04H: {
+          $ref: "#/$defs/ChangeFcPriceSetResponse04"
         }
       }
+    };
+  }
+});
+
+// node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-schema/core-schema-registry.js
+var require_core_schema_registry = __commonJS({
+  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-schema/core-schema-registry.js"(exports2) {
+    "use strict";
+    var __importDefault = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.coreSchemaValidators = exports2.validateChangeFcPriceSetResp04h = exports2.validateChangeFcPriceSetReq04h = exports2.validateChangeFcPriceSetResp03h = exports2.validateChangeFcPriceSetReq03h = exports2.validateClearFpSupTransResp = exports2.validateClearFpSupTransReq = exports2.validateFpSupTransResp = exports2.validateFpSupTransReq = exports2.validateFpFuellingDataResp = exports2.validateFpFuellingDataReq = exports2.validateFpStatusResp03h = exports2.validateFpStatusReq03h = exports2.validateFpStatusResp00h = exports2.validateFpStatusReq00h = exports2.validateFcOperationModeStatusResp = exports2.validateFcOperationModeStatusReq = exports2.validateFcPriceSetStatusResp01h = exports2.validateFcPriceSetStatusReq01h = exports2.validateFcPriceSetStatusResp00h = exports2.validateFcPriceSetStatusReq00h = exports2.validateFcInstallStatusResp02h = exports2.validateFcInstallStatusReq02h = exports2.validateFcInstallStatusReq00h = exports2.validateChangeFcStatusUpdateModeReq = exports2.validateFcStatusResp = exports2.validateFcStatusReq = exports2.validateFcLogonReq01h = exports2.validateFcLogonResp00h = exports2.validateFcLogonReq00h = exports2.validateMultiMessageResp = exports2.validateMultiMessageReq = exports2.validateRejectMessageResp = exports2.validateRejectResp = exports2.validateVersionBannerResp = exports2.validateHeartbeatResp = exports2.validateHeartbeatReq = void 0;
+    var ajv_1 = require_ajv2();
+    var envelope_schema_json_1 = __importDefault(require_envelope_schema());
+    var doms_jpl_core_schema_json_1 = __importDefault(require_doms_jpl_core_schema());
+    var ajv = (0, ajv_1.createProtocolAjv)();
+    ajv.addSchema(envelope_schema_json_1.default);
+    ajv.addSchema(doms_jpl_core_schema_json_1.default);
+    function getCoreValidator(defName) {
+      const validate = ajv.getSchema(`${doms_jpl_core_schema_json_1.default.$id}#/$defs/${defName}`);
+      if (!validate) {
+        throw new Error(`[protocol] missing core schema validator: ${defName}`);
+      }
+      return validate;
+    }
+    exports2.validateHeartbeatReq = getCoreValidator("HeartbeatReq");
+    exports2.validateHeartbeatResp = getCoreValidator("HeartbeatResp");
+    exports2.validateVersionBannerResp = getCoreValidator("VersionBannerResp");
+    exports2.validateRejectResp = getCoreValidator("RejectResp");
+    exports2.validateRejectMessageResp = getCoreValidator("RejectMessageResp");
+    exports2.validateMultiMessageReq = getCoreValidator("MultiMessageReq");
+    exports2.validateMultiMessageResp = getCoreValidator("MultiMessageResp");
+    exports2.validateFcLogonReq00h = getCoreValidator("FcLogonReq00H");
+    exports2.validateFcLogonResp00h = getCoreValidator("FcLogonResp00H");
+    exports2.validateFcLogonReq01h = getCoreValidator("FcLogonReq01H");
+    exports2.validateFcStatusReq = getCoreValidator("FcStatusReq");
+    exports2.validateFcStatusResp = getCoreValidator("FcStatusResp");
+    exports2.validateChangeFcStatusUpdateModeReq = getCoreValidator("ChangeFcStatusUpdateModeReq");
+    exports2.validateFcInstallStatusReq00h = getCoreValidator("FcInstallStatusReq00H");
+    exports2.validateFcInstallStatusReq02h = getCoreValidator("FcInstallStatusReq02H");
+    exports2.validateFcInstallStatusResp02h = getCoreValidator("FcInstallStatusResp02H");
+    exports2.validateFcPriceSetStatusReq00h = getCoreValidator("FcPriceSetStatusReq00H");
+    exports2.validateFcPriceSetStatusResp00h = getCoreValidator("FcPriceSetStatusResp00H");
+    exports2.validateFcPriceSetStatusReq01h = getCoreValidator("FcPriceSetStatusReq01H");
+    exports2.validateFcPriceSetStatusResp01h = getCoreValidator("FcPriceSetStatusResp01H");
+    exports2.validateFcOperationModeStatusReq = getCoreValidator("FcOperationModeStatusReq");
+    exports2.validateFcOperationModeStatusResp = getCoreValidator("FcOperationModeStatusResp");
+    exports2.validateFpStatusReq00h = getCoreValidator("FpStatusReq00H");
+    exports2.validateFpStatusResp00h = getCoreValidator("FpStatusResp00H");
+    exports2.validateFpStatusReq03h = getCoreValidator("FpStatusReq03H");
+    exports2.validateFpStatusResp03h = getCoreValidator("FpStatusResp03H");
+    exports2.validateFpFuellingDataReq = getCoreValidator("FpFuellingDataReq");
+    exports2.validateFpFuellingDataResp = getCoreValidator("FpFuellingDataResp");
+    exports2.validateFpSupTransReq = getCoreValidator("FpSupTransReq");
+    exports2.validateFpSupTransResp = getCoreValidator("FpSupTransResp");
+    exports2.validateClearFpSupTransReq = getCoreValidator("ClearFpSupTransReq");
+    exports2.validateClearFpSupTransResp = getCoreValidator("ClearFpSupTransResp");
+    exports2.validateChangeFcPriceSetReq03h = getCoreValidator("ChangeFcPriceSetReq03H");
+    exports2.validateChangeFcPriceSetResp03h = getCoreValidator("ChangeFcPriceSetResp03H");
+    exports2.validateChangeFcPriceSetReq04h = getCoreValidator("ChangeFcPriceSetReq04H");
+    exports2.validateChangeFcPriceSetResp04h = getCoreValidator("ChangeFcPriceSetResp04H");
+    exports2.coreSchemaValidators = {
+      validateHeartbeatReq: exports2.validateHeartbeatReq,
+      validateHeartbeatResp: exports2.validateHeartbeatResp,
+      validateVersionBannerResp: exports2.validateVersionBannerResp,
+      validateRejectResp: exports2.validateRejectResp,
+      validateRejectMessageResp: exports2.validateRejectMessageResp,
+      validateMultiMessageReq: exports2.validateMultiMessageReq,
+      validateMultiMessageResp: exports2.validateMultiMessageResp,
+      validateFcLogonReq00h: exports2.validateFcLogonReq00h,
+      validateFcLogonResp00h: exports2.validateFcLogonResp00h,
+      validateFcLogonReq01h: exports2.validateFcLogonReq01h,
+      validateFcStatusReq: exports2.validateFcStatusReq,
+      validateFcStatusResp: exports2.validateFcStatusResp,
+      validateChangeFcStatusUpdateModeReq: exports2.validateChangeFcStatusUpdateModeReq,
+      validateFcInstallStatusReq00h: exports2.validateFcInstallStatusReq00h,
+      validateFcInstallStatusReq02h: exports2.validateFcInstallStatusReq02h,
+      validateFcInstallStatusResp02h: exports2.validateFcInstallStatusResp02h,
+      validateFcPriceSetStatusReq00h: exports2.validateFcPriceSetStatusReq00h,
+      validateFcPriceSetStatusResp00h: exports2.validateFcPriceSetStatusResp00h,
+      validateFcPriceSetStatusReq01h: exports2.validateFcPriceSetStatusReq01h,
+      validateFcPriceSetStatusResp01h: exports2.validateFcPriceSetStatusResp01h,
+      validateFcOperationModeStatusReq: exports2.validateFcOperationModeStatusReq,
+      validateFcOperationModeStatusResp: exports2.validateFcOperationModeStatusResp,
+      validateFpStatusReq00h: exports2.validateFpStatusReq00h,
+      validateFpStatusResp00h: exports2.validateFpStatusResp00h,
+      validateFpStatusReq03h: exports2.validateFpStatusReq03h,
+      validateFpStatusResp03h: exports2.validateFpStatusResp03h,
+      validateFpFuellingDataReq: exports2.validateFpFuellingDataReq,
+      validateFpFuellingDataResp: exports2.validateFpFuellingDataResp,
+      validateFpSupTransReq: exports2.validateFpSupTransReq,
+      validateFpSupTransResp: exports2.validateFpSupTransResp,
+      validateClearFpSupTransReq: exports2.validateClearFpSupTransReq,
+      validateClearFpSupTransResp: exports2.validateClearFpSupTransResp,
+      validateChangeFcPriceSetReq03h: exports2.validateChangeFcPriceSetReq03h,
+      validateChangeFcPriceSetResp03h: exports2.validateChangeFcPriceSetResp03h,
+      validateChangeFcPriceSetReq04h: exports2.validateChangeFcPriceSetReq04h,
+      validateChangeFcPriceSetResp04h: exports2.validateChangeFcPriceSetResp04h
     };
   }
 });
@@ -100265,21 +102661,381 @@ var require_validators = __commonJS({
       return mod && mod.__esModule ? mod : { "default": mod };
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.validateFcLogonReq01h = exports2.validateEnvelope = void 0;
+    exports2.validateEnvelope = exports2.validateChangeFcPriceSetResp04h = exports2.validateChangeFcPriceSetReq04h = exports2.validateChangeFcPriceSetResp03h = exports2.validateChangeFcPriceSetReq03h = exports2.validateClearFpSupTransResp = exports2.validateClearFpSupTransReq = exports2.validateFpSupTransResp = exports2.validateFpSupTransReq = exports2.validateFpFuellingDataResp = exports2.validateFpFuellingDataReq = exports2.validateFpStatusResp03h = exports2.validateFpStatusReq03h = exports2.validateFpStatusResp00h = exports2.validateFpStatusReq00h = exports2.validateFcOperationModeStatusResp = exports2.validateFcOperationModeStatusReq = exports2.validateFcPriceSetStatusResp01h = exports2.validateFcPriceSetStatusReq01h = exports2.validateFcPriceSetStatusResp00h = exports2.validateFcPriceSetStatusReq00h = exports2.validateFcInstallStatusResp02h = exports2.validateFcInstallStatusReq02h = exports2.validateFcInstallStatusReq00h = exports2.validateChangeFcStatusUpdateModeReq = exports2.validateFcStatusResp = exports2.validateFcStatusReq = exports2.validateFcLogonReq01h = exports2.validateFcLogonResp00h = exports2.validateFcLogonReq00h = exports2.validateMultiMessageResp = exports2.validateMultiMessageReq = exports2.validateRejectMessageResp = exports2.validateRejectResp = exports2.validateVersionBannerResp = exports2.validateHeartbeatResp = exports2.validateHeartbeatReq = exports2.coreSchemaValidators = void 0;
     exports2.assertDirectionalEnvelopeRules = assertDirectionalEnvelopeRules;
     var ajv_1 = require_ajv2();
     var envelope_schema_json_1 = __importDefault(require_envelope_schema());
-    var fc_logon_req_01h_schema_json_1 = __importDefault(require_fc_logon_req_01h_schema());
+    var core_schema_registry_1 = require_core_schema_registry();
+    Object.defineProperty(exports2, "coreSchemaValidators", { enumerable: true, get: function() {
+      return core_schema_registry_1.coreSchemaValidators;
+    } });
+    Object.defineProperty(exports2, "validateHeartbeatReq", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateHeartbeatReq;
+    } });
+    Object.defineProperty(exports2, "validateHeartbeatResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateHeartbeatResp;
+    } });
+    Object.defineProperty(exports2, "validateVersionBannerResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateVersionBannerResp;
+    } });
+    Object.defineProperty(exports2, "validateRejectResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateRejectResp;
+    } });
+    Object.defineProperty(exports2, "validateRejectMessageResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateRejectMessageResp;
+    } });
+    Object.defineProperty(exports2, "validateMultiMessageReq", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateMultiMessageReq;
+    } });
+    Object.defineProperty(exports2, "validateMultiMessageResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateMultiMessageResp;
+    } });
+    Object.defineProperty(exports2, "validateFcLogonReq00h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcLogonReq00h;
+    } });
+    Object.defineProperty(exports2, "validateFcLogonResp00h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcLogonResp00h;
+    } });
+    Object.defineProperty(exports2, "validateFcLogonReq01h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcLogonReq01h;
+    } });
+    Object.defineProperty(exports2, "validateFcStatusReq", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcStatusReq;
+    } });
+    Object.defineProperty(exports2, "validateFcStatusResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcStatusResp;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcStatusUpdateModeReq", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateChangeFcStatusUpdateModeReq;
+    } });
+    Object.defineProperty(exports2, "validateFcInstallStatusReq00h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcInstallStatusReq00h;
+    } });
+    Object.defineProperty(exports2, "validateFcInstallStatusReq02h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcInstallStatusReq02h;
+    } });
+    Object.defineProperty(exports2, "validateFcInstallStatusResp02h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcInstallStatusResp02h;
+    } });
+    Object.defineProperty(exports2, "validateFcPriceSetStatusReq00h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcPriceSetStatusReq00h;
+    } });
+    Object.defineProperty(exports2, "validateFcPriceSetStatusResp00h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcPriceSetStatusResp00h;
+    } });
+    Object.defineProperty(exports2, "validateFcPriceSetStatusReq01h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcPriceSetStatusReq01h;
+    } });
+    Object.defineProperty(exports2, "validateFcPriceSetStatusResp01h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcPriceSetStatusResp01h;
+    } });
+    Object.defineProperty(exports2, "validateFcOperationModeStatusReq", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcOperationModeStatusReq;
+    } });
+    Object.defineProperty(exports2, "validateFcOperationModeStatusResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFcOperationModeStatusResp;
+    } });
+    Object.defineProperty(exports2, "validateFpStatusReq00h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFpStatusReq00h;
+    } });
+    Object.defineProperty(exports2, "validateFpStatusResp00h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFpStatusResp00h;
+    } });
+    Object.defineProperty(exports2, "validateFpStatusReq03h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFpStatusReq03h;
+    } });
+    Object.defineProperty(exports2, "validateFpStatusResp03h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFpStatusResp03h;
+    } });
+    Object.defineProperty(exports2, "validateFpFuellingDataReq", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFpFuellingDataReq;
+    } });
+    Object.defineProperty(exports2, "validateFpFuellingDataResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFpFuellingDataResp;
+    } });
+    Object.defineProperty(exports2, "validateFpSupTransReq", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFpSupTransReq;
+    } });
+    Object.defineProperty(exports2, "validateFpSupTransResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateFpSupTransResp;
+    } });
+    Object.defineProperty(exports2, "validateClearFpSupTransReq", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateClearFpSupTransReq;
+    } });
+    Object.defineProperty(exports2, "validateClearFpSupTransResp", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateClearFpSupTransResp;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcPriceSetReq03h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateChangeFcPriceSetReq03h;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcPriceSetResp03h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateChangeFcPriceSetResp03h;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcPriceSetReq04h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateChangeFcPriceSetReq04h;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcPriceSetResp04h", { enumerable: true, get: function() {
+      return core_schema_registry_1.validateChangeFcPriceSetResp04h;
+    } });
     var ajv = (0, ajv_1.createProtocolAjv)();
     ajv.addSchema(envelope_schema_json_1.default);
-    ajv.addSchema(fc_logon_req_01h_schema_json_1.default);
     exports2.validateEnvelope = ajv.getSchema(envelope_schema_json_1.default.$id);
-    exports2.validateFcLogonReq01h = ajv.getSchema(fc_logon_req_01h_schema_json_1.default.$id);
     function assertDirectionalEnvelopeRules(env, direction) {
       if (direction === "client_to_server" && Object.prototype.hasOwnProperty.call(env, "solicited")) {
         throw new Error("[protocol] client->server envelopes must not include `solicited`.");
       }
     }
+  }
+});
+
+// node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-json/client/request-dispatcher.js
+var require_request_dispatcher = __commonJS({
+  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-json/client/request-dispatcher.js"(exports2) {
+    "use strict";
+    var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
+      function adopt(value) {
+        return value instanceof P ? value : new P(function(resolve) {
+          resolve(value);
+        });
+      }
+      return new (P || (P = Promise))(function(resolve, reject) {
+        function fulfilled(value) {
+          try {
+            step(generator.next(value));
+          } catch (e) {
+            reject(e);
+          }
+        }
+        function rejected(value) {
+          try {
+            step(generator["throw"](value));
+          } catch (e) {
+            reject(e);
+          }
+        }
+        function step(result) {
+          result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+        }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+      });
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.RequestDispatcher = void 0;
+    var crypto_1 = require("crypto");
+    var errors_1 = require_errors5();
+    var RequestDispatcher = class {
+      constructor(options) {
+        var _a, _b;
+        this.options = options;
+        this.pendingByCorrelation = /* @__PURE__ */ new Map();
+        this.pendingQueue = [];
+        this.createCorrelationId = (_a = options.createCorrelationId) !== null && _a !== void 0 ? _a : (() => (0, crypto_1.randomUUID)());
+        this.now = (_b = options.now) !== null && _b !== void 0 ? _b : (() => Date.now());
+      }
+      getPendingCount() {
+        return this.pendingQueue.length;
+      }
+      hasPendingRequests() {
+        return this.pendingQueue.length > 0;
+      }
+      getDispatchMode() {
+        const correlationSupport = this.options.getCorrelationSupport();
+        switch (this.options.policy) {
+          case "correlation-required":
+            if (correlationSupport !== true) {
+              throw new Error("Request dispatcher policy requires correlation ID support before issuing requests.");
+            }
+            return "correlated-concurrent";
+          case "auto":
+          case "strict-single-flight-when-uncorrelated":
+          default:
+            return correlationSupport === true ? "correlated-concurrent" : "strict-single-flight";
+        }
+      }
+      request(envelope, options) {
+        return __awaiter(this, void 0, void 0, function* () {
+          var _a, _b;
+          if (!envelope.data) {
+            envelope.data = {};
+          }
+          if (this.pendingQueue.length >= this.options.maxPendingRequests) {
+            throw new Error(`Too many pending requests (max=${this.options.maxPendingRequests}).`);
+          }
+          const dispatchMode = this.getDispatchMode();
+          if (dispatchMode === "strict-single-flight" && this.pendingQueue.length > 0) {
+            throw new Error("Cannot issue concurrent requests when correlation IDs are unavailable or unsupported.");
+          }
+          const correlationSupport = this.options.getCorrelationSupport();
+          const shouldSendCorrelationId = correlationSupport !== false;
+          const correlationId = (_a = envelope.correlationId) !== null && _a !== void 0 ? _a : this.createCorrelationId();
+          const timeoutMs = (_b = options === null || options === void 0 ? void 0 : options.timeoutMs) !== null && _b !== void 0 ? _b : this.options.requestTimeoutMs;
+          if (shouldSendCorrelationId) {
+            envelope.correlationId = correlationId;
+          } else {
+            delete envelope.correlationId;
+          }
+          return new Promise((resolve, reject) => {
+            var _a2, _b2;
+            const pending = {
+              correlationId,
+              createdAt: this.now(),
+              timeoutMs,
+              sentWithCorrelationId: shouldSendCorrelationId,
+              timer: null,
+              resolve: (message) => resolve(message),
+              reject
+            };
+            pending.timer = setTimeout(() => {
+              if (this.pendingByCorrelation.has(correlationId)) {
+                this.cleanupPending(pending);
+                reject(new errors_1.RequestTimeoutError(correlationId, timeoutMs));
+              }
+            }, timeoutMs);
+            (_b2 = (_a2 = pending.timer).unref) === null || _b2 === void 0 ? void 0 : _b2.call(_a2);
+            this.pendingByCorrelation.set(correlationId, pending);
+            this.pendingQueue.push(pending);
+            try {
+              this.options.sendEnvelope(envelope);
+            } catch (error) {
+              this.cleanupPending(pending);
+              reject(error);
+            }
+          });
+        });
+      }
+      dispatchInbound(message) {
+        const correlationId = message.correlationId;
+        if (correlationId && this.pendingByCorrelation.has(correlationId)) {
+          this.settlePending(this.pendingByCorrelation.get(correlationId), message);
+          return true;
+        }
+        let dispatchMode = null;
+        try {
+          dispatchMode = this.getDispatchMode();
+        } catch (_a) {
+          dispatchMode = null;
+        }
+        if (dispatchMode === "strict-single-flight" && this.pendingQueue.length === 1 && (!correlationId || correlationId === "") && message.solicited !== false) {
+          this.settlePending(this.pendingQueue[0], message);
+          return true;
+        }
+        return false;
+      }
+      rejectAll(error) {
+        for (const pending of [...this.pendingQueue]) {
+          this.cleanupPending(pending);
+          pending.reject(error);
+        }
+      }
+      settlePending(pending, message) {
+        var _a, _b;
+        this.cleanupPending(pending);
+        const responseError = (_b = (_a = this.options).toResponseError) === null || _b === void 0 ? void 0 : _b.call(_a, message);
+        if (responseError) {
+          pending.reject(responseError);
+          return;
+        }
+        pending.resolve(message);
+      }
+      cleanupPending(pending) {
+        if (pending.timer) {
+          clearTimeout(pending.timer);
+          pending.timer = null;
+        }
+        this.pendingByCorrelation.delete(pending.correlationId);
+        const pendingIndex = this.pendingQueue.findIndex((candidate) => candidate.correlationId === pending.correlationId);
+        if (pendingIndex >= 0) {
+          this.pendingQueue.splice(pendingIndex, 1);
+        }
+      }
+    };
+    exports2.RequestDispatcher = RequestDispatcher;
+  }
+});
+
+// node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-json/client/session-state.js
+var require_session_state = __commonJS({
+  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-json/client/session-state.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.JplSessionState = void 0;
+    var JplSessionState = class {
+      constructor() {
+        this.loggedOn = false;
+        this.lastLogonResponse = null;
+        this.serverJplVersion = null;
+        this.correlationCapability = "unknown";
+      }
+      isLoggedOn() {
+        return this.loggedOn;
+      }
+      markLoggedOn(response) {
+        this.loggedOn = true;
+        this.lastLogonResponse = response;
+      }
+      getLastLogonResponse() {
+        return this.lastLogonResponse;
+      }
+      getServerJplVersion() {
+        return this.serverJplVersion;
+      }
+      getCorrelationCapability() {
+        return this.correlationCapability;
+      }
+      getServerSupportsCorrelationIds() {
+        if (this.correlationCapability === "supported")
+          return true;
+        if (this.correlationCapability === "unsupported")
+          return false;
+        return null;
+      }
+      setServerInfoFromJplHello(msg) {
+        const data = msg.data;
+        const version = typeof (data === null || data === void 0 ? void 0 : data.version) === "string" ? data.version : null;
+        if (!version)
+          return null;
+        const normalizedVersion = this.normalizeJplVersion(version);
+        this.serverJplVersion = normalizedVersion;
+        if (this.parseJplVersionForCompare(normalizedVersion)) {
+          this.correlationCapability = this.isAtLeast(normalizedVersion, "470-02-1.06") ? "supported" : "unsupported";
+        } else {
+          this.correlationCapability = "unknown";
+        }
+        return {
+          version: normalizedVersion,
+          supportsCorrelationIds: this.getServerSupportsCorrelationIds()
+        };
+      }
+      normalizeJplVersion(version) {
+        return version.replace(/\s+/g, "").trim();
+      }
+      parseJplVersionForCompare(version) {
+        const normalizedVersion = this.normalizeJplVersion(version);
+        const match = /^(\d+)-(\d+)-(\d+)\.(\d+)$/.exec(normalizedVersion);
+        if (!match)
+          return null;
+        return {
+          a: Number(match[1]),
+          b: Number(match[2]),
+          c: Number(match[3]),
+          d: Number(match[4])
+        };
+      }
+      isAtLeast(version, minimumVersion) {
+        const current = this.parseJplVersionForCompare(version);
+        const minimum = this.parseJplVersionForCompare(minimumVersion);
+        if (!current || !minimum)
+          return false;
+        if (current.a !== minimum.a)
+          return current.a > minimum.a;
+        if (current.b !== minimum.b)
+          return current.b > minimum.b;
+        if (current.c !== minimum.c)
+          return current.c > minimum.c;
+        return current.d >= minimum.d;
+      }
+    };
+    exports2.JplSessionState = JplSessionState;
   }
 });
 
@@ -100322,68 +103078,35 @@ var require_jpl_client = __commonJS({
     var socket_connection_1 = require_socket_connection();
     var ajv_1 = require_ajv2();
     var validators_1 = require_validators();
+    var request_dispatcher_1 = require_request_dispatcher();
+    var session_state_1 = require_session_state();
     var JplClient2 = class extends events_1.EventEmitter {
-      getServerJplVersion() {
-        return this.serverJplVersion;
-      }
-      getServerSupportsCorrelationIds() {
-        return this.serverSupportsCorrelationIds;
-      }
-      normalizeJplVersion(v) {
-        return v.replace(/\s+/g, "").trim();
-      }
-      parseJplVersionForCompare(v) {
-        const norm = this.normalizeJplVersion(v);
-        const m = /^(\d+)-(\d+)-(\d+)\.(\d+)$/.exec(norm);
-        if (!m)
-          return null;
-        return {
-          a: Number(m[1]),
-          b: Number(m[2]),
-          c: Number(m[3]),
-          d: Number(m[4])
-        };
-      }
-      isAtLeast(v, min) {
-        const pv = this.parseJplVersionForCompare(v);
-        const pm = this.parseJplVersionForCompare(min);
-        if (!pv || !pm)
-          return false;
-        if (pv.a !== pm.a)
-          return pv.a > pm.a;
-        if (pv.b !== pm.b)
-          return pv.b > pm.b;
-        if (pv.c !== pm.c)
-          return pv.c > pm.c;
-        return pv.d >= pm.d;
-      }
-      setServerInfoFromJplHello(msg) {
-        const d = msg.data;
-        const version = typeof (d === null || d === void 0 ? void 0 : d.version) === "string" ? d.version : null;
-        if (!version)
-          return;
-        const norm = this.normalizeJplVersion(version);
-        this.serverJplVersion = norm;
-        this.serverSupportsCorrelationIds = this.parseJplVersionForCompare(norm) ? this.isAtLeast(norm, "470-02-1.07") : null;
-        this.emit("serverInfo", {
-          version: norm,
-          supportsCorrelationIds: this.serverSupportsCorrelationIds
-        });
-      }
       constructor(opts) {
         var _a, _b, _c, _d, _e, _f, _g, _h;
         super();
+        this.session = new session_state_1.JplSessionState();
         this.tickHandle = null;
         this.lastSentAt = 0;
         this.lastReceivedAt = 0;
-        this.pendingByCorrelation = /* @__PURE__ */ new Map();
-        this.pendingQueue = [];
-        this.loggedOn = false;
-        this.lastLogonResponse = null;
-        this.serverJplVersion = null;
-        this.serverSupportsCorrelationIds = null;
-        this.opts = Object.assign(Object.assign({}, opts), { heartbeatIdleMs: (_a = opts.heartbeatIdleMs) !== null && _a !== void 0 ? _a : 3e4, inboundSilenceMs: (_b = opts.inboundSilenceMs) !== null && _b !== void 0 ? _b : 3e4, tickMs: (_c = opts.tickMs) !== null && _c !== void 0 ? _c : 1e3, requestTimeoutMs: (_d = opts.requestTimeoutMs) !== null && _d !== void 0 ? _d : 1e4, allowUncorrelatedResponses: (_e = opts.allowUncorrelatedResponses) !== null && _e !== void 0 ? _e : true, maxPendingRequests: (_f = opts.maxPendingRequests) !== null && _f !== void 0 ? _f : 50, requireLogon: (_g = opts.requireLogon) !== null && _g !== void 0 ? _g : false, strictProtocolValidation: (_h = opts.strictProtocolValidation) !== null && _h !== void 0 ? _h : false });
+        const requestDispatchPolicy = (_a = opts.requestDispatchPolicy) !== null && _a !== void 0 ? _a : opts.allowUncorrelatedResponses === false ? "correlation-required" : "auto";
+        this.opts = Object.assign(Object.assign({}, opts), { heartbeatIdleMs: (_b = opts.heartbeatIdleMs) !== null && _b !== void 0 ? _b : 1e4, inboundSilenceMs: (_c = opts.inboundSilenceMs) !== null && _c !== void 0 ? _c : 3e4, tickMs: (_d = opts.tickMs) !== null && _d !== void 0 ? _d : 1e3, requestTimeoutMs: (_e = opts.requestTimeoutMs) !== null && _e !== void 0 ? _e : 5e3, requestDispatchPolicy, maxPendingRequests: (_f = opts.maxPendingRequests) !== null && _f !== void 0 ? _f : 50, requireLogon: (_g = opts.requireLogon) !== null && _g !== void 0 ? _g : false, strictProtocolValidation: (_h = opts.strictProtocolValidation) !== null && _h !== void 0 ? _h : false });
         this.conn = new socket_connection_1.SocketConnectionImpl(this.opts);
+        this.requestDispatcher = new request_dispatcher_1.RequestDispatcher({
+          requestTimeoutMs: this.opts.requestTimeoutMs,
+          maxPendingRequests: this.opts.maxPendingRequests,
+          policy: this.opts.requestDispatchPolicy,
+          getCorrelationSupport: () => this.session.getServerSupportsCorrelationIds(),
+          sendEnvelope: (envelope) => {
+            this.conn.sendEnvelope(envelope);
+            this.lastSentAt = Date.now();
+          },
+          toResponseError: (message) => {
+            if (message.name === "RejectMessage_resp" || message.name === "Reject_resp") {
+              return this.toRejectError(message);
+            }
+            return void 0;
+          }
+        });
         this.conn.on("connect", () => {
           const now = Date.now();
           this.lastSentAt = now;
@@ -100393,32 +103116,44 @@ var require_jpl_client = __commonJS({
         });
         this.conn.on("close", () => {
           this.stopTick();
-          this.rejectPendingOnClose();
+          this.requestDispatcher.rejectAll(new errors_1.ConnectionClosedError());
           this.emit("disconnect");
         });
-        this.conn.on("error", (err) => this.emit("error", err));
-        this.conn.on("message", (msg) => {
+        this.conn.on("error", (error) => this.emit("error", error));
+        this.conn.on("rawFrame", (frame) => this.emit("rawFrame", frame));
+        this.conn.on("message", (message) => {
           this.lastReceivedAt = Date.now();
+          this.normalizeInboundSubCode(message);
           if (this.opts.strictProtocolValidation) {
-            (0, ajv_1.assertValid)(validators_1.validateEnvelope, msg, "Inbound Envelope");
-            (0, validators_1.assertDirectionalEnvelopeRules)(msg, "server_to_client");
+            (0, ajv_1.assertValid)(validators_1.validateEnvelope, message, "Inbound Envelope");
+            (0, validators_1.assertDirectionalEnvelopeRules)(message, "server_to_client");
           }
-          if (msg.name === "jpl") {
-            this.setServerInfoFromJplHello(msg);
+          if (message.name === "jpl") {
+            const serverInfo = this.session.setServerInfoFromJplHello(message);
+            if (serverInfo) {
+              this.emit("serverInfo", serverInfo);
+            }
           }
-          if (msg.name === "MultiMessage_resp") {
-            const anyData = msg.data;
-            const messages = Array.isArray(anyData === null || anyData === void 0 ? void 0 : anyData.messages) ? anyData.messages : [];
-            for (const inner of messages) {
-              if (inner && typeof inner === "object") {
-                this.onInboundMessage(inner);
+          if (message.name === "MultiMessage_resp") {
+            const data = message.data;
+            const messages = Array.isArray(data === null || data === void 0 ? void 0 : data.messages) ? data.messages : [];
+            for (const innerMessage of messages) {
+              if (innerMessage && typeof innerMessage === "object") {
+                this.normalizeInboundSubCode(innerMessage);
+                this.onInboundMessage(innerMessage);
               }
             }
-            this.emit("message", msg);
+            this.emit("message", message);
             return;
           }
-          this.onInboundMessage(msg);
+          this.onInboundMessage(message);
         });
+      }
+      getServerJplVersion() {
+        return this.session.getServerJplVersion();
+      }
+      getServerSupportsCorrelationIds() {
+        return this.session.getServerSupportsCorrelationIds();
       }
       isConnected() {
         return this.conn.isConnected();
@@ -100433,17 +103168,12 @@ var require_jpl_client = __commonJS({
           yield this.conn.close();
         });
       }
-      /**
-       * Send any envelope. Ensures `correlationId` exists for easier migration to request/response API.
-       * (Promise-based correlation is implemented in PR#2.)
-       */
       send(envelope) {
         if (!envelope.data) {
           envelope.data = {};
         }
-        const supports = this.serverSupportsCorrelationIds;
-        const shouldAttachCorrelationId = supports !== false;
-        if (!shouldAttachCorrelationId) {
+        const correlationSupport = this.session.getServerSupportsCorrelationIds();
+        if (correlationSupport === false) {
           delete envelope.correlationId;
         } else if (!envelope.correlationId) {
           envelope.correlationId = (0, crypto_1.randomUUID)();
@@ -100456,11 +103186,6 @@ var require_jpl_client = __commonJS({
         this.conn.sendEnvelope(envelope);
         this.lastSentAt = Date.now();
       }
-      /**
-       * Convenience wrapper around `change_FcStatusUpdateMode_req`.
-       * - 0: unsolicited status updates OFF
-       * - 3: unsolicited status updates ON
-       */
       setStatusUpdateMode(statusUpdateCode, options) {
         return __awaiter(this, void 0, void 0, function* () {
           yield this.request({
@@ -100470,157 +103195,66 @@ var require_jpl_client = __commonJS({
           }, { timeoutMs: options === null || options === void 0 ? void 0 : options.timeoutMs });
         });
       }
-      onInboundMessage(msg) {
-        const correlationId = msg.correlationId;
-        if (correlationId && this.pendingByCorrelation.has(correlationId)) {
-          const pending = this.pendingByCorrelation.get(correlationId);
-          this.pendingByCorrelation.delete(correlationId);
-          const idx = this.pendingQueue.findIndex((p) => p.correlationId === correlationId);
-          if (idx >= 0)
-            this.pendingQueue.splice(idx, 1);
-          if (msg.name === "RejectMessage_resp" || msg.name === "Reject_resp") {
-            pending.reject(this.toRejectError(msg));
-          } else {
-            pending.resolve(msg);
-          }
-          this.emit("message", msg);
-          return;
-        }
-        if (this.opts.allowUncorrelatedResponses && this.pendingQueue.length > 0 && (!correlationId || correlationId === "") && msg.solicited !== false) {
-          const pending = this.pendingQueue.shift();
-          this.pendingByCorrelation.delete(pending.correlationId);
-          if (msg.name === "RejectMessage_resp" || msg.name === "Reject_resp") {
-            pending.reject(this.toRejectError(msg));
-          } else {
-            pending.resolve(msg);
-          }
-          this.emit("message", msg);
-          return;
-        }
-        this.emit("message", msg);
-        this.emit("unsolicited", msg);
+      logon(envelope, options) {
+        return __awaiter(this, void 0, void 0, function* () {
+          const response = yield this.requestInternal(envelope, options, {
+            skipLogonCheck: true
+          });
+          this.session.markLoggedOn(response);
+          return response;
+        });
       }
-      toRejectError(msg) {
-        const d = msg.data;
-        const rejectInfoText = typeof (d === null || d === void 0 ? void 0 : d.RejectInfoText) === "string" ? d.RejectInfoText : void 0;
-        const rejectInfo = d === null || d === void 0 ? void 0 : d.RejectInfo;
-        const rejectCode = d === null || d === void 0 ? void 0 : d.RejectCode;
-        const rejectedName = typeof (d === null || d === void 0 ? void 0 : d.RejectedExtendedMsgCode) === "string" ? d.RejectedExtendedMsgCode : typeof (d === null || d === void 0 ? void 0 : d.MsgCode) === "string" ? d.MsgCode : void 0;
-        const rejectedSubCode = typeof (d === null || d === void 0 ? void 0 : d.RejectedMsgSubc) === "string" ? d.RejectedMsgSubc : typeof (d === null || d === void 0 ? void 0 : d.MsgSubCode) === "string" ? d.MsgSubCode : void 0;
+      isLoggedOn() {
+        return this.session.isLoggedOn();
+      }
+      getLastLogonResponse() {
+        return this.session.getLastLogonResponse();
+      }
+      request(envelope, options) {
+        return __awaiter(this, void 0, void 0, function* () {
+          return this.requestInternal(envelope, options, { skipLogonCheck: false });
+        });
+      }
+      requestInternal(envelope, options, requestOptions) {
+        return __awaiter(this, void 0, void 0, function* () {
+          if (!this.isConnected()) {
+            throw new Error("Socket is not connected.");
+          }
+          if (!requestOptions.skipLogonCheck && this.opts.requireLogon && !this.session.isLoggedOn()) {
+            throw new Error("Client requires logon. Call client.logon(buildFcLogonEnvelope(...)) after connect().");
+          }
+          return this.requestDispatcher.request(envelope, options);
+        });
+      }
+      onInboundMessage(message) {
+        const matched = this.requestDispatcher.dispatchInbound(message);
+        this.emit("message", message);
+        if (!matched) {
+          this.emit("unsolicited", message);
+        }
+      }
+      normalizeInboundSubCode(message) {
+        const candidate = message;
+        if (!Object.prototype.hasOwnProperty.call(candidate, "subCode") || candidate.subCode == null) {
+          candidate.subCode = "00H";
+        }
+      }
+      toRejectError(message) {
+        const data = message.data;
+        const rejectInfoText = typeof (data === null || data === void 0 ? void 0 : data.RejectInfoText) === "string" ? data.RejectInfoText : void 0;
+        const rejectInfo = data === null || data === void 0 ? void 0 : data.RejectInfo;
+        const rejectCode = data === null || data === void 0 ? void 0 : data.RejectCode;
+        const rejectedName = typeof (data === null || data === void 0 ? void 0 : data.RejectedExtendedMsgCode) === "string" ? data.RejectedExtendedMsgCode : typeof (data === null || data === void 0 ? void 0 : data.MsgCode) === "string" ? data.MsgCode : void 0;
+        const rejectedSubCode = typeof (data === null || data === void 0 ? void 0 : data.RejectedMsgSubc) === "string" ? data.RejectedMsgSubc : typeof (data === null || data === void 0 ? void 0 : data.MsgSubCode) === "string" ? data.MsgSubCode : void 0;
         const kind = rejectInfoText && !rejectInfo ? "jtm" : rejectInfo ? "pss" : "unknown";
-        const summary = rejectInfoText !== null && rejectInfoText !== void 0 ? rejectInfoText : "Request rejected.";
-        return new errors_1.RejectError(summary, {
+        return new errors_1.RejectError(rejectInfoText !== null && rejectInfoText !== void 0 ? rejectInfoText : "Request rejected.", {
           kind,
           rejectCode,
           rejectInfo,
           rejectInfoText,
           rejectedName,
           rejectedSubCode,
-          raw: msg
-        });
-      }
-      rejectPendingOnClose() {
-        if (this.pendingQueue.length === 0)
-          return;
-        const err = new errors_1.ConnectionClosedError();
-        for (const pending of this.pendingQueue.splice(0, this.pendingQueue.length)) {
-          this.pendingByCorrelation.delete(pending.correlationId);
-          pending.reject(err);
-        }
-      }
-      /**
-       * Send a request and await the corresponding response.
-       * Matching is done by `correlationId` when available; otherwise (optionally) falls back to sequential mode.
-       */
-      /**
-       * Perform FcLogon_req. This does not auto-run; callers should invoke it after connect().
-       * If opts.requireLogon=true, request() will throw until logon() succeeds.
-       */
-      logon(envelope, options) {
-        return __awaiter(this, void 0, void 0, function* () {
-          const resp = yield this.requestInternal(envelope, options, {
-            skipLogonCheck: true
-          });
-          this.loggedOn = true;
-          this.lastLogonResponse = resp;
-          return resp;
-        });
-      }
-      isLoggedOn() {
-        return this.loggedOn;
-      }
-      getLastLogonResponse() {
-        return this.lastLogonResponse;
-      }
-      requestInternal(envelope, options, opts) {
-        return __awaiter(this, void 0, void 0, function* () {
-          var _a, _b;
-          if (!this.isConnected()) {
-            throw new Error("Socket is not connected.");
-          }
-          if (!opts.skipLogonCheck && this.opts.requireLogon && !this.loggedOn) {
-            throw new Error("Client requires logon. Call client.logon(buildFcLogonEnvelope(...)) after connect().");
-          }
-          if (this.pendingQueue.length >= this.opts.maxPendingRequests) {
-            throw new Error(`Too many pending requests (max=${this.opts.maxPendingRequests}).`);
-          }
-          if (!envelope.data) {
-            envelope.data = {};
-          }
-          const supports = this.serverSupportsCorrelationIds;
-          const shouldAttachCorrelationId = supports !== false;
-          const correlationId = (_a = envelope.correlationId) !== null && _a !== void 0 ? _a : (0, crypto_1.randomUUID)();
-          if (!shouldAttachCorrelationId) {
-            delete envelope.correlationId;
-          } else {
-            envelope.correlationId = correlationId;
-          }
-          const timeoutMs = (_b = options === null || options === void 0 ? void 0 : options.timeoutMs) !== null && _b !== void 0 ? _b : this.opts.requestTimeoutMs;
-          const resp = yield new Promise((resolve, reject) => {
-            var _a2, _b2;
-            const pending = {
-              correlationId,
-              createdAt: Date.now(),
-              timeoutMs,
-              resolve: (msg) => resolve(msg),
-              reject
-            };
-            this.pendingByCorrelation.set(correlationId, pending);
-            this.pendingQueue.push(pending);
-            const timer = setTimeout(() => {
-              if (this.pendingByCorrelation.has(correlationId)) {
-                this.pendingByCorrelation.delete(correlationId);
-                const idx = this.pendingQueue.findIndex((p) => p.correlationId === correlationId);
-                if (idx >= 0)
-                  this.pendingQueue.splice(idx, 1);
-                reject(new errors_1.RequestTimeoutError(correlationId, timeoutMs));
-              }
-            }, timeoutMs);
-            (_b2 = (_a2 = timer).unref) === null || _b2 === void 0 ? void 0 : _b2.call(_a2);
-            try {
-              this.conn.sendEnvelope(envelope);
-              this.lastSentAt = Date.now();
-            } catch (err) {
-              clearTimeout(timer);
-              this.pendingByCorrelation.delete(correlationId);
-              const idx = this.pendingQueue.findIndex((p) => p.correlationId === correlationId);
-              if (idx >= 0)
-                this.pendingQueue.splice(idx, 1);
-              reject(err);
-            }
-          });
-          return resp;
-        });
-      }
-      /**
-       * Send a request to the controller and await the response.
-       *
-       * CorrelationId routing is used when supported; otherwise the client may fall back
-       * to sequential mode.
-       */
-      request(envelope, options) {
-        return __awaiter(this, void 0, void 0, function* () {
-          return this.requestInternal(envelope, options, { skipLogonCheck: false });
+          raw: message
         });
       }
       startTick() {
@@ -100642,8 +103276,7 @@ var require_jpl_client = __commonJS({
           void this.disconnect();
           return;
         }
-        const hasPending = this.pendingQueue.length > 0;
-        if (!hasPending && now - this.lastSentAt >= this.opts.heartbeatIdleMs) {
+        if (!this.requestDispatcher.hasPendingRequests() && now - this.lastSentAt >= this.opts.heartbeatIdleMs) {
           this.send({
             name: "heartbeat",
             subCode: "00H",
@@ -100662,11 +103295,18 @@ var require_access_code = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.FORECOURT_FULL_UNSOL_FLAGS = void 0;
-    exports2.buildFcAccessCode = buildFcAccessCode;
+    exports2.buildMfdrUnsolFlag = buildMfdrUnsolFlag3;
+    exports2.buildUnsolFpStatusFlag = buildUnsolFpStatusFlag;
+    exports2.buildUnsolTransBufStatusFlag = buildUnsolTransBufStatusFlag;
+    exports2.buildUnsolInstallStatusFlag = buildUnsolInstallStatusFlag;
+    exports2.buildUnsolPriceSetStatusFlag = buildUnsolPriceSetStatusFlag;
+    exports2.buildForecourtFullUnsolFlags = buildForecourtFullUnsolFlags;
+    exports2.buildFcAccessCode = buildFcAccessCode3;
     exports2.FORECOURT_FULL_UNSOL_FLAGS = [
       // Pumps / transactions
       "UNSO_FPSTA_3",
       "UNSO_TRBUFSTA_3",
+      "UNSO_INSTSTA_1",
       // Wetstock
       "UNSO_TGSTA_1",
       "UNSO_DELIVSTA_1",
@@ -100675,7 +103315,33 @@ var require_access_code = __commonJS({
       // Prices
       "UNSO_PRISTA_1"
     ];
-    function buildFcAccessCode(input = {}) {
+    function buildMfdrUnsolFlag3(flag, mfdr) {
+      const normalizedFlag = normalizeToken(flag);
+      if (!normalizedFlag) {
+        throw new Error("MFDR unsolicited flag requires a non-empty flag name");
+      }
+      const normalizedMfdr = normalizeMfdrValue(mfdr);
+      return normalizedMfdr ? `${normalizedFlag}:MFDR=${normalizedMfdr}` : normalizedFlag;
+    }
+    function buildUnsolFpStatusFlag(opts = {}) {
+      return buildMfdrUnsolFlag3("UNSO_FPSTA_3", opts.mfdr);
+    }
+    function buildUnsolTransBufStatusFlag(opts = {}) {
+      return buildMfdrUnsolFlag3("UNSO_TRBUFSTA_3", opts.mfdr);
+    }
+    function buildUnsolInstallStatusFlag(opts = {}) {
+      return buildMfdrUnsolFlag3("UNSO_INSTSTA_1", opts.mfdr);
+    }
+    function buildUnsolPriceSetStatusFlag(opts = {}) {
+      return buildMfdrUnsolFlag3("UNSO_PRISTA_1", opts.mfdr);
+    }
+    function buildForecourtFullUnsolFlags(input = {}) {
+      return exports2.FORECOURT_FULL_UNSOL_FLAGS.map((flag) => {
+        var _a;
+        return buildMfdrUnsolFlag3(flag, (_a = input.mfdrByFlag) === null || _a === void 0 ? void 0 : _a[flag]);
+      });
+    }
+    function buildFcAccessCode3(input = {}) {
       var _a, _b, _c;
       const password = ((_a = input.password) !== null && _a !== void 0 ? _a : "POS").trim();
       const parts = [password];
@@ -100685,7 +103351,7 @@ var require_access_code = __commonJS({
       if (input.applId && input.applId.trim().length > 0) {
         parts.push(`APPL_ID=${input.applId.trim()}`);
       }
-      const flags = ((_c = input.flags) !== null && _c !== void 0 ? _c : []).map((f) => f.trim()).filter(Boolean);
+      const flags = ((_c = input.flags) !== null && _c !== void 0 ? _c : []).map(normalizeFlagInput).filter((flag) => Boolean(flag));
       parts.push(...flags);
       const seen = /* @__PURE__ */ new Set();
       const out = [];
@@ -100697,6 +103363,24 @@ var require_access_code = __commonJS({
         out.push(p);
       }
       return out.join(",");
+    }
+    function normalizeFlagInput(input) {
+      if (typeof input === "string") {
+        const normalized = normalizeToken(input);
+        return normalized || null;
+      }
+      return buildMfdrUnsolFlag3(input.flag, input.mfdr);
+    }
+    function normalizeMfdrValue(mfdr) {
+      if (mfdr == null)
+        return null;
+      const normalized = `${mfdr}`.trim();
+      if (!normalized)
+        return null;
+      return /^\d+$/.test(normalized) ? normalized.padStart(2, "0") : normalized;
+    }
+    function normalizeToken(token) {
+      return (token !== null && token !== void 0 ? token : "").toString().trim().replace(/^,+|,+$/g, "");
     }
   }
 });
@@ -100733,13 +103417,31 @@ var require_fc_logon = __commonJS({
       });
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.buildFcLogonEnvelope00 = buildFcLogonEnvelope00;
+    exports2.buildFcLogonEnvelope01 = buildFcLogonEnvelope01;
     exports2.buildFcLogonEnvelope = buildFcLogonEnvelope;
     exports2.fcLogon = fcLogon;
-    function buildFcLogonEnvelope(req) {
+    var DEFAULT_COUNTRY_CODE = "1234";
+    var DEFAULT_POS_VERSION_ID = "470-02-1.06";
+    var DEFAULT_ACCESS_CODE = "POS";
+    function buildFcLogonEnvelope00(req = {}) {
+      var _a, _b, _c;
+      return {
+        name: "FcLogon_req",
+        subCode: "00H",
+        data: {
+          FcAccessCode: (_a = req.accessCode) !== null && _a !== void 0 ? _a : DEFAULT_ACCESS_CODE,
+          CountryCode: (_b = req.countryCode) !== null && _b !== void 0 ? _b : DEFAULT_COUNTRY_CODE,
+          PosVersionId: (_c = req.posVersionId) !== null && _c !== void 0 ? _c : DEFAULT_POS_VERSION_ID
+        }
+      };
+    }
+    function buildFcLogonEnvelope01(req = {}) {
+      var _a, _b, _c;
       const data = {
-        FcAccessCode: req.accessCode,
-        CountryCode: req.countryCode,
-        PosVersionId: req.posVersionId,
+        FcAccessCode: (_a = req.accessCode) !== null && _a !== void 0 ? _a : DEFAULT_ACCESS_CODE,
+        CountryCode: (_b = req.countryCode) !== null && _b !== void 0 ? _b : DEFAULT_COUNTRY_CODE,
+        PosVersionId: (_c = req.posVersionId) !== null && _c !== void 0 ? _c : DEFAULT_POS_VERSION_ID,
         FcLogonPars: {}
       };
       if (req.unsolMsgList && req.unsolMsgList.length > 0) {
@@ -100751,8 +103453,16 @@ var require_fc_logon = __commonJS({
         data
       };
     }
-    function fcLogon(client, req, options) {
-      return __awaiter(this, void 0, void 0, function* () {
+    function buildFcLogonEnvelope(req = {}) {
+      var _a;
+      const variant = (_a = req.variant) !== null && _a !== void 0 ? _a : "01H";
+      if (variant === "00H") {
+        return buildFcLogonEnvelope00(req);
+      }
+      return buildFcLogonEnvelope01(req);
+    }
+    function fcLogon(client_1) {
+      return __awaiter(this, arguments, void 0, function* (client, req = {}, options) {
         const env = buildFcLogonEnvelope(req);
         const resp = yield client.request(env, options);
         return resp;
@@ -100771,6 +103481,111 @@ var require_status_update_mode = __commonJS({
       Off: 0,
       On: 3
     };
+  }
+});
+
+// node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-json/fp/fp-messages.js
+var require_fp_messages = __commonJS({
+  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-json/fp/fp-messages.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.buildFcStatusEnvelope = buildFcStatusEnvelope;
+    exports2.buildChangeFcStatusUpdateModeEnvelope = buildChangeFcStatusUpdateModeEnvelope;
+    exports2.buildFcInstallStatusEnvelope = buildFcInstallStatusEnvelope;
+    exports2.buildFcPriceSetStatusEnvelope = buildFcPriceSetStatusEnvelope;
+    exports2.buildFcOperationModeStatusEnvelope = buildFcOperationModeStatusEnvelope;
+    exports2.buildFpStatusEnvelope = buildFpStatusEnvelope3;
+    exports2.buildFpFuellingDataEnvelope = buildFpFuellingDataEnvelope3;
+    function buildFcStatusEnvelope() {
+      return {
+        name: "FcStatus_req",
+        subCode: "00H",
+        data: {}
+      };
+    }
+    function buildChangeFcStatusUpdateModeEnvelope(statusUpdateCode) {
+      return {
+        name: "change_FcStatusUpdateMode_req",
+        subCode: "00H",
+        data: {
+          StatusUpdateCode: statusUpdateCode
+        }
+      };
+    }
+    function buildFcInstallStatusEnvelope(input = {}) {
+      var _a;
+      return {
+        name: "FcInstallStatus_req",
+        subCode: (_a = input.variant) !== null && _a !== void 0 ? _a : "00H",
+        data: {}
+      };
+    }
+    function buildFcPriceSetStatusEnvelope(input = {}) {
+      var _a;
+      return {
+        name: "FcPriceSetStatus_req",
+        subCode: (_a = input.variant) !== null && _a !== void 0 ? _a : "00H",
+        data: {}
+      };
+    }
+    function buildFcOperationModeStatusEnvelope() {
+      return {
+        name: "FcOperationModeStatus_req",
+        subCode: "00H",
+        data: {}
+      };
+    }
+    function buildFpStatusEnvelope3(input) {
+      var _a;
+      return {
+        name: "FpStatus_req",
+        subCode: (_a = input.variant) !== null && _a !== void 0 ? _a : "00H",
+        data: {
+          FpId: input.fpId
+        }
+      };
+    }
+    function buildFpFuellingDataEnvelope3(input) {
+      return {
+        name: "FpFuellingData_req",
+        subCode: "00H",
+        data: {
+          FpId: input.fpId
+        }
+      };
+    }
+  }
+});
+
+// node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-json/transactions/supervised.js
+var require_supervised = __commonJS({
+  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/protocol-json/transactions/supervised.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.buildFpSupTransEnvelope = buildFpSupTransEnvelope3;
+    exports2.buildClearFpSupTransEnvelope = buildClearFpSupTransEnvelope3;
+    var DEFAULT_TRANS_PAR_IDS = ["51", "64", "65", "66"];
+    function buildFpSupTransEnvelope3(input) {
+      var _a;
+      return {
+        name: "FpSupTrans_req",
+        subCode: "00H",
+        data: {
+          FpId: input.fpId,
+          PosId: input.posId,
+          TransSeqNo: input.transSeqNo,
+          TransParId: (_a = input.transParIds) !== null && _a !== void 0 ? _a : DEFAULT_TRANS_PAR_IDS
+        }
+      };
+    }
+    function buildClearFpSupTransEnvelope3(input) {
+      var _a, _b;
+      return {
+        name: "clear_FpSupTrans_req",
+        subCode: (_a = input.subCode) !== null && _a !== void 0 ? _a : "04H",
+        data: Object.assign({ FpId: input.fpId, PosId: input.posId, TransSeqNo: input.transSeqNo }, (_b = input.extraData) !== null && _b !== void 0 ? _b : {})
+      };
+    }
   }
 });
 
@@ -101501,43 +104316,6 @@ var require_fp_unsuptransbufstatus = __commonJS({
 var require_transaction_lifecycle = __commonJS({
   "node_modules/@gilbarcoafs/doms-pos-jpl/dist/jpl-json-domains/transactions/transaction-lifecycle.js"(exports2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
-      if (k2 === void 0) k2 = k;
-      var desc = Object.getOwnPropertyDescriptor(m, k);
-      if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-        desc = { enumerable: true, get: function() {
-          return m[k];
-        } };
-      }
-      Object.defineProperty(o, k2, desc);
-    }) : (function(o, m, k, k2) {
-      if (k2 === void 0) k2 = k;
-      o[k2] = m[k];
-    }));
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o, v) {
-      Object.defineProperty(o, "default", { enumerable: true, value: v });
-    }) : function(o, v) {
-      o["default"] = v;
-    });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
-      var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function(o2) {
-          var ar = [];
-          for (var k in o2) if (Object.prototype.hasOwnProperty.call(o2, k)) ar[ar.length] = k;
-          return ar;
-        };
-        return ownKeys(o);
-      };
-      return function(mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) {
-          for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        }
-        __setModuleDefault(result, mod);
-        return result;
-      };
-    })();
     var __awaiter = exports2 && exports2.__awaiter || function(thisArg, _arguments, P, generator) {
       function adopt(value) {
         return value instanceof P ? value : new P(function(resolve) {
@@ -101778,7 +104556,7 @@ var require_transaction_lifecycle = __commonJS({
       completeUnsupervisedSale(fpId_1, posId_1, clearDataBuilder_1) {
         return __awaiter(this, arguments, void 0, function* (fpId, posId, clearDataBuilder, opts = {}) {
           const buf = yield this.getUnSupTransBufferStatus(fpId, opts);
-          const { selectLatestStoredUnSupTransSeqNo } = yield Promise.resolve().then(() => __importStar(require_fp_unsuptransbufstatus()));
+          const { selectLatestStoredUnSupTransSeqNo } = yield Promise.resolve().then(() => __toESM(require_fp_unsuptransbufstatus()));
           const transSeqNo = selectLatestStoredUnSupTransSeqNo(buf);
           if (!transSeqNo) {
             throw new Error(`No stored unsupervised transaction found for FpId=${fpId}`);
@@ -101911,7 +104689,7 @@ var require_transaction_buffer_watcher = __commonJS({
     var message_router_1 = require_message_router();
     var fp_suptransbufstatus_1 = require_fp_suptransbufstatus();
     var fp_unsuptransbufstatus_1 = require_fp_unsuptransbufstatus();
-    var TransactionBufferWatcher2 = class extends events_1.EventEmitter {
+    var TransactionBufferWatcher = class extends events_1.EventEmitter {
       constructor(client, options = {}) {
         super();
         this.client = client;
@@ -101964,7 +104742,7 @@ var require_transaction_buffer_watcher = __commonJS({
         });
       }
     };
-    exports2.TransactionBufferWatcher = TransactionBufferWatcher2;
+    exports2.TransactionBufferWatcher = TransactionBufferWatcher;
   }
 });
 
@@ -104345,7 +107123,7 @@ var require_forecourt = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.createForecourt = createForecourt2;
-    exports2.forecourtLogon = forecourtLogon2;
+    exports2.forecourtLogon = forecourtLogon;
     var protocol_json_1 = require_protocol_json();
     var access_code_1 = require_access_code();
     var fc_logon_1 = require_fc_logon();
@@ -104360,7 +107138,7 @@ var require_forecourt = __commonJS({
     var vm_status_watcher_1 = require_vm_status_watcher();
     var vm_totals_handler_1 = require_vm_totals_handler();
     function createForecourt2(input) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6;
       const client = new protocol_json_1.JplClient(input.client);
       const bus = new forecourt_event_bus_1.ForecourtEventBus();
       const features = {
@@ -104395,14 +107173,21 @@ var require_forecourt = __commonJS({
       if (input.logon) {
         const includeDefaultUnsolFlags = (_w = input.logon.includeDefaultUnsolFlags) !== null && _w !== void 0 ? _w : true;
         const flags = [
-          ...includeDefaultUnsolFlags ? access_code_1.FORECOURT_FULL_UNSOL_FLAGS : [],
+          ...includeDefaultUnsolFlags ? (0, access_code_1.buildForecourtFullUnsolFlags)() : [],
           ...(_y = (_x = input.logon.accessCodeOptions) === null || _x === void 0 ? void 0 : _x.flags) !== null && _y !== void 0 ? _y : []
         ];
         const accessCode = (_z = input.logon.accessCode) !== null && _z !== void 0 ? _z : (0, access_code_1.buildFcAccessCode)(Object.assign(Object.assign({}, (_0 = input.logon.accessCodeOptions) !== null && _0 !== void 0 ? _0 : {}), { flags }));
-        const env = (0, fc_logon_1.buildFcLogonEnvelope)({
+        const variant = (_1 = input.logon.variant) !== null && _1 !== void 0 ? _1 : "01H";
+        const env = variant === "00H" ? (0, fc_logon_1.buildFcLogonEnvelope)({
+          variant,
           accessCode,
-          countryCode: input.logon.countryCode,
-          posVersionId: input.logon.posVersionId,
+          countryCode: (_2 = input.logon.countryCode) !== null && _2 !== void 0 ? _2 : "1",
+          posVersionId: (_3 = input.logon.posVersionId) !== null && _3 !== void 0 ? _3 : "470-02-1.06"
+        }) : (0, fc_logon_1.buildFcLogonEnvelope)({
+          variant,
+          accessCode,
+          countryCode: (_4 = input.logon.countryCode) !== null && _4 !== void 0 ? _4 : "1",
+          posVersionId: (_5 = input.logon.posVersionId) !== null && _5 !== void 0 ? _5 : "470-02-1.06",
           unsolMsgList: input.logon.unsolMsgList
         });
         client.__forecourtLogonEnvelope = env;
@@ -104411,10 +107196,10 @@ var require_forecourt = __commonJS({
         client,
         bus,
         watchers,
-        lifecycle: (_1 = watchers.wetstock) === null || _1 === void 0 ? void 0 : _1.lifecycle
+        lifecycle: (_6 = watchers.wetstock) === null || _6 === void 0 ? void 0 : _6.lifecycle
       };
     }
-    function forecourtLogon2(client, options) {
+    function forecourtLogon(client, options) {
       return __awaiter(this, void 0, void 0, function* () {
         const env = client.__forecourtLogonEnvelope;
         if (!env) {
@@ -104426,9 +107211,9 @@ var require_forecourt = __commonJS({
   }
 });
 
-// node_modules/@gilbarcoafs/doms-pos-jpl/dist/public/index.js
-var require_public = __commonJS({
-  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/public/index.js"(exports2) {
+// node_modules/@gilbarcoafs/doms-pos-jpl/dist/index.js
+var require_dist6 = __commonJS({
+  "node_modules/@gilbarcoafs/doms-pos-jpl/dist/index.js"(exports2) {
     "use strict";
     var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
       if (k2 === void 0) k2 = k;
@@ -104443,19 +107228,70 @@ var require_public = __commonJS({
       if (k2 === void 0) k2 = k;
       o[k2] = m[k];
     }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o, v) {
+      Object.defineProperty(o, "default", { enumerable: true, value: v });
+    }) : function(o, v) {
+      o["default"] = v;
+    });
     var __exportStar = exports2 && exports2.__exportStar || function(m, exports3) {
       for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports3, p)) __createBinding(exports3, m, p);
     };
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
+      var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function(o2) {
+          var ar = [];
+          for (var k in o2) if (Object.prototype.hasOwnProperty.call(o2, k)) ar[ar.length] = k;
+          return ar;
+        };
+        return ownKeys(o);
+      };
+      return function(mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) {
+          for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        }
+        __setModuleDefault(result, mod);
+        return result;
+      };
+    })();
     Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.wireForecourtWatchers = exports2.ForecourtEventBus = exports2.StatusUpdateCode = exports2.fcLogon = exports2.buildFcLogonEnvelope = exports2.FORECOURT_FULL_UNSOL_FLAGS = exports2.buildFcAccessCode = exports2.JplClient = void 0;
+    exports2.validateFcOperationModeStatusResp = exports2.validateFcOperationModeStatusReq = exports2.validateFcPriceSetStatusResp01h = exports2.validateFcPriceSetStatusReq01h = exports2.validateFcPriceSetStatusResp00h = exports2.validateFcPriceSetStatusReq00h = exports2.validateFcInstallStatusResp02h = exports2.validateFcInstallStatusReq02h = exports2.validateFcInstallStatusReq00h = exports2.validateChangeFcStatusUpdateModeReq = exports2.validateFcStatusResp = exports2.validateFcStatusReq = exports2.validateFcLogonReq01h = exports2.validateFcLogonResp00h = exports2.validateFcLogonReq00h = exports2.validateMultiMessageResp = exports2.validateMultiMessageReq = exports2.validateRejectMessageResp = exports2.validateRejectResp = exports2.validateVersionBannerResp = exports2.validateHeartbeatResp = exports2.validateHeartbeatReq = exports2.validateEnvelope = exports2.wireForecourtWatchers = exports2.ForecourtEventBus = exports2.buildClearFpSupTransEnvelope = exports2.buildFpSupTransEnvelope = exports2.buildFpFuellingDataEnvelope = exports2.buildFpStatusEnvelope = exports2.buildFcOperationModeStatusEnvelope = exports2.buildFcPriceSetStatusEnvelope = exports2.buildFcInstallStatusEnvelope = exports2.buildChangeFcStatusUpdateModeEnvelope = exports2.buildFcStatusEnvelope = exports2.StatusUpdateCode = exports2.fcLogon = exports2.buildFcLogonEnvelope01 = exports2.buildFcLogonEnvelope00 = exports2.buildFcLogonEnvelope = exports2.FORECOURT_FULL_UNSOL_FLAGS = exports2.buildUnsolTransBufStatusFlag = exports2.buildUnsolPriceSetStatusFlag = exports2.buildUnsolInstallStatusFlag = exports2.buildUnsolFpStatusFlag = exports2.buildMfdrUnsolFlag = exports2.buildForecourtFullUnsolFlags = exports2.buildFcAccessCode = exports2.JplSessionState = exports2.RequestDispatcher = exports2.JplClient = void 0;
+    exports2.assertDirectionalEnvelopeRules = exports2.coreSchemaValidators = exports2.validateChangeFcPriceSetResp04h = exports2.validateChangeFcPriceSetReq04h = exports2.validateChangeFcPriceSetResp03h = exports2.validateChangeFcPriceSetReq03h = exports2.validateClearFpSupTransResp = exports2.validateClearFpSupTransReq = exports2.validateFpSupTransResp = exports2.validateFpSupTransReq = exports2.validateFpFuellingDataResp = exports2.validateFpFuellingDataReq = exports2.validateFpStatusResp03h = exports2.validateFpStatusReq03h = exports2.validateFpStatusResp00h = exports2.validateFpStatusReq00h = void 0;
     var jpl_client_1 = require_jpl_client();
     Object.defineProperty(exports2, "JplClient", { enumerable: true, get: function() {
       return jpl_client_1.JplClient;
     } });
     __exportStar(require_errors5(), exports2);
+    var request_dispatcher_1 = require_request_dispatcher();
+    Object.defineProperty(exports2, "RequestDispatcher", { enumerable: true, get: function() {
+      return request_dispatcher_1.RequestDispatcher;
+    } });
+    var session_state_1 = require_session_state();
+    Object.defineProperty(exports2, "JplSessionState", { enumerable: true, get: function() {
+      return session_state_1.JplSessionState;
+    } });
     var access_code_1 = require_access_code();
     Object.defineProperty(exports2, "buildFcAccessCode", { enumerable: true, get: function() {
       return access_code_1.buildFcAccessCode;
+    } });
+    Object.defineProperty(exports2, "buildForecourtFullUnsolFlags", { enumerable: true, get: function() {
+      return access_code_1.buildForecourtFullUnsolFlags;
+    } });
+    Object.defineProperty(exports2, "buildMfdrUnsolFlag", { enumerable: true, get: function() {
+      return access_code_1.buildMfdrUnsolFlag;
+    } });
+    Object.defineProperty(exports2, "buildUnsolFpStatusFlag", { enumerable: true, get: function() {
+      return access_code_1.buildUnsolFpStatusFlag;
+    } });
+    Object.defineProperty(exports2, "buildUnsolInstallStatusFlag", { enumerable: true, get: function() {
+      return access_code_1.buildUnsolInstallStatusFlag;
+    } });
+    Object.defineProperty(exports2, "buildUnsolPriceSetStatusFlag", { enumerable: true, get: function() {
+      return access_code_1.buildUnsolPriceSetStatusFlag;
+    } });
+    Object.defineProperty(exports2, "buildUnsolTransBufStatusFlag", { enumerable: true, get: function() {
+      return access_code_1.buildUnsolTransBufStatusFlag;
     } });
     Object.defineProperty(exports2, "FORECOURT_FULL_UNSOL_FLAGS", { enumerable: true, get: function() {
       return access_code_1.FORECOURT_FULL_UNSOL_FLAGS;
@@ -104464,12 +107300,47 @@ var require_public = __commonJS({
     Object.defineProperty(exports2, "buildFcLogonEnvelope", { enumerable: true, get: function() {
       return fc_logon_1.buildFcLogonEnvelope;
     } });
+    Object.defineProperty(exports2, "buildFcLogonEnvelope00", { enumerable: true, get: function() {
+      return fc_logon_1.buildFcLogonEnvelope00;
+    } });
+    Object.defineProperty(exports2, "buildFcLogonEnvelope01", { enumerable: true, get: function() {
+      return fc_logon_1.buildFcLogonEnvelope01;
+    } });
     Object.defineProperty(exports2, "fcLogon", { enumerable: true, get: function() {
       return fc_logon_1.fcLogon;
     } });
     var status_update_mode_1 = require_status_update_mode();
     Object.defineProperty(exports2, "StatusUpdateCode", { enumerable: true, get: function() {
       return status_update_mode_1.StatusUpdateCode;
+    } });
+    var fp_messages_1 = require_fp_messages();
+    Object.defineProperty(exports2, "buildFcStatusEnvelope", { enumerable: true, get: function() {
+      return fp_messages_1.buildFcStatusEnvelope;
+    } });
+    Object.defineProperty(exports2, "buildChangeFcStatusUpdateModeEnvelope", { enumerable: true, get: function() {
+      return fp_messages_1.buildChangeFcStatusUpdateModeEnvelope;
+    } });
+    Object.defineProperty(exports2, "buildFcInstallStatusEnvelope", { enumerable: true, get: function() {
+      return fp_messages_1.buildFcInstallStatusEnvelope;
+    } });
+    Object.defineProperty(exports2, "buildFcPriceSetStatusEnvelope", { enumerable: true, get: function() {
+      return fp_messages_1.buildFcPriceSetStatusEnvelope;
+    } });
+    Object.defineProperty(exports2, "buildFcOperationModeStatusEnvelope", { enumerable: true, get: function() {
+      return fp_messages_1.buildFcOperationModeStatusEnvelope;
+    } });
+    Object.defineProperty(exports2, "buildFpStatusEnvelope", { enumerable: true, get: function() {
+      return fp_messages_1.buildFpStatusEnvelope;
+    } });
+    Object.defineProperty(exports2, "buildFpFuellingDataEnvelope", { enumerable: true, get: function() {
+      return fp_messages_1.buildFpFuellingDataEnvelope;
+    } });
+    var supervised_1 = require_supervised();
+    Object.defineProperty(exports2, "buildFpSupTransEnvelope", { enumerable: true, get: function() {
+      return supervised_1.buildFpSupTransEnvelope;
+    } });
+    Object.defineProperty(exports2, "buildClearFpSupTransEnvelope", { enumerable: true, get: function() {
+      return supervised_1.buildClearFpSupTransEnvelope;
     } });
     __exportStar(require_jpl_json_domains(), exports2);
     var forecourt_event_bus_1 = require_forecourt_event_bus();
@@ -104485,7 +107356,1315 @@ var require_public = __commonJS({
     __exportStar(require_ept(), exports2);
     __exportStar(require_wash(), exports2);
     __exportStar(require_vending(), exports2);
+    var validators_1 = require_validators();
+    Object.defineProperty(exports2, "validateEnvelope", { enumerable: true, get: function() {
+      return validators_1.validateEnvelope;
+    } });
+    Object.defineProperty(exports2, "validateHeartbeatReq", { enumerable: true, get: function() {
+      return validators_1.validateHeartbeatReq;
+    } });
+    Object.defineProperty(exports2, "validateHeartbeatResp", { enumerable: true, get: function() {
+      return validators_1.validateHeartbeatResp;
+    } });
+    Object.defineProperty(exports2, "validateVersionBannerResp", { enumerable: true, get: function() {
+      return validators_1.validateVersionBannerResp;
+    } });
+    Object.defineProperty(exports2, "validateRejectResp", { enumerable: true, get: function() {
+      return validators_1.validateRejectResp;
+    } });
+    Object.defineProperty(exports2, "validateRejectMessageResp", { enumerable: true, get: function() {
+      return validators_1.validateRejectMessageResp;
+    } });
+    Object.defineProperty(exports2, "validateMultiMessageReq", { enumerable: true, get: function() {
+      return validators_1.validateMultiMessageReq;
+    } });
+    Object.defineProperty(exports2, "validateMultiMessageResp", { enumerable: true, get: function() {
+      return validators_1.validateMultiMessageResp;
+    } });
+    Object.defineProperty(exports2, "validateFcLogonReq00h", { enumerable: true, get: function() {
+      return validators_1.validateFcLogonReq00h;
+    } });
+    Object.defineProperty(exports2, "validateFcLogonResp00h", { enumerable: true, get: function() {
+      return validators_1.validateFcLogonResp00h;
+    } });
+    Object.defineProperty(exports2, "validateFcLogonReq01h", { enumerable: true, get: function() {
+      return validators_1.validateFcLogonReq01h;
+    } });
+    Object.defineProperty(exports2, "validateFcStatusReq", { enumerable: true, get: function() {
+      return validators_1.validateFcStatusReq;
+    } });
+    Object.defineProperty(exports2, "validateFcStatusResp", { enumerable: true, get: function() {
+      return validators_1.validateFcStatusResp;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcStatusUpdateModeReq", { enumerable: true, get: function() {
+      return validators_1.validateChangeFcStatusUpdateModeReq;
+    } });
+    Object.defineProperty(exports2, "validateFcInstallStatusReq00h", { enumerable: true, get: function() {
+      return validators_1.validateFcInstallStatusReq00h;
+    } });
+    Object.defineProperty(exports2, "validateFcInstallStatusReq02h", { enumerable: true, get: function() {
+      return validators_1.validateFcInstallStatusReq02h;
+    } });
+    Object.defineProperty(exports2, "validateFcInstallStatusResp02h", { enumerable: true, get: function() {
+      return validators_1.validateFcInstallStatusResp02h;
+    } });
+    Object.defineProperty(exports2, "validateFcPriceSetStatusReq00h", { enumerable: true, get: function() {
+      return validators_1.validateFcPriceSetStatusReq00h;
+    } });
+    Object.defineProperty(exports2, "validateFcPriceSetStatusResp00h", { enumerable: true, get: function() {
+      return validators_1.validateFcPriceSetStatusResp00h;
+    } });
+    Object.defineProperty(exports2, "validateFcPriceSetStatusReq01h", { enumerable: true, get: function() {
+      return validators_1.validateFcPriceSetStatusReq01h;
+    } });
+    Object.defineProperty(exports2, "validateFcPriceSetStatusResp01h", { enumerable: true, get: function() {
+      return validators_1.validateFcPriceSetStatusResp01h;
+    } });
+    Object.defineProperty(exports2, "validateFcOperationModeStatusReq", { enumerable: true, get: function() {
+      return validators_1.validateFcOperationModeStatusReq;
+    } });
+    Object.defineProperty(exports2, "validateFcOperationModeStatusResp", { enumerable: true, get: function() {
+      return validators_1.validateFcOperationModeStatusResp;
+    } });
+    Object.defineProperty(exports2, "validateFpStatusReq00h", { enumerable: true, get: function() {
+      return validators_1.validateFpStatusReq00h;
+    } });
+    Object.defineProperty(exports2, "validateFpStatusResp00h", { enumerable: true, get: function() {
+      return validators_1.validateFpStatusResp00h;
+    } });
+    Object.defineProperty(exports2, "validateFpStatusReq03h", { enumerable: true, get: function() {
+      return validators_1.validateFpStatusReq03h;
+    } });
+    Object.defineProperty(exports2, "validateFpStatusResp03h", { enumerable: true, get: function() {
+      return validators_1.validateFpStatusResp03h;
+    } });
+    Object.defineProperty(exports2, "validateFpFuellingDataReq", { enumerable: true, get: function() {
+      return validators_1.validateFpFuellingDataReq;
+    } });
+    Object.defineProperty(exports2, "validateFpFuellingDataResp", { enumerable: true, get: function() {
+      return validators_1.validateFpFuellingDataResp;
+    } });
+    Object.defineProperty(exports2, "validateFpSupTransReq", { enumerable: true, get: function() {
+      return validators_1.validateFpSupTransReq;
+    } });
+    Object.defineProperty(exports2, "validateFpSupTransResp", { enumerable: true, get: function() {
+      return validators_1.validateFpSupTransResp;
+    } });
+    Object.defineProperty(exports2, "validateClearFpSupTransReq", { enumerable: true, get: function() {
+      return validators_1.validateClearFpSupTransReq;
+    } });
+    Object.defineProperty(exports2, "validateClearFpSupTransResp", { enumerable: true, get: function() {
+      return validators_1.validateClearFpSupTransResp;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcPriceSetReq03h", { enumerable: true, get: function() {
+      return validators_1.validateChangeFcPriceSetReq03h;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcPriceSetResp03h", { enumerable: true, get: function() {
+      return validators_1.validateChangeFcPriceSetResp03h;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcPriceSetReq04h", { enumerable: true, get: function() {
+      return validators_1.validateChangeFcPriceSetReq04h;
+    } });
+    Object.defineProperty(exports2, "validateChangeFcPriceSetResp04h", { enumerable: true, get: function() {
+      return validators_1.validateChangeFcPriceSetResp04h;
+    } });
+    Object.defineProperty(exports2, "coreSchemaValidators", { enumerable: true, get: function() {
+      return validators_1.coreSchemaValidators;
+    } });
+    Object.defineProperty(exports2, "assertDirectionalEnvelopeRules", { enumerable: true, get: function() {
+      return validators_1.assertDirectionalEnvelopeRules;
+    } });
     __exportStar(require_forecourt(), exports2);
+    var jpl_client_2 = require_jpl_client();
+    var request_dispatcher_2 = require_request_dispatcher();
+    var session_state_2 = require_session_state();
+    var access_code_2 = require_access_code();
+    var fc_logon_2 = require_fc_logon();
+    var status_update_mode_2 = require_status_update_mode();
+    var fp_messages_2 = require_fp_messages();
+    var supervised_2 = require_supervised();
+    var forecourt_event_bus_2 = require_forecourt_event_bus();
+    var wire_forecourt_watchers_2 = require_wire_forecourt_watchers();
+    var publicForecourtApi = __importStar(require_forecourt());
+    var domsPosJpl = Object.assign({ JplClient: jpl_client_2.JplClient, RequestDispatcher: request_dispatcher_2.RequestDispatcher, JplSessionState: session_state_2.JplSessionState, buildFcAccessCode: access_code_2.buildFcAccessCode, buildForecourtFullUnsolFlags: access_code_2.buildForecourtFullUnsolFlags, buildMfdrUnsolFlag: access_code_2.buildMfdrUnsolFlag, buildUnsolFpStatusFlag: access_code_2.buildUnsolFpStatusFlag, buildUnsolInstallStatusFlag: access_code_2.buildUnsolInstallStatusFlag, buildUnsolPriceSetStatusFlag: access_code_2.buildUnsolPriceSetStatusFlag, buildUnsolTransBufStatusFlag: access_code_2.buildUnsolTransBufStatusFlag, FORECOURT_FULL_UNSOL_FLAGS: access_code_2.FORECOURT_FULL_UNSOL_FLAGS, buildFcLogonEnvelope: fc_logon_2.buildFcLogonEnvelope, buildFcLogonEnvelope00: fc_logon_2.buildFcLogonEnvelope00, buildFcLogonEnvelope01: fc_logon_2.buildFcLogonEnvelope01, fcLogon: fc_logon_2.fcLogon, StatusUpdateCode: status_update_mode_2.StatusUpdateCode, buildFcStatusEnvelope: fp_messages_2.buildFcStatusEnvelope, buildChangeFcStatusUpdateModeEnvelope: fp_messages_2.buildChangeFcStatusUpdateModeEnvelope, buildFcInstallStatusEnvelope: fp_messages_2.buildFcInstallStatusEnvelope, buildFcPriceSetStatusEnvelope: fp_messages_2.buildFcPriceSetStatusEnvelope, buildFcOperationModeStatusEnvelope: fp_messages_2.buildFcOperationModeStatusEnvelope, buildFpStatusEnvelope: fp_messages_2.buildFpStatusEnvelope, buildFpFuellingDataEnvelope: fp_messages_2.buildFpFuellingDataEnvelope, buildFpSupTransEnvelope: supervised_2.buildFpSupTransEnvelope, buildClearFpSupTransEnvelope: supervised_2.buildClearFpSupTransEnvelope, ForecourtEventBus: forecourt_event_bus_2.ForecourtEventBus, wireForecourtWatchers: wire_forecourt_watchers_2.wireForecourtWatchers }, publicForecourtApi);
+    exports2.default = domsPosJpl;
+  }
+});
+
+// src/modules/forecourt/infrastructure/jpl/protocol/bootstrap.ts
+var DomsPosJpl, DEFAULT_JPL_REQUIRED_FLAGS, DEFAULT_JPL_MFDR_FLAGS, CONSERVATIVE_JPL_REQUIRED_FLAGS, buildFcAccessCode2, buildMfdrUnsolFlag2, toCanonicalToken, tokenizeAccessCode, normalizeJplPosId, tokenMatches, formatMfdrToken, buildJplAccessCode, uniqueAccessCodes, passwordOnlyAccessCode, buildJplAccessCodeFallbacks, isJplProtocolFamilyEnabled, buildJplBootstrapConfig;
+var init_bootstrap = __esm({
+  "src/modules/forecourt/infrastructure/jpl/protocol/bootstrap.ts"() {
+    "use strict";
+    DomsPosJpl = __toESM(require_dist6());
+    DEFAULT_JPL_REQUIRED_FLAGS = [
+      "UNSO_INSTSTA_1",
+      "UNSO_TRBUFSTA_3",
+      "UNSO_TGSTA_1",
+      "UNSO_DELIVSTA_1",
+      "UNSO_PRISTA_1"
+    ];
+    DEFAULT_JPL_MFDR_FLAGS = ["UNSO_FPSTA_3"];
+    CONSERVATIVE_JPL_REQUIRED_FLAGS = [
+      "UNSO_TRBUFSTA_3",
+      "UNSO_INSTSTA_1"
+    ];
+    buildFcAccessCode2 = DomsPosJpl.buildFcAccessCode;
+    buildMfdrUnsolFlag2 = DomsPosJpl.buildMfdrUnsolFlag;
+    toCanonicalToken = (value) => String(value ?? "").trim();
+    tokenizeAccessCode = (value) => String(value ?? "").split(",").map((token) => token.trim()).filter(Boolean);
+    normalizeJplPosId = (value, fallback = "01", options = {}) => {
+      const allowZero = Boolean(options.allowZero);
+      const raw = String(value ?? "").trim();
+      const fallbackRaw = String(fallback ?? "01").trim() || "01";
+      const chosen = raw || fallbackRaw;
+      if (!/^\d{1,2}$/.test(chosen)) {
+        throw new Error("JPL POS ID must be a 1-2 digit numeric string");
+      }
+      const numeric = Math.trunc(Number(chosen));
+      if (!Number.isFinite(numeric)) {
+        throw new Error("JPL POS ID must be numeric");
+      }
+      if (!allowZero && numeric === 0) {
+        throw new Error(
+          "JPL POS ID 00 is reserved and cannot be used by a POS client"
+        );
+      }
+      if (numeric < 0 || numeric > 89) {
+        throw new Error("JPL POS ID must be between 01 and 89 for real POS clients");
+      }
+      return String(numeric).padStart(2, "0");
+    };
+    tokenMatches = (candidate, token) => {
+      const left = candidate.toUpperCase();
+      const right = token.toUpperCase();
+      return left === right || left.startsWith(`${right}:`);
+    };
+    formatMfdrToken = (flag, drSeconds) => {
+      if (buildMfdrUnsolFlag2) return buildMfdrUnsolFlag2(flag, drSeconds);
+      return `${toCanonicalToken(flag)}:MFDR=${String(drSeconds).padStart(2, "0")}`;
+    };
+    buildJplAccessCode = (options) => {
+      const {
+        baseAccessCode,
+        drSeconds = 5,
+        ensureRi = true,
+        requiredFlags = DEFAULT_JPL_REQUIRED_FLAGS,
+        mfdrFlags = DEFAULT_JPL_MFDR_FLAGS
+      } = options;
+      const tokens = tokenizeAccessCode(baseAccessCode);
+      const [passwordToken, ...flagTokens] = tokens.length > 0 ? tokens : ["POS"];
+      const effectivePassword = passwordToken || "POS";
+      const effectiveDr = Number.isFinite(Number(drSeconds)) && Number(drSeconds) > 0 ? Math.trunc(Number(drSeconds)) : 5;
+      const workingFlags = [...flagTokens];
+      const upsertPlainToken = (token) => {
+        const canonical = toCanonicalToken(token);
+        if (!canonical) return;
+        if (workingFlags.some((candidate) => tokenMatches(candidate, canonical))) {
+          return;
+        }
+        workingFlags.push(canonical);
+      };
+      const upsertMfdrToken = (flag) => {
+        const canonical = toCanonicalToken(flag);
+        if (!canonical) return;
+        const mfdrToken = formatMfdrToken(canonical, effectiveDr);
+        const existingIndex = workingFlags.findIndex(
+          (candidate) => tokenMatches(candidate, canonical)
+        );
+        if (existingIndex >= 0) {
+          workingFlags[existingIndex] = mfdrToken;
+          return;
+        }
+        workingFlags.push(mfdrToken);
+      };
+      if (ensureRi) upsertPlainToken("RI");
+      for (const flag of requiredFlags) upsertPlainToken(flag);
+      for (const flag of mfdrFlags) upsertMfdrToken(flag);
+      if (buildFcAccessCode2) {
+        return buildFcAccessCode2({
+          password: effectivePassword,
+          rejectInfo: false,
+          flags: workingFlags
+        });
+      }
+      return [effectivePassword, ...workingFlags].join(",");
+    };
+    uniqueAccessCodes = (values) => {
+      const seen = /* @__PURE__ */ new Set();
+      const out = [];
+      for (const value of values) {
+        const normalized = String(value ?? "").trim();
+        if (!normalized) continue;
+        const key = normalized.toUpperCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(normalized);
+      }
+      return out;
+    };
+    passwordOnlyAccessCode = (baseAccessCode) => {
+      const [password] = tokenizeAccessCode(baseAccessCode);
+      return password || "POS";
+    };
+    buildJplAccessCodeFallbacks = (options) => {
+      const passwordOnly = passwordOnlyAccessCode(options.baseAccessCode);
+      const primary = buildJplAccessCode(options);
+      const conservative = buildJplAccessCode({
+        baseAccessCode: passwordOnly,
+        drSeconds: options.drSeconds,
+        ensureRi: true,
+        requiredFlags: CONSERVATIVE_JPL_REQUIRED_FLAGS,
+        mfdrFlags: options.mfdrFlags && options.mfdrFlags.length > 0 ? options.mfdrFlags : DEFAULT_JPL_MFDR_FLAGS
+      });
+      const rejectInfoOnly = buildJplAccessCode({
+        baseAccessCode: passwordOnly,
+        ensureRi: true,
+        requiredFlags: [],
+        mfdrFlags: []
+      });
+      const barePassword = buildJplAccessCode({
+        baseAccessCode: passwordOnly,
+        ensureRi: false,
+        requiredFlags: [],
+        mfdrFlags: []
+      });
+      return uniqueAccessCodes([
+        primary,
+        conservative,
+        rejectInfoOnly,
+        barePassword
+      ]);
+    };
+    isJplProtocolFamilyEnabled = (cfg, family) => (cfg.jplOptionalProtocolFamilies ?? []).map((entry) => String(entry).trim().toLowerCase()).includes(family.trim().toLowerCase());
+    buildJplBootstrapConfig = (cfg) => {
+      const posId = normalizeJplPosId(cfg.jplPosId, "01");
+      const accessCodeOptions = {
+        baseAccessCode: cfg.jplAccessCode,
+        drSeconds: cfg.jplUnsolicitedDrSeconds,
+        requiredFlags: cfg.jplUnsolicitedFlags?.length > 0 ? cfg.jplUnsolicitedFlags : DEFAULT_JPL_REQUIRED_FLAGS,
+        mfdrFlags: cfg.jplUnsolicitedMfdrFlags?.length > 0 ? cfg.jplUnsolicitedMfdrFlags : DEFAULT_JPL_MFDR_FLAGS
+      };
+      const accessCode = buildJplAccessCode(accessCodeOptions);
+      const accessCodeFallbacks = buildJplAccessCodeFallbacks(accessCodeOptions);
+      const heartbeatIdleMs = Math.max(
+        5e3,
+        Number(cfg.jplHeartbeatIntervalMs || 15e3)
+      );
+      const inboundSilenceMs = Math.max(
+        heartbeatIdleMs + 5e3,
+        Number(cfg.jplDeadConnectionTimeoutMs || 3e4)
+      );
+      const requestedStatusUpdateCode = Number(cfg.jplStatusUpdateCode ?? 3);
+      const hasUnsolicitedSubscriptions = (cfg.jplUnsolicitedFlags?.length ?? 0) > 0 || (cfg.jplUnsolicitedMfdrFlags?.length ?? 0) > 0;
+      const statusUpdateCode = hasUnsolicitedSubscriptions && (!Number.isFinite(requestedStatusUpdateCode) || requestedStatusUpdateCode <= 0) ? 3 : requestedStatusUpdateCode;
+      return {
+        posId,
+        secureMode: Boolean(cfg.jplTlsRequired) || Number(cfg.jplPort) === 8889,
+        tlsRequired: Boolean(cfg.jplTlsRequired),
+        integrationScope: cfg.jplIntegrationScope,
+        optionalProtocolFamilies: [...cfg.jplOptionalProtocolFamilies ?? []],
+        accessCode,
+        accessCodeFallbacks,
+        countryCode: String(cfg.jplCountryCode ?? "").trim() || "1",
+        posVersionId: String(cfg.jplPosVersionId ?? "").trim() || "470-02-1.08",
+        statusUpdateCode,
+        bootstrapSnapshotEnabled: Boolean(cfg.jplBootstrapSnapshotEnabled ?? true),
+        clientOptions: {
+          host: cfg.jplHost,
+          port: cfg.jplPort,
+          strictProtocolValidation: true,
+          heartbeatIdleMs,
+          inboundSilenceMs
+        },
+        logonOptions: {
+          accessCode,
+          countryCode: String(cfg.jplCountryCode ?? "").trim() || "1",
+          posVersionId: String(cfg.jplPosVersionId ?? "").trim() || "470-02-1.08",
+          includeDefaultUnsolFlags: false
+        },
+        features: {
+          wetstock: true,
+          ept: false,
+          wash: isJplProtocolFamilyEnabled(cfg, "wash"),
+          vending: isJplProtocolFamilyEnabled(cfg, "vending")
+        }
+      };
+    };
+  }
+});
+
+// src/shared/forecourt/settings.ts
+async function getForecourtSettings(stationId2) {
+  const base = getForecourtRuntimeConfig2();
+  const keys = [
+    FORECOURT_RUNTIME_KV_KEYS.JPL_OPERATION_MODE,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_HOST,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_PORT,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_POS_ID,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_FC_ACCESS_CODE,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_COUNTRY_CODE,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_POS_VERSION_ID,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_UNSOLICITED_DR_SECONDS,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_HEARTBEAT_INTERVAL_MS,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_DEAD_CONNECTION_TIMEOUT_MS,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_EXPECTED_MIN_VERSION,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_UNSOLICITED_FLAGS,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_UNSOLICITED_MFDR_FLAGS,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_STATUS_UPDATE_CODE,
+    FORECOURT_RUNTIME_KV_KEYS.JPL_BOOTSTRAP_SNAPSHOT_ENABLED,
+    FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_DEPTH_SUP,
+    FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_DEPTH_SUP,
+    FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_AGE_MIN_SUP,
+    FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_AGE_MIN_SUP,
+    FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_DEPTH_UNSUP,
+    FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_DEPTH_UNSUP,
+    FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_AGE_MIN_UNSUP,
+    FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_AGE_MIN_UNSUP
+  ];
+  const values = await kvGetMany2(stationId2, [...keys]);
+  const [
+    jplOperationMode,
+    jplHost,
+    jplPort,
+    jplPosId,
+    jplAccessCode,
+    jplCountryCode,
+    jplPosVersionId,
+    jplUnsolicitedDrSeconds,
+    jplHeartbeatIntervalMs,
+    jplDeadConnectionTimeoutMs,
+    jplExpectedMinVersion,
+    jplUnsolicitedFlags,
+    jplUnsolicitedMfdrFlags,
+    jplStatusUpdateCode,
+    jplBootstrapSnapshotEnabled,
+    bufferWarnDepthSup,
+    bufferCritDepthSup,
+    bufferWarnAgeMinSup,
+    bufferCritAgeMinSup,
+    bufferWarnDepthUnsup,
+    bufferCritDepthUnsup,
+    bufferWarnAgeMinUnsup,
+    bufferCritAgeMinUnsup
+  ] = keys.map((key) => values[key]);
+  const effectiveDrSeconds = jplUnsolicitedDrSeconds != null ? Number(jplUnsolicitedDrSeconds) : base.jplUnsolicitedDrSeconds;
+  const effectiveFlags = jplUnsolicitedFlags != null ? parseCsvStringList(jplUnsolicitedFlags) : base.jplUnsolicitedFlags;
+  const effectiveMfdrFlags = jplUnsolicitedMfdrFlags != null ? parseCsvStringList(jplUnsolicitedMfdrFlags) : base.jplUnsolicitedMfdrFlags;
+  return {
+    mode: "jpl_tcp",
+    jplOperationMode: jplOperationMode != null && String(jplOperationMode).trim().length ? normalizeJplOperationMode(jplOperationMode) : base.jplOperationMode,
+    jplHost: normalizeForecourtHost(jplHost, base.jplHost),
+    jplPort: jplPort != null ? normalizeForecourtPort(jplPort, base.jplPort) : base.jplPort,
+    jplPosId: normalizeJplPosId(
+      jplPosId != null ? jplPosId : base.jplPosId,
+      String(base.jplPosId ?? "01")
+    ),
+    jplAccessCode: buildJplAccessCode({
+      baseAccessCode: jplAccessCode != null ? String(jplAccessCode) : base.jplAccessCode,
+      drSeconds: effectiveDrSeconds,
+      requiredFlags: effectiveFlags,
+      mfdrFlags: effectiveMfdrFlags
+    }),
+    jplCountryCode: jplCountryCode != null ? jplCountryCode : base.jplCountryCode,
+    jplPosVersionId: jplPosVersionId != null ? jplPosVersionId : base.jplPosVersionId,
+    jplUnsolicitedDrSeconds: effectiveDrSeconds,
+    jplHeartbeatIntervalMs: jplHeartbeatIntervalMs != null ? Number(jplHeartbeatIntervalMs) : base.jplHeartbeatIntervalMs,
+    jplDeadConnectionTimeoutMs: jplDeadConnectionTimeoutMs != null ? Number(jplDeadConnectionTimeoutMs) : base.jplDeadConnectionTimeoutMs,
+    jplExpectedMinVersion: jplExpectedMinVersion != null ? String(jplExpectedMinVersion) : base.jplExpectedMinVersion,
+    jplUnsolicitedFlags: effectiveFlags,
+    jplUnsolicitedMfdrFlags: effectiveMfdrFlags,
+    jplStatusUpdateCode: jplStatusUpdateCode != null ? Number(jplStatusUpdateCode) : base.jplStatusUpdateCode,
+    jplBootstrapSnapshotEnabled: jplBootstrapSnapshotEnabled != null ? normalizeBooleanFlag(
+      jplBootstrapSnapshotEnabled,
+      base.jplBootstrapSnapshotEnabled
+    ) : base.jplBootstrapSnapshotEnabled,
+    bufferWarnDepthSup: bufferWarnDepthSup != null ? Number(bufferWarnDepthSup) : base.bufferWarnDepthSup,
+    bufferCritDepthSup: bufferCritDepthSup != null ? Number(bufferCritDepthSup) : base.bufferCritDepthSup,
+    bufferWarnAgeMinSup: bufferWarnAgeMinSup != null ? Number(bufferWarnAgeMinSup) : base.bufferWarnAgeMinSup,
+    bufferCritAgeMinSup: bufferCritAgeMinSup != null ? Number(bufferCritAgeMinSup) : base.bufferCritAgeMinSup,
+    bufferWarnDepthUnsup: bufferWarnDepthUnsup != null ? Number(bufferWarnDepthUnsup) : base.bufferWarnDepthUnsup,
+    bufferCritDepthUnsup: bufferCritDepthUnsup != null ? Number(bufferCritDepthUnsup) : base.bufferCritDepthUnsup,
+    bufferWarnAgeMinUnsup: bufferWarnAgeMinUnsup != null ? Number(bufferWarnAgeMinUnsup) : base.bufferWarnAgeMinUnsup,
+    bufferCritAgeMinUnsup: bufferCritAgeMinUnsup != null ? Number(bufferCritAgeMinUnsup) : base.bufferCritAgeMinUnsup
+  };
+}
+var init_settings = __esm({
+  "src/shared/forecourt/settings.ts"() {
+    "use strict";
+    init_runtime();
+    init_runtimeConfigShared();
+    init_stationKv();
+    init_bootstrap();
+    init_runtimeConfig();
+  }
+});
+
+// src/platform/integrations/jpl/config.ts
+var config_exports = {};
+__export(config_exports, {
+  getJplConfig: () => getJplConfig
+});
+async function getJplConfig(stationId2) {
+  const [cfg, forecourtSettings] = await Promise.all([
+    getSystemConfiguration(stationId2),
+    getForecourtSettings(stationId2)
+  ]);
+  const integrations = cfg?.integrations ?? {};
+  const jpl = integrations?.jpl;
+  const forecourtBase = getForecourtRuntimeConfig();
+  const hasExplicitForecourtHost = String(forecourtSettings?.jplHost ?? "").trim().length > 0 && String(forecourtSettings?.jplHost ?? "").trim() !== String(forecourtBase.jplHost ?? "").trim();
+  const hasExplicitForecourtPort = Number(forecourtSettings?.jplPort) !== Number(forecourtBase.jplPort);
+  const hasExplicitForecourtAccessCode = String(forecourtSettings?.jplAccessCode ?? "").trim().length > 0 && String(forecourtSettings?.jplAccessCode ?? "").trim() !== String(forecourtBase.jplAccessCode ?? "").trim();
+  const hasExplicitForecourtCountryCode = String(forecourtSettings?.jplCountryCode ?? "").trim().length > 0 && String(forecourtSettings?.jplCountryCode ?? "").trim() !== String(forecourtBase.jplCountryCode ?? "").trim();
+  const hasExplicitForecourtPosId = String(forecourtSettings?.jplPosId ?? "").trim().length > 0 && String(forecourtSettings?.jplPosId ?? "").trim() !== String(forecourtBase.jplPosId ?? "").trim();
+  const host = String(
+    hasExplicitForecourtHost ? forecourtSettings.jplHost : jpl?.host ?? forecourtSettings?.jplHost ?? ""
+  ).trim();
+  if (!host) return null;
+  const portOverrides = {
+    apc1: hasExplicitForecourtPort && Number.isFinite(Number(forecourtSettings?.jplPort)) ? Number(forecourtSettings?.jplPort) : jpl?.portOverrides?.apc1 != null ? Number(jpl.portOverrides.apc1) : void 0,
+    apc2: jpl?.portOverrides?.apc2 != null ? Number(jpl.portOverrides.apc2) : void 0
+  };
+  const appId = String(jpl?.appId ?? process.env.JPL_APP_ID ?? "POS").trim();
+  const accessCode = String(
+    hasExplicitForecourtAccessCode ? forecourtSettings.jplAccessCode : jpl?.accessCode ?? jpl?.jplAccessCode ?? forecourtSettings?.jplAccessCode ?? process.env.JPL_FC_ACCESS_CODE ?? "POS"
+  ).trim();
+  const countryCode = String(
+    hasExplicitForecourtCountryCode ? forecourtSettings.jplCountryCode : jpl?.countryCode ?? forecourtSettings?.jplCountryCode ?? process.env.JPL_COUNTRY_CODE ?? "1"
+  ).trim();
+  const enabledApcs = Array.isArray(jpl?.enabledApcs) ? jpl.enabledApcs.map((x) => String(x).trim().toLowerCase()).filter((x) => x === "apc1" || x === "apc2") : void 0;
+  const posId = hasExplicitForecourtPosId ? Number(forecourtSettings.jplPosId) : jpl?.posId != null ? Number(jpl.posId) : Number(process.env.JPL_POS_ID);
+  const fpOperationModeNo = jpl?.fpOperationModeNo != null ? Number(jpl.fpOperationModeNo) : Number(process.env.JPL_FP_OPERATION_MODE_NO);
+  return {
+    host,
+    appId,
+    accessCode,
+    countryCode,
+    enabledApcs,
+    portOverrides,
+    posId: Number.isFinite(posId) ? posId : 1,
+    fpOperationModeNo: Number.isFinite(fpOperationModeNo) ? fpOperationModeNo : 1,
+    timeoutMs: Number(jpl?.timeoutMs ?? process.env.JPL_TIMEOUT_MS ?? 1e4)
+  };
+}
+var init_config = __esm({
+  "src/platform/integrations/jpl/config.ts"() {
+    "use strict";
+    init_loader();
+    init_settings();
+    init_runtimeConfig();
+  }
+});
+
+// src/modules/forecourt/infrastructure/jpl/globals.ts
+var init_globals = __esm({
+  "src/modules/forecourt/infrastructure/jpl/globals.ts"() {
+    "use strict";
+  }
+});
+
+// src/shared/status.ts
+var PUMP_NOZZLE_STATE;
+var init_status2 = __esm({
+  "src/shared/status.ts"() {
+    "use strict";
+    PUMP_NOZZLE_STATE = {
+      IDLE: "idle",
+      AUTH: "auth",
+      PREAUTHORIZED: "preauthorized",
+      CALLING: "calling",
+      STARTING: "starting",
+      NOZZLE_UP: "nozzle_up",
+      NOZZLE_DOWN: "nozzle_down",
+      DISPENSING: "dispensing",
+      DISPENSING_PAUSED: "dispensing_paused",
+      ERROR: "error",
+      CLOSED: "closed",
+      UNAVAILABLE: "unavailable",
+      UNCONFIGURED: "unconfigured"
+    };
+  }
+});
+
+// src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers.ts
+var import_util4, serializeError, serializeForLog, padId2, mapJplMainState, extractNozzleNumber, extractSubCode, eventTypeFromDomainEvent, unwrapMultiMessage, resolveTransSeqNo, toJplDecimalString, firstNonBlank, leftPadDigits, getSupervisedTxClearFields;
+var init_jplTcpAdapter_helpers = __esm({
+  "src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers.ts"() {
+    "use strict";
+    import_util4 = __toESM(require("util"));
+    init_status2();
+    serializeError = (err) => {
+      if (!err) return { message: "" };
+      if (err instanceof Error) {
+        const anyErr = err;
+        return {
+          name: err.name,
+          message: err.message,
+          stack: err.stack,
+          code: anyErr.code,
+          errno: anyErr.errno,
+          syscall: anyErr.syscall,
+          address: anyErr.address,
+          port: anyErr.port,
+          cause: anyErr.cause ? String(anyErr.cause) : void 0
+        };
+      }
+      if (typeof err === "object") {
+        const anyErr = err;
+        return {
+          message: anyErr?.message ? String(anyErr.message) : String(err),
+          stack: anyErr?.stack ? String(anyErr.stack) : void 0,
+          code: anyErr?.code,
+          errno: anyErr?.errno,
+          syscall: anyErr?.syscall,
+          address: anyErr?.address,
+          port: anyErr?.port
+        };
+      }
+      return { message: String(err) };
+    };
+    serializeForLog = (value) => {
+      if (typeof value === "string") return value;
+      if (value instanceof Error)
+        return value.stack || `${value.name}: ${value.message}`;
+      return import_util4.default.inspect(value, {
+        depth: 8,
+        colors: false,
+        maxArrayLength: 200,
+        breakLength: 140,
+        compact: false
+      });
+    };
+    padId2 = (value) => {
+      const n = Number(value);
+      if (!Number.isFinite(n) || n < 0) return String(value ?? "");
+      const s = String(Math.trunc(n));
+      return s.length >= 2 ? s : s.padStart(2, "0");
+    };
+    mapJplMainState = (value) => {
+      const unwrap = (v) => {
+        if (v == null) return "";
+        if (typeof v === "object") {
+          const enumObj = v.enum;
+          const vv = v.value;
+          if (enumObj && typeof enumObj === "object") {
+            if (typeof vv === "string") {
+              const matchKey = Object.keys(enumObj).find((k) => enumObj[k] === vv);
+              if (matchKey) return matchKey;
+            }
+            const keys = Object.keys(enumObj);
+            if (keys.length) return keys[0];
+          }
+          if (typeof vv === "string") return vv;
+        }
+        return String(v);
+      };
+      const raw = unwrap(value).trim().toLowerCase();
+      if (!raw) return PUMP_NOZZLE_STATE.IDLE;
+      if (raw.includes("unconfigured")) return PUMP_NOZZLE_STATE.UNCONFIGURED;
+      if (raw.includes("unavailable")) return PUMP_NOZZLE_STATE.UNAVAILABLE;
+      if (raw.includes("closed")) return PUMP_NOZZLE_STATE.CLOSED;
+      if (raw.includes("error")) return PUMP_NOZZLE_STATE.ERROR;
+      if (raw.includes("terminated") || raw.includes("final") || raw.includes("stopped"))
+        return PUMP_NOZZLE_STATE.NOZZLE_DOWN;
+      if (raw.includes("preauthorized") || raw.includes("authorized"))
+        return PUMP_NOZZLE_STATE.PREAUTHORIZED;
+      if (raw.includes("calling") || raw === "call")
+        return PUMP_NOZZLE_STATE.CALLING;
+      if (raw.includes("starting")) return PUMP_NOZZLE_STATE.STARTING;
+      if (raw.includes("fuelling_paused") || raw.includes("fueling_paused") || raw.includes("dispensing_paused")) {
+        return PUMP_NOZZLE_STATE.DISPENSING_PAUSED;
+      }
+      if (raw.includes("fuelling") || raw.includes("fueling") || raw.includes("dispens")) {
+        return PUMP_NOZZLE_STATE.DISPENSING;
+      }
+      if (raw.includes("idle")) {
+        return PUMP_NOZZLE_STATE.IDLE;
+      }
+      if (/^[0-9a-f]{2}h$/.test(raw)) return PUMP_NOZZLE_STATE.IDLE;
+      return raw;
+    };
+    extractNozzleNumber = (payload) => {
+      const v = payload?.NozzleNumber ?? payload?.nozzleNumber ?? payload?.NozzleNo ?? payload?.nozzleNo ?? payload?.Nozzle ?? payload?.nozzle;
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    };
+    extractSubCode = (payload) => {
+      const v = payload?.SubCode ?? payload?.subCode ?? payload?.subcode;
+      if (!v) return null;
+      const s = String(v).trim();
+      return s ? s : null;
+    };
+    eventTypeFromDomainEvent = (evt) => {
+      const base = String(evt?.name ?? "").trim();
+      const sc = extractSubCode(evt?.payload);
+      if (!sc) return base;
+      if (base.endsWith(`_${sc}`)) return base;
+      if (base.includes("_resp_") || base.includes("_req_")) return base;
+      return `${base}_${sc}`;
+    };
+    unwrapMultiMessage = (eventType, payload) => {
+      if (!payload || typeof payload !== "object") return null;
+      const isMulti = eventType.startsWith("MultiMessage_resp") || eventType.startsWith("MultiMessage_") || payload?.MultiMessage != null || Array.isArray(payload?.messages) || Array.isArray(payload?.Messages) || Array.isArray(payload?.Message);
+      if (!isMulti) return null;
+      const candidates = [];
+      if (Array.isArray(payload?.messages)) candidates.push(...payload.messages);
+      if (Array.isArray(payload?.Messages)) candidates.push(...payload.Messages);
+      if (Array.isArray(payload?.Message)) candidates.push(...payload.Message);
+      if (Array.isArray(payload?.MultiMessage))
+        candidates.push(...payload.MultiMessage);
+      if (Array.isArray(payload?.Msgs)) candidates.push(...payload.Msgs);
+      const decoded = [];
+      for (const m of candidates) {
+        const name = m?.name ?? m?.Name ?? m?.MsgName ?? m?.msgName;
+        const subCode = m?.subCode ?? m?.SubCode ?? m?.subcode;
+        const data = m?.data ?? m?.Data ?? m?.payload ?? m?.Payload ?? m;
+        if (name) {
+          decoded.push({
+            __eventType: `${String(name)}_${String(subCode ?? "").trim()}`,
+            payload: data
+          });
+        } else if (data && typeof data === "object" && (data.name || data.Name)) {
+          decoded.push({
+            __eventType: `${String(data.name ?? data.Name)}_${String(data.subCode ?? data.SubCode ?? "").trim()}`,
+            payload: data.data ?? data.Data ?? {}
+          });
+        }
+      }
+      return decoded.length ? decoded : null;
+    };
+    resolveTransSeqNo = (tx) => {
+      const candidates = [
+        tx?.transSeqNo,
+        tx?.transSeq,
+        tx?.sequenceNo,
+        tx?.raw?.TransSeqNo,
+        tx?.raw?.TransSeqNo_e,
+        tx?.raw?.TransSeqNo_E,
+        tx?.raw?.TransInSupBuffer?.[0]?.TransSeqNo,
+        tx?.raw?.TransInUnSupBuffer?.[0]?.TransSeqNo,
+        tx?.raw?.TransInSupBuffer?.[0]?.TransSeqNo_e,
+        tx?.raw?.TransInUnSupBuffer?.[0]?.TransSeqNo_e,
+        tx?.item?.TransSeqNo,
+        tx?.transaction?.TransSeqNo,
+        tx?.transaction?.transSeqNo
+      ];
+      for (const v of candidates) {
+        if (v == null) continue;
+        const n = Number(v);
+        if (Number.isFinite(n)) return n;
+      }
+      return null;
+    };
+    toJplDecimalString = (value, fallback = "0") => {
+      if (value == null) return fallback;
+      const s = String(value).trim();
+      return s.length > 0 ? s : fallback;
+    };
+    firstNonBlank = (...values) => {
+      for (const value of values) {
+        if (value == null) continue;
+        const s = String(value).trim();
+        if (s) return s;
+      }
+      return null;
+    };
+    leftPadDigits = (value, length, fallback = "0") => {
+      const s = toJplDecimalString(value, fallback).replace(/\D/g, "");
+      return (s || fallback).padStart(length, "0");
+    };
+    getSupervisedTxClearFields = (txData) => {
+      const tp = txData?.TransPars ?? txData?.transPars ?? {};
+      const volE = firstNonBlank(
+        tp?.Vol_e,
+        txData?.Vol_e,
+        tp?.Volume_e,
+        txData?.Volume_e
+      );
+      const moneyE = firstNonBlank(
+        tp?.Money_e,
+        txData?.Money_e,
+        tp?.MoneyDue_e,
+        txData?.MoneyDue_e
+      );
+      const volStd = firstNonBlank(tp?.Vol, txData?.Vol, tp?.Volume, txData?.Volume);
+      const moneyStd = firstNonBlank(
+        tp?.Money,
+        txData?.Money,
+        tp?.MoneyDue,
+        txData?.MoneyDue
+      );
+      return {
+        Vol_e: volE ? String(volE) : leftPadDigits(volStd, 10, "0"),
+        Money_e: moneyE ? String(moneyE) : leftPadDigits(moneyStd, 10, "0")
+      };
+    };
+  }
+});
+
+// src/shared/forecourt/adapters/jplTcpAdapter.helpers.ts
+var init_jplTcpAdapter_helpers2 = __esm({
+  "src/shared/forecourt/adapters/jplTcpAdapter.helpers.ts"() {
+    "use strict";
+    init_jplTcpAdapter_helpers();
+  }
+});
+
+// src/shared/forecourt/runtimeConfig.ts
+var init_runtimeConfig2 = __esm({
+  "src/shared/forecourt/runtimeConfig.ts"() {
+    "use strict";
+    init_runtimeConfig();
+  }
+});
+
+// src/modules/forecourt/infrastructure/jpl/dispense.ts
+var normalizeText, resolveDispenseAuthorizeMode, buildFpStatusSubCodePreference, derivePumpErrorGuidance;
+var init_dispense = __esm({
+  "src/modules/forecourt/infrastructure/jpl/dispense.ts"() {
+    "use strict";
+    normalizeText = (value) => String(value ?? "").trim().toLowerCase();
+    resolveDispenseAuthorizeMode = (action, payload) => {
+      const normalized = normalizeText(action);
+      const data = payload ?? {};
+      if (normalized.includes("prepare") || normalized.includes("prepay") || data["StartLimit_e"] != null || data["startLimit_e"] != null || data["AuthorizePars"] != null || data["authorizePars"] != null) {
+        if (normalized.includes("prepare") || normalized.includes("prepay")) {
+          return "prepare_transaction";
+        }
+      }
+      if (normalized.includes("preset") || data["PresetType"] != null || data["presetType"] != null || data["MoneyPresetLimit"] != null || data["moneyPresetLimit"] != null || data["VolumePresetLimit"] != null || data["volumePresetLimit"] != null || data["VoidPresetLimit"] != null || data["voidPresetLimit"] != null) {
+        return "preset";
+      }
+      if (normalized.includes("extended") || data["AuthorizePars"] != null || data["authorizePars"] != null) {
+        return "extended";
+      }
+      return "standard";
+    };
+    buildFpStatusSubCodePreference = (preferredSubCode) => {
+      const requested = String(preferredSubCode ?? "03H").trim().toUpperCase();
+      return [requested, "03H", "02H", "01H", "00H"].filter(
+        (value, index, list) => value && list.indexOf(value) === index
+      );
+    };
+    derivePumpErrorGuidance = (args) => {
+      const name = normalizeText(args.errorName);
+      const pumpCode = normalizeText(args.pumpErrorCode);
+      const code = normalizeText(args.errorCode);
+      if (name.includes("lock") || name.includes("preauthorized") || name.includes("authorized") || pumpCode.includes("lock")) {
+        return {
+          category: "controller_lock",
+          operatorMessage: "The fuelling point is locked or reserved by the controller/POS workflow.",
+          recommendedAction: "Confirm which POS owns the transaction, then unlock or clear the transaction before retrying.",
+          needsAdminIntervention: args.severity !== "warning"
+        };
+      }
+      if (name.includes("price") || name.includes("grade") || name.includes("preset") || pumpCode.includes("price") || pumpCode.includes("grade")) {
+        return {
+          category: "price_or_grade",
+          operatorMessage: "The fuelling point rejected the request because grade, price, or preset data is not acceptable in its current state.",
+          recommendedAction: "Refresh pump status, verify active grades and prices, then resend the authorization with the correct preset/grade restrictions.",
+          needsAdminIntervention: false
+        };
+      }
+      if (name.includes("tank") || name.includes("delivery") || name.includes("wetstock") || pumpCode.includes("tank") || pumpCode.includes("delivery") || code === "49" || code === "50" || code === "51" || code === "52") {
+        return {
+          category: "tank_or_delivery",
+          operatorMessage: "The fuelling point is blocked by a tank, delivery, or inventory-related condition.",
+          recommendedAction: "Check the linked tank status and delivery workflow, resolve alarms or low-stock conditions, then reset/reauthorize the pump if needed.",
+          needsAdminIntervention: true
+        };
+      }
+      if (name.includes("offline") || name.includes("comm") || name.includes("protocol") || pumpCode.includes("offline") || pumpCode.includes("comm") || pumpCode.includes("protocol")) {
+        return {
+          category: "communication",
+          operatorMessage: "Communication with the dispenser or protocol bridge is degraded.",
+          recommendedAction: "Verify pump online status, forecourt controller connectivity, and protocol adapter health before retrying the command.",
+          needsAdminIntervention: true
+        };
+      }
+      if (name.includes("pump") || name.includes("motor") || name.includes("nozzle") || name.includes("encoder") || pumpCode.startsWith("sp") || pumpCode.startsWith("hw")) {
+        return {
+          category: "hardware",
+          operatorMessage: "The dispenser reported a hardware-side pump fault.",
+          recommendedAction: "Inspect the dispenser locally, acknowledge the hardware alarm, and use reset only after the physical condition has been checked.",
+          needsAdminIntervention: true
+        };
+      }
+      if (args.severity === "warning") {
+        return {
+          category: "operator_action",
+          operatorMessage: "The fuelling point reported a warning condition that may still allow local recovery.",
+          recommendedAction: "Review the latest pump state and retry only after confirming the warning is understood.",
+          needsAdminIntervention: false
+        };
+      }
+      return {
+        category: "unknown",
+        operatorMessage: "The fuelling point reported an unmapped error condition.",
+        recommendedAction: "Read the raw DOMS error payload and controller logs, then follow the site recovery procedure before retrying.",
+        needsAdminIntervention: true
+      };
+    };
+  }
+});
+
+// src/modules/forecourt/infrastructure/jpl/protocol/normalize.ts
+var asObject, enumLabel, bitValue, stringOrUndefined, arrayOfStrings, normalizeFpStatusPayload, normalizeFpInfoPayload, normalizeFpFuellingDataPayload, normalizeTgStatusPayload, normalizeSiteDeliveryStatusPayload, normalizeTankDeliveryDataPayload, warningFpErrorCodes, normalizeFpErrorPayload, normalizePpStatusPayload, normalizePpErrorPayload, normalizeWashStatusPayload, normalizeWashErrorPayload, normalizeDigitalIoStatusPayload, normalizeSensorStatusPayload, normalizeVendingStatusPayload, normalizeVendingErrorPayload;
+var init_normalize = __esm({
+  "src/modules/forecourt/infrastructure/jpl/protocol/normalize.ts"() {
+    "use strict";
+    init_jplTcpAdapter_helpers2();
+    init_dispense();
+    asObject = (value) => value && typeof value === "object" ? value : {};
+    enumLabel = (value) => {
+      if (!value || typeof value !== "object") return void 0;
+      const entries = Object.entries(value?.enum ?? {});
+      if (!entries.length) return void 0;
+      return String(entries[0]?.[0] ?? "").trim() || void 0;
+    };
+    bitValue = (value, key) => Boolean(value?.bits?.[key] ?? value?.[key]);
+    stringOrUndefined = (value) => {
+      const text = String(value ?? "").trim();
+      return text || void 0;
+    };
+    arrayOfStrings = (value) => Array.isArray(value) ? value.map((entry) => stringOrUndefined(entry?.value ?? entry)).filter(Boolean) : [];
+    normalizeFpStatusPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const supplementary = asObject(data?.FpSupplStatusPars);
+      const subStates = asObject(data?.FpSubStates);
+      const subStates2 = asObject(supplementary?.FpSubStates2);
+      const subStates3 = asObject(supplementary?.FpSubStates3);
+      const subStates4 = asObject(supplementary?.FpSubStates4);
+      return {
+        fpId: stringOrUndefined(data?.FpId),
+        subCode: stringOrUndefined(subCode),
+        smId: stringOrUndefined(data?.SmId),
+        mainState: enumLabel(data?.FpMainState) ?? stringOrUndefined(data?.FpMainState?.value),
+        nozzleState: mapJplMainState(data?.FpMainState),
+        lockId: stringOrUndefined(data?.FpLockId),
+        gradeId: stringOrUndefined(data?.FcGradeId),
+        nozzleId: stringOrUndefined(supplementary?.NozzleId),
+        nozzleNumber: extractNozzleNumber(supplementary) ?? extractNozzleNumber(data),
+        operationModeNo: data?.FpOperationModeNo,
+        availableGrades: arrayOfStrings(supplementary?.FpAvailableGrades),
+        availableSms: arrayOfStrings(supplementary?.FpAvailableSms),
+        permittedGrades: arrayOfStrings(supplementary?.FpPermittedGrades),
+        descriptor: {
+          isCarWashMachine: bitValue(data?.FpDescriptor, "FpIsACarWashMachine"),
+          isScreenWashDispenser: bitValue(
+            data?.FpDescriptor,
+            "FpIsAScreenWashDispenser"
+          )
+        },
+        flags: {
+          isLockedByPos: bitValue(subStates, "IsLockedByPos"),
+          isSupervised: bitValue(subStates, "IsSupervised"),
+          isOnline: bitValue(subStates, "IsOnline"),
+          isEstopped: bitValue(subStates, "IsEstopped"),
+          hasFreeBuffer: bitValue(subStates, "HasFreeBuffer"),
+          isInErrorState: bitValue(subStates, "IsInErrorState"),
+          hasActiveGrades: bitValue(subStates, "HasActiveGrades"),
+          isPreset: bitValue(subStates, "IsPreset"),
+          pumpTotalsReady: bitValue(subStates2, "pump_totals_ready"),
+          vrmAlarm: bitValue(
+            subStates2,
+            "VRM_alarm_on_one_or_more_nozzles_(timer_running)"
+          ),
+          vrmError: bitValue(subStates2, "VRM_error_on_one_or_more_nozzles"),
+          pumpInManualMode: bitValue(subStates2, "Pump_in_manual_mode"),
+          pricesLocked: bitValue(subStates2, "Prices_locked"),
+          nozzleHasTagReader: bitValue(subStates2, "Nozzle_has_a_tag_reader"),
+          fuellingHalted: bitValue(subStates2, "Fuelling_halted"),
+          totalsInSync: bitValue(subStates2, "totals_in_sync"),
+          presetReached: bitValue(subStates4, "Preset_reached_in_fuelling"),
+          fuellingWithoutProgress: bitValue(
+            subStates4,
+            "Fuelling_without_progress"
+          ),
+          doorAlarm: bitValue(subStates4, "Door_alarm")
+        },
+        supplementary: {
+          subStates2: supplementary?.FpSubStates2,
+          subStates3: supplementary?.FpSubStates3,
+          subStates4: supplementary?.FpSubStates4,
+          currentFlowRate: supplementary?.CurrentFlowRate,
+          currentFuelTemperature: supplementary?.CurrentFuelTemperature,
+          fuellingDataVol_e: stringOrUndefined(supplementary?.FuellingDataVol_e),
+          fuellingDataMon_e: stringOrUndefined(supplementary?.FuellingDataMon_e),
+          attendantAccountId: stringOrUndefined(supplementary?.AttendantAccountId),
+          pgId: stringOrUndefined(supplementary?.PgId),
+          nozzleTagReaderId: stringOrUndefined(supplementary?.NozzleTagReaderId),
+          rawSubStates3: supplementary?.FpSubStates3
+        },
+        raw: data
+      };
+    };
+    normalizeFpInfoPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const items = asObject(data?.FpInfoItems);
+      return {
+        fpId: stringOrUndefined(data?.FpId),
+        subCode: stringOrUndefined(subCode),
+        gradePrices: Array.isArray(items?.FpGradePrices) ? items.FpGradePrices : [],
+        gradePricesExtended: Array.isArray(items?.FpGradePrices_e) ? items.FpGradePrices_e : [],
+        transReturnData: Array.isArray(items?.FpTransReturnData) ? items.FpTransReturnData : [],
+        transReturnData2: Array.isArray(items?.FpTransReturnData2) ? items.FpTransReturnData2 : [],
+        raw: data
+      };
+    };
+    normalizeFpFuellingDataPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      return {
+        fpId: stringOrUndefined(data?.FpId),
+        subCode: stringOrUndefined(subCode),
+        volume: stringOrUndefined(data?.Vol),
+        money: stringOrUndefined(data?.Money),
+        volumeExtended: stringOrUndefined(data?.Vol_e),
+        moneyExtended: stringOrUndefined(data?.Money_e),
+        raw: data
+      };
+    };
+    normalizeTgStatusPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const subStates = asObject(data?.TgSubStates);
+      const alarmStatus = asObject(data?.TgAlarmStatus);
+      return {
+        tgId: stringOrUndefined(data?.TgId),
+        subCode: stringOrUndefined(subCode),
+        mainState: enumLabel(data?.TgMainState) ?? stringOrUndefined(data?.TgMainState?.value),
+        flags: {
+          online: bitValue(subStates, "TankGaugeOnline") || bitValue(subStates, "TankGaugeOnLine"),
+          alarmActive: bitValue(subStates, "TankGaugeAlarmActive"),
+          errorActive: bitValue(subStates, "TankGaugeErrorActive"),
+          ticketedDeliveryInProgress: bitValue(
+            subStates,
+            "TicketedDeliveryInProgress"
+          ),
+          ticketedDeliveryDataReady: bitValue(
+            subStates,
+            "TicketedDeliveryDataReady"
+          ),
+          deliveryInProgress: bitValue(subStates, "DeliveryInProgress"),
+          deliveryDataReady: bitValue(subStates, "DeliveryDataReady") || bitValue(subStates, "DelvieryDataReady"),
+          allInventoryDataReady: bitValue(
+            subStates,
+            "AllAvailableInventoryDataReady"
+          )
+        },
+        alarms: {
+          highLevel: bitValue(alarmStatus, "HighLevelAlarm"),
+          highHighLevel: bitValue(alarmStatus, "HighHighLevelAlarm"),
+          lowLevel: bitValue(alarmStatus, "LowLevelAlarm"),
+          lowLowLevel: bitValue(alarmStatus, "LowLowLevelAlarm"),
+          highWater: bitValue(alarmStatus, "HighWaterAlarm"),
+          tankLeak: bitValue(alarmStatus, "TankLeakAlarm"),
+          tankDataMissing: bitValue(alarmStatus, "TankDataMissingAlarm"),
+          highHighWater: bitValue(alarmStatus, "HighHighWaterAlarm"),
+          ticketedDeliveryDataLost: bitValue(
+            alarmStatus,
+            "TicketedDeliveryDataLost"
+          ),
+          deliveryDataLost: bitValue(alarmStatus, "DeliveryDataLost"),
+          otherAlarm: bitValue(alarmStatus, "OtherAlarm")
+        },
+        raw: data
+      };
+    };
+    normalizeSiteDeliveryStatusPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const flags = asObject(data?.DeliveryStatusFlags);
+      return {
+        subCode: stringOrUndefined(subCode),
+        deliveryReportSeqNo: stringOrUndefined(data?.DeliveryReportSeqNo),
+        flags: {
+          siteDeliveryStartingMarked: bitValue(flags, "SiteDeliveryStartingMarked") || bitValue(flags, "SiteDeliveryStartMarked"),
+          siteDeliveryInProgress: bitValue(flags, "SiteDeliveryInProgress"),
+          siteDeliveryFinishingMarked: bitValue(flags, "SiteDeliveryFinishingMarked") || bitValue(flags, "SiteDeliveryFinishedMarked"),
+          siteDeliveryDataReady: bitValue(flags, "SiteDeliveryDataIsReady"),
+          siteTicketedDeliveryDataReady: bitValue(
+            flags,
+            "SiteTicketedDeliveryDataIsReady"
+          ),
+          siteTicketedDeliveryInProgress: bitValue(
+            flags,
+            "SiteTicketedDeliveryInProgress"
+          )
+        },
+        tgIds: arrayOfStrings(data?.TgId),
+        tankDeliveries: arrayOfStrings(data?.TankDeliveries),
+        tankTicketedDeliveries: arrayOfStrings(data?.TankTicketedDeliveries),
+        raw: data
+      };
+    };
+    normalizeTankDeliveryDataPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const items = asObject(data?.TankDeliveryDataItems);
+      return {
+        tgId: stringOrUndefined(data?.TgId),
+        posId: stringOrUndefined(data?.PosId),
+        subCode: stringOrUndefined(subCode),
+        deliveryReportSeqNo: stringOrUndefined(data?.DeliveryReportSeqNo) ?? stringOrUndefined(items?.DeliveryReportSeqNo),
+        tankDeliverySeqNo: stringOrUndefined(items?.TankDeliverySeqNo),
+        productCode: stringOrUndefined(items?.TgProductCode),
+        deliveredVol: stringOrUndefined(items?.TankDeliveredVol),
+        deliveredTcVol: stringOrUndefined(items?.TankDeliveredTcVol),
+        deliveredMass: stringOrUndefined(items?.TankDeliveredMass),
+        startDateAndTime: stringOrUndefined(items?.TankDeliveryStartDateAndTime),
+        stopDateAndTime: stringOrUndefined(items?.TankDeliveryStopDateAndTime),
+        raw: data
+      };
+    };
+    warningFpErrorCodes = /* @__PURE__ */ new Set(["49", "50", "51", "52"]);
+    normalizeFpErrorPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const errorValue = stringOrUndefined(
+        data?.FpErrorCode?.value ?? data?.FpErrorCode
+      );
+      const errorName = enumLabel(data?.FpErrorCode);
+      const severity = warningFpErrorCodes.has(
+        String(errorValue ?? "").padStart(2, "0")
+      ) ? "warning" : "error";
+      const guidance = derivePumpErrorGuidance({
+        errorCode: errorValue,
+        errorName,
+        pumpErrorCode: stringOrUndefined(data?.PumpErrorCode),
+        severity
+      });
+      return {
+        fpId: stringOrUndefined(data?.FpId),
+        subCode: stringOrUndefined(subCode),
+        errorCode: errorValue,
+        errorName,
+        errorDateAndTime: stringOrUndefined(data?.FpErrorDateAndTime),
+        pumpProtocolId: stringOrUndefined(data?.PumpProtocolId),
+        pumpErrorCode: stringOrUndefined(data?.PumpErrorCode),
+        severity,
+        guidance,
+        raw: data
+      };
+    };
+    normalizePpStatusPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const subStates = asObject(data?.PpSubStates);
+      return {
+        ppId: stringOrUndefined(data?.PpId),
+        subCode: stringOrUndefined(subCode),
+        mainState: enumLabel(data?.PpMainState) ?? stringOrUndefined(data?.PpMainState?.value),
+        flags: {
+          online: bitValue(subStates, "PricePoleOnline"),
+          errorActive: bitValue(subStates, "PricePoleErrorActive")
+        },
+        raw: data
+      };
+    };
+    normalizePpErrorPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      return {
+        ppId: stringOrUndefined(data?.PpId),
+        subCode: stringOrUndefined(subCode),
+        errorCode: stringOrUndefined(data?.PpErrorCode?.value ?? data?.PpErrorCode),
+        errorName: enumLabel(data?.PpErrorCode),
+        errorDateAndTime: stringOrUndefined(data?.PpErrorDateAndTime),
+        raw: data
+      };
+    };
+    normalizeWashStatusPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const subStates = asObject(data?.WpSubStates);
+      return {
+        wpId: stringOrUndefined(data?.WpId),
+        subCode: stringOrUndefined(subCode),
+        smId: stringOrUndefined(data?.WpSmId),
+        lockId: stringOrUndefined(data?.WpLockId),
+        washId: stringOrUndefined(data?.FcWashId),
+        mainState: enumLabel(data?.WpMainState) ?? stringOrUndefined(data?.WpMainState?.value),
+        flags: {
+          lockedByPos: bitValue(subStates, "Locked_by_POS"),
+          haltedByPss: bitValue(subStates, "Halted_By_PSS"),
+          online: bitValue(subStates, "Online"),
+          stopped: bitValue(subStates, "Stopped"),
+          freeBuffer: bitValue(subStates, "Free-buffer") || bitValue(subStates, "FreeBuffer"),
+          errorState: bitValue(subStates, "Error-State") || bitValue(subStates, "ErrorState"),
+          emergencyStopped: bitValue(subStates, "Emergency_Stopped"),
+          machineUndefined: bitValue(subStates, "Machine_in_undefined_state")
+        },
+        additional: data?.AdditionalWpStatusPars ?? null,
+        unsupervisedBuffer: data?.WpTransInUnsBuffer ?? null,
+        raw: data
+      };
+    };
+    normalizeWashErrorPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      return {
+        wpId: stringOrUndefined(data?.WpId),
+        subCode: stringOrUndefined(subCode),
+        errorCode: stringOrUndefined(data?.WpErrorCode?.value ?? data?.WpErrorCode),
+        errorName: enumLabel(data?.WpErrorCode),
+        errorDateAndTime: stringOrUndefined(data?.WpErrorDateAndTime),
+        raw: data
+      };
+    };
+    normalizeDigitalIoStatusPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const parameters = data?.DiopStatusParameters ?? data?.DiopStatusPars ?? null;
+      return {
+        diopId: stringOrUndefined(data?.DiopId),
+        subCode: stringOrUndefined(subCode),
+        parameters,
+        raw: data
+      };
+    };
+    normalizeSensorStatusPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      return {
+        sensorId: stringOrUndefined(data?.SensorId),
+        subCode: stringOrUndefined(subCode),
+        mainState: enumLabel(data?.SensorMainState) ?? stringOrUndefined(data?.SensorMainState?.value),
+        status: data?.SensorStatus ?? data?.SensorStatusParameters ?? null,
+        alarms: data?.SensorAlarms ?? data?.SensorAlarmStatus ?? null,
+        raw: data
+      };
+    };
+    normalizeVendingStatusPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      const subStates = asObject(data?.VmSubStates);
+      return {
+        vmId: stringOrUndefined(data?.VmId),
+        subCode: stringOrUndefined(subCode),
+        mainState: enumLabel(data?.VmMainState) ?? stringOrUndefined(data?.VmMainState?.value),
+        flags: {
+          online: bitValue(subStates, "VendingMachineOnline") || bitValue(subStates, "Online"),
+          errorActive: bitValue(subStates, "VendingMachineErrorActive") || bitValue(subStates, "ErrorActive")
+        },
+        raw: data
+      };
+    };
+    normalizeVendingErrorPayload = (payload, subCode) => {
+      const data = asObject(payload);
+      return {
+        vmId: stringOrUndefined(data?.VmId),
+        subCode: stringOrUndefined(subCode),
+        errorCode: stringOrUndefined(data?.VmErrorCode?.value ?? data?.VmErrorCode),
+        errorName: enumLabel(data?.VmErrorCode),
+        errorDateAndTime: stringOrUndefined(data?.VmErrorDateAndTime),
+        raw: data
+      };
+    };
+  }
+});
+
+// src/modules/forecourt/infrastructure/jpl/replayState.ts
+var ensureReplayLocks, withReplayLock, getInFlightReplayKeys, beginReplayKey, endReplayKey, getReplayCapabilities, markReplayCapability, canAttemptReplay;
+var init_replayState = __esm({
+  "src/modules/forecourt/infrastructure/jpl/replayState.ts"() {
+    "use strict";
+    ensureReplayLocks = () => {
+      if (!globalThis.__jplReplayLocks) {
+        globalThis.__jplReplayLocks = /* @__PURE__ */ new Map();
+      }
+      return globalThis.__jplReplayLocks;
+    };
+    withReplayLock = async (key, fn) => {
+      const locks = ensureReplayLocks();
+      const prev = locks.get(key) ?? Promise.resolve();
+      let release;
+      const current = new Promise((resolve) => {
+        release = resolve;
+      });
+      locks.set(
+        key,
+        prev.catch(() => {
+        }).then(() => current)
+      );
+      await prev;
+      try {
+        await fn();
+      } finally {
+        release();
+        if (locks.get(key) === current) {
+          locks.delete(key);
+        }
+      }
+    };
+    getInFlightReplayKeys = () => {
+      if (!globalThis.__jplInFlightReplayKeys) {
+        globalThis.__jplInFlightReplayKeys = /* @__PURE__ */ new Set();
+      }
+      return globalThis.__jplInFlightReplayKeys;
+    };
+    beginReplayKey = (key) => {
+      const s = getInFlightReplayKeys();
+      if (s.has(key)) return false;
+      s.add(key);
+      return true;
+    };
+    endReplayKey = (key) => {
+      getInFlightReplayKeys().delete(key);
+    };
+    getReplayCapabilities = () => {
+      if (!globalThis.__jplReplayCapabilities) {
+        globalThis.__jplReplayCapabilities = {
+          supervised: "unknown",
+          unsupervised: "unknown"
+        };
+      }
+      return globalThis.__jplReplayCapabilities;
+    };
+    markReplayCapability = (mode, value) => {
+      const caps = getReplayCapabilities();
+      caps[mode] = value;
+    };
+    canAttemptReplay = (mode) => {
+      const caps = getReplayCapabilities();
+      return caps[mode] !== "denied";
+    };
+  }
+});
+
+// src/modules/forecourt/infrastructure/repositories/fuelStationsRepo.ts
+var fuelStationsRepo;
+var init_fuelStationsRepo = __esm({
+  "src/modules/forecourt/infrastructure/repositories/fuelStationsRepo.ts"() {
+    "use strict";
+    init_postgres();
+    fuelStationsRepo = {
+      async getActiveStationId() {
+        const row = await queryOne(
+          "SELECT id FROM fuel_stations WHERE is_active = TRUE ORDER BY created_at ASC LIMIT 1"
+        );
+        return row?.id ?? null;
+      },
+      async getCountryById(stationId2) {
+        const row = await queryOne(
+          "SELECT country FROM fuel_stations WHERE id = $1",
+          [stationId2]
+        );
+        return row?.country ?? null;
+      },
+      async getSummaryById(stationId2) {
+        return await queryOne(
+          "SELECT id, name, address, city, country, phone, email FROM fuel_stations WHERE id = $1",
+          [stationId2]
+        );
+      }
+    };
+  }
+});
+
+// src/modules/forecourt/infrastructure/jpl/station.ts
+var resolveStationId;
+var init_station = __esm({
+  "src/modules/forecourt/infrastructure/jpl/station.ts"() {
+    "use strict";
+    init_getStationId();
+    init_uuid();
+    init_fuelStationsRepo();
+    resolveStationId = async () => {
+      const envStation = getStationId();
+      if (envStation && isUuid(envStation)) return envStation;
+      return await fuelStationsRepo.getActiveStationId();
+    };
   }
 });
 
@@ -104810,6 +108989,16 @@ var init_helpers = __esm({
   }
 });
 
+// src/modules/tank-levels/application/deductionProxyStatus.ts
+function resolveDeductionProxyStatusForFiscalizedTransaction() {
+  return "SENT";
+}
+var init_deductionProxyStatus = __esm({
+  "src/modules/tank-levels/application/deductionProxyStatus.ts"() {
+    "use strict";
+  }
+});
+
 // src/modules/tank-levels/infrastructure/tankLevelsRepo.ts
 async function syncDeductionForTransactionRepo(stationId2, transactionId) {
   const movementTable = await getTankInventoryTable();
@@ -104895,7 +109084,8 @@ async function syncDeductionForTransactionRepo(stationId2, transactionId) {
               product_id = $4,
               document_id = $5,
               quantity_litres = $6,
-              effective_at = $7::timestamptz
+              effective_at = $7::timestamptz,
+              proxy_status = $8
         WHERE station_id = $1
           AND source_transaction_id = $2
           AND movement_type = 'DEDUCTION'`,
@@ -104906,7 +109096,8 @@ async function syncDeductionForTransactionRepo(stationId2, transactionId) {
         nozzle.product_id,
         `TXN-${transactionId}`,
         quantityLitres,
-        effectiveAt
+        effectiveAt,
+        resolveDeductionProxyStatusForFiscalizedTransaction()
       ]
     );
     return { success: true, movementId: existing.id, created: false };
@@ -104916,7 +109107,7 @@ async function syncDeductionForTransactionRepo(stationId2, transactionId) {
      id, station_id, tank_id, product_id, movement_type, document_id, quantity_litres,
      effective_at, source_transaction_id, proxy_status, created_at
     )
-    VALUES ($1, $2, $3, $4, 'DEDUCTION', $5, $6, $7::timestamptz, $8, 'PENDING', NOW())
+    VALUES ($1, $2, $3, $4, 'DEDUCTION', $5, $6, $7::timestamptz, $8, $9, NOW())
     RETURNING *`,
     [
       uuidv4(),
@@ -104926,7 +109117,8 @@ async function syncDeductionForTransactionRepo(stationId2, transactionId) {
       `TXN-${transactionId}`,
       quantityLitres,
       effectiveAt,
-      transactionId
+      transactionId,
+      resolveDeductionProxyStatusForFiscalizedTransaction()
     ]
   );
   return { success: true, movementId: movement?.id ?? null, created: true };
@@ -104939,6 +109131,7 @@ var init_tankLevelsRepo = __esm({
     init_client2();
     init_helpers();
     init_uuid();
+    init_deductionProxyStatus();
     resolveExistingTable = async (tables) => {
       const checks = tables.map(
         (table, index) => `WHEN to_regclass($${index + 1}) IS NOT NULL THEN $${index + 1}`
@@ -105036,6 +109229,7 @@ function buildJplPayloadHash(payload) {
 async function ingestJplTransaction(args) {
   const stationId2 = String(args.stationId);
   const pumpNumber = Number(args.pumpNumber);
+  const domsFpId = toNumberStrict(args.domsFpId) ?? pumpNumber;
   const transSeqNo = Number(args.transSeqNo);
   if (!Number.isFinite(pumpNumber) || !Number.isFinite(transSeqNo)) return null;
   const sourceMode = args.sourceMode === "supervised" ? "supervised" : "unsupervised";
@@ -105050,6 +109244,7 @@ async function ingestJplTransaction(args) {
   const jplPayload = {
     sourceMode,
     pumpNumber,
+    domsFpId,
     transSeqNo,
     lockId,
     nozzleId: strOrNull(args.nozzleId),
@@ -105104,7 +109299,7 @@ async function ingestJplTransaction(args) {
         posReference,
         linkingWindowSeconds,
         sourceMode,
-        pumpNumber,
+        domsFpId,
         transSeqNo,
         lockId ?? "na",
         JSON.stringify(jplPayload),
@@ -105127,6 +109322,7 @@ async function ingestJplTransaction(args) {
       id: row?.id,
       stationId: stationId2,
       pumpNumber,
+      domsFpId,
       transSeqNo,
       lockId: lockId ?? "na",
       totalAmount,
@@ -105142,6 +109338,7 @@ async function ingestJplTransaction(args) {
       msg: "failed to upsert transaction",
       stationId: stationId2,
       pumpNumber,
+      domsFpId,
       transSeqNo,
       lockId: lockId ?? "na",
       totalAmount,
@@ -105188,9 +109385,14 @@ var init_pumpMappingsRepo = __esm({
       async listRowsByStationId(stationId2) {
         return await queryAll(
           `SELECT p.pump_number,
+              p.doms_fp_id,
+              p.doms_device_sub_address,
               p.id as pump_id,
               n.id as nozzle_id,
               n.nozzle_number,
+              n.doms_grade_option_id,
+              n.doms_grade_id,
+              n.doms_tank_id,
               pr.product_code,
               pr.product_name
          FROM pumps p
@@ -105198,7 +109400,7 @@ var init_pumpMappingsRepo = __esm({
          LEFT JOIN tanks t ON n.tank_id = t.id
          LEFT JOIN products pr ON t.product_id = pr.id
         WHERE p.station_id = $1
-        ORDER BY p.pump_number, n.nozzle_number`,
+        ORDER BY COALESCE(p.doms_fp_id, p.pump_number), n.nozzle_number`,
           [stationId2]
         );
       }
@@ -105234,16 +109436,32 @@ var init_pumpMappings = __esm({
         for (const row of rows) {
           if (!Number.isFinite(row.pump_number ?? NaN)) continue;
           const pumpNumber = Number(row.pump_number);
-          if (!map.has(pumpNumber)) {
-            map.set(pumpNumber, { pumpNumber, nozzles: [] });
+          const domsFpId = Number.isFinite(row.doms_fp_id ?? NaN) ? Number(row.doms_fp_id) : null;
+          const deviceSubAddress = Number.isFinite(
+            row.doms_device_sub_address ?? NaN
+          ) ? Number(row.doms_device_sub_address) : null;
+          const mapKey = domsFpId ?? pumpNumber;
+          if (!map.has(mapKey)) {
+            map.set(mapKey, {
+              pumpNumber,
+              domsFpId,
+              deviceSubAddress,
+              nozzles: []
+            });
           }
           if (row.nozzle_id && Number.isFinite(row.nozzle_number ?? NaN)) {
             const nozzleNumber = Number(row.nozzle_number);
-            map.get(pumpNumber)?.nozzles.push({
+            const domsGradeOptionId = Number.isFinite(
+              row.doms_grade_option_id ?? NaN
+            ) ? Number(row.doms_grade_option_id) : null;
+            map.get(mapKey)?.nozzles.push({
               nozzleId: row.nozzle_id,
               nozzleNumber,
               fuelType: row.product_name ?? row.product_code ?? null,
-              productCode: row.product_code ?? null
+              productCode: row.product_code ?? null,
+              domsGradeOptionId,
+              domsGradeId: row.doms_grade_id ?? null,
+              domsTankId: row.doms_tank_id ?? null
             });
           }
         }
@@ -105267,13 +109485,14 @@ var init_pumpMappings = __esm({
 });
 
 // src/modules/forecourt/infrastructure/jpl/protocol/schema.ts
-var id2Schema, code1Schema, nameSchema, objectDataSchema, envelopeSchema, requestEnvelopeSchema, responseEnvelopeSchema, supportedRequestSchemas, rejectEnvelopeSchema, multiMessageEnvelopeSchema, JplProtocolValidationError, createCorrelationId, canonicalizeEnvelope, buildIssueMessage, validateWithSchema, validateJplOutboundMessage, normalizeJplInboundEnvelope, mapRejectEnvelope;
-var init_schema = __esm({
+var id2Schema, code1Schema, code2Schema, nameSchema, objectDataSchema, envelopeSchema, requestEnvelopeSchema, responseEnvelopeSchema, supportedRequestSchemas, rejectEnvelopeSchema, multiMessageEnvelopeSchema, JplProtocolValidationError, canonicalizeEnvelope, buildIssueMessage, validateWithSchema, validateJplOutboundMessage, normalizeJplInboundEnvelope, mapRejectEnvelope;
+var init_schema2 = __esm({
   "src/modules/forecourt/infrastructure/jpl/protocol/schema.ts"() {
     "use strict";
     init_zod();
     id2Schema = external_exports.string().trim().regex(/^\d{2}$/, "Expected ID2 string");
     code1Schema = external_exports.string().trim().regex(/^[0-9A-F]{2}H$/i, "Expected CODE1 string").transform((value) => value.toUpperCase());
+    code2Schema = external_exports.string().trim().regex(/^[0-9A-F]{4}H$/i, "Expected CODE2 string").transform((value) => value.toUpperCase());
     nameSchema = external_exports.string().trim().min(1);
     objectDataSchema = external_exports.record(external_exports.any());
     envelopeSchema = external_exports.object({
@@ -105464,6 +109683,140 @@ var init_schema = __esm({
           TransSeqNo: external_exports.string().trim().regex(/^\d{4}$/, "Expected DEC4 TransSeqNo")
         }).passthrough()
       }),
+      clear_InstallData_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("clear_InstallData_req"),
+        subCode: external_exports.literal("01H"),
+        data: external_exports.object({ ExtendedInstallMsgCode: code2Schema, FcDeviceId: id2Schema }).passthrough()
+      }),
+      PpStatus_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("PpStatus_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ PpId: id2Schema }).passthrough()
+      }),
+      open_Pp_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("open_Pp_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({
+          PpId: id2Schema,
+          PosId: id2Schema,
+          PpOperationModeNo: external_exports.number().int().nonnegative()
+        }).passthrough()
+      }),
+      close_Pp_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("close_Pp_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ PpId: id2Schema }).passthrough()
+      }),
+      PpErrorMsg_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("PpErrorMsg_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ PpId: id2Schema }).passthrough()
+      }),
+      clear_PpError_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("clear_PpError_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ PpId: id2Schema, PpErrorCode: external_exports.string().trim().min(2) })
+      }),
+      reset_Pp_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("reset_Pp_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ PpId: id2Schema }).passthrough()
+      }),
+      WpStatus_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("WpStatus_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema }).passthrough()
+      }),
+      prepare_WpAuth_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("prepare_WpAuth_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema, PosId: id2Schema }).passthrough()
+      }),
+      authorize_Wp_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("authorize_Wp_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema, PosId: id2Schema }).passthrough()
+      }),
+      cancel_WpAuth_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("cancel_WpAuth_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema, PosId: id2Schema }).passthrough()
+      }),
+      stop_Wp_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("stop_Wp_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema, PosId: id2Schema }).passthrough()
+      }),
+      cancel_WpStop_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("cancel_WpStop_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema, PosId: id2Schema }).passthrough()
+      }),
+      WpErrorMsg_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("WpErrorMsg_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema }).passthrough()
+      }),
+      clear_WpError_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("clear_WpError_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema, WpErrorCode: external_exports.string().trim().min(2) })
+      }),
+      reset_Wp_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("reset_Wp_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ WpId: id2Schema }).passthrough()
+      }),
+      DiopStatus_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("DiopStatus_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ DiopId: id2Schema }).passthrough()
+      }),
+      change_DiopOutput_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("change_DiopOutput_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ DiopId: id2Schema, DiopControl: code1Schema }).passthrough()
+      }),
+      SensorStatus_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("SensorStatus_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ SensorId: id2Schema }).passthrough()
+      }),
+      VmStatus_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("VmStatus_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ VmId: id2Schema }).passthrough()
+      }),
+      open_Vm_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("open_Vm_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ VmId: id2Schema }).passthrough()
+      }),
+      close_Vm_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("close_Vm_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ VmId: id2Schema }).passthrough()
+      }),
+      VmDrystockTotals_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("VmDrystockTotals_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ VmId: id2Schema }).passthrough()
+      }),
+      VmErrorMsg_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("VmErrorMsg_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ VmId: id2Schema }).passthrough()
+      }),
+      clear_VmError_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("clear_VmError_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ VmId: id2Schema, VmErrorCode: external_exports.string().trim().min(2) })
+      }),
+      reset_Vm_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("reset_Vm_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ VmId: id2Schema }).passthrough()
+      }),
       FcInstallStatus_req: requestEnvelopeSchema.extend({
         name: external_exports.literal("FcInstallStatus_req"),
         subCode: external_exports.literal("00H"),
@@ -105486,6 +109839,41 @@ var init_schema = __esm({
         name: external_exports.literal("TgErrorMsg_req"),
         subCode: external_exports.literal("00H"),
         data: external_exports.object({ TgId: id2Schema })
+      }),
+      open_TankController_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("open_TankController_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({
+          TankId: id2Schema,
+          PosId: id2Schema,
+          TankOperationModeNo: external_exports.number().int().min(0).max(255)
+        })
+      }),
+      close_TankController_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("close_TankController_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({ TankId: id2Schema }).passthrough()
+      }),
+      start_DeliveryProcess_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("start_DeliveryProcess_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({
+          TankId: id2Schema,
+          PosId: id2Schema,
+          FcProductId: id2Schema,
+          StartDeliveryProcessPars: external_exports.object({
+            FcProductName: external_exports.string().optional(),
+            TankControlSmId: id2Schema.optional()
+          }).passthrough().optional()
+        })
+      }),
+      stop_DeliveryProcess_req: requestEnvelopeSchema.extend({
+        name: external_exports.literal("stop_DeliveryProcess_req"),
+        subCode: external_exports.literal("00H"),
+        data: external_exports.object({
+          TankId: id2Schema,
+          PosId: id2Schema
+        })
       }),
       SiteDeliveryStatus_req: requestEnvelopeSchema.extend({
         name: external_exports.literal("SiteDeliveryStatus_req"),
@@ -105549,7 +109937,6 @@ var init_schema = __esm({
         this.issues = issues;
       }
     };
-    createCorrelationId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     canonicalizeEnvelope = (message) => {
       if (!message || typeof message !== "object") return message;
       const next2 = { ...message };
@@ -105778,14 +110165,130 @@ var init_forecourtJplReplayRepo = __esm({
   }
 });
 
+// src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionCheckpointRepo.ts
+var forecourtJplTransactionCheckpointRepo_exports = {};
+__export(forecourtJplTransactionCheckpointRepo_exports, {
+  forecourtJplTransactionCheckpointRepo: () => forecourtJplTransactionCheckpointRepo
+});
+var sql2, forecourtJplTransactionCheckpointRepo;
+var init_forecourtJplTransactionCheckpointRepo = __esm({
+  "src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionCheckpointRepo.ts"() {
+    "use strict";
+    init_postgres();
+    sql2 = {
+      upsert: `
+    INSERT INTO forecourt_jpl_transaction_checkpoints (
+      station_id,
+      source_mode,
+      fp_id,
+      trans_seq_no,
+      lifecycle_stage,
+      lock_id,
+      owner_pos_id,
+      blocked_by_foreign_pos,
+      read_attempts,
+      clear_attempts,
+      last_attempt_at,
+      last_success_at,
+      read_payload_json,
+      clear_payload_json,
+      last_error,
+      updated_at
+    )
+    VALUES (
+      $1, $2, $3, $4,
+      COALESCE($5, 'discovered'),
+      $6, $7, $8,
+      COALESCE($9, 0), COALESCE($10, 0),
+      $11::timestamptz, $12::timestamptz,
+      $13::jsonb, $14::jsonb, $15,
+      NOW()
+    )
+    ON CONFLICT (station_id, source_mode, fp_id, trans_seq_no)
+    DO UPDATE SET
+      lifecycle_stage = COALESCE(EXCLUDED.lifecycle_stage, forecourt_jpl_transaction_checkpoints.lifecycle_stage),
+      lock_id = COALESCE(EXCLUDED.lock_id, forecourt_jpl_transaction_checkpoints.lock_id),
+      owner_pos_id = COALESCE(EXCLUDED.owner_pos_id, forecourt_jpl_transaction_checkpoints.owner_pos_id),
+      blocked_by_foreign_pos = EXCLUDED.blocked_by_foreign_pos,
+      read_attempts = forecourt_jpl_transaction_checkpoints.read_attempts + COALESCE(EXCLUDED.read_attempts, 0),
+      clear_attempts = forecourt_jpl_transaction_checkpoints.clear_attempts + COALESCE(EXCLUDED.clear_attempts, 0),
+      last_attempt_at = COALESCE(EXCLUDED.last_attempt_at, forecourt_jpl_transaction_checkpoints.last_attempt_at),
+      last_success_at = COALESCE(EXCLUDED.last_success_at, forecourt_jpl_transaction_checkpoints.last_success_at),
+      read_payload_json = COALESCE(EXCLUDED.read_payload_json, forecourt_jpl_transaction_checkpoints.read_payload_json),
+      clear_payload_json = COALESCE(EXCLUDED.clear_payload_json, forecourt_jpl_transaction_checkpoints.clear_payload_json),
+      last_error = EXCLUDED.last_error,
+      updated_at = NOW()
+  `,
+      listActiveByStation: `
+    SELECT
+      station_id,
+      source_mode,
+      fp_id,
+      trans_seq_no,
+      lifecycle_stage,
+      lock_id,
+      owner_pos_id,
+      blocked_by_foreign_pos,
+      read_attempts,
+      clear_attempts,
+      first_seen_at,
+      last_attempt_at,
+      last_success_at,
+      read_payload_json,
+      clear_payload_json,
+      last_error,
+      updated_at
+    FROM forecourt_jpl_transaction_checkpoints
+    WHERE station_id = $1
+      AND (
+        lifecycle_stage <> 'cleared'
+        OR blocked_by_foreign_pos = TRUE
+        OR last_error IS NOT NULL
+      )
+    ORDER BY updated_at ASC
+  `
+    };
+    forecourtJplTransactionCheckpointRepo = {
+      async upsert(args) {
+        await query(sql2.upsert, [
+          args.stationId,
+          args.sourceMode,
+          args.fpId,
+          args.transSeqNo,
+          args.lifecycleStage ?? null,
+          args.lockId ?? null,
+          args.ownerPosId ?? null,
+          Boolean(args.blockedByForeignPos),
+          args.readAttemptsIncrement ?? 0,
+          args.clearAttemptsIncrement ?? 0,
+          args.lastAttemptAt ?? null,
+          args.lastSuccessAt ?? null,
+          args.readPayloadJson != null ? JSON.stringify(args.readPayloadJson) : null,
+          args.clearPayloadJson != null ? JSON.stringify(args.clearPayloadJson) : null,
+          args.lastError ?? null
+        ]);
+      },
+      async listActiveByStation(args) {
+        return await queryAll(sql2.listActiveByStation, [
+          args.stationId
+        ]);
+      }
+    };
+  }
+});
+
 // src/modules/forecourt/infrastructure/jpl/transactionService.ts
-var DEFAULT_TRANSACTION_PAR_IDS, toId2, toDec4, pick, toPayload, resolveTransactionParIds, extractTransactionCore, extractExtendedClearFields, buildReadSupervisedTransactionRequest, buildUnlockSupervisedTransactionRequest, buildClearSupervisedTransactionRequest, buildReadUnsupervisedTransactionRequest, buildUnlockUnsupervisedTransactionRequest, buildClearUnsupervisedTransactionRequest, getReplayStatusSummary;
+var DomsPosJpl2, buildFpSupTransEnvelope2, buildClearFpSupTransEnvelope2, buildUnlockFpSupTransEnvelope2, DEFAULT_TRANSACTION_PAR_IDS, toId2, toDec4, pick, toPayload, resolveTransactionParIds, extractTransactionCore, extractExtendedClearFields, buildReadSupervisedTransactionRequest, buildUnlockSupervisedTransactionRequest, buildClearSupervisedTransactionRequest, buildReadUnsupervisedTransactionRequest, buildUnlockUnsupervisedTransactionRequest, buildClearUnsupervisedTransactionRequest, getReplayStatusSummary;
 var init_transactionService = __esm({
   "src/modules/forecourt/infrastructure/jpl/transactionService.ts"() {
     "use strict";
+    DomsPosJpl2 = __toESM(require_dist6());
     init_jplTcpAdapter_helpers2();
-    init_schema();
+    init_schema2();
     init_replayState();
+    buildFpSupTransEnvelope2 = DomsPosJpl2.buildFpSupTransEnvelope;
+    buildClearFpSupTransEnvelope2 = DomsPosJpl2.buildClearFpSupTransEnvelope;
+    buildUnlockFpSupTransEnvelope2 = DomsPosJpl2.buildUnlockFpSupTransEnvelope;
     DEFAULT_TRANSACTION_PAR_IDS = [
       "30",
       "31",
@@ -105871,25 +110374,40 @@ var init_transactionService = __esm({
         Money: money != null && String(money).trim() !== "" ? String(money).trim() : void 0
       };
     };
-    buildReadSupervisedTransactionRequest = (args) => validateJplOutboundMessage({
-      name: "FpSupTrans_req",
-      subCode: "00H",
-      data: {
-        FpId: toId2(args.fpId, "00"),
-        TransSeqNo: toDec4(args.transSeqNo),
-        PosId: toId2(args.posId, "00"),
-        TransParId: Array.isArray(args.transParId) && args.transParId.length ? args.transParId.map((entry) => toId2(entry, "")).filter(Boolean) : [...DEFAULT_TRANSACTION_PAR_IDS]
-      }
-    });
-    buildUnlockSupervisedTransactionRequest = (args) => validateJplOutboundMessage({
-      name: "unlock_FpSupTrans_req",
-      subCode: "00H",
-      data: {
-        FpId: toId2(args.fpId, "00"),
-        PosId: toId2(args.posId, "00"),
-        TransSeqNo: toDec4(args.transSeqNo)
-      }
-    });
+    buildReadSupervisedTransactionRequest = (args) => {
+      const request = buildFpSupTransEnvelope2 ? buildFpSupTransEnvelope2({
+        fpId: toId2(args.fpId, "00"),
+        posId: toId2(args.posId, "00"),
+        transSeqNo: toDec4(args.transSeqNo),
+        transParIds: Array.isArray(args.transParId) && args.transParId.length ? args.transParId.map((entry) => toId2(entry, "")).filter(Boolean) : [...DEFAULT_TRANSACTION_PAR_IDS]
+      }) : {
+        name: "FpSupTrans_req",
+        subCode: "00H",
+        data: {
+          FpId: toId2(args.fpId, "00"),
+          TransSeqNo: toDec4(args.transSeqNo),
+          PosId: toId2(args.posId, "00"),
+          TransParId: Array.isArray(args.transParId) && args.transParId.length ? args.transParId.map((entry) => toId2(entry, "")).filter(Boolean) : [...DEFAULT_TRANSACTION_PAR_IDS]
+        }
+      };
+      return validateJplOutboundMessage(request);
+    };
+    buildUnlockSupervisedTransactionRequest = (args) => {
+      const request = buildUnlockFpSupTransEnvelope2 ? buildUnlockFpSupTransEnvelope2({
+        fpId: toId2(args.fpId, "00"),
+        posId: toId2(args.posId, "00"),
+        transSeqNo: toDec4(args.transSeqNo)
+      }) : {
+        name: "unlock_FpSupTrans_req",
+        subCode: "00H",
+        data: {
+          FpId: toId2(args.fpId, "00"),
+          PosId: toId2(args.posId, "00"),
+          TransSeqNo: toDec4(args.transSeqNo)
+        }
+      };
+      return validateJplOutboundMessage(request);
+    };
     buildClearSupervisedTransactionRequest = (args) => {
       const extra = extractExtendedClearFields(args.txData ?? args.payload);
       const paymentParameters = pick(args.payload, [
@@ -105897,7 +110415,18 @@ var init_transactionService = __esm({
         "paymentParameters"
       ]);
       const useExtended = Boolean(extra.Vol_e || extra.Money_e || paymentParameters);
-      return validateJplOutboundMessage({
+      const request = buildClearFpSupTransEnvelope2 ? buildClearFpSupTransEnvelope2({
+        fpId: toId2(args.fpId, "00"),
+        posId: toId2(args.posId, "00"),
+        transSeqNo: toDec4(args.transSeqNo),
+        subCode: useExtended ? "04H" : "00H",
+        extraData: {
+          ...extra.Money ? { Money: extra.Money } : {},
+          ...extra.Vol_e ? { Vol_e: extra.Vol_e } : {},
+          ...extra.Money_e ? { Money_e: extra.Money_e } : {},
+          ...paymentParameters && typeof paymentParameters === "object" ? { PaymentParameters: paymentParameters } : {}
+        }
+      }) : {
         name: "clear_FpSupTrans_req",
         subCode: useExtended ? "04H" : "00H",
         data: {
@@ -105909,7 +110438,8 @@ var init_transactionService = __esm({
           ...extra.Money_e ? { Money_e: extra.Money_e } : {},
           ...paymentParameters && typeof paymentParameters === "object" ? { PaymentParameters: paymentParameters } : {}
         }
-      });
+      };
+      return validateJplOutboundMessage(request);
     };
     buildReadUnsupervisedTransactionRequest = (args) => validateJplOutboundMessage({
       name: "FpUnSupTrans_req",
@@ -105960,9 +110490,13 @@ var init_transactionService = __esm({
     };
     getReplayStatusSummary = async (stationId2) => {
       const { forecourtJplReplayRepo: forecourtJplReplayRepo2 } = await Promise.resolve().then(() => (init_forecourtJplReplayRepo(), forecourtJplReplayRepo_exports));
-      const pendingRows = await forecourtJplReplayRepo2.listPendingClearRows({
-        stationId: stationId2
-      });
+      const { forecourtJplTransactionCheckpointRepo: forecourtJplTransactionCheckpointRepo2 } = await Promise.resolve().then(() => (init_forecourtJplTransactionCheckpointRepo(), forecourtJplTransactionCheckpointRepo_exports));
+      const [pendingRows, checkpointRows] = await Promise.all([
+        forecourtJplReplayRepo2.listPendingClearRows({
+          stationId: stationId2
+        }),
+        forecourtJplTransactionCheckpointRepo2.listActiveByStation({ stationId: stationId2 })
+      ]);
       const capabilities = getReplayCapabilities();
       return {
         replayCapabilities: {
@@ -105976,6 +110510,19 @@ var init_transactionService = __esm({
           lockId: row.lock_id,
           updatedAt: row.updated_at,
           lastError: row.last_error
+        })),
+        transactionCheckpoints: checkpointRows.map((row) => ({
+          sourceMode: row.source_mode,
+          fpId: Number(row.fp_id),
+          transSeqNo: Number(row.trans_seq_no),
+          lifecycleStage: row.lifecycle_stage,
+          lockId: row.lock_id,
+          ownerPosId: row.owner_pos_id,
+          blockedByForeignPos: Boolean(row.blocked_by_foreign_pos),
+          readAttempts: Number(row.read_attempts ?? 0),
+          clearAttempts: Number(row.clear_attempts ?? 0),
+          updatedAt: row.updated_at,
+          lastError: row.last_error
         }))
       };
     };
@@ -105983,12 +110530,12 @@ var init_transactionService = __esm({
 });
 
 // src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionsRepo.ts
-var sql2, forecourtJplTransactionsRepo;
+var sql3, forecourtJplTransactionsRepo;
 var init_forecourtJplTransactionsRepo = __esm({
   "src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionsRepo.ts"() {
     "use strict";
     init_postgres();
-    sql2 = {
+    sql3 = {
       upsertNormalizedBufferTransaction: `
     INSERT INTO transactions (
       id, station_id, customer_id, pump_number, transaction_date_time, total_amount, volume, fuel_type, pos_reference,
@@ -106019,7 +110566,7 @@ var init_forecourtJplTransactionsRepo = __esm({
     forecourtJplTransactionsRepo = {
       async upsertNormalizedBufferTransaction(args) {
         return await queryOne(
-          sql2.upsertNormalizedBufferTransaction,
+          sql3.upsertNormalizedBufferTransaction,
           [
             args.id,
             args.stationId,
@@ -106067,7 +110614,7 @@ async function upsertTransactionFromNormalized(stationId2, tx) {
     }
   });
 }
-var transParId, normalizeLockId, isAccessReject, getRejectData, getRejectInfoText, getRejectedExtendedMsgCode, classifyReplayReject, isUnsupportedSubCodeReject, resolveClearSeqNo, requestBufferStatusWithFallback, pullAndClearSupervisedTransactions, pullAndClearUnsupervisedTransactions, reconcileTransactionBuffersOnStartup;
+var transParId, normalizeLockId, isAccessReject, getRejectData, getRejectInfoText, getRejectedExtendedMsgCode, classifyReplayReject, isUnsupportedSubCodeReject, resolveClearSeqNo, requestBufferStatusWithFallback, checkpointErrorText, pullAndClearSupervisedTransactions, pullAndClearUnsupervisedTransactions, reconcileTransactionBuffersOnStartup;
 var init_replay = __esm({
   "src/modules/forecourt/infrastructure/jpl/replay.ts"() {
     "use strict";
@@ -106082,6 +110629,7 @@ var init_replay = __esm({
     init_replayState();
     init_transactionService();
     init_forecourtJplReplayRepo();
+    init_forecourtJplTransactionCheckpointRepo();
     init_forecourtJplTransactionsRepo();
     init_linkingWindow();
     transParId = [
@@ -106199,6 +110747,11 @@ var init_replay = __esm({
         };
       }
     };
+    checkpointErrorText = (err) => {
+      const serialized = serializeError(err);
+      if (serialized == null) return null;
+      return typeof serialized === "string" ? serialized : JSON.stringify(serialized);
+    };
     pullAndClearSupervisedTransactions = async (args) => {
       const { bufferEntries, stationId: stationId2, handleNormalizedTransactions: handleNormalizedTransactions2 } = args;
       const cfg = getForecourtRuntimeConfig();
@@ -106222,6 +110775,18 @@ var init_replay = __esm({
         try {
           await withReplayLock(`sup:${fpId}`, async () => {
             if (globalThis.__jplSeenTransactions?.has(seenKey)) return;
+            await forecourtJplTransactionCheckpointRepo.upsert({
+              stationId: stationId2,
+              sourceMode: "supervised",
+              fpId,
+              transSeqNo,
+              lifecycleStage: "discovered",
+              lockId,
+              ownerPosId: currentPosId,
+              blockedByForeignPos: false,
+              lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+              lastError: null
+            });
             if (lockId && lockId !== "00" && lockId !== currentPosId) {
               logger.warn("[jplTcp]", {
                 msg: "supervised tx locked by another POS; skipping",
@@ -106229,6 +110794,18 @@ var init_replay = __esm({
                 transSeqNo: seq4,
                 lockId,
                 currentPosId
+              });
+              await forecourtJplTransactionCheckpointRepo.upsert({
+                stationId: stationId2,
+                sourceMode: "supervised",
+                fpId,
+                transSeqNo,
+                lifecycleStage: "blocked_by_foreign_pos",
+                lockId,
+                ownerPosId: currentPosId,
+                blockedByForeignPos: true,
+                lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+                lastError: `Locked by POS ${lockId}`
               });
               return;
             }
@@ -106283,6 +110860,21 @@ var init_replay = __esm({
                   clearFieldsJson: clearFields,
                   lastError: null
                 });
+                await forecourtJplTransactionCheckpointRepo.upsert({
+                  stationId: stationId2,
+                  sourceMode: "supervised",
+                  fpId,
+                  transSeqNo,
+                  lifecycleStage: "read_locked",
+                  lockId: currentPosId,
+                  ownerPosId: currentPosId,
+                  blockedByForeignPos: false,
+                  readAttemptsIncrement: 1,
+                  lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+                  readPayloadJson: txData,
+                  clearPayloadJson: clearFields,
+                  lastError: null
+                });
               }
             } else {
               const tx = await client.request({
@@ -106305,6 +110897,21 @@ var init_replay = __esm({
                 lockId: currentPosId,
                 readPayloadJson: txData,
                 clearFieldsJson: clearFields,
+                lastError: null
+              });
+              await forecourtJplTransactionCheckpointRepo.upsert({
+                stationId: stationId2,
+                sourceMode: "supervised",
+                fpId,
+                transSeqNo,
+                lifecycleStage: "read_locked",
+                lockId: currentPosId,
+                ownerPosId: currentPosId,
+                blockedByForeignPos: false,
+                readAttemptsIncrement: 1,
+                lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+                readPayloadJson: txData,
+                clearPayloadJson: clearFields,
                 lastError: null
               });
             }
@@ -106367,11 +110974,37 @@ var init_replay = __esm({
                 capturedAt: (/* @__PURE__ */ new Date()).toISOString(),
                 lastError: null
               });
+              await forecourtJplTransactionCheckpointRepo.upsert({
+                stationId: stationId2,
+                sourceMode: "supervised",
+                fpId,
+                transSeqNo,
+                lifecycleStage: "captured",
+                lockId: currentPosId,
+                ownerPosId: currentPosId,
+                blockedByForeignPos: false,
+                lastSuccessAt: (/* @__PURE__ */ new Date()).toISOString(),
+                lastError: null
+              });
             }
             const clearSeqNo = resolveClearSeqNo({
               fallbackSeqNo: transSeqNo,
               txData,
               replayRow
+            });
+            await forecourtJplTransactionCheckpointRepo.upsert({
+              stationId: stationId2,
+              sourceMode: "supervised",
+              fpId,
+              transSeqNo,
+              lifecycleStage: "clear_requested",
+              lockId: currentPosId,
+              ownerPosId: currentPosId,
+              blockedByForeignPos: false,
+              clearAttemptsIncrement: 1,
+              lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+              clearPayloadJson: { PaymentParameters: {}, ...clearFields },
+              lastError: null
             });
             await client.request({
               name: "clear_FpSupTrans_req",
@@ -106393,6 +111026,18 @@ var init_replay = __esm({
               transSeqNo
               // transLockId: currentPosId,
             });
+            await forecourtJplTransactionCheckpointRepo.upsert({
+              stationId: stationId2,
+              sourceMode: "supervised",
+              fpId,
+              transSeqNo,
+              lifecycleStage: "cleared",
+              lockId: currentPosId,
+              ownerPosId: currentPosId,
+              blockedByForeignPos: false,
+              lastSuccessAt: (/* @__PURE__ */ new Date()).toISOString(),
+              lastError: null
+            });
           });
         } catch (err) {
           const kind = classifyReplayReject(err);
@@ -106400,6 +111045,18 @@ var init_replay = __esm({
             markReplayCapability("supervised", "denied");
           }
           markBufferError("supervised", fpId, err);
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId: stationId2,
+            sourceMode: "supervised",
+            fpId,
+            transSeqNo,
+            lifecycleStage: "failed",
+            lockId,
+            ownerPosId: currentPosId,
+            blockedByForeignPos: false,
+            lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+            lastError: checkpointErrorText(err)
+          });
           logger.error("[jplTcp]", {
             msg: `supervised pull/clear failed fpId=${fpId} seq=${transSeqNo}`,
             replayReject: kind,
@@ -106429,6 +111086,17 @@ var init_replay = __esm({
         if (globalThis.__jplSeenTransactions.has(key)) continue;
         if (!beginReplayKey(key)) continue;
         try {
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId: stationId2,
+            sourceMode: "unsupervised",
+            fpId,
+            transSeqNo,
+            lifecycleStage: "discovered",
+            ownerPosId: currentPosId,
+            blockedByForeignPos: false,
+            lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+            lastError: null
+          });
           markBufferRead("unsupervised", fpId, transSeqNo);
           const tx = await client.request(
             buildReadUnsupervisedTransactionRequest({
@@ -106438,6 +111106,19 @@ var init_replay = __esm({
             })
           );
           const txData = tx?.data ?? {};
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId: stationId2,
+            sourceMode: "unsupervised",
+            fpId,
+            transSeqNo,
+            lifecycleStage: "read_locked",
+            ownerPosId: currentPosId,
+            blockedByForeignPos: false,
+            readAttemptsIncrement: 1,
+            lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+            readPayloadJson: txData,
+            lastError: null
+          });
           const moneyDue = Number(
             txData?.MoneyDue ?? txData?.Money ?? txData?.TransPars?.Money_e ?? txData?.TransPars?.Money ?? NaN
           );
@@ -106450,6 +111131,19 @@ var init_replay = __esm({
             isSupported: false,
             volume: Number.isFinite(volume) ? volume : null,
             moneyDue: Number.isFinite(moneyDue) ? moneyDue : null
+          });
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId: stationId2,
+            sourceMode: "unsupervised",
+            fpId,
+            transSeqNo,
+            lifecycleStage: "clear_requested",
+            ownerPosId: currentPosId,
+            blockedByForeignPos: false,
+            clearAttemptsIncrement: 1,
+            lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+            clearPayloadJson: txData,
+            lastError: null
           });
           await client.request(
             buildClearUnsupervisedTransactionRequest({
@@ -106468,9 +111162,31 @@ var init_replay = __esm({
             fpId,
             transSeqNo
           });
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId: stationId2,
+            sourceMode: "unsupervised",
+            fpId,
+            transSeqNo,
+            lifecycleStage: "cleared",
+            ownerPosId: currentPosId,
+            blockedByForeignPos: false,
+            lastSuccessAt: (/* @__PURE__ */ new Date()).toISOString(),
+            lastError: null
+          });
         } catch (err) {
           if (isAccessReject(err)) {
             markReplayCapability("unsupervised", "denied");
+            await forecourtJplTransactionCheckpointRepo.upsert({
+              stationId: stationId2,
+              sourceMode: "unsupervised",
+              fpId,
+              transSeqNo,
+              lifecycleStage: "failed",
+              ownerPosId: currentPosId,
+              blockedByForeignPos: false,
+              lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+              lastError: checkpointErrorText(err)
+            });
             logger.error("[jplTcp]", {
               msg: `unsupervised replay denied by controller fpId=${fpId} seq=${transSeqNo}`,
               error: serializeError(err)
@@ -106479,6 +111195,17 @@ var init_replay = __esm({
           }
           globalThis.__jplSeenTransactions?.delete(key);
           markBufferError("unsupervised", fpId, err);
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId: stationId2,
+            sourceMode: "unsupervised",
+            fpId,
+            transSeqNo,
+            lifecycleStage: "failed",
+            ownerPosId: currentPosId,
+            blockedByForeignPos: false,
+            lastAttemptAt: (/* @__PURE__ */ new Date()).toISOString(),
+            lastError: checkpointErrorText(err)
+          });
           logger.error("[jplTcp]", {
             msg: `unsupervised pull/clear failed fpId=${fpId} seq=${transSeqNo}`,
             error: err
@@ -106998,8 +111725,8 @@ var init_events = __esm({
     handleNormalizedPumpStatus = async (stationId2, mappings, pumpStatus) => {
       const fpId = Number(pumpStatus?.fpId);
       if (!Number.isFinite(fpId)) return;
-      const pumpNumber = fpId;
-      const mapping = mappings.get(pumpNumber);
+      const mapping = mappings.get(fpId);
+      const pumpNumber = mapping?.pumpNumber ?? fpId;
       const payload = pumpStatus?.data ?? {};
       const nozzleNumber = extractNozzleNumber(payload);
       const state = mapJplMainState(
@@ -107050,7 +111777,9 @@ var init_events = __esm({
             });
             continue;
           }
-          const pumpNumber = fpId;
+          const mapping = mappings.get(fpId);
+          const pumpNumber = mapping?.pumpNumber ?? fpId;
+          const domsFpId = fpId;
           const transSeqNo = resolveTransSeqNo(tx);
           if (transSeqNo == null || !Number.isFinite(transSeqNo)) {
             logger.debug("[JPL]", {
@@ -107065,18 +111794,20 @@ var init_events = __esm({
           const lockId = tx?.transLockId ?? tx?.raw?.TransLockId ?? null;
           const sourceMode = tx?.sourceMode === "supervised" || tx?.raw?.sourceMode === "supervised" || tx?.isSupervised === true || tx?.raw?.isSupervised === true ? "supervised" : "unsupervised";
           const ingestFn = sourceMode === "supervised" ? ingestJplSupervisedTransaction : ingestJplUnsupervisedTransaction;
-          const dedupeKey = `${stationId2}:${sourceMode}:${pumpNumber}:${transSeqNo}`;
+          const dedupeKey = `${stationId2}:${sourceMode}:${domsFpId}:${transSeqNo}`;
           if (seen.has(dedupeKey)) {
             logger.debug("[JPL]", {
               msg: "skip tx: deduped",
               dedupeKey,
               sourceMode,
               pumpNumber,
+              domsFpId,
               transSeqNo
             });
             results.push({
               sourceMode,
               pumpNumber,
+              domsFpId,
               transSeqNo,
               lockId,
               persisted: true,
@@ -107085,7 +111816,6 @@ var init_events = __esm({
             continue;
           }
           seen.add(dedupeKey);
-          const mapping = mappings.get(pumpNumber);
           const cfg = getForecourtRuntimeConfig();
           const stationDecimals = await getStationDecimalSettingsCached(stationId2);
           const resolvedVolume = resolveTransactionVolume(
@@ -107100,11 +111830,10 @@ var init_events = __esm({
           );
           if (!mapping) {
             logger.debug("[JPL]", {
-              msg: "mapping missing for pump -> ingest minimal",
+              msg: "mapping missing for DOMS fpId -> ingest minimal",
+              fpId: domsFpId,
               pumpNumber,
-              availableMappingKeys: Array.from(mappings.keys()).sort(
-                (a, b) => a - b
-              ),
+              availableDomsFpIds: Array.from(mappings.keys()).sort((a, b) => a - b),
               transSeqNo,
               lockId
             });
@@ -107112,6 +111841,7 @@ var init_events = __esm({
               stationId: stationId2,
               sourceMode,
               pumpNumber,
+              domsFpId,
               transSeqNo,
               lockId,
               nozzleId: null,
@@ -107124,6 +111854,7 @@ var init_events = __esm({
             results.push({
               sourceMode,
               pumpNumber,
+              domsFpId,
               transSeqNo,
               lockId,
               persisted: Boolean(persistedId2)
@@ -107136,6 +111867,7 @@ var init_events = __esm({
             logger.debug("[JPL]", {
               msg: "no nozzle in mapping -> ingest minimal",
               pumpNumber,
+              domsFpId,
               transSeqNo,
               lockId,
               nozzleNumber,
@@ -107145,6 +111877,7 @@ var init_events = __esm({
               stationId: stationId2,
               sourceMode,
               pumpNumber,
+              domsFpId,
               transSeqNo,
               lockId,
               nozzleId: null,
@@ -107157,6 +111890,7 @@ var init_events = __esm({
             results.push({
               sourceMode,
               pumpNumber,
+              domsFpId,
               transSeqNo,
               lockId,
               persisted: Boolean(persistedId2)
@@ -107169,6 +111903,7 @@ var init_events = __esm({
             msg: "ingest tx",
             sourceMode,
             pumpNumber,
+            domsFpId,
             transSeqNo,
             lockId,
             nozzleId: nozzle.nozzleId,
@@ -107180,6 +111915,7 @@ var init_events = __esm({
             stationId: stationId2,
             sourceMode,
             pumpNumber,
+            domsFpId,
             transSeqNo,
             lockId,
             nozzleId: nozzle.nozzleId,
@@ -107192,6 +111928,7 @@ var init_events = __esm({
           results.push({
             sourceMode,
             pumpNumber,
+            domsFpId,
             transSeqNo,
             lockId,
             persisted: Boolean(persistedId)
@@ -107862,15 +112599,75 @@ var init_persistence2 = __esm({
 });
 
 // src/modules/forecourt/infrastructure/jpl/protocol/commands.ts
-var normalizeJplCommandAction, maybeArray, toBoolInt, cleanObject, normalizeId2List, buildAuthorizeParsPayload, toPresetPayload, buildJplCommandRequest;
+var DomsPosJpl3, buildFpStatusEnvelope2, buildFpFuellingDataEnvelope2, EXTENDED_INSTALL_MESSAGE_CODES, ALL_TANK_DELIVERY_ITEM_IDS, normalizeCode1, normalizeCode2, buildWashAuthorizeParsPayload, normalizeJplCommandAction, maybeArray, toBoolInt, cleanObject, normalizeId2List, buildAuthorizeParsPayload, toPresetPayload, describeJplAuthorizeRequest, buildJplCommandRequest;
 var init_commands = __esm({
   "src/modules/forecourt/infrastructure/jpl/protocol/commands.ts"() {
     "use strict";
+    DomsPosJpl3 = __toESM(require_dist6());
     init_jplTcpAdapter_helpers2();
     init_runtimeConfig2();
+    init_dispense();
     init_bootstrap();
-    init_schema();
+    init_schema2();
     init_transactionService();
+    buildFpStatusEnvelope2 = DomsPosJpl3.buildFpStatusEnvelope;
+    buildFpFuellingDataEnvelope2 = DomsPosJpl3.buildFpFuellingDataEnvelope;
+    EXTENDED_INSTALL_MESSAGE_CODES = {
+      fuellingPoint: "0010H",
+      pricePole: "0037H",
+      tankGauge: "0040H",
+      electronicPaymentTerminal: "0050H",
+      vapourRecoveryController: "002AH",
+      washPoint: "0101H",
+      serialServer: "0201H",
+      externalTerminalSubDevice: "0301H",
+      digitalIoPin: "0401H",
+      dispenser: "0710H",
+      vendingMachine: "0C01H"
+    };
+    ALL_TANK_DELIVERY_ITEM_IDS = Array.from(
+      { length: 29 },
+      (_, index) => String(index + 1).padStart(2, "0")
+    );
+    normalizeCode1 = (value, fallback = "00H") => {
+      const raw = String(value ?? "").trim().toUpperCase();
+      if (/^[0-9A-F]{2}H$/.test(raw)) return raw;
+      const numeric = Number(raw.replace(/H$/, ""));
+      if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 255) {
+        return `${String(Math.trunc(numeric)).padStart(2, "0")}H`;
+      }
+      return fallback;
+    };
+    normalizeCode2 = (value, fallback = "0000H") => {
+      const raw = String(value ?? "").trim().toUpperCase();
+      if (/^[0-9A-F]{4}H$/.test(raw)) return raw;
+      const numeric = Number(raw.replace(/H$/, ""));
+      if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 65535) {
+        return `${String(Math.trunc(numeric)).padStart(4, "0")}H`;
+      }
+      return fallback;
+    };
+    buildWashAuthorizeParsPayload = (payload) => {
+      const nested = payload?.AuthorizePars ?? payload?.authorizePars;
+      if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+        return nested;
+      }
+      const authorizePars = cleanObject({
+        WpValidWashPrograms: normalizeId2List(
+          payload?.WpValidWashPrograms ?? payload?.wpValidWashPrograms
+        ),
+        WpStartLimit: payload?.WpStartLimit ?? payload?.wpStartLimit,
+        WpTransReturnData: maybeArray(
+          payload?.WpTransReturnData ?? payload?.wpTransReturnData
+        ),
+        WpLogData: payload?.WpLogData ?? payload?.wpLogData,
+        WpTransReturnData2: maybeArray(
+          payload?.WpTransReturnData2 ?? payload?.wpTransReturnData2
+        ),
+        WpWashOptions: maybeArray(payload?.WpWashOptions ?? payload?.wpWashOptions)
+      });
+      return Object.keys(authorizePars).length ? authorizePars : void 0;
+    };
     normalizeJplCommandAction = (action) => String(action ?? "").trim().toUpperCase();
     maybeArray = (value) => Array.isArray(value) ? value : void 0;
     toBoolInt = (value) => {
@@ -107942,6 +112739,9 @@ var init_commands = __esm({
       }
       return request;
     };
+    describeJplAuthorizeRequest = (action, payload) => ({
+      authorizeMode: resolveDispenseAuthorizeMode(action, payload ?? void 0)
+    });
     buildJplCommandRequest = (action, payload) => {
       const normalized = normalizeJplCommandAction(action);
       const cfg = getForecourtRuntimeConfig();
@@ -108003,11 +112803,18 @@ var init_commands = __esm({
         });
       }
       if (normalized === "GET_FP_STATUS" || normalized === "READ_FP_STATUS") {
-        return validateJplOutboundMessage({
+        const preferred = buildFpStatusSubCodePreference(
+          String(payload?.subCode ?? payload?.SubCode ?? "03H")
+        )[0];
+        const request = buildFpStatusEnvelope2 ? buildFpStatusEnvelope2({
+          fpId,
+          variant: preferred
+        }) : {
           name: "FpStatus_req",
-          subCode: String(payload?.subCode ?? payload?.SubCode ?? "03H").trim().toUpperCase(),
+          subCode: preferred,
           data: { FpId: fpId }
-        });
+        };
+        return validateJplOutboundMessage(request);
       }
       if (normalized === "GET_FP_INFO" || normalized === "READ_FP_INFO") {
         return validateJplOutboundMessage({
@@ -108020,17 +112827,81 @@ var init_commands = __esm({
         });
       }
       if (normalized === "GET_FP_FUELLING_DATA" || normalized === "READ_FP_FUELLING_DATA") {
-        return validateJplOutboundMessage({
+        const request = buildFpFuellingDataEnvelope2 ? {
+          ...buildFpFuellingDataEnvelope2({ fpId }),
+          subCode: String(payload?.subCode ?? payload?.SubCode ?? "01H").trim().toUpperCase()
+        } : {
           name: "FpFuellingData_req",
           subCode: String(payload?.subCode ?? payload?.SubCode ?? "01H").trim().toUpperCase(),
           data: { FpId: fpId }
-        });
+        };
+        return validateJplOutboundMessage(request);
       }
       if (normalized === "GET_FP_ERROR" || normalized === "READ_FP_ERROR") {
         return validateJplOutboundMessage({
           name: "FpErrorMsg_req",
           subCode: "00H",
           data: { FpId: fpId }
+        });
+      }
+      if (normalized === "OPEN_TANK_CONTROLLER") {
+        return validateJplOutboundMessage({
+          name: "open_TankController_req",
+          subCode: "00H",
+          data: {
+            TankId: padId2(payload?.tankId ?? payload?.TankId ?? payload?.tgId),
+            PosId: normalizeJplPosId(
+              payload?.posId ?? payload?.PosId ?? cfg.jplPosId ?? "01",
+              "01",
+              { allowZero: true }
+            ),
+            TankOperationModeNo: Number(
+              payload?.tankOperationModeNo ?? payload?.TankOperationModeNo ?? 0
+            )
+          }
+        });
+      }
+      if (normalized === "CLOSE_TANK_CONTROLLER") {
+        return validateJplOutboundMessage({
+          name: "close_TankController_req",
+          subCode: "00H",
+          data: {
+            TankId: padId2(
+              payload?.tankId ?? payload?.TankId ?? payload?.tgId ?? 0
+            )
+          }
+        });
+      }
+      if (normalized === "START_DELIVERY_PROCESS") {
+        return validateJplOutboundMessage({
+          name: "start_DeliveryProcess_req",
+          subCode: "00H",
+          data: {
+            TankId: padId2(payload?.tankId ?? payload?.TankId),
+            PosId: normalizeJplPosId(
+              payload?.posId ?? payload?.PosId ?? cfg.jplPosId ?? "01",
+              "01",
+              { allowZero: true }
+            ),
+            FcProductId: padId2(payload?.fcProductId ?? payload?.FcProductId),
+            ...payload?.startDeliveryProcessPars ?? payload?.StartDeliveryProcessPars ? {
+              StartDeliveryProcessPars: payload?.startDeliveryProcessPars ?? payload?.StartDeliveryProcessPars
+            } : {}
+          }
+        });
+      }
+      if (normalized === "STOP_DELIVERY_PROCESS") {
+        return validateJplOutboundMessage({
+          name: "stop_DeliveryProcess_req",
+          subCode: "00H",
+          data: {
+            TankId: padId2(payload?.tankId ?? payload?.TankId),
+            PosId: normalizeJplPosId(
+              payload?.posId ?? payload?.PosId ?? cfg.jplPosId ?? "01",
+              "01",
+              { allowZero: true }
+            )
+          }
         });
       }
       if (normalized === "GET_TG_STATUS" || normalized === "READ_TG_STATUS") {
@@ -108065,7 +112936,7 @@ var init_commands = __esm({
             ZERO: 1,
             TankDeliveryDataItemId: Array.isArray(
               payload?.tankDeliveryDataItemId ?? payload?.TankDeliveryDataItemId
-            ) ? payload?.tankDeliveryDataItemId ?? payload?.TankDeliveryDataItemId : void 0
+            ) ? payload?.tankDeliveryDataItemId ?? payload?.TankDeliveryDataItemId : ALL_TANK_DELIVERY_ITEM_IDS
           }
         });
       }
@@ -108083,6 +112954,295 @@ var init_commands = __esm({
             ...Array.isArray(payload?.tankDeliveries ?? payload?.TankDeliveries) ? {
               TankDeliveries: payload?.tankDeliveries ?? payload?.TankDeliveries
             } : {}
+          }
+        });
+      }
+      if (normalized === "GET_PP_STATUS" || normalized === "READ_PP_STATUS") {
+        return validateJplOutboundMessage({
+          name: "PpStatus_req",
+          subCode: "00H",
+          data: {
+            PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId)
+          }
+        });
+      }
+      if (normalized === "OPEN_PP" || normalized === "OPEN_PRICE_POLE") {
+        return validateJplOutboundMessage({
+          name: "open_Pp_req",
+          subCode: "00H",
+          data: {
+            PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId),
+            PosId: posId,
+            PpOperationModeNo: Number(
+              payload?.ppOperationModeNo ?? payload?.PpOperationModeNo ?? 0
+            )
+          }
+        });
+      }
+      if (normalized === "CLOSE_PP" || normalized === "CLOSE_PRICE_POLE") {
+        return validateJplOutboundMessage({
+          name: "close_Pp_req",
+          subCode: "00H",
+          data: {
+            PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId)
+          }
+        });
+      }
+      if (normalized === "GET_PP_ERROR" || normalized === "READ_PP_ERROR") {
+        return validateJplOutboundMessage({
+          name: "PpErrorMsg_req",
+          subCode: "00H",
+          data: {
+            PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId)
+          }
+        });
+      }
+      if (normalized === "CLEAR_PP_ERROR") {
+        return validateJplOutboundMessage({
+          name: "clear_PpError_req",
+          subCode: "00H",
+          data: {
+            PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId),
+            PpErrorCode: String(
+              payload?.ppErrorCode ?? payload?.PpErrorCode ?? "00"
+            ).trim().padStart(2, "0")
+          }
+        });
+      }
+      if (normalized === "RESET_PP" || normalized === "RESET_PRICE_POLE") {
+        return validateJplOutboundMessage({
+          name: "reset_Pp_req",
+          subCode: "00H",
+          data: {
+            PpId: padId2(payload?.ppId ?? payload?.PpId ?? payload?.pricePoleId)
+          }
+        });
+      }
+      if (normalized === "GET_WP_STATUS" || normalized === "READ_WP_STATUS") {
+        return validateJplOutboundMessage({
+          name: "WpStatus_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId)
+          }
+        });
+      }
+      if (normalized === "PREPARE_WP_AUTH" || normalized === "PREPARE_WASH_AUTH") {
+        return validateJplOutboundMessage({
+          name: "prepare_WpAuth_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+            PosId: posId,
+            AuthorizePars: buildWashAuthorizeParsPayload(payload)
+          }
+        });
+      }
+      if (normalized === "AUTHORIZE_WP" || normalized === "AUTHORIZE_WASH") {
+        return validateJplOutboundMessage({
+          name: "authorize_Wp_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+            PosId: posId,
+            AuthorizePars: buildWashAuthorizeParsPayload(payload)
+          }
+        });
+      }
+      if (normalized === "CANCEL_WP_AUTH" || normalized === "CANCEL_WASH_AUTH") {
+        return validateJplOutboundMessage({
+          name: "cancel_WpAuth_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+            PosId: posId
+          }
+        });
+      }
+      if (normalized === "STOP_WP" || normalized === "STOP_WASH") {
+        return validateJplOutboundMessage({
+          name: "stop_Wp_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+            PosId: posId
+          }
+        });
+      }
+      if (normalized === "RESUME_WP" || normalized === "RESUME_WASH") {
+        return validateJplOutboundMessage({
+          name: "cancel_WpStop_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+            PosId: posId
+          }
+        });
+      }
+      if (normalized === "GET_WP_ERROR" || normalized === "READ_WP_ERROR") {
+        return validateJplOutboundMessage({
+          name: "WpErrorMsg_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId)
+          }
+        });
+      }
+      if (normalized === "CLEAR_WP_ERROR") {
+        return validateJplOutboundMessage({
+          name: "clear_WpError_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId),
+            WpErrorCode: String(
+              payload?.wpErrorCode ?? payload?.WpErrorCode ?? "00"
+            ).trim().padStart(2, "0")
+          }
+        });
+      }
+      if (normalized === "RESET_WP" || normalized === "RESET_WASH") {
+        return validateJplOutboundMessage({
+          name: "reset_Wp_req",
+          subCode: "00H",
+          data: {
+            WpId: padId2(payload?.wpId ?? payload?.WpId ?? payload?.washPointId)
+          }
+        });
+      }
+      if (normalized === "GET_DIOP_STATUS" || normalized === "READ_DIOP_STATUS") {
+        return validateJplOutboundMessage({
+          name: "DiopStatus_req",
+          subCode: "00H",
+          data: {
+            DiopId: padId2(
+              payload?.diopId ?? payload?.DiopId ?? payload?.pinId ?? 0
+            )
+          }
+        });
+      }
+      if (normalized === "CHANGE_DIOP_OUTPUT" || normalized === "SET_DIOP_OUTPUT") {
+        return validateJplOutboundMessage({
+          name: "change_DiopOutput_req",
+          subCode: "00H",
+          data: {
+            DiopId: padId2(
+              payload?.diopId ?? payload?.DiopId ?? payload?.pinId ?? 0
+            ),
+            DiopControl: normalizeCode1(
+              payload?.diopControl ?? payload?.DiopControl ?? payload?.outputCode ?? "00H"
+            )
+          }
+        });
+      }
+      if (normalized === "GET_SENSOR_STATUS" || normalized === "READ_SENSOR_STATUS") {
+        return validateJplOutboundMessage({
+          name: "SensorStatus_req",
+          subCode: "00H",
+          data: { SensorId: padId2(payload?.sensorId ?? payload?.SensorId) }
+        });
+      }
+      if (normalized === "GET_VM_STATUS" || normalized === "READ_VM_STATUS") {
+        return validateJplOutboundMessage({
+          name: "VmStatus_req",
+          subCode: "00H",
+          data: {
+            VmId: padId2(
+              payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId
+            )
+          }
+        });
+      }
+      if (normalized === "OPEN_VM" || normalized === "OPEN_VENDING_MACHINE") {
+        return validateJplOutboundMessage({
+          name: "open_Vm_req",
+          subCode: "00H",
+          data: {
+            VmId: padId2(
+              payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId
+            )
+          }
+        });
+      }
+      if (normalized === "CLOSE_VM" || normalized === "CLOSE_VENDING_MACHINE") {
+        return validateJplOutboundMessage({
+          name: "close_Vm_req",
+          subCode: "00H",
+          data: {
+            VmId: padId2(
+              payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId
+            )
+          }
+        });
+      }
+      if (normalized === "GET_VM_DRYSTOCK_TOTALS" || normalized === "READ_VM_TOTALS") {
+        return validateJplOutboundMessage({
+          name: "VmDrystockTotals_req",
+          subCode: "00H",
+          data: {
+            VmId: padId2(
+              payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId
+            )
+          }
+        });
+      }
+      if (normalized === "GET_VM_ERROR" || normalized === "READ_VM_ERROR") {
+        return validateJplOutboundMessage({
+          name: "VmErrorMsg_req",
+          subCode: "00H",
+          data: {
+            VmId: padId2(
+              payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId
+            )
+          }
+        });
+      }
+      if (normalized === "CLEAR_VM_ERROR") {
+        return validateJplOutboundMessage({
+          name: "clear_VmError_req",
+          subCode: "00H",
+          data: {
+            VmId: padId2(
+              payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId
+            ),
+            VmErrorCode: String(
+              payload?.vmErrorCode ?? payload?.VmErrorCode ?? "00"
+            ).trim().padStart(2, "0")
+          }
+        });
+      }
+      if (normalized === "RESET_VM" || normalized === "RESET_VENDING_MACHINE") {
+        return validateJplOutboundMessage({
+          name: "reset_Vm_req",
+          subCode: "00H",
+          data: {
+            VmId: padId2(
+              payload?.vmId ?? payload?.VmId ?? payload?.vendingMachineId
+            )
+          }
+        });
+      }
+      if (normalized === "CLEAR_SERIAL_SERVER_INSTALLATION") {
+        return validateJplOutboundMessage({
+          name: "clear_InstallData_req",
+          subCode: "01H",
+          data: {
+            ExtendedInstallMsgCode: EXTENDED_INSTALL_MESSAGE_CODES.serialServer,
+            FcDeviceId: padId2(
+              payload?.serialServerId ?? payload?.SerialServerId ?? payload?.fcDeviceId ?? 0
+            )
+          }
+        });
+      }
+      if (normalized === "CLEAR_INSTALLATION_DATA") {
+        return validateJplOutboundMessage({
+          name: "clear_InstallData_req",
+          subCode: "01H",
+          data: {
+            ExtendedInstallMsgCode: normalizeCode2(
+              payload?.extendedInstallMsgCode ?? payload?.ExtendedInstallMsgCode,
+              "0000H"
+            ),
+            FcDeviceId: padId2(payload?.fcDeviceId ?? payload?.FcDeviceId ?? 0)
           }
         });
       }
@@ -108127,46 +113287,26 @@ var init_commands = __esm({
         });
       }
       if (normalized === "GET_SUPERVISED_TRANSACTION" || normalized === "READ_SUPERVISED_TRANSACTION") {
-        return validateJplOutboundMessage({
-          name: "FpSupTrans_req",
-          subCode: "00H",
-          data: {
-            FpId: fpId,
-            TransSeqNo: String(payload?.transSeqNo ?? payload?.TransSeqNo ?? "").trim().padStart(4, "0"),
-            PosId: padId2(payload?.posId ?? payload?.PosId ?? "00"),
-            TransParId: Array.isArray(payload?.TransParId ?? payload?.transParId) ? payload?.TransParId ?? payload?.transParId : [...DEFAULT_TRANSACTION_PAR_IDS]
-          }
+        return buildReadSupervisedTransactionRequest({
+          fpId,
+          posId: padId2(payload?.posId ?? payload?.PosId ?? "00"),
+          transSeqNo: payload?.transSeqNo ?? payload?.TransSeqNo ?? "",
+          transParId: payload?.TransParId ?? payload?.transParId ?? [...DEFAULT_TRANSACTION_PAR_IDS]
         });
       }
       if (normalized === "UNLOCK_SUPERVISED_TRANSACTION") {
-        return validateJplOutboundMessage({
-          name: "unlock_FpSupTrans_req",
-          subCode: "00H",
-          data: {
-            FpId: fpId,
-            PosId: padId2(payload?.posId ?? payload?.PosId ?? posId),
-            TransSeqNo: String(payload?.transSeqNo ?? payload?.TransSeqNo ?? "").trim().padStart(4, "0")
-          }
+        return buildUnlockSupervisedTransactionRequest({
+          fpId,
+          posId: padId2(payload?.posId ?? payload?.PosId ?? posId),
+          transSeqNo: payload?.transSeqNo ?? payload?.TransSeqNo ?? ""
         });
       }
       if (normalized === "CLEAR_SUPERVISED_TRANSACTION") {
-        const useExtended = Boolean(
-          payload?.Vol_e ?? payload?.vol_e ?? payload?.Money_e ?? payload?.money_e ?? payload?.PaymentParameters ?? payload?.paymentParameters
-        );
-        return validateJplOutboundMessage({
-          name: "clear_FpSupTrans_req",
-          subCode: useExtended ? "04H" : "00H",
-          data: {
-            FpId: fpId,
-            PosId: padId2(payload?.posId ?? payload?.PosId ?? posId),
-            TransSeqNo: String(payload?.transSeqNo ?? payload?.TransSeqNo ?? "").trim().padStart(4, "0"),
-            ...payload?.Vol_e != null || payload?.vol_e != null ? { Vol_e: String(payload?.Vol_e ?? payload?.vol_e) } : {},
-            ...payload?.Money_e != null || payload?.money_e != null ? { Money_e: String(payload?.Money_e ?? payload?.money_e) } : {},
-            ...payload?.Money != null || payload?.money != null ? { Money: String(payload?.Money ?? payload?.money) } : {},
-            ...(payload?.PaymentParameters ?? payload?.paymentParameters) && typeof (payload?.PaymentParameters ?? payload?.paymentParameters) === "object" ? {
-              PaymentParameters: payload?.PaymentParameters ?? payload?.paymentParameters
-            } : {}
-          }
+        return buildClearSupervisedTransactionRequest({
+          fpId,
+          posId: padId2(payload?.posId ?? payload?.PosId ?? posId),
+          transSeqNo: payload?.transSeqNo ?? payload?.TransSeqNo ?? "",
+          payload
         });
       }
       if (normalized === "GET_UNSUPERVISED_TRANSACTION" || normalized === "READ_UNSUPERVISED_TRANSACTION") {
@@ -108222,21 +113362,12 @@ var init_commands = __esm({
           payload?.transSeqNo ?? payload?.TransSeqNo ?? ""
         ).trim();
         if (!transSeqNo) return null;
-        const request = {
-          name: "clear_FpSupTrans_req",
-          subCode: "00H",
-          data: {
-            FpId: fpId,
-            PosId: posId,
-            TransSeqNo: transSeqNo.padStart(4, "0")
-          }
-        };
-        if (payload?.Money_e != null || payload?.money_e != null) {
-          request.data.Money_e = String(payload?.Money_e ?? payload?.money_e);
-        } else if (payload?.Money != null || payload?.money != null) {
-          request.data.Money = String(payload?.Money ?? payload?.money);
-        }
-        return validateJplOutboundMessage(request);
+        return buildClearSupervisedTransactionRequest({
+          fpId,
+          posId,
+          transSeqNo,
+          payload
+        });
       }
       return null;
     };
@@ -108244,12 +113375,12 @@ var init_commands = __esm({
 });
 
 // src/modules/forecourt/infrastructure/jpl/lifecycle.ts
-var import_doms_pos_jpl, RECONNECT_BASE_MS, RECONNECT_MAX_MS, isEnabled, ALL_TANK_DATA_ITEM_IDS, processHandlersAttached, attachProcessHandlers, clearReconnectTimer, clearConnectionMonitors, nowMs, markMessageSeen, markRequestSent, extractWelcomeVersion, parseVersionTuple, isVersionAtLeast, buildRejectError, recordReject, updateAdapterSnapshotState, rememberServiceMessage, upsertSnapshotByKey, rememberFpStatus, rememberFpInfo, rememberFpFuellingData, rememberFpError, rememberTgStatus, rememberSiteDeliveryStatus, rememberTankDeliveryData, normalizeBackOfficeRecordResponse, rememberBackOfficeRecord, requestBackOfficeRecord, drainFcServiceMessages, drainBackOfficeRecords, runStartupSnapshot, dispatchMultiMessage, disposeProtocolListeners, detachClient, scheduleReconnect, markDisconnected, attachJplProtocolListeners, requestJplTcpTankGaugeData, startConnectionMonitors, startJplTcpAdapter, sendJplTcpCommand;
+var DomsPosJpl4, domsJpl, RECONNECT_BASE_MS, RECONNECT_MAX_MS, isEnabled, ALL_TANK_DATA_ITEM_IDS, processHandlersAttached, attachProcessHandlers, clearReconnectTimer, clearConnectionMonitors, nowMs, markMessageSeen, markRequestSent, extractWelcomeVersion, parseVersionTuple2, isVersionAtLeast2, resolveRequestDispatchPolicy, resolveCorrelationSupport, resolveRequestDispatchMode, buildProtocolCapabilityPatch, buildRejectError, recordReject, redactAccessCode, isInvalidFcAccessCodeError, buildLogonEnvelopeForAccessCode, setClientLogonAccessCode, orderAccessCodeCandidates, logonWithAccessCodeFallbacks, updateAdapterSnapshotState, rememberServiceMessage, upsertSnapshotByKey, rememberFpStatus, rememberFpInfo, rememberFpFuellingData, rememberFpError, rememberTgStatus, rememberSiteDeliveryStatus, rememberTankDeliveryData, rememberPpStatus, rememberPpError, rememberWashStatus, rememberWashError, rememberDigitalIoStatus, rememberSensorStatus, rememberVendingStatus, rememberVendingError, normalizeBackOfficeRecordResponse, rememberBackOfficeRecord, requestBackOfficeRecord, drainFcServiceMessages, drainBackOfficeRecords, runStartupSnapshot, routePolledEnvelope, resolvePollFpIds, pollJplLiveState, startJplFallbackPolling, dispatchMultiMessage, disposeProtocolListeners, detachClient, scheduleReconnect, markDisconnected, attachJplProtocolListeners, requestJplTcpTankGaugeData, startConnectionMonitors, startJplTcpAdapter, sendJplTcpCommand;
 var init_lifecycle = __esm({
   "src/modules/forecourt/infrastructure/jpl/lifecycle.ts"() {
     "use strict";
     init_globals();
-    import_doms_pos_jpl = __toESM(require_public());
+    DomsPosJpl4 = __toESM(require_dist6());
     init_tankGauge();
     init_jplTcpAdapter_helpers2();
     init_jplState();
@@ -108262,9 +113393,11 @@ var init_lifecycle = __esm({
     init_bootstrap();
     init_commands();
     init_normalize();
-    init_schema();
+    init_schema2();
+    init_pumpMappings();
     init_replay();
     init_station();
+    domsJpl = DomsPosJpl4.createForecourt || DomsPosJpl4.JplClient ? DomsPosJpl4 : DomsPosJpl4.default ?? DomsPosJpl4;
     RECONNECT_BASE_MS = 1e3;
     RECONNECT_MAX_MS = 3e4;
     isEnabled = () => getForecourtRuntimeConfig().mode === "jpl_tcp";
@@ -108332,6 +113465,11 @@ var init_lifecycle = __esm({
         clearInterval(globalThis.__jplTcpHealthTimer);
         globalThis.__jplTcpHealthTimer = void 0;
       }
+      if (globalThis.__jplTcpFallbackPollTimer) {
+        clearInterval(globalThis.__jplTcpFallbackPollTimer);
+        globalThis.__jplTcpFallbackPollTimer = void 0;
+      }
+      globalThis.__jplTcpFallbackPollInFlight = false;
     };
     nowMs = () => Date.now();
     markMessageSeen = (stationId2, patch = {}) => {
@@ -108345,14 +113483,14 @@ var init_lifecycle = __esm({
     extractWelcomeVersion = (env) => String(
       env?.data?.version ?? env?.payload?.data?.version ?? env?.version ?? ""
     ).trim();
-    parseVersionTuple = (version) => {
+    parseVersionTuple2 = (version) => {
       const match = String(version || "").trim().match(/(\d+)-(\d+)-(\d+)\.(\d+)/);
       if (!match) return null;
       return match.slice(1).map((part) => Number(part));
     };
-    isVersionAtLeast = (candidate, minimum) => {
-      const cand = parseVersionTuple(candidate);
-      const min = parseVersionTuple(minimum);
+    isVersionAtLeast2 = (candidate, minimum) => {
+      const cand = parseVersionTuple2(candidate);
+      const min = parseVersionTuple2(minimum);
       if (!cand || !min) return true;
       for (let i = 0; i < Math.max(cand.length, min.length); i += 1) {
         const a = cand[i] ?? 0;
@@ -108361,6 +113499,53 @@ var init_lifecycle = __esm({
         if (a < b) return false;
       }
       return true;
+    };
+    resolveRequestDispatchPolicy = (client, cfg = getForecourtRuntimeConfig()) => {
+      const candidate = client?.opts?.requestDispatchPolicy;
+      if (candidate === "correlation-required" || candidate === "auto" || candidate === "strict-single-flight-when-uncorrelated") {
+        return candidate;
+      }
+      return cfg.jplRequestDispatchPolicy ?? "auto";
+    };
+    resolveCorrelationSupport = (client) => {
+      const value = client?.getServerSupportsCorrelationIds?.();
+      return value === true ? true : value === false ? false : null;
+    };
+    resolveRequestDispatchMode = (client, cfg = getForecourtRuntimeConfig()) => {
+      const direct = client?.getRequestDispatchMode?.();
+      if (direct === "correlated-concurrent" || direct === "strict-single-flight") {
+        return direct;
+      }
+      const dispatcherMode = client?.requestDispatcher?.getDispatchMode?.();
+      if (dispatcherMode === "correlated-concurrent" || dispatcherMode === "strict-single-flight") {
+        return dispatcherMode;
+      }
+      const correlationSupport = resolveCorrelationSupport(client);
+      const policy = resolveRequestDispatchPolicy(client, cfg);
+      if (policy === "correlation-required") {
+        return correlationSupport === true ? "correlated-concurrent" : "strict-single-flight";
+      }
+      return correlationSupport === true ? "correlated-concurrent" : "strict-single-flight";
+    };
+    buildProtocolCapabilityPatch = (client, stationId2, secureMode) => {
+      const version = client?.getServerJplVersion?.() ?? void 0;
+      const correlationSupport = resolveCorrelationSupport(client);
+      const requestDispatchPolicy = resolveRequestDispatchPolicy(client);
+      const requestDispatchMode = resolveRequestDispatchMode(client);
+      const correlationCapability = correlationSupport === true ? "supported" : correlationSupport === false ? "unsupported" : "unknown";
+      const requestMode = requestDispatchMode === "correlated-concurrent" ? "correlated" : "single-flight-fallback";
+      return {
+        welcomeVersion: version,
+        secureMode,
+        protocolVersion: version,
+        correlationSupport,
+        correlationCapability,
+        requestDispatchPolicy,
+        requestDispatchMode,
+        requestMode,
+        lastLifecycleEventAt: nowMs(),
+        stationId: stationId2
+      };
     };
     buildRejectError = (response, request) => {
       const normalizedResponse = normalizeJplInboundEnvelope(response);
@@ -108397,6 +113582,137 @@ var init_lifecycle = __esm({
         message: error.message
       });
       return error;
+    };
+    redactAccessCode = (value) => {
+      const text = String(value ?? "").trim();
+      if (!text) return null;
+      const [password] = text.split(",");
+      return `${password || "POS"},***`;
+    };
+    isInvalidFcAccessCodeError = (error) => {
+      const err = error;
+      const raw = err?.raw ?? err?.response ?? void 0;
+      const data = raw?.data ?? {};
+      const rejectCode = String(
+        err?.rejectCode?.value ?? err?.rejectCode ?? data?.RejectCode?.value ?? data?.RejectCode?.enum?.access_error ?? ""
+      ).trim().toUpperCase();
+      const searchable = [
+        err?.message,
+        err?.rejectInfoText,
+        err?.rejectInfo,
+        data?.RejectInfoText,
+        data?.RejectInfo,
+        rejectCode
+      ].filter(Boolean).join(" ").toLowerCase();
+      return rejectCode === "03H" || searchable.includes("access_error") || searchable.includes("fc_access_code") || searchable.includes("fcaccesscode") || searchable.includes("access code");
+    };
+    buildLogonEnvelopeForAccessCode = (args) => {
+      const builder = domsJpl.buildFcLogonEnvelope;
+      if (typeof builder === "function") {
+        return builder({
+          variant: "01H",
+          accessCode: args.accessCode,
+          countryCode: args.countryCode,
+          posVersionId: args.posVersionId
+        });
+      }
+      return {
+        name: "FcLogon_req",
+        subCode: "01H",
+        data: {
+          FcAccessCode: args.accessCode,
+          CountryCode: args.countryCode,
+          PosVersionId: args.posVersionId
+        }
+      };
+    };
+    setClientLogonAccessCode = (args) => {
+      const existing = args.client.__forecourtLogonEnvelope;
+      if (existing?.data) {
+        existing.data.FcAccessCode = args.accessCode;
+        existing.data.CountryCode = args.countryCode;
+        existing.data.PosVersionId = args.posVersionId;
+        if (!existing.data.FcLogonPars) existing.data.FcLogonPars = {};
+        args.client.__forecourtLogonEnvelope = existing;
+        return;
+      }
+      ;
+      args.client.__forecourtLogonEnvelope = buildLogonEnvelopeForAccessCode(args);
+    };
+    orderAccessCodeCandidates = (candidates) => {
+      const accepted = String(globalThis.__jplTcpAcceptedAccessCode ?? "").trim();
+      const normalized = candidates.map((candidate) => String(candidate ?? "").trim()).filter(Boolean);
+      if (!accepted) return normalized;
+      const matchingIndex = normalized.findIndex(
+        (candidate) => candidate.toUpperCase() === accepted.toUpperCase()
+      );
+      if (matchingIndex <= 0) return normalized;
+      return [
+        normalized[matchingIndex],
+        ...normalized.slice(0, matchingIndex),
+        ...normalized.slice(matchingIndex + 1)
+      ];
+    };
+    logonWithAccessCodeFallbacks = async (args) => {
+      const candidates = orderAccessCodeCandidates(args.accessCodes);
+      let lastError;
+      for (let index = 0; index < candidates.length; index += 1) {
+        const accessCode = candidates[index];
+        setClientLogonAccessCode({
+          client: args.client,
+          accessCode,
+          countryCode: args.countryCode,
+          posVersionId: args.posVersionId
+        });
+        try {
+          const response = await domsJpl.forecourtLogon(args.client);
+          globalThis.__jplTcpAcceptedAccessCode = accessCode;
+          if (index > 0) {
+            logger.warn("[jplTcp] logon succeeded with FcAccessCode fallback", {
+              stationId: args.stationId,
+              host: args.host,
+              port: args.port,
+              accessCode: redactAccessCode(accessCode),
+              fallbackIndex: index
+            });
+            writeJplTrafficLog(args.stationId, "info", "logon:fallback_ok", {
+              accessCode: redactAccessCode(accessCode),
+              fallbackIndex: index
+            });
+          }
+          return { response, accessCode, fallbackIndex: index };
+        } catch (error) {
+          lastError = error;
+          if (!isInvalidFcAccessCodeError(error) || index === candidates.length - 1) {
+            throw error;
+          }
+          globalThis.__jplTcpAcceptedAccessCode = candidates[index + 1];
+          logger.warn(
+            "[jplTcp] FcAccessCode rejected; retrying conservative logon",
+            {
+              stationId: args.stationId,
+              host: args.host,
+              port: args.port,
+              accessCode: redactAccessCode(accessCode),
+              nextAccessCode: redactAccessCode(candidates[index + 1]),
+              fallbackIndex: index + 1,
+              error: serializeError(error)
+            }
+          );
+          writeJplTrafficLog(
+            args.stationId,
+            "error",
+            "logon:access_code_rejected",
+            {
+              accessCode: redactAccessCode(accessCode),
+              nextAccessCode: redactAccessCode(candidates[index + 1]),
+              fallbackIndex: index + 1,
+              error: serializeError(error)
+            }
+          );
+        }
+      }
+      throw lastError ?? new Error("JPL logon failed");
     };
     updateAdapterSnapshotState = (stationId2, messageName, payload, subCode) => {
       if (messageName === "FcStatus_resp") {
@@ -108451,6 +113767,38 @@ var init_lifecycle = __esm({
       }
       if (messageName === "TankDeliveryData_resp") {
         rememberTankDeliveryData(stationId2, payload ?? null, subCode);
+        return;
+      }
+      if (messageName === "PpStatus_resp") {
+        rememberPpStatus(stationId2, payload ?? null, subCode);
+        return;
+      }
+      if (messageName === "PpErrorMsg_resp") {
+        rememberPpError(stationId2, payload ?? null, subCode);
+        return;
+      }
+      if (messageName === "WpStatus_resp") {
+        rememberWashStatus(stationId2, payload ?? null, subCode);
+        return;
+      }
+      if (messageName === "WpErrorMsg_resp") {
+        rememberWashError(stationId2, payload ?? null, subCode);
+        return;
+      }
+      if (messageName === "DiopStatus_resp") {
+        rememberDigitalIoStatus(stationId2, payload ?? null, subCode);
+        return;
+      }
+      if (messageName === "SensorStatus_resp") {
+        rememberSensorStatus(stationId2, payload ?? null, subCode);
+        return;
+      }
+      if (messageName === "VmStatus_resp") {
+        rememberVendingStatus(stationId2, payload ?? null, subCode);
+        return;
+      }
+      if (messageName === "VmErrorMsg_resp") {
+        rememberVendingError(stationId2, payload ?? null, subCode);
         return;
       }
     };
@@ -108584,6 +113932,100 @@ var init_lifecycle = __esm({
         32
       );
       syncAdapterState(stationId2, { lastTankDeliveryData: next2 });
+    };
+    rememberPpStatus = (stationId2, payload, subCode) => {
+      const state = getJplAdapterState();
+      const normalized = normalizePpStatusPayload(payload, subCode);
+      const next2 = upsertSnapshotByKey(
+        state.lastPpStatuses,
+        "ppId",
+        { ppId: normalized.ppId, subCode, normalized, payload, at: nowMs() },
+        32
+      );
+      syncAdapterState(stationId2, { lastPpStatuses: next2 });
+    };
+    rememberPpError = (stationId2, payload, subCode) => {
+      const state = getJplAdapterState();
+      const normalized = normalizePpErrorPayload(payload, subCode);
+      const next2 = upsertSnapshotByKey(
+        state.lastPpErrors,
+        "ppId",
+        { ppId: normalized.ppId, subCode, normalized, payload, at: nowMs() },
+        32
+      );
+      syncAdapterState(stationId2, { lastPpErrors: next2 });
+    };
+    rememberWashStatus = (stationId2, payload, subCode) => {
+      const state = getJplAdapterState();
+      const normalized = normalizeWashStatusPayload(payload, subCode);
+      const next2 = upsertSnapshotByKey(
+        state.lastWashStatuses,
+        "wpId",
+        { wpId: normalized.wpId, subCode, normalized, payload, at: nowMs() },
+        32
+      );
+      syncAdapterState(stationId2, { lastWashStatuses: next2 });
+    };
+    rememberWashError = (stationId2, payload, subCode) => {
+      const state = getJplAdapterState();
+      const normalized = normalizeWashErrorPayload(payload, subCode);
+      const next2 = upsertSnapshotByKey(
+        state.lastWashErrors,
+        "wpId",
+        { wpId: normalized.wpId, subCode, normalized, payload, at: nowMs() },
+        32
+      );
+      syncAdapterState(stationId2, { lastWashErrors: next2 });
+    };
+    rememberDigitalIoStatus = (stationId2, payload, subCode) => {
+      const state = getJplAdapterState();
+      const normalized = normalizeDigitalIoStatusPayload(payload, subCode);
+      const next2 = upsertSnapshotByKey(
+        state.lastDigitalIoStatuses,
+        "diopId",
+        { diopId: normalized.diopId, subCode, normalized, payload, at: nowMs() },
+        64
+      );
+      syncAdapterState(stationId2, { lastDigitalIoStatuses: next2 });
+    };
+    rememberSensorStatus = (stationId2, payload, subCode) => {
+      const state = getJplAdapterState();
+      const normalized = normalizeSensorStatusPayload(payload, subCode);
+      const next2 = upsertSnapshotByKey(
+        state.lastSensorStatuses,
+        "sensorId",
+        {
+          sensorId: normalized.sensorId,
+          subCode,
+          normalized,
+          payload,
+          at: nowMs()
+        },
+        64
+      );
+      syncAdapterState(stationId2, { lastSensorStatuses: next2 });
+    };
+    rememberVendingStatus = (stationId2, payload, subCode) => {
+      const state = getJplAdapterState();
+      const normalized = normalizeVendingStatusPayload(payload, subCode);
+      const next2 = upsertSnapshotByKey(
+        state.lastVendingStatuses,
+        "vmId",
+        { vmId: normalized.vmId, subCode, normalized, payload, at: nowMs() },
+        32
+      );
+      syncAdapterState(stationId2, { lastVendingStatuses: next2 });
+    };
+    rememberVendingError = (stationId2, payload, subCode) => {
+      const state = getJplAdapterState();
+      const normalized = normalizeVendingErrorPayload(payload, subCode);
+      const next2 = upsertSnapshotByKey(
+        state.lastVendingErrors,
+        "vmId",
+        { vmId: normalized.vmId, subCode, normalized, payload, at: nowMs() },
+        32
+      );
+      syncAdapterState(stationId2, { lastVendingErrors: next2 });
     };
     normalizeBackOfficeRecordResponse = (response, usedSubCode) => {
       const env = normalizeJplInboundEnvelope(response);
@@ -108777,6 +114219,141 @@ var init_lifecycle = __esm({
         }
       }
     };
+    routePolledEnvelope = async (stationId2, response, source) => {
+      const inbound = normalizeJplInboundEnvelope(response);
+      const name = String(inbound?.name ?? "").trim();
+      if (!name || name === "heartbeat" || name === "jpl") return;
+      if (name === "RejectMessage_resp") {
+        recordReject(stationId2, inbound);
+        return;
+      }
+      const subCode = String(inbound?.subCode ?? "").trim();
+      let eventType = subCode ? `${name}_${subCode}` : name;
+      if ((name === "FpSupTransBufStatus_resp" || name === "FpUnSupTransBufStatus_resp") && subCode === "00H") {
+        eventType = `${name}_03H`;
+      }
+      const payload = inbound?.data ?? {};
+      updateAdapterSnapshotState(stationId2, name, payload, subCode || void 0);
+      markMessageSeen(stationId2, {
+        lastCorrelationId: inbound?.correlationId ?? void 0
+      });
+      writeJplTrafficLog(stationId2, "recv", eventType, {
+        source,
+        correlationId: inbound?.correlationId ?? null,
+        payload
+      });
+      pushForecourtLiveEvent("jpl.poll", {
+        action: eventType,
+        stationId: stationId2,
+        source,
+        correlationId: inbound?.correlationId ?? null,
+        payload: payload ?? null
+      });
+      if (await dispatchMultiMessage(stationId2, eventType, payload)) return;
+      await persistJplEventOnce({
+        stationId: stationId2,
+        eventType,
+        payload,
+        occurredAt: payload?.at ?? nowMs()
+      }).catch((err) => logger.error("[jplTcp] poll persist error", { error: err }));
+      await handleJplEvent(eventType, payload);
+    };
+    resolvePollFpIds = async (stationId2) => {
+      const mappings = await getJplPumpMappings(stationId2);
+      const ids = Array.from(mappings.keys()).filter((value) => Number.isFinite(Number(value)) && Number(value) > 0).map((value) => String(Math.trunc(Number(value))).padStart(2, "0"));
+      return ids.length ? ids : ["00"];
+    };
+    pollJplLiveState = async (args) => {
+      const { client, stationId: stationId2 } = args;
+      if (globalThis.__jplTcpClient !== client) return;
+      if (globalThis.__jplTcpFallbackPollInFlight) return;
+      globalThis.__jplTcpFallbackPollInFlight = true;
+      try {
+        const fpIds = await resolvePollFpIds(stationId2);
+        try {
+          await routePolledEnvelope(
+            stationId2,
+            await client.request({
+              name: "FpStatus_req",
+              subCode: "00H",
+              data: { FpId: "00" }
+            }),
+            "fallback-poll:fp-status"
+          );
+        } catch (error) {
+          logger.debug("[jplTcp] fallback FpStatus poll failed", {
+            stationId: stationId2,
+            error: serializeError(error)
+          });
+        }
+        for (const fpId of fpIds) {
+          for (const request of [
+            {
+              name: "FpSupTransBufStatus_req",
+              subCode: "00H",
+              data: { FpId: fpId }
+            },
+            {
+              name: "FpUnSupTransBufStatus_req",
+              subCode: "00H",
+              data: { FpId: fpId }
+            }
+          ]) {
+            if (globalThis.__jplTcpClient !== client) return;
+            try {
+              await routePolledEnvelope(
+                stationId2,
+                await client.request(request),
+                `fallback-poll:${request.name}:${fpId}`
+              );
+            } catch (error) {
+              logger.debug("[jplTcp] fallback transaction-buffer poll failed", {
+                stationId: stationId2,
+                fpId,
+                request: request.name,
+                error: serializeError(error)
+              });
+            }
+          }
+        }
+      } finally {
+        globalThis.__jplTcpFallbackPollInFlight = false;
+      }
+    };
+    startJplFallbackPolling = (args) => {
+      if (globalThis.__jplTcpFallbackPollTimer) {
+        clearInterval(globalThis.__jplTcpFallbackPollTimer);
+        globalThis.__jplTcpFallbackPollTimer = void 0;
+      }
+      const cfg = getForecourtRuntimeConfig();
+      const heartbeatMs = Math.max(
+        5e3,
+        Number(cfg.jplHeartbeatIntervalMs || 15e3)
+      );
+      const intervalMs = Math.max(
+        3e3,
+        Math.min(1e4, Math.trunc(heartbeatMs / 2))
+      );
+      void pollJplLiveState(args).catch(
+        (error) => logger.debug("[jplTcp] initial fallback poll failed", {
+          stationId: args.stationId,
+          error: serializeError(error)
+        })
+      );
+      globalThis.__jplTcpFallbackPollTimer = setInterval(() => {
+        void pollJplLiveState(args).catch(
+          (error) => logger.debug("[jplTcp] fallback poll failed", {
+            stationId: args.stationId,
+            error: serializeError(error)
+          })
+        );
+      }, intervalMs);
+      globalThis.__jplTcpFallbackPollTimer.unref?.();
+      syncAdapterState(args.stationId, {
+        liveFallbackPollIntervalMs: intervalMs,
+        lastLifecycleEventAt: nowMs()
+      });
+    };
     dispatchMultiMessage = async (stationId2, eventType, payload) => {
       const entries = unwrapMultiMessage(eventType, payload);
       if (!entries?.length) return false;
@@ -108953,7 +114530,7 @@ var init_lifecycle = __esm({
         if (!env || typeof env !== "object") return;
         const inbound = normalizeJplInboundEnvelope(env);
         const name = String(inbound.name ?? "").trim();
-        if (name !== "FpStatus_resp" && name !== "FpSupTransBufStatus_resp" && name !== "FpUnSupTransBufStatus_resp" && name !== "TgStatus_resp" && name !== "SiteDeliveryStatus_resp" && name !== "FcStatus_resp" && name !== "PosConnectionStatus_resp" && name !== "PssPeripheralsStatus_resp" && name !== "FcInstallStatus_resp" && name !== "MultiMessage_resp" && name !== "heartbeat") {
+        if (name !== "FpStatus_resp" && name !== "FpSupTransBufStatus_resp" && name !== "FpUnSupTransBufStatus_resp" && name !== "TgStatus_resp" && name !== "SiteDeliveryStatus_resp" && name !== "FcStatus_resp" && name !== "PosConnectionStatus_resp" && name !== "PssPeripheralsStatus_resp" && name !== "FcInstallStatus_resp" && name !== "PpStatus_resp" && name !== "PpErrorMsg_resp" && name !== "WpStatus_resp" && name !== "WpErrorMsg_resp" && name !== "DiopStatus_resp" && name !== "SensorStatus_resp" && name !== "VmStatus_resp" && name !== "VmErrorMsg_resp" && name !== "MultiMessage_resp" && name !== "heartbeat") {
           return;
         }
         const subRaw = String(inbound.subCode ?? "").trim();
@@ -108968,7 +114545,9 @@ var init_lifecycle = __esm({
         } catch {
         }
       });
-      const txWatcher = new import_doms_pos_jpl.TransactionBufferWatcher(client, { strict: false });
+      const txWatcher = new domsJpl.TransactionBufferWatcher(client, {
+        strict: false
+      });
       globalThis.__jplTcpTxBufferWatcher = txWatcher;
       txWatcher.start();
       const onSup = (e) => {
@@ -109049,23 +114628,6 @@ var init_lifecycle = __esm({
         heartbeatIntervalMs: heartbeatMs,
         deadConnectionTimeoutMs: deadTimeoutMs
       });
-      globalThis.__jplTcpHeartbeatTimer = setInterval(() => {
-        if (globalThis.__jplTcpClient !== client) return;
-        const state = getJplAdapterState();
-        const lastOutbound = Math.max(
-          Number(state.lastRequestAt ?? 0),
-          Number(state.lastHeartbeatSentAt ?? 0)
-        );
-        if (lastOutbound && nowMs() - lastOutbound < heartbeatMs - 250) return;
-        void client.request({ name: "heartbeat", subCode: "00H", data: {} }).catch((error) => {
-          logger.warn("[jplTcp] heartbeat failed", {
-            stationId: stationId2,
-            error: serializeError(error)
-          });
-          onConnectionLost("heartbeat_failed", error);
-        });
-      }, heartbeatMs);
-      globalThis.__jplTcpHeartbeatTimer.unref?.();
       globalThis.__jplTcpHealthTimer = setInterval(
         () => {
           if (globalThis.__jplTcpClient !== client) return;
@@ -109095,10 +114657,15 @@ var init_lifecycle = __esm({
       const cfg = getForecourtRuntimeConfig();
       const bootstrap = buildJplBootstrapConfig(cfg);
       const accessCode = bootstrap.accessCode;
+      const accessCodeCandidates = bootstrap.accessCodeFallbacks ?? [accessCode];
+      let activeAccessCode = accessCode;
       const countryCode = bootstrap.countryCode;
       const posVersionId = bootstrap.posVersionId;
-      const { client, bus } = (0, import_doms_pos_jpl.createForecourt)({
-        client: bootstrap.clientOptions,
+      const { client, bus } = domsJpl.createForecourt({
+        client: {
+          ...bootstrap.clientOptions,
+          requestDispatchPolicy: cfg.jplRequestDispatchPolicy
+        },
         logon: bootstrap.logonOptions,
         features: bootstrap.features
       });
@@ -109110,10 +114677,7 @@ var init_lifecycle = __esm({
       };
       const originalRequest = client.request.bind(client);
       client.request = async (message, ...rest) => {
-        const requestEnvelope = validateJplOutboundMessage({
-          ...message ?? {},
-          correlationId: message?.correlationId ?? createCorrelationId()
-        });
+        const requestEnvelope = validateJplOutboundMessage(message ?? {});
         const reqName = String(requestEnvelope?.name ?? "unknown");
         const reqSubCode = String(requestEnvelope?.subCode ?? "").trim();
         const reqEvent = reqSubCode ? `${reqName}_${reqSubCode}` : reqName;
@@ -109173,6 +114737,26 @@ var init_lifecycle = __esm({
           throw err;
         }
       };
+      const onSend = (message) => {
+        const requestEnvelope = validateJplOutboundMessage(message ?? {});
+        const reqName = String(requestEnvelope?.name ?? "unknown");
+        const reqSubCode = String(requestEnvelope?.subCode ?? "").trim();
+        const reqEvent = reqSubCode ? `${reqName}_${reqSubCode}` : reqName;
+        markRequestSent(stationId2, {
+          lastCorrelationId: requestEnvelope.correlationId,
+          lastHeartbeatSentAt: reqName === "heartbeat" ? nowMs() : void 0
+        });
+        writeJplTrafficLog(stationId2, "send", reqEvent, {
+          correlationId: requestEnvelope.correlationId,
+          payload: requestEnvelope?.data ?? requestEnvelope
+        });
+        pushForecourtLiveEvent("jpl.send", {
+          action: reqEvent,
+          stationId: stationId2,
+          correlationId: requestEnvelope.correlationId,
+          payload: requestEnvelope?.data ?? requestEnvelope ?? null
+        });
+      };
       try {
         const onError = (e) => {
           logger.error("[jplTcp] client error", { error: serializeError(e) });
@@ -109187,12 +114771,17 @@ var init_lifecycle = __esm({
           onConnectionLost("disconnect", args?.[0]);
         };
         client.on("error", onError);
+        client.on("send", onSend);
         client.on?.("close", onClose);
         client.on?.("disconnect", onDisconnect);
         globalThis.__jplTcpProtocolDisposers = globalThis.__jplTcpProtocolDisposers || [];
         globalThis.__jplTcpProtocolDisposers.push(() => {
           try {
             client.off("error", onError);
+          } catch {
+          }
+          try {
+            client.off("send", onSend);
           } catch {
           }
           try {
@@ -109237,6 +114826,7 @@ var init_lifecycle = __esm({
         globalThis.__jplTcpProtocolDisposers = globalThis.__jplTcpProtocolDisposers || [];
         globalThis.__jplTcpProtocolDisposers.push(() => {
           try {
+            ;
             busUnsubscribe();
           } catch {
           }
@@ -109257,11 +114847,16 @@ var init_lifecycle = __esm({
           const version = extractWelcomeVersion(inbound);
           if (version) {
             const cfg2 = getForecourtRuntimeConfig();
-            const supported = isVersionAtLeast(version, cfg2.jplExpectedMinVersion);
+            const supported = isVersionAtLeast2(version, cfg2.jplExpectedMinVersion);
             syncAdapterState(stationId2, {
               welcomeVersion: version,
               secureMode: Number(cfg2.jplPort) === 8889,
-              lastError: supported ? void 0 : `Unsupported JPL version ${version}; expected >= ${cfg2.jplExpectedMinVersion}`
+              lastError: supported ? void 0 : `Unsupported JPL version ${version}; expected >= ${cfg2.jplExpectedMinVersion}`,
+              ...buildProtocolCapabilityPatch(
+                globalThis.__jplTcpClient ?? client,
+                stationId2,
+                Number(cfg2.jplPort) === 8889
+              )
             });
             if (!supported) {
               logger.warn("[jplTcp] unsupported JPL version banner", {
@@ -109336,12 +114931,33 @@ var init_lifecycle = __esm({
           posVersionId,
           posId: bootstrap.posId
         });
-        await (0, import_doms_pos_jpl.forecourtLogon)(client);
+        const logonResult = await logonWithAccessCodeFallbacks({
+          client,
+          stationId: stationId2,
+          host: cfg.jplHost,
+          port: cfg.jplPort,
+          countryCode,
+          posVersionId,
+          accessCodes: accessCodeCandidates
+        });
+        activeAccessCode = logonResult.accessCode;
+        const requestedStatusUpdateCode = Number(cfg.jplStatusUpdateCode ?? 3);
+        const effectiveStatusUpdateCode = Number(bootstrap.statusUpdateCode ?? 3);
+        if (Number.isFinite(requestedStatusUpdateCode) && requestedStatusUpdateCode !== effectiveStatusUpdateCode) {
+          logger.warn(
+            "[jplTcp] overriding disabled status update mode to keep unsolicited updates enabled",
+            {
+              stationId: stationId2,
+              requestedStatusUpdateCode,
+              effectiveStatusUpdateCode
+            }
+          );
+        }
         try {
           await client.request({
             name: "change_FcStatusUpdateMode_req",
             subCode: "00H",
-            data: { StatusUpdateCode: Number(bootstrap.statusUpdateCode ?? 3) }
+            data: { StatusUpdateCode: effectiveStatusUpdateCode }
           });
         } catch (error) {
           logger.warn(
@@ -109358,15 +114974,19 @@ var init_lifecycle = __esm({
         }
         pushForecourtLiveEvent("jpl.info", { action: "logon:ok", stationId: stationId2 });
         writeJplTrafficLog(stationId2, "info", "logon:ok", {
-          accessCode,
+          accessCode: activeAccessCode,
           countryCode,
           posVersionId,
           posId: bootstrap.posId,
           statusUpdateCode: bootstrap.statusUpdateCode,
-          bootstrapSnapshotEnabled: bootstrap.bootstrapSnapshotEnabled
+          bootstrapSnapshotEnabled: bootstrap.bootstrapSnapshotEnabled,
+          integrationScope: bootstrap.integrationScope,
+          tlsRequired: bootstrap.tlsRequired,
+          optionalProtocolFamilies: bootstrap.optionalProtocolFamilies,
+          features: bootstrap.features
         });
       } catch (err) {
-        const redactedAccessCode = accessCode ? `${String(accessCode).slice(0, 4)}***` : null;
+        const redactedAccessCode = redactAccessCode(activeAccessCode || accessCode);
         logger.error("[JPL-ADAPTER] connect/logon failed", {
           host: cfg.jplHost,
           port: cfg.jplPort,
@@ -109377,7 +114997,7 @@ var init_lifecycle = __esm({
           error: serializeError(err)
         });
         onConnectionLost("connect/logon_failed", err);
-        throw err;
+        return;
       }
       clearReconnectTimer();
       const st = getJplAdapterState();
@@ -109398,19 +115018,28 @@ var init_lifecycle = __esm({
         lastLifecycleEventAt: nowMs(),
         heartbeatIntervalMs: cfg.jplHeartbeatIntervalMs,
         deadConnectionTimeoutMs: cfg.jplDeadConnectionTimeoutMs,
-        welcomeVersion: st.welcomeVersion
+        welcomeVersion: st.welcomeVersion,
+        ...buildProtocolCapabilityPatch(
+          client,
+          stationId2,
+          bootstrap.secureMode
+        )
       });
       pushForecourtLiveEvent("jpl.lifecycle", {
         action: "online",
         stationId: stationId2,
         secureMode: bootstrap.secureMode,
         posId: bootstrap.posId,
-        version: st.welcomeVersion ?? null
+        version: st.welcomeVersion ?? null,
+        correlationSupport: resolveCorrelationSupport(client),
+        requestDispatchPolicy: resolveRequestDispatchPolicy(client, cfg),
+        requestDispatchMode: resolveRequestDispatchMode(client, cfg)
       });
       globalThis.__jplTcpClient = client;
       globalThis.__jplTcpAdapterStarted = true;
       startConnectionMonitors({ client, stationId: stationId2, onConnectionLost });
       attachJplProtocolListeners({ client, stationId: stationId2 });
+      startJplFallbackPolling({ client, stationId: stationId2 });
       attachProcessHandlers(client);
       globalThis.__jplPumpMappingsCache = void 0;
       logger.info("[jplTcp] adapter connected", {
@@ -109467,6 +115096,57 @@ var init_adapter = __esm({
     "use strict";
     init_lifecycle();
     init_jplState();
+  }
+});
+
+// src/shared/integrations/posBackend.ts
+var posBackend_exports = {};
+__export(posBackend_exports, {
+  assertPosBackendAllowed: () => assertPosBackendAllowed,
+  getEffectivePosBackend: () => getEffectivePosBackend
+});
+function normalizeBackend(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "auto";
+  const lower = raw.toLowerCase();
+  if (lower === "none" || lower === "db" || lower === "dbfirst") return "none";
+  if (lower === "jpl") return "jpl";
+  if (lower === "ppx") return "ppx";
+  if (lower === "ligo") return "ligo";
+  if (lower === "namos") return "namos";
+  if (lower === "auto") return "auto";
+  return "auto";
+}
+async function getEffectivePosBackend(stationId2) {
+  const cfg = await getSystemConfiguration2(
+    requireNonEmptyString(stationId2, "stationId")
+  );
+  const raw = cfg?.integrations?.posBackend;
+  const explicit = raw != null && String(raw).trim() !== "";
+  if (explicit) return normalizeBackend(raw);
+  const hasJpl = Boolean(
+    String(cfg?.integrations?.jpl?.host ?? "").trim()
+  );
+  return hasJpl ? "jpl" : "none";
+}
+async function assertPosBackendAllowed(stationId2, allowed) {
+  const allow = Array.isArray(allowed) ? allowed : [allowed];
+  const backend = await getEffectivePosBackend(stationId2);
+  if (!allow.includes(backend)) {
+    throw Object.assign(
+      new Error(
+        `POS backend '${backend}' is not enabled (allowed: ${allow.join(", ")})`
+      ),
+      { code: "POS_BACKEND_DISABLED", status: 409, backend, allowed: allow }
+    );
+  }
+  return backend;
+}
+var init_posBackend = __esm({
+  "src/shared/integrations/posBackend.ts"() {
+    "use strict";
+    init_loader2();
+    init_inputs();
   }
 });
 
@@ -109785,7 +115465,7 @@ var init_busListeners = __esm({
 // node_modules/base64id/lib/base64id.js
 var require_base64id = __commonJS({
   "node_modules/base64id/lib/base64id.js"(exports2, module2) {
-    var crypto10 = require("crypto");
+    var crypto11 = require("crypto");
     var Base64Id = function() {
     };
     Base64Id.prototype.getRandomBytes = function(bytes) {
@@ -109793,12 +115473,12 @@ var require_base64id = __commonJS({
       var self2 = this;
       bytes = bytes || 12;
       if (bytes > BUFFER_SIZE) {
-        return crypto10.randomBytes(bytes);
+        return crypto11.randomBytes(bytes);
       }
       var bytesInBuffer = parseInt(BUFFER_SIZE / bytes);
       var threshold = parseInt(bytesInBuffer * 0.85);
       if (!threshold) {
-        return crypto10.randomBytes(bytes);
+        return crypto11.randomBytes(bytes);
       }
       if (this.bytesBufferIndex == null) {
         this.bytesBufferIndex = -1;
@@ -109810,14 +115490,14 @@ var require_base64id = __commonJS({
       if (this.bytesBufferIndex == -1 || this.bytesBufferIndex > threshold) {
         if (!this.isGeneratingBytes) {
           this.isGeneratingBytes = true;
-          crypto10.randomBytes(BUFFER_SIZE, function(err, bytes2) {
+          crypto11.randomBytes(BUFFER_SIZE, function(err, bytes2) {
             self2.bytesBuffer = bytes2;
             self2.bytesBufferIndex = 0;
             self2.isGeneratingBytes = false;
           });
         }
         if (this.bytesBufferIndex == -1) {
-          return crypto10.randomBytes(bytes);
+          return crypto11.randomBytes(bytes);
         }
       }
       var result = this.bytesBuffer.slice(bytes * this.bytesBufferIndex, bytes * (this.bytesBufferIndex + 1));
@@ -109831,7 +115511,7 @@ var require_base64id = __commonJS({
       }
       this.sequenceNumber = this.sequenceNumber + 1 | 0;
       rand.writeInt32BE(this.sequenceNumber, 11);
-      if (crypto10.randomBytes) {
+      if (crypto11.randomBytes) {
         this.getRandomBytes(12).copy(rand);
       } else {
         [0, 4, 8].forEach(function(i) {
@@ -116021,7 +121701,7 @@ var require_object_assign = __commonJS({
 });
 
 // node_modules/cors/lib/index.js
-var require_lib6 = __commonJS({
+var require_lib7 = __commonJS({
   "node_modules/cors/lib/index.js"(exports2, module2) {
     (function() {
       "use strict";
@@ -116290,7 +121970,7 @@ var require_server2 = __commonJS({
           }, opts.cookie);
         }
         if (this.opts.cors) {
-          this.use(require_lib6()(this.opts.cors));
+          this.use(require_lib7()(this.opts.cors));
         }
         if (opts.perMessageDeflate) {
           this.opts.perMessageDeflate = Object.assign({
@@ -121710,7 +127390,7 @@ var require_cluster_adapter = __commonJS({
 });
 
 // node_modules/socket.io-adapter/dist/index.js
-var require_dist6 = __commonJS({
+var require_dist7 = __commonJS({
   "node_modules/socket.io-adapter/dist/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -121745,7 +127425,7 @@ var require_parent_namespace = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.ParentNamespace = void 0;
     var namespace_1 = require_namespace();
-    var socket_io_adapter_1 = require_dist6();
+    var socket_io_adapter_1 = require_dist7();
     var debug_1 = __importDefault(require_src5());
     var debug = (0, debug_1.default)("socket.io:parent-namespace");
     var ParentNamespace = class _ParentNamespace extends namespace_1.Namespace {
@@ -121815,7 +127495,7 @@ var require_uws = __commonJS({
     exports2.patchAdapter = patchAdapter;
     exports2.restoreAdapter = restoreAdapter;
     exports2.serveFile = serveFile;
-    var socket_io_adapter_1 = require_dist6();
+    var socket_io_adapter_1 = require_dist7();
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src5());
     var debug = (0, debug_1.default)("socket.io:adapter-uws");
@@ -122028,7 +127708,7 @@ var require_package4 = __commonJS({
 });
 
 // node_modules/socket.io/dist/index.js
-var require_dist7 = __commonJS({
+var require_dist8 = __commonJS({
   "node_modules/socket.io/dist/index.js"(exports2, module2) {
     "use strict";
     var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
@@ -122077,7 +127757,7 @@ var require_dist7 = __commonJS({
       return namespace_1.Namespace;
     } });
     var parent_namespace_1 = require_parent_namespace();
-    var socket_io_adapter_1 = require_dist6();
+    var socket_io_adapter_1 = require_dist7();
     var parser = __importStar(require_cjs3());
     var debug_1 = __importDefault(require_src5());
     var socket_1 = require_socket2();
@@ -122086,7 +127766,7 @@ var require_dist7 = __commonJS({
     } });
     var typed_events_1 = require_typed_events();
     var uws_1 = require_uws();
-    var cors_1 = __importDefault(require_lib6());
+    var cors_1 = __importDefault(require_lib7());
     var debug = (0, debug_1.default)("socket.io:server");
     var clientVersion = require_package4().version;
     var dotMapRegex = /\.map/;
@@ -123328,71 +129008,8 @@ var VPOS_CONSOLE_MONOLITH = {
   REPORTS: "fiscal.reports.json"
 };
 
-// src/shared/config/schema.ts
-init_zod();
-var loggerParamsSchema = external_exports.object({
-  label: external_exports.string(),
-  level: external_exports.string(),
-  console: external_exports.boolean()
-});
-var pluginDefinitionSchema = external_exports.object({
-  name: external_exports.string(),
-  enabled: external_exports.boolean().default(true),
-  config: external_exports.record(external_exports.any()).default({})
-});
-var healthCheckSchema = external_exports.object({
-  enabled: external_exports.boolean().optional(),
-  interval: external_exports.number().optional(),
-  timeout: external_exports.number().optional()
-}).passthrough();
-var memoryLimitsSchema = external_exports.object({
-  maxHeapSizeMB: external_exports.number().optional(),
-  maxRssSizeMB: external_exports.number().optional(),
-  maxOldSpaceSizeMB: external_exports.number().optional()
-}).passthrough();
-var processDefinitionSchema = external_exports.object({
-  name: external_exports.string().optional(),
-  path: external_exports.string().optional(),
-  enabled: external_exports.boolean().optional(),
-  required: external_exports.boolean().optional(),
-  autoRestart: external_exports.boolean().optional(),
-  allowedToStop: external_exports.boolean().optional(),
-  startupOrder: external_exports.number().optional(),
-  debug: external_exports.boolean().optional(),
-  debugPort: external_exports.number().optional(),
-  loggerParams: loggerParamsSchema.partial().optional(),
-  maxRestarts: external_exports.number().optional(),
-  restartDelay: external_exports.number().optional(),
-  startupTimeout: external_exports.number().optional(),
-  healthCheck: healthCheckSchema.optional(),
-  memoryLimits: memoryLimitsSchema.optional(),
-  config: external_exports.record(external_exports.any()).default({}),
-  plugins: external_exports.array(pluginDefinitionSchema).default([])
-}).passthrough();
-var processesConfigSchema = external_exports.object({
-  loggerParams: loggerParamsSchema,
-  process: external_exports.record(processDefinitionSchema)
-}).passthrough();
-var supervisorConfigSchema = external_exports.object({
-  loggerParams: loggerParamsSchema,
-  restartDelay: external_exports.number(),
-  maxRestarts: external_exports.number(),
-  healthCheckInterval: external_exports.number(),
-  startupTimeout: external_exports.number()
-}).passthrough();
-var configParamsSchema = external_exports.object({
-  country: external_exports.string(),
-  timezone: external_exports.string(),
-  language: external_exports.string(),
-  rtl: external_exports.boolean()
-}).passthrough();
-var systemConfigSchema = external_exports.object({
-  config: configParamsSchema,
-  supervisor: supervisorConfigSchema,
-  processes: processesConfigSchema
-}).passthrough();
-
 // src/modules/setup/infrastructure/legacy-importer/engineConfigTransform.ts
+init_schema();
 function transformEngineConfigToSystemConfig(oldConfig) {
   const level = String(oldConfig?.logger?.level ?? "warn");
   const domsHost = String(oldConfig?.doms?.host ?? "127.0.0.1");
@@ -125662,415 +131279,8 @@ var hashString = (value) => {
   return import_crypto2.default.createHash("sha256").update(value).digest("hex");
 };
 
-// src/platform/config/loader.ts
-var import_crypto3 = require("crypto");
-var fs12 = __toESM(require("fs/promises"));
-var import_path13 = __toESM(require("path"));
-
-// src/platform/config/deep-merge.ts
-function isPlainObject(value) {
-  if (!value || typeof value !== "object") return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
-function deepMerge(base, override) {
-  if (Array.isArray(base) || Array.isArray(override)) {
-    return override ?? base;
-  }
-  if (isPlainObject(base) && isPlainObject(override)) {
-    const out = { ...base };
-    for (const [k, v] of Object.entries(override)) {
-      if (k in out) out[k] = deepMerge(out[k], v);
-      else out[k] = v;
-    }
-    return out;
-  }
-  return override ?? base;
-}
-
-// src/shared/config/defaults.ts
-init_postgres();
-init_inputs();
-
-// src/shared/utils/safeAsync.ts
-init_logger();
-async function safeAsync(promise, context2) {
-  try {
-    return await promise;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.warn(context2 ?? "safeAsync", { error: message });
-    return null;
-  }
-}
-
-// src/shared/config/defaults.ts
-var DEFAULTS_SELECT_SQL = `SELECT id, country, schema_version, config_json, created_at, updated_at
-       FROM station_config_defaults`;
-async function getStationConfigDefaults(country, schemaVersion) {
-  const row = await safeAsync(
-    queryOne(
-      `${DEFAULTS_SELECT_SQL}
-       WHERE country = $1 AND schema_version = $2`,
-      [
-        requireNonEmptyString(country, "country").trim().toUpperCase(),
-        requireNonEmptyString(schemaVersion, "schemaVersion")
-      ]
-    ),
-    "defaults.getStationConfigDefaults"
-  );
-  if (!row) return null;
-  return toCamelCase(row);
-}
-
-// src/platform/config/effective.ts
-init_postgres();
-function upsertPlugin(cfg, processType, pluginName, enabled, configJson) {
-  const p = cfg.processes?.process?.[processType];
-  if (!p) return;
-  const plugins = Array.isArray(p.plugins) ? p.plugins : [];
-  const idx = plugins.findIndex((x) => x?.name === pluginName);
-  const next2 = {
-    name: pluginName,
-    enabled: enabled !== false,
-    config: configJson ?? {}
-  };
-  if (idx >= 0) plugins[idx] = { ...plugins[idx], ...next2 };
-  else plugins.push(next2);
-  p.plugins = plugins;
-}
-async function getEffectiveSystemConfiguration(stationId2) {
-  let station = await getStationConfig(stationId2);
-  if (!station) {
-    await bootstrapStationConfig(stationId2);
-    station = await getStationConfig(stationId2);
-  }
-  if (!station) {
-    throw new Error(`Station config not found for station_id: ${stationId2}`);
-  }
-  const stationCfg = station.configJson;
-  const country = String(stationCfg?.config?.country || "US").trim().toUpperCase();
-  const defaults2 = await getStationConfigDefaults(
-    country,
-    station.schemaVersion || "vpos-app-1"
-  );
-  const base = defaults2?.configJson ? deepMerge(defaults2.configJson, stationCfg) : stationCfg;
-  const pluginRows = await queryAll(
-    `
-    SELECT process_type, plugin_name, enabled, config_json
-    FROM plugin_configs
-    WHERE station_id = $1
-    ORDER BY process_type, plugin_name
-    `,
-    [stationId2]
-  );
-  for (const r of pluginRows) {
-    upsertPlugin(base, r.process_type, r.plugin_name, r.enabled, r.config_json);
-  }
-  const deviceRows = await queryAll(
-    `
-    SELECT device_type, device_key, enabled, config_json
-    FROM device_configs
-    WHERE station_id = $1
-    ORDER BY device_type, device_key
-    `,
-    [stationId2]
-  );
-  const devices = {};
-  for (const r of deviceRows) {
-    if (!devices[r.device_type]) devices[r.device_type] = {};
-    devices[r.device_type][r.device_key] = {
-      enabled: r.enabled !== false,
-      config: r.config_json ?? {}
-    };
-  }
-  ;
-  base.devices = devices;
-  const validated = systemConfigSchema.parse(base);
-  const ss = await safeAsync(
-    queryOne(
-      `SELECT linking_window_seconds,
-            unallocated_handling,
-            fiscalization_engine,
-            auto_fiscalize_enabled,
-            sync_enabled,
-            sync_time,
-            sync_timezone,
-            proxy_url,
-            proxy_base_path,
-            vat_rate_tz,
-            vat_rate_ke,
-            vat_rate_default
-     FROM station_settings
-     WHERE station_id = $1`,
-      [stationId2]
-    ),
-    "effective.stationSettings"
-  );
-  validated.stationSettings = ss ? {
-    linkingWindowSeconds: ss.linking_window_seconds,
-    unallocatedHandling: ss.unallocated_handling,
-    fiscalizationEngine: ss.fiscalization_engine,
-    autoFiscalizeEnabled: ss.auto_fiscalize_enabled,
-    syncEnabled: ss.sync_enabled,
-    syncTime: ss.sync_time,
-    syncTimezone: ss.sync_timezone,
-    proxyUrl: ss.proxy_url,
-    proxyBasePath: ss.proxy_base_path,
-    vatRateTz: ss.vat_rate_tz != null ? Number(ss.vat_rate_tz) : null,
-    vatRateKe: ss.vat_rate_ke != null ? Number(ss.vat_rate_ke) : null,
-    vatRateDefault: ss.vat_rate_default != null ? Number(ss.vat_rate_default) : null
-  } : null;
-  return validated;
-}
-
-// src/platform/config/loader.ts
-init_station_kv();
-init_postgres();
-init_uuid();
-var DEFAULT_SCHEMA_VERSION = "vpos-app-1";
-var DEFAULT_API_HOST = "127.0.0.1";
-var DEFAULT_API_PORT = 4101;
-var normalizeCountry = (value) => String(value || "").trim().toUpperCase();
-var configLooksUninitialized = (cfg) => {
-  const c = cfg.configJson?.config;
-  const country = String(c?.country || "");
-  const timezone = String(c?.timezone || "");
-  return !country || !timezone || country === "US" && timezone === "UTC";
-};
-var pickLanguage = (_country) => "en";
-var buildConfigFromStationKv = async (stationId2) => {
-  try {
-    const site = await kvGet(stationId2, "site.profile");
-    if (!site || typeof site !== "object") return null;
-    const dev = await kvGet(stationId2, "vpos.device.data") || await kvGet(stationId2, "vpos.device.registration") || null;
-    const minimal = buildMinimalConfig();
-    const country = normalizeCountry(String(site.country || ""));
-    const timezone = String(site.timezone || "").trim();
-    const next2 = {
-      ...minimal,
-      config: {
-        ...minimal.config,
-        country: country || minimal.config?.country,
-        timezone: timezone || minimal.config?.timezone,
-        language: pickLanguage(country),
-        rtl: false
-      }
-    };
-    if (dev?.deviceId) {
-      next2.config.deviceId = dev.deviceId;
-      if (dev.deviceName) next2.config.deviceName = dev.deviceName;
-    }
-    return validateStationConfig(next2);
-  } catch {
-    return null;
-  }
-};
-var getStationConfig = async (stationId2) => {
-  const row = await queryOne(
-    `SELECT station_id, schema_version, config_json, created_at, updated_at
-     FROM station_config
-     WHERE station_id = $1`,
-    [stationId2]
-  );
-  if (!row) return null;
-  return toCamelCase(row);
-};
-var saveStationConfig = async (stationId2, configJson, schemaVersion = DEFAULT_SCHEMA_VERSION) => {
-  await query(
-    `INSERT INTO station_config (station_id, schema_version, config_json)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (station_id)
-     DO UPDATE SET schema_version = EXCLUDED.schema_version,
-                   config_json = EXCLUDED.config_json,
-                   updated_at = NOW()`,
-    [stationId2, schemaVersion, configJson]
-  );
-  const id = uuidv4();
-  await query(
-    `INSERT INTO station_config_versions (id, station_id, schema_version, config_json, created_by)
-      VALUES ($1, $2, $3, $4, $5)`,
-    [id, stationId2, schemaVersion, configJson, "bootstrap"]
-  );
-};
-var bootstrapStationConfig = async (stationId2) => {
-  const existing = await getStationConfig(stationId2);
-  if (existing) return existing;
-  const fromKv = await buildConfigFromStationKv(stationId2);
-  if (existing && fromKv && configLooksUninitialized(existing)) {
-    await saveStationConfig(stationId2, fromKv, DEFAULT_SCHEMA_VERSION);
-    const repaired = await getStationConfig(stationId2);
-    if (repaired) return repaired;
-  }
-  if (existing) return existing;
-  if (fromKv) {
-    await saveStationConfig(stationId2, fromKv, DEFAULT_SCHEMA_VERSION);
-    const created2 = await getStationConfig(stationId2);
-    if (created2) return created2;
-  }
-  const candidatePath = await findConfigJsonPath();
-  if (candidatePath) {
-    const imported = await importConfigFromJson(stationId2, candidatePath);
-    if (imported) return imported;
-  }
-  let seedCountry = "US";
-  try {
-    const site = await kvGet(stationId2, "site.profile");
-    if (site?.country) seedCountry = normalizeCountry(String(site.country));
-  } catch {
-  }
-  const minimalConfig = buildMinimalConfig();
-  const defaults2 = await getStationConfigDefaults(
-    seedCountry,
-    DEFAULT_SCHEMA_VERSION
-  );
-  const seeded = defaults2?.configJson ? deepMerge(minimalConfig, defaults2.configJson) : minimalConfig;
-  await saveStationConfig(stationId2, seeded, DEFAULT_SCHEMA_VERSION);
-  const created = await getStationConfig(stationId2);
-  if (!created) throw new Error("Failed to create minimal station_config row");
-  return created;
-};
-async function getSystemConfiguration(stationId2) {
-  return await getEffectiveSystemConfiguration(stationId2);
-}
-var importConfigFromJson = async (stationId2, configPath) => {
-  try {
-    const raw = await fs12.readFile(configPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const configJson = normalizeConfigPayload(parsed);
-    const checksum = hashString2(raw);
-    await saveStationConfig(stationId2, configJson, DEFAULT_SCHEMA_VERSION);
-    await logConfigImport(stationId2, configPath, checksum, "IMPORTED", null);
-    return await getStationConfig(stationId2);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await logConfigImport(
-      stationId2,
-      configPath,
-      hashString2(configPath),
-      "FAILED",
-      message
-    );
-    return null;
-  }
-};
-var validateStationConfig = (input) => {
-  return systemConfigSchema.parse(input);
-};
-var normalizeConfigPayload = (input) => {
-  if (typeof input === "object" && input !== null && "data" in input) {
-    return validateStationConfig(
-      input.data
-    );
-  }
-  return validateStationConfig(input);
-};
-var portRaw = process.env.VPOS_API_PORT;
-var port = portRaw ? Number(portRaw) : DEFAULT_API_PORT;
-if (!Number.isFinite(port) || port <= 0 || port > 65535) {
-  throw new Error(`Invalid VPOS_API_PORT="${portRaw}"`);
-}
-var buildMinimalConfig = () => {
-  return {
-    config: {
-      country: "US",
-      timezone: "UTC",
-      language: "en",
-      rtl: false
-    },
-    supervisor: {
-      loggerParams: {
-        label: "VPOS-PSS-SUPERVISOR",
-        level: "warn",
-        console: false
-      },
-      restartDelay: 5e3,
-      maxRestarts: 5,
-      healthCheckInterval: 5e3,
-      startupTimeout: 6e4
-    },
-    processes: {
-      loggerParams: {
-        label: "VPOS-PSS-PROCESS",
-        level: "warn",
-        console: false
-      },
-      process: {
-        api: {
-          name: "VPOS API Module",
-          enabled: true,
-          required: true,
-          autoRestart: true,
-          allowedToStop: false,
-          startupOrder: 0,
-          debug: false,
-          debugPort: 9229,
-          config: {
-            port,
-            host: process.env.VPOS_API_HOST || DEFAULT_API_HOST
-          },
-          plugins: [
-            {
-              name: "supervisor",
-              enabled: true,
-              config: {}
-            },
-            {
-              name: "config",
-              enabled: true,
-              config: {}
-            }
-          ]
-        }
-      }
-    }
-  };
-};
-var findConfigJsonPath = async () => {
-  const candidates = resolveCandidatePaths();
-  for (const candidate of candidates) {
-    if (await exists(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
-};
-var resolveCandidatePaths = () => {
-  const candidates = [];
-  const envPath = process.env.VPOS_CONFIG_PATH;
-  const envDir = process.env.VPOS_CONFIG_DIR;
-  if (envPath) candidates.push(envPath);
-  if (envDir) {
-    candidates.push(import_path13.default.join(envDir, "vpos.config.json"));
-    candidates.push(import_path13.default.join(envDir, "config.json"));
-  }
-  const cwd = process.cwd();
-  candidates.push(import_path13.default.join(cwd, "vpos.config.json"));
-  candidates.push(import_path13.default.join(cwd, "config.json"));
-  candidates.push(import_path13.default.join(cwd, "vpos.config.example.json"));
-  return candidates;
-};
-var exists = async (candidate) => {
-  try {
-    await fs12.access(candidate);
-    return true;
-  } catch {
-    return false;
-  }
-};
-var hashString2 = (value) => {
-  return (0, import_crypto3.createHash)("sha256").update(value).digest("hex");
-};
-var logConfigImport = async (stationId2, sourcePath, sourceChecksum, status, message) => {
-  const id = uuidv4();
-  await query(
-    `INSERT INTO config_imports (id, station_id, source_path, source_checksum, status, message)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, stationId2, sourcePath, sourceChecksum, status, message]
-  );
-};
-
 // src/platform/bootstrap/first-boot.ts
+init_loader();
 init_postgres();
 init_logger();
 init_uuid();
@@ -126369,7 +131579,7 @@ function parseRuntimeInterval(value, fallback) {
 }
 
 // src/platform/integrations/pssXml/watcherWorker.ts
-var import_node_crypto4 = __toESM(require("node:crypto"));
+var import_node_crypto5 = __toESM(require("node:crypto"));
 var import_promises12 = __toESM(require("node:fs/promises"));
 
 // src/platform/integrations/pssXml/exporter.ts
@@ -126390,7 +131600,7 @@ var PSS_XML_KEYS = {
 };
 
 // src/shared/integrations/pssXml/xml.ts
-var import_xmldom = __toESM(require_lib5());
+var import_xmldom = __toESM(require_lib6());
 var toArray = (list) => {
   const out = [];
   if (!list || typeof list.length !== "number") return out;
@@ -126412,6 +131622,10 @@ var getAttr = (el, name) => {
 var getText = (el) => {
   const raw = String(el?.textContent ?? "").trim();
   return raw;
+};
+var toIntOrNull = (value) => {
+  const n = Number(String(value ?? "").trim());
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 };
 var getDirectChild = (parent, name) => {
   if (!parent?.childNodes) return null;
@@ -126500,6 +131714,13 @@ var parsePssConfigXml = (xml) => {
     for (const fp of fpNodes) {
       const id = getAttr(fp, "ID").trim();
       if (!id) continue;
+      const pssPortNo = toIntOrNull(getText(getDirectChild(fp, "PSSPortNo")));
+      const deviceSubAddress = toIntOrNull(
+        getText(getDirectChild(fp, "DeviceSubAddress"))
+      );
+      const endpointNode = getDirectChild(fp, "IPAddressAndPortNo");
+      const ipAddress = endpointNode ? getText(getDirectChild(endpointNode, "IPAddress")) : "";
+      const tcpUdpPortNo = endpointNode ? toIntOrNull(getText(getDirectChild(endpointNode, "TCP_UDP_PortNo"))) : null;
       const gradeOptions = [];
       const gradeOptionsNode = getDirectChild(fp, "GradeOptions");
       if (gradeOptionsNode) {
@@ -126511,14 +131732,23 @@ var parsePssConfigXml = (xml) => {
           const gradeId = gradeIdNode ? getText(gradeIdNode) : "";
           const partNode = getDirectChild(go, "Part");
           const tankId = partNode ? getAttr(partNode, "TankID").trim() : "";
+          const parts = partNode ? getAttr(partNode, "Parts").trim() : "";
           gradeOptions.push({
             id: goId,
             gradeId: gradeId || null,
-            tankId: tankId || null
+            tankId: tankId || null,
+            parts: parts || null
           });
         }
       }
-      fuellingPoints.push({ id, gradeOptions });
+      fuellingPoints.push({
+        id,
+        pssPortNo,
+        ipAddress: ipAddress || null,
+        tcpUdpPortNo,
+        deviceSubAddress,
+        gradeOptions
+      });
     }
   }
   return { grades, priceGroups, products, tanks, fuellingPoints };
@@ -126588,6 +131818,7 @@ ${serialized}`;
 
 // src/platform/integrations/pssXml/exporter.ts
 init_stationKv();
+init_safeAsync();
 
 // src/shared/setup/keys.ts
 var KV_KEYS = {
@@ -126725,6 +131956,7 @@ init_stationKv();
 init_inputs();
 
 // src/shared/setup/forecourtSync.ts
+var import_node_crypto3 = __toESM(require("node:crypto"));
 init_postgres();
 init_inputs();
 init_uuid();
@@ -126732,6 +131964,42 @@ var toInt = (value) => {
   const n = Number(String(value ?? "").trim());
   return Number.isFinite(n) ? Math.trunc(n) : NaN;
 };
+var toNullableInt = (value) => {
+  const n = toInt(value);
+  return Number.isFinite(n) ? n : null;
+};
+var nullableString = (value) => {
+  const s = String(value ?? "").trim();
+  return s ? s : null;
+};
+var sha256Hex = (value) => import_node_crypto3.default.createHash("sha256").update(JSON.stringify(value)).digest("hex");
+var buildPumpTopologyHash = (pump) => sha256Hex({
+  domsFpId: nullableString(pump.domsFpId ?? pump.pumpId),
+  deviceSubAddress: nullableString(pump.deviceSubAddress),
+  pssPortNo: nullableString(pump.pssPortNo),
+  nozzles: (Array.isArray(pump.nozzles) ? pump.nozzles : []).map((n) => ({
+    nozzleId: nullableString(n.nozzleId),
+    domsGradeOptionId: nullableString(n.domsGradeOptionId ?? n.nozzleId),
+    domsGradeId: nullableString(n.domsGradeId),
+    domsTankId: nullableString(n.domsTankId),
+    tankId: nullableString(n.tankId)
+  })).sort(
+    (a, b) => String(a.domsGradeOptionId ?? a.nozzleId ?? "").localeCompare(
+      String(b.domsGradeOptionId ?? b.nozzleId ?? ""),
+      void 0,
+      { numeric: true }
+    )
+  )
+});
+var buildNozzleTopologyHash = (nozzle) => sha256Hex({
+  nozzleId: nullableString(nozzle.nozzleId),
+  domsGradeOptionId: nullableString(
+    nozzle.domsGradeOptionId ?? nozzle.nozzleId
+  ),
+  domsGradeId: nullableString(nozzle.domsGradeId),
+  domsTankId: nullableString(nozzle.domsTankId),
+  tankId: nullableString(nozzle.tankId)
+});
 var sanitizeCode = (raw, maxLen) => {
   const base = raw.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   return base.length > maxLen ? base.slice(0, maxLen) : base;
@@ -126772,37 +132040,134 @@ var syncForecourtFromPumpsConfig = async (stationId2, config) => {
       if (!row?.id) throw new Error(`Unknown tankId '${tankId}' for station`);
       return row.id;
     };
-    const ensurePump2 = async (pumpNumber) => {
-      const existing = await txQuery(
-        client,
-        `SELECT id FROM pumps WHERE station_id = $1 AND pump_number = $2 LIMIT 1`,
-        [normalizedStationId, pumpNumber]
-      ).then((r) => r.rows[0] || null);
-      if (existing?.id) return existing.id;
-      const pumpId = uuidv4();
+    const ensurePump2 = async (pump) => {
+      const pumpNumber = toInt(pump?.pumpNumber ?? pump?.pumpId);
+      if (!pumpNumber || pumpNumber <= 0) return null;
+      const domsFpId = toNullableInt(pump?.domsFpId ?? pump?.pumpId);
+      const deviceSubAddress = toNullableInt(pump?.deviceSubAddress);
+      const pssPortNo = toNullableInt(pump?.pssPortNo);
+      const endpointHost = nullableString(pump?.endpointHost);
+      const endpointPort = toNullableInt(pump?.endpointPort);
+      const domsTopologyHash = nullableString(pump?.domsTopologyHash) ?? buildPumpTopologyHash(pump);
+      let existing = null;
+      if (domsFpId != null) {
+        existing = await txQuery(
+          client,
+          `SELECT id, pump_number
+             FROM pumps
+            WHERE station_id = $1 AND doms_fp_id = $2
+            LIMIT 1`,
+          [normalizedStationId, domsFpId]
+        ).then((r) => r.rows[0] || null);
+      }
+      if (!existing && deviceSubAddress != null && pssPortNo != null) {
+        existing = await txQuery(
+          client,
+          `SELECT id, pump_number
+             FROM pumps
+            WHERE station_id = $1
+              AND doms_pss_port_no = $2
+              AND doms_device_sub_address = $3
+            LIMIT 1`,
+          [normalizedStationId, pssPortNo, deviceSubAddress]
+        ).then((r) => r.rows[0] || null);
+      }
+      if (!existing && deviceSubAddress != null) {
+        existing = await txQuery(
+          client,
+          `SELECT id, pump_number
+             FROM pumps
+            WHERE station_id = $1 AND doms_device_sub_address = $2
+            ORDER BY CASE WHEN doms_pss_port_no IS NULL THEN 1 ELSE 0 END, updated_at DESC
+            LIMIT 1`,
+          [normalizedStationId, deviceSubAddress]
+        ).then((r) => r.rows[0] || null);
+      }
+      if (!existing) {
+        existing = await txQuery(
+          client,
+          `SELECT id, pump_number
+             FROM pumps
+            WHERE station_id = $1 AND pump_number = $2
+            LIMIT 1`,
+          [normalizedStationId, pumpNumber]
+        ).then((r) => r.rows[0] || null);
+      }
       const code = sanitizeCode(`PUMP_${pumpNumber}`, 50) || `PUMP_${pumpNumber}`;
-      await txQuery(
+      const name = `Pump ${pumpNumber}`;
+      if (existing?.id) {
+        await txQuery(
+          client,
+          `UPDATE pumps
+              SET code = COALESCE(NULLIF(code, ''), $3),
+                  name = COALESCE(NULLIF(name, ''), $4),
+                  pump_number = $5,
+                  doms_fp_id = COALESCE($6, doms_fp_id),
+                  doms_device_sub_address = COALESCE($7, doms_device_sub_address),
+                  doms_pss_port_no = COALESCE($8, doms_pss_port_no),
+                  doms_endpoint_host = COALESCE($9, doms_endpoint_host),
+                  doms_endpoint_port = COALESCE($10, doms_endpoint_port),
+                  doms_topology_hash = COALESCE($11, doms_topology_hash),
+                  doms_last_seen_at = NOW(),
+                  updated_at = NOW()
+            WHERE station_id = $1 AND id = $2`,
+          [
+            normalizedStationId,
+            existing.id,
+            code,
+            name,
+            pumpNumber,
+            domsFpId,
+            deviceSubAddress,
+            pssPortNo,
+            endpointHost,
+            endpointPort,
+            domsTopologyHash
+          ]
+        );
+        return existing.id;
+      }
+      const pumpId = uuidv4();
+      const inserted = await txQuery(
         client,
-        `INSERT INTO pumps (id, station_id, code, name, status, has_nozzle_selector, pump_number)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (station_id, pump_number) DO UPDATE SET code = EXCLUDED.code, name = EXCLUDED.name, updated_at = NOW()
+        `INSERT INTO pumps (
+           id, station_id, code, name, status, has_nozzle_selector, pump_number,
+           doms_fp_id, doms_device_sub_address, doms_pss_port_no,
+           doms_endpoint_host, doms_endpoint_port, doms_topology_hash, doms_last_seen_at
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+         ON CONFLICT (station_id, pump_number) DO UPDATE SET
+           code = EXCLUDED.code,
+           name = EXCLUDED.name,
+           doms_fp_id = COALESCE(EXCLUDED.doms_fp_id, pumps.doms_fp_id),
+           doms_device_sub_address = COALESCE(EXCLUDED.doms_device_sub_address, pumps.doms_device_sub_address),
+           doms_pss_port_no = COALESCE(EXCLUDED.doms_pss_port_no, pumps.doms_pss_port_no),
+           doms_endpoint_host = COALESCE(EXCLUDED.doms_endpoint_host, pumps.doms_endpoint_host),
+           doms_endpoint_port = COALESCE(EXCLUDED.doms_endpoint_port, pumps.doms_endpoint_port),
+           doms_topology_hash = COALESCE(EXCLUDED.doms_topology_hash, pumps.doms_topology_hash),
+           doms_last_seen_at = NOW(),
+           updated_at = NOW()
          RETURNING id`,
         [
           pumpId,
           normalizedStationId,
           code,
-          `Pump ${pumpNumber}`,
+          name,
           "ACTIVE",
           false,
-          pumpNumber
+          pumpNumber,
+          domsFpId,
+          deviceSubAddress,
+          pssPortNo,
+          endpointHost,
+          endpointPort,
+          domsTopologyHash
         ]
-      );
-      return pumpId;
+      ).then((r) => r.rows[0] || null);
+      return inserted?.id ?? pumpId;
     };
     for (const p of pumps) {
-      const pumpNumber = toInt(p?.pumpId);
-      if (!pumpNumber || pumpNumber <= 0) continue;
-      const pumpDbId = await ensurePump2(pumpNumber);
+      const pumpDbId = await ensurePump2(p);
+      if (!pumpDbId) continue;
       const nozzles = Array.isArray(p?.nozzles) ? p.nozzles : [];
       for (const n of nozzles) {
         const nozzleNumber = toInt(n?.nozzleId);
@@ -126811,24 +132176,88 @@ var syncForecourtFromPumpsConfig = async (stationId2, config) => {
         if (!nozzleNumber || nozzleNumber <= 0) continue;
         const tankId = tankIdRaw ? await ensureTankExists(tankIdRaw) : productIdFallback ? await resolveExistingTankForProduct(productIdFallback) : "";
         if (!tankId) continue;
-        const existingNozzle = await txQuery(
-          client,
-          `SELECT id FROM nozzles WHERE station_id = $1 AND pump_id = $2 AND nozzle_number = $3 LIMIT 1`,
-          [normalizedStationId, pumpDbId, nozzleNumber]
-        ).then((r) => r.rows[0] || null);
+        const domsGradeOptionId = toNullableInt(
+          n?.domsGradeOptionId ?? n?.nozzleId
+        );
+        const domsGradeId = nullableString(n?.domsGradeId);
+        const domsTankId = nullableString(n?.domsTankId);
+        const domsTopologyHash = nullableString(n?.domsTopologyHash) ?? buildNozzleTopologyHash(n);
+        let existingNozzle = null;
+        if (domsGradeOptionId != null) {
+          existingNozzle = await txQuery(
+            client,
+            `SELECT id
+               FROM nozzles
+              WHERE station_id = $1
+                AND pump_id = $2
+                AND doms_grade_option_id = $3
+              LIMIT 1`,
+            [normalizedStationId, pumpDbId, domsGradeOptionId]
+          ).then((r) => r.rows[0] || null);
+        }
+        if (!existingNozzle) {
+          existingNozzle = await txQuery(
+            client,
+            `SELECT id
+               FROM nozzles
+              WHERE station_id = $1
+                AND pump_id = $2
+                AND nozzle_number = $3
+              LIMIT 1`,
+            [normalizedStationId, pumpDbId, nozzleNumber]
+          ).then((r) => r.rows[0] || null);
+        }
         if (existingNozzle?.id) {
           await txQuery(
             client,
-            `UPDATE nozzles SET tank_id = $1, updated_at = NOW() WHERE id = $2 AND station_id = $3`,
-            [tankId, existingNozzle.id, normalizedStationId]
+            `UPDATE nozzles
+                SET tank_id = $1,
+                    nozzle_number = $2,
+                    doms_grade_option_id = COALESCE($3, doms_grade_option_id),
+                    doms_grade_id = COALESCE($4, doms_grade_id),
+                    doms_tank_id = COALESCE($5, doms_tank_id),
+                    doms_topology_hash = COALESCE($6, doms_topology_hash),
+                    doms_last_seen_at = NOW(),
+                    updated_at = NOW()
+              WHERE id = $7 AND station_id = $8`,
+            [
+              tankId,
+              nozzleNumber,
+              domsGradeOptionId,
+              domsGradeId,
+              domsTankId,
+              domsTopologyHash,
+              existingNozzle.id,
+              normalizedStationId
+            ]
           );
         } else {
           await txQuery(
             client,
-            `INSERT INTO nozzles (id, station_id, pump_id, tank_id, nozzle_number)
-             VALUES ($1,$2,$3,$4,$5)
-             ON CONFLICT (pump_id, nozzle_number) DO UPDATE SET tank_id = EXCLUDED.tank_id, updated_at = NOW()`,
-            [uuidv4(), normalizedStationId, pumpDbId, tankId, nozzleNumber]
+            `INSERT INTO nozzles (
+               id, station_id, pump_id, tank_id, nozzle_number,
+               doms_grade_option_id, doms_grade_id, doms_tank_id,
+               doms_topology_hash, doms_last_seen_at
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+             ON CONFLICT (pump_id, nozzle_number) DO UPDATE SET
+               tank_id = EXCLUDED.tank_id,
+               doms_grade_option_id = COALESCE(EXCLUDED.doms_grade_option_id, nozzles.doms_grade_option_id),
+               doms_grade_id = COALESCE(EXCLUDED.doms_grade_id, nozzles.doms_grade_id),
+               doms_tank_id = COALESCE(EXCLUDED.doms_tank_id, nozzles.doms_tank_id),
+               doms_topology_hash = COALESCE(EXCLUDED.doms_topology_hash, nozzles.doms_topology_hash),
+               doms_last_seen_at = NOW(),
+               updated_at = NOW()`,
+            [
+              uuidv4(),
+              normalizedStationId,
+              pumpDbId,
+              tankId,
+              nozzleNumber,
+              domsGradeOptionId,
+              domsGradeId,
+              domsTankId,
+              domsTopologyHash
+            ]
           );
         }
       }
@@ -126840,10 +132269,28 @@ var getPumpsConfigFromDb = async (stationId2) => {
   const rows = await withTransaction(
     async (client) => txQuery(
       client,
-      `SELECT pu.pump_number, nz.nozzle_number, tk.id as tank_id, tk.code as tank_code, tk.name as tank_name, pr.product_id, pr.product_code, pr.product_name
-     FROM pumps pu JOIN nozzles nz ON nz.pump_id = pu.id JOIN tanks tk ON tk.id = nz.tank_id JOIN products pr ON pr.id = tk.product_id
-    WHERE pu.station_id = $1 AND nz.station_id = $1
-    ORDER BY pu.pump_number ASC, nz.nozzle_number ASC`,
+      `SELECT pu.pump_number,
+              pu.doms_fp_id,
+              pu.doms_device_sub_address,
+              pu.doms_pss_port_no,
+              pu.doms_endpoint_host,
+              pu.doms_endpoint_port,
+              nz.nozzle_number,
+              nz.doms_grade_option_id,
+              nz.doms_grade_id,
+              nz.doms_tank_id,
+              tk.id as tank_id,
+              tk.code as tank_code,
+              tk.name as tank_name,
+              pr.product_id,
+              pr.product_code,
+              pr.product_name
+         FROM pumps pu
+         JOIN nozzles nz ON nz.pump_id = pu.id
+         JOIN tanks tk ON tk.id = nz.tank_id
+         JOIN products pr ON pr.id = tk.product_id
+        WHERE pu.station_id = $1 AND nz.station_id = $1
+        ORDER BY pu.pump_number ASC, nz.nozzle_number ASC`,
       [normalizedStationId]
     ).then((r) => r.rows)
   );
@@ -126859,7 +132306,16 @@ var getPumpsConfigFromDb = async (stationId2) => {
     const productCode = String(row.product_code ?? "").trim();
     const productName = String(row.product_name ?? "").trim();
     if (!byPump.has(pumpNumber)) {
-      const item = { pumpId: String(pumpNumber), nozzles: [] };
+      const item = {
+        pumpId: String(row.doms_fp_id ?? pumpNumber),
+        pumpNumber,
+        domsFpId: row.doms_fp_id ?? void 0,
+        deviceSubAddress: row.doms_device_sub_address ?? void 0,
+        pssPortNo: row.doms_pss_port_no ?? void 0,
+        endpointHost: row.doms_endpoint_host ?? void 0,
+        endpointPort: row.doms_endpoint_port ?? void 0,
+        nozzles: []
+      };
       byPump.set(pumpNumber, item);
       pumps.push(item);
     }
@@ -126870,7 +132326,10 @@ var getPumpsConfigFromDb = async (stationId2) => {
       tankName,
       productId,
       productCode,
-      productName
+      productName,
+      domsGradeOptionId: row.doms_grade_option_id ?? void 0,
+      domsGradeId: row.doms_grade_id ?? void 0,
+      domsTankId: row.doms_tank_id ?? void 0
     });
   }
   return { pumps };
@@ -126892,8 +132351,8 @@ init_inputs();
 async function getPumpsConfigFromDb2(stationId2) {
   return await getPumpsConfigFromDb(stationId2);
 }
-async function syncForecourtFromPumpsConfig2(stationId2, pumps) {
-  return await syncForecourtFromPumpsConfig(stationId2, pumps);
+async function syncForecourtFromPumpsConfig2(stationId2, pumpsConfig) {
+  return await syncForecourtFromPumpsConfig(stationId2, pumpsConfig);
 }
 
 // src/platform/integrations/pssXml/exporter.ts
@@ -126967,7 +132426,7 @@ var exportPssConfigXml = async (args) => {
 };
 
 // src/modules/setup/infrastructure/pssXmlImporter.ts
-var import_node_crypto3 = __toESM(require("node:crypto"));
+var import_node_crypto4 = __toESM(require("node:crypto"));
 init_postgres();
 init_client2();
 
@@ -127003,7 +132462,7 @@ init_stationKv();
 init_getStationId();
 init_logger();
 init_uuid();
-var sha256Hex = (input) => import_node_crypto3.default.createHash("sha256").update(input, "utf8").digest("hex");
+var sha256Hex2 = (input) => import_node_crypto4.default.createHash("sha256").update(input, "utf8").digest("hex");
 var toPrice = (raw) => {
   if (raw == null) return 0;
   const n = Number(raw);
@@ -127166,7 +132625,7 @@ var buildTankConfigFromPss = (parsed) => {
 };
 var importPssConfigXml = async (args) => {
   const { stationId: stationId2, xml, sourcePath } = args;
-  const checksum = sha256Hex(xml);
+  const checksum = sha256Hex2(xml);
   const parsed = parsePssConfigXml(xml);
   const currency = await resolveCurrency(stationId2);
   const primaryPriceGroup = pickPrimaryPriceGroup(parsed);
@@ -127176,7 +132635,9 @@ var importPssConfigXml = async (args) => {
     sourceChecksum: checksum,
     importedAt: (/* @__PURE__ */ new Date()).toISOString(),
     productDbIdByGradeId: {},
-    tankDbIdByTankId: {}
+    tankDbIdByTankId: {},
+    pumpDbIdByFpId: {},
+    nozzleDbIdByFpIdGradeOptionId: {}
   };
   const { importedProductsCount, importedProducts, importedTanks } = await withTransaction(async (client) => {
     let productsCount = 0;
@@ -127319,13 +132780,61 @@ var importPssConfigXml = async (args) => {
         if (!nozzleId || !pssTankId) return null;
         const tankDbId = idMap.tankDbIdByTankId[pssTankId];
         if (!tankDbId) return null;
-        return { nozzleId, tankId: tankDbId };
+        return {
+          nozzleId,
+          tankId: tankDbId,
+          domsGradeOptionId: nozzleId,
+          domsGradeId: safeTrim2(go.gradeId) || null,
+          domsTankId: pssTankId
+        };
       }).filter(Boolean);
-      return nozzles.length ? { pumpId, nozzles } : null;
+      return nozzles.length ? {
+        pumpId,
+        pumpNumber: pumpId,
+        domsFpId: pumpId,
+        deviceSubAddress: fp.deviceSubAddress ?? null,
+        pssPortNo: fp.pssPortNo ?? null,
+        endpointHost: safeTrim2(fp.ipAddress) || null,
+        endpointPort: fp.tcpUdpPortNo ?? null,
+        nozzles
+      } : null;
     }).filter(Boolean)
   };
   if (pumpsPayload.pumps.length) {
     await syncForecourtFromPumpsConfig2(stationId2, pumpsPayload);
+    await withTransaction(async (client) => {
+      const domsFpIds = pumpsPayload.pumps.map((p) => Number(p.domsFpId ?? p.pumpId)).filter((n) => Number.isFinite(n));
+      const pumpRows = await txQuery(
+        client,
+        `SELECT id, doms_fp_id, pump_number
+           FROM pumps
+          WHERE station_id = $1
+            AND COALESCE(doms_fp_id, pump_number) = ANY($2::int[])`,
+        [stationId2, domsFpIds]
+      );
+      for (const row of pumpRows.rows) {
+        const fpId = String(row.doms_fp_id ?? row.pump_number);
+        idMap.pumpDbIdByFpId[fpId] = String(row.id);
+      }
+      const nozzleRows = await txQuery(
+        client,
+        `SELECT n.id,
+                p.doms_fp_id AS fp_id,
+                p.pump_number,
+                n.doms_grade_option_id,
+                n.nozzle_number
+           FROM nozzles n
+           JOIN pumps p ON p.id = n.pump_id AND p.station_id = n.station_id
+          WHERE n.station_id = $1
+            AND COALESCE(p.doms_fp_id, p.pump_number) = ANY($2::int[])`,
+        [stationId2, domsFpIds]
+      );
+      for (const row of nozzleRows.rows) {
+        const fpId = String(row.fp_id ?? row.pump_number);
+        const goId = String(row.doms_grade_option_id ?? row.nozzle_number);
+        idMap.nozzleDbIdByFpIdGradeOptionId[fpId + ":" + goId] = String(row.id);
+      }
+    });
     await withTransaction(async (client) => {
       await txQuery(
         client,
@@ -127435,7 +132944,7 @@ function mapToProxyProducts(importedProducts, options) {
 // src/platform/integrations/pssXml/watcherWorker.ts
 init_stationKv();
 init_logger();
-var sha256Hex2 = (input) => import_node_crypto4.default.createHash("sha256").update(input, "utf8").digest("hex");
+var sha256Hex3 = (input) => import_node_crypto5.default.createHash("sha256").update(input, "utf8").digest("hex");
 var envBool2 = (name, fallback = false) => {
   const raw = String(process.env[name] ?? "").trim().toLowerCase();
   if (!raw) return fallback;
@@ -127508,7 +133017,7 @@ var startPssXmlSyncWorker = (opts) => {
       if (inPath && !baselineReady) {
         const xml = await readInboundXml();
         if (xml) {
-          const checksum = sha256Hex2(xml);
+          const checksum = sha256Hex3(xml);
           if (checksum !== lastInChecksum) {
             lastInChecksum = checksum;
             logger.info("pss-xml", {
@@ -127643,16 +133152,7 @@ init_getStationId();
 
 // src/modules/forecourt/infrastructure/configSync/service.ts
 init_postgres();
-
-// src/shared/config/loader.ts
-init_inputs();
-var getSystemConfiguration2 = async (stationId2) => {
-  return await getSystemConfiguration(
-    requireNonEmptyString(stationId2, "stationId")
-  );
-};
-
-// src/modules/forecourt/infrastructure/configSync/service.ts
+init_loader2();
 init_numbers();
 init_stationKv();
 
@@ -127672,173 +133172,10 @@ init_uuid();
 // src/modules/forecourt/infrastructure/configSync/io.ts
 var import_promises13 = __toESM(require("node:fs/promises"));
 var import_node_path3 = __toESM(require("node:path"));
+init_loader2();
 
-// src/shared/forecourt/runtime.ts
-init_jplState();
-init_inputs();
-init_liveEvents();
-init_runtimeConfig();
-function getForecourtRuntimeConfig2() {
-  return getForecourtRuntimeConfig();
-}
-async function loadForecourtRuntimeConfigFromDb2(stationId2) {
-  return await loadForecourtRuntimeConfigFromDb(
-    requireNonEmptyString(stationId2, "stationId")
-  );
-}
-function startForecourtRuntimeConfigWatcher(stationId2) {
-  const stop = subscribeForecourtRuntimeConfig(() => {
-  });
-  void loadForecourtRuntimeConfigFromDb(stationId2).catch(() => {
-  });
-  return stop;
-}
-
-// src/shared/forecourt/settings.ts
-init_runtimeConfigShared();
-init_stationKv();
-init_bootstrap();
-init_runtimeConfig();
-async function getForecourtSettings(stationId2) {
-  const base = getForecourtRuntimeConfig2();
-  const keys = [
-    FORECOURT_RUNTIME_KV_KEYS.JPL_OPERATION_MODE,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_HOST,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_PORT,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_POS_ID,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_FC_ACCESS_CODE,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_COUNTRY_CODE,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_POS_VERSION_ID,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_UNSOLICITED_DR_SECONDS,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_HEARTBEAT_INTERVAL_MS,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_DEAD_CONNECTION_TIMEOUT_MS,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_EXPECTED_MIN_VERSION,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_UNSOLICITED_FLAGS,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_UNSOLICITED_MFDR_FLAGS,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_STATUS_UPDATE_CODE,
-    FORECOURT_RUNTIME_KV_KEYS.JPL_BOOTSTRAP_SNAPSHOT_ENABLED,
-    FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_DEPTH_SUP,
-    FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_DEPTH_SUP,
-    FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_AGE_MIN_SUP,
-    FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_AGE_MIN_SUP,
-    FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_DEPTH_UNSUP,
-    FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_DEPTH_UNSUP,
-    FORECOURT_RUNTIME_KV_KEYS.BUFFER_WARN_AGE_MIN_UNSUP,
-    FORECOURT_RUNTIME_KV_KEYS.BUFFER_CRIT_AGE_MIN_UNSUP
-  ];
-  const values = await kvGetMany2(stationId2, [...keys]);
-  const [
-    jplOperationMode,
-    jplHost,
-    jplPort,
-    jplPosId,
-    jplAccessCode,
-    jplCountryCode,
-    jplPosVersionId,
-    jplUnsolicitedDrSeconds,
-    jplHeartbeatIntervalMs,
-    jplDeadConnectionTimeoutMs,
-    jplExpectedMinVersion,
-    jplUnsolicitedFlags,
-    jplUnsolicitedMfdrFlags,
-    jplStatusUpdateCode,
-    jplBootstrapSnapshotEnabled,
-    bufferWarnDepthSup,
-    bufferCritDepthSup,
-    bufferWarnAgeMinSup,
-    bufferCritAgeMinSup,
-    bufferWarnDepthUnsup,
-    bufferCritDepthUnsup,
-    bufferWarnAgeMinUnsup,
-    bufferCritAgeMinUnsup
-  ] = keys.map((key) => values[key]);
-  const effectiveDrSeconds = jplUnsolicitedDrSeconds != null ? Number(jplUnsolicitedDrSeconds) : base.jplUnsolicitedDrSeconds;
-  const effectiveFlags = jplUnsolicitedFlags != null ? parseCsvStringList(jplUnsolicitedFlags) : base.jplUnsolicitedFlags;
-  const effectiveMfdrFlags = jplUnsolicitedMfdrFlags != null ? parseCsvStringList(jplUnsolicitedMfdrFlags) : base.jplUnsolicitedMfdrFlags;
-  return {
-    mode: "jpl_tcp",
-    jplOperationMode: jplOperationMode != null && String(jplOperationMode).trim().length ? normalizeJplOperationMode(jplOperationMode) : base.jplOperationMode,
-    jplHost: normalizeForecourtHost(jplHost, base.jplHost),
-    jplPort: jplPort != null ? normalizeForecourtPort(jplPort, base.jplPort) : base.jplPort,
-    jplPosId: normalizeJplPosId(
-      jplPosId != null ? jplPosId : base.jplPosId,
-      String(base.jplPosId ?? "01")
-    ),
-    jplAccessCode: buildJplAccessCode({
-      baseAccessCode: jplAccessCode != null ? String(jplAccessCode) : base.jplAccessCode,
-      drSeconds: effectiveDrSeconds,
-      requiredFlags: effectiveFlags,
-      mfdrFlags: effectiveMfdrFlags
-    }),
-    jplCountryCode: jplCountryCode != null ? jplCountryCode : base.jplCountryCode,
-    jplPosVersionId: jplPosVersionId != null ? jplPosVersionId : base.jplPosVersionId,
-    jplUnsolicitedDrSeconds: effectiveDrSeconds,
-    jplHeartbeatIntervalMs: jplHeartbeatIntervalMs != null ? Number(jplHeartbeatIntervalMs) : base.jplHeartbeatIntervalMs,
-    jplDeadConnectionTimeoutMs: jplDeadConnectionTimeoutMs != null ? Number(jplDeadConnectionTimeoutMs) : base.jplDeadConnectionTimeoutMs,
-    jplExpectedMinVersion: jplExpectedMinVersion != null ? String(jplExpectedMinVersion) : base.jplExpectedMinVersion,
-    jplUnsolicitedFlags: effectiveFlags,
-    jplUnsolicitedMfdrFlags: effectiveMfdrFlags,
-    jplStatusUpdateCode: jplStatusUpdateCode != null ? Number(jplStatusUpdateCode) : base.jplStatusUpdateCode,
-    jplBootstrapSnapshotEnabled: jplBootstrapSnapshotEnabled != null ? normalizeBooleanFlag(
-      jplBootstrapSnapshotEnabled,
-      base.jplBootstrapSnapshotEnabled
-    ) : base.jplBootstrapSnapshotEnabled,
-    bufferWarnDepthSup: bufferWarnDepthSup != null ? Number(bufferWarnDepthSup) : base.bufferWarnDepthSup,
-    bufferCritDepthSup: bufferCritDepthSup != null ? Number(bufferCritDepthSup) : base.bufferCritDepthSup,
-    bufferWarnAgeMinSup: bufferWarnAgeMinSup != null ? Number(bufferWarnAgeMinSup) : base.bufferWarnAgeMinSup,
-    bufferCritAgeMinSup: bufferCritAgeMinSup != null ? Number(bufferCritAgeMinSup) : base.bufferCritAgeMinSup,
-    bufferWarnDepthUnsup: bufferWarnDepthUnsup != null ? Number(bufferWarnDepthUnsup) : base.bufferWarnDepthUnsup,
-    bufferCritDepthUnsup: bufferCritDepthUnsup != null ? Number(bufferCritDepthUnsup) : base.bufferCritDepthUnsup,
-    bufferWarnAgeMinUnsup: bufferWarnAgeMinUnsup != null ? Number(bufferWarnAgeMinUnsup) : base.bufferWarnAgeMinUnsup,
-    bufferCritAgeMinUnsup: bufferCritAgeMinUnsup != null ? Number(bufferCritAgeMinUnsup) : base.bufferCritAgeMinUnsup
-  };
-}
-
-// src/platform/integrations/jpl/config.ts
-init_runtimeConfig();
-async function getJplConfig(stationId2) {
-  const [cfg, forecourtSettings] = await Promise.all([
-    getSystemConfiguration(stationId2),
-    getForecourtSettings(stationId2)
-  ]);
-  const integrations = cfg?.integrations ?? {};
-  const jpl = integrations?.jpl;
-  const forecourtBase = getForecourtRuntimeConfig();
-  const hasExplicitForecourtHost = String(forecourtSettings?.jplHost ?? "").trim().length > 0 && String(forecourtSettings?.jplHost ?? "").trim() !== String(forecourtBase.jplHost ?? "").trim();
-  const hasExplicitForecourtPort = Number(forecourtSettings?.jplPort) !== Number(forecourtBase.jplPort);
-  const hasExplicitForecourtAccessCode = String(forecourtSettings?.jplAccessCode ?? "").trim().length > 0 && String(forecourtSettings?.jplAccessCode ?? "").trim() !== String(forecourtBase.jplAccessCode ?? "").trim();
-  const hasExplicitForecourtCountryCode = String(forecourtSettings?.jplCountryCode ?? "").trim().length > 0 && String(forecourtSettings?.jplCountryCode ?? "").trim() !== String(forecourtBase.jplCountryCode ?? "").trim();
-  const hasExplicitForecourtPosId = String(forecourtSettings?.jplPosId ?? "").trim().length > 0 && String(forecourtSettings?.jplPosId ?? "").trim() !== String(forecourtBase.jplPosId ?? "").trim();
-  const host = String(
-    hasExplicitForecourtHost ? forecourtSettings.jplHost : jpl?.host ?? forecourtSettings?.jplHost ?? ""
-  ).trim();
-  if (!host) return null;
-  const portOverrides = {
-    apc1: hasExplicitForecourtPort && Number.isFinite(Number(forecourtSettings?.jplPort)) ? Number(forecourtSettings?.jplPort) : jpl?.portOverrides?.apc1 != null ? Number(jpl.portOverrides.apc1) : void 0,
-    apc2: jpl?.portOverrides?.apc2 != null ? Number(jpl.portOverrides.apc2) : void 0
-  };
-  const appId = String(jpl?.appId ?? process.env.JPL_APP_ID ?? "POS").trim();
-  const accessCode = String(
-    hasExplicitForecourtAccessCode ? forecourtSettings.jplAccessCode : jpl?.accessCode ?? jpl?.jplAccessCode ?? forecourtSettings?.jplAccessCode ?? process.env.JPL_FC_ACCESS_CODE ?? "POS"
-  ).trim();
-  const countryCode = String(
-    hasExplicitForecourtCountryCode ? forecourtSettings.jplCountryCode : jpl?.countryCode ?? forecourtSettings?.jplCountryCode ?? process.env.JPL_COUNTRY_CODE ?? "1"
-  ).trim();
-  const enabledApcs = Array.isArray(jpl?.enabledApcs) ? jpl.enabledApcs.map((x) => String(x).trim().toLowerCase()).filter((x) => x === "apc1" || x === "apc2") : void 0;
-  const posId = hasExplicitForecourtPosId ? Number(forecourtSettings.jplPosId) : jpl?.posId != null ? Number(jpl.posId) : Number(process.env.JPL_POS_ID);
-  const fpOperationModeNo = jpl?.fpOperationModeNo != null ? Number(jpl.fpOperationModeNo) : Number(process.env.JPL_FP_OPERATION_MODE_NO);
-  return {
-    host,
-    appId,
-    accessCode,
-    countryCode,
-    enabledApcs,
-    portOverrides,
-    posId: Number.isFinite(posId) ? posId : 1,
-    fpOperationModeNo: Number.isFinite(fpOperationModeNo) ? fpOperationModeNo : 1,
-    timeoutMs: Number(jpl?.timeoutMs ?? process.env.JPL_TIMEOUT_MS ?? 1e4)
-  };
-}
+// src/platform/integrations/jpl/client.ts
+init_config();
 
 // src/platform/integrations/jpl/gateway.ts
 init_globals();
@@ -127846,9 +133183,151 @@ init_jplTcpAdapter_helpers2();
 init_jplState();
 init_runtimeConfig2();
 init_normalize();
+
+// src/modules/forecourt/infrastructure/jpl/protocolHealth.ts
+var parseVersionTuple = (version) => {
+  const match = String(version || "").trim().match(/(\d+)-(\d+)-(\d+)\.(\d+)/);
+  if (!match) return null;
+  return match.slice(1).map((part) => Number(part));
+};
+var isVersionAtLeast = (candidate, minimum) => {
+  const cand = parseVersionTuple(candidate);
+  const min = parseVersionTuple(minimum);
+  if (!cand || !min) return true;
+  for (let i = 0; i < Math.max(cand.length, min.length); i += 1) {
+    const a = cand[i] ?? 0;
+    const b = min[i] ?? 0;
+    if (a > b) return true;
+    if (a < b) return false;
+  }
+  return true;
+};
+var buildProtocolHealth = (input) => {
+  const issues = [];
+  if (input.protocolVersion && input.expectedMinVersion && !isVersionAtLeast(input.protocolVersion, input.expectedMinVersion)) {
+    issues.push({
+      code: "version-mismatch",
+      severity: "critical",
+      message: `protocol version ${input.protocolVersion} is below expected minimum ${input.expectedMinVersion}`
+    });
+  }
+  if (typeof input.expectedSecureTransport === "boolean" && input.expectedSecureTransport !== input.secureTransport) {
+    issues.push({
+      code: "secure-mode-mismatch",
+      severity: "critical",
+      message: input.expectedSecureTransport ? "secure transport expected but not active" : "secure transport active when plain transport is expected"
+    });
+  }
+  if (input.correlationSupported === false) {
+    issues.push({
+      code: "correlation-unavailable",
+      severity: "warn",
+      message: "controller does not support request correlation IDs"
+    });
+  }
+  if (input.requestMode === "single-flight-fallback") {
+    issues.push({
+      code: "single-flight-fallback",
+      severity: "warn",
+      message: "request flow is operating in strict single-flight mode"
+    });
+  }
+  if (input.lastReject?.at) {
+    issues.push({
+      code: "recent-reject",
+      severity: "warn",
+      message: input.lastReject.info || "recent protocol reject observed"
+    });
+  }
+  return {
+    status: issues.length ? "degraded" : "healthy",
+    issues,
+    protocolVersion: input.protocolVersion,
+    correlationSupported: input.correlationSupported,
+    requestMode: input.requestMode,
+    requestDispatchMode: input.requestDispatchMode,
+    requestDispatchPolicy: input.requestDispatchPolicy,
+    secureTransport: input.secureTransport,
+    lastReject: input.lastReject,
+    defaultSubscriptions: input.defaultSubscriptions,
+    rawFrameDiagnosticsEnabled: input.rawFrameDiagnosticsEnabled
+  };
+};
+
+// src/platform/integrations/jpl/gateway.ts
 init_replayState();
 init_station();
 var cachedStationId = null;
+var resolveRequestDispatchPolicy2 = (client) => {
+  const candidate = client?.opts?.requestDispatchPolicy;
+  if (candidate === "correlation-required" || candidate === "auto" || candidate === "strict-single-flight-when-uncorrelated") {
+    return candidate;
+  }
+  return getForecourtRuntimeConfig().jplRequestDispatchPolicy ?? "auto";
+};
+var resolveCorrelationSupport2 = (client) => {
+  const value = client?.getServerSupportsCorrelationIds?.();
+  return value === true ? true : value === false ? false : null;
+};
+var resolveRequestDispatchMode2 = (client) => {
+  const direct = client?.getRequestDispatchMode?.();
+  if (direct === "correlated-concurrent" || direct === "strict-single-flight") {
+    return direct;
+  }
+  const dispatcherMode = client?.requestDispatcher?.getDispatchMode?.();
+  if (dispatcherMode === "correlated-concurrent" || dispatcherMode === "strict-single-flight") {
+    return dispatcherMode;
+  }
+  return resolveCorrelationSupport2(client) === true ? "correlated-concurrent" : "strict-single-flight";
+};
+var buildProtocolState = (client, state) => {
+  const cfg = getForecourtRuntimeConfig();
+  const version = client?.getServerJplVersion?.() ?? state.welcomeVersion ?? state.protocolVersion ?? void 0;
+  const secureMode = typeof state.secureMode === "boolean" ? state.secureMode : Number(cfg.jplPort) === 8889;
+  const correlationSupport = resolveCorrelationSupport2(client);
+  const requestDispatchPolicy = resolveRequestDispatchPolicy2(client);
+  const requestDispatchMode = resolveRequestDispatchMode2(client);
+  const requestMode = requestDispatchMode === "correlated-concurrent" ? "correlated" : "single-flight-fallback";
+  const defaultSubscriptions = {
+    unsolicitedFlags: [...cfg.jplUnsolicitedFlags ?? []],
+    unsolicitedMfdrFlags: [...cfg.jplUnsolicitedMfdrFlags ?? []],
+    drSeconds: cfg.jplUnsolicitedDrSeconds,
+    statusUpdateCode: cfg.jplStatusUpdateCode
+  };
+  const rawFrameDiagnosticsEnabled = Boolean(
+    client && typeof client.listenerCount === "function" && client.listenerCount("rawFrame") > 0
+  );
+  const protocolHealth = buildProtocolHealth({
+    protocolVersion: version,
+    expectedMinVersion: cfg.jplExpectedMinVersion,
+    correlationSupported: correlationSupport,
+    requestMode,
+    requestDispatchMode,
+    requestDispatchPolicy,
+    secureTransport: secureMode,
+    expectedSecureTransport: Number(cfg.jplPort) === 8889,
+    lastReject: state.lastReject ?? void 0,
+    defaultSubscriptions,
+    rawFrameDiagnosticsEnabled
+  });
+  return {
+    version,
+    secureMode,
+    tlsRequired: Boolean(cfg.jplTlsRequired),
+    integrationScope: cfg.jplIntegrationScope,
+    optionalProtocolFamilies: [...cfg.jplOptionalProtocolFamilies ?? []],
+    paymentControlEnabled: false,
+    correlationSupport,
+    correlationCapability: correlationSupport === true ? "supported" : correlationSupport === false ? "unsupported" : "unknown",
+    requestDispatchPolicy,
+    requestDispatchMode,
+    requestMode,
+    lastReject: state.lastReject ?? void 0,
+    defaultSubscriptions,
+    rawFrameDiagnosticsEnabled,
+    protocolHealth
+  };
+};
 var deriveControllerFlags = (status) => ({
   serviceMessageReady: Boolean(status?.FcStatus2Flags?.bits?.ServiceMsgReady),
   backOfficeRecordExists: Boolean(
@@ -127906,13 +133385,24 @@ var derivePumpErrorDiagnostics = (entries) => (entries ?? []).map((entry) => ({
   occurredAt: entry?.normalized?.errorDateAndTime,
   pumpProtocolId: entry?.normalized?.pumpProtocolId,
   pumpErrorCode: entry?.normalized?.pumpErrorCode,
-  severity: entry?.normalized?.severity
+  severity: entry?.normalized?.severity,
+  category: entry?.normalized?.guidance?.category,
+  operatorMessage: entry?.normalized?.guidance?.operatorMessage,
+  recommendedAction: entry?.normalized?.guidance?.recommendedAction,
+  needsAdminIntervention: entry?.normalized?.guidance?.needsAdminIntervention
 }));
 var deriveTankStatusSummary = (entries) => (entries ?? []).map((entry) => ({
   tgId: entry?.tgId ?? entry?.normalized?.tgId,
   mainState: entry?.normalized?.mainState ?? enumLabel(entry?.payload?.TgMainState) ?? void 0,
   flags: entry?.normalized?.flags ?? {},
   alarms: entry?.normalized?.alarms ?? {},
+  at: entry?.at
+}));
+var deriveOptionalDeviceSummary = (entries, idKey, mainStateKey = "mainState") => (entries ?? []).map((entry) => ({
+  id: entry?.normalized?.[idKey],
+  [idKey]: entry?.normalized?.[idKey],
+  mainState: entry?.normalized?.[mainStateKey],
+  flags: entry?.normalized?.flags ?? {},
   at: entry?.at
 }));
 var evaluateBufferEntry = (mode, entry) => {
@@ -128002,27 +133492,41 @@ async function ensureJplGatewayStarted() {
   await startJplTcpAdapter2();
   cachedStationId = cachedStationId ?? await resolveStationId();
   const state = getJplAdapterState();
+  const client = globalThis.__jplTcpClient ?? null;
+  const protocol = buildProtocolState(client, state);
   return {
     started: Boolean(globalThis.__jplTcpClient) || Boolean(state.connected),
     connected: Boolean(state.connected),
     loggedOn: Boolean(state.loggedOn),
     lastError: state.lastError,
     stationId: cachedStationId,
-    client: globalThis.__jplTcpClient ?? null,
+    client,
+    protocol,
+    protocolHealth: protocol.protocolHealth,
     sharedClient: true
   };
 }
 function getJplGatewayState() {
   const state = getJplAdapterState();
+  const client = globalThis.__jplTcpClient ?? null;
   const started4 = Boolean(globalThis.__jplTcpClient) || Boolean(state.connected);
   const { bufferHealth, bufferAlerts } = deriveBufferHealth();
   const replayCapabilities = getReplayCapabilities();
+  const protocol = buildProtocolState(client, state);
+  const protocolHealth = protocol.protocolHealth;
   return {
     started: started4,
     stationId: cachedStationId,
     lastError: state.lastError,
-    version: state.welcomeVersion,
-    secureMode: state.secureMode,
+    version: protocol.version,
+    secureMode: protocol.secureMode,
+    correlationSupport: protocol.correlationSupport,
+    requestDispatchPolicy: protocol.requestDispatchPolicy,
+    requestDispatchMode: protocol.requestDispatchMode,
+    requestMode: protocol.requestMode,
+    lastReject: protocol.lastReject,
+    protocol,
+    protocolHealth,
     posId: state.posId,
     lastMessageAt: state.lastMessageAt,
     lastHeartbeatAt: state.lastHeartbeatAt,
@@ -128038,6 +133542,14 @@ function getJplGatewayState() {
     tankStatuses: state.lastTgStatuses,
     siteDeliveryStatus: state.lastSiteDeliveryStatus,
     tankDeliveryData: state.lastTankDeliveryData,
+    pricePoleStatuses: state.lastPpStatuses,
+    pricePoleErrors: state.lastPpErrors,
+    washStatuses: state.lastWashStatuses,
+    washErrors: state.lastWashErrors,
+    digitalIoStatuses: state.lastDigitalIoStatuses,
+    sensorStatuses: state.lastSensorStatuses,
+    vendingStatuses: state.lastVendingStatuses,
+    vendingErrors: state.lastVendingErrors,
     fpErrors: state.lastFpErrors,
     serviceMessages: state.lastServiceMessages,
     backOfficeRecords: state.lastBackOfficeRecords,
@@ -128050,6 +133562,20 @@ function getJplGatewayState() {
     peripheralAlerts: derivePeripheralAlerts(state.lastPssPeripheralsStatus),
     activePumpStatuses: derivePumpStatusSummary(state.lastFpStatuses),
     tankAlerts: deriveTankStatusSummary(state.lastTgStatuses),
+    pricePoleSummary: deriveOptionalDeviceSummary(state.lastPpStatuses, "ppId"),
+    washSummary: deriveOptionalDeviceSummary(state.lastWashStatuses, "wpId"),
+    digitalIoSummary: deriveOptionalDeviceSummary(
+      state.lastDigitalIoStatuses,
+      "diopId"
+    ),
+    sensorSummary: deriveOptionalDeviceSummary(
+      state.lastSensorStatuses,
+      "sensorId"
+    ),
+    vendingSummary: deriveOptionalDeviceSummary(
+      state.lastVendingStatuses,
+      "vmId"
+    ),
     pumpErrorDiagnostics: derivePumpErrorDiagnostics(state.lastFpErrors),
     replayCapabilities: { ...replayCapabilities },
     apcs: {
@@ -128068,49 +133594,40 @@ function getJplClient() {
 init_tankGauge();
 init_jplState();
 
-// src/shared/integrations/posBackend.ts
+// src/shared/integrations/jplAccess.ts
 init_inputs();
-function normalizeBackend(value) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "auto";
-  const lower = raw.toLowerCase();
-  if (lower === "none" || lower === "db" || lower === "dbfirst") return "none";
-  if (lower === "jpl") return "jpl";
-  if (lower === "ppx") return "ppx";
-  if (lower === "ligo") return "ligo";
-  if (lower === "namos") return "namos";
-  if (lower === "auto") return "auto";
-  return "auto";
+async function resolveJplAccessDeps(deps) {
+  if (deps) return deps;
+  const [{ assertPosBackendAllowed: assertPosBackendAllowed2 }, { getJplConfig: getJplConfig2 }] = await Promise.all([
+    Promise.resolve().then(() => (init_posBackend(), posBackend_exports)),
+    Promise.resolve().then(() => (init_config(), config_exports))
+  ]);
+  return {
+    assertPosBackendAllowed: assertPosBackendAllowed2,
+    getJplConfig: getJplConfig2
+  };
 }
-async function getEffectivePosBackend(stationId2) {
-  const cfg = await getSystemConfiguration2(
-    requireNonEmptyString(stationId2, "stationId")
-  );
-  const raw = cfg?.integrations?.posBackend;
-  const explicit = raw != null && String(raw).trim() !== "";
-  if (explicit) return normalizeBackend(raw);
-  const dbFirst = String(process.env.VPOS_DB_FIRST).toLowerCase() === "1" || String(process.env.VPOS_DB_FIRST ?? "true").toLowerCase() === "true";
-  if (dbFirst) return "none";
-  const hasJpl = Boolean(cfg?.integrations?.jpl?.host);
-  if (hasJpl) return "jpl";
-  return "none";
-}
-async function assertPosBackendAllowed(stationId2, allowed) {
-  const allow = Array.isArray(allowed) ? allowed : [allowed];
-  const backend = await getEffectivePosBackend(stationId2);
-  if (!allow.includes(backend)) {
-    throw Object.assign(
-      new Error(
-        `POS backend '${backend}' is not enabled (allowed: ${allow.join(", ")})`
-      ),
-      { code: "POS_BACKEND_DISABLED", status: 409, backend, allowed: allow }
-    );
+async function assertJplAccessAllowed(stationId2, accessMode = "pos", deps) {
+  const normalizedStationId = requireNonEmptyString(stationId2, "stationId");
+  const resolvedDeps = await resolveJplAccessDeps(deps);
+  if (accessMode === "forecourt") {
+    const cfg = await resolvedDeps.getJplConfig(normalizedStationId);
+    if (!cfg?.host) {
+      throw Object.assign(new Error("JPL is not configured"), {
+        code: "JPL_NOT_CONFIGURED",
+        status: 409
+      });
+    }
+    return "jpl";
   }
-  return backend;
+  return await resolvedDeps.assertPosBackendAllowed(normalizedStationId, [
+    "jpl"
+  ]);
 }
 
 // src/platform/integrations/jpl/client.ts
 init_logger();
+init_dispense();
 init_commands();
 init_normalize();
 init_transactionService();
@@ -128129,6 +133646,9 @@ function enqueueApc1(fn) {
   return next2;
 }
 var ZERO_FC_DATE_TIME = "00000000000000";
+async function assertJplAccessAllowedForMode(stationId2, accessMode = "pos") {
+  await assertJplAccessAllowed(stationId2, accessMode);
+}
 var ID_ZERO = "00";
 var CURRENT_PRICE_SET_TYPE = "00H";
 var PENDING_PRICE_SET_TYPE = "01H";
@@ -128163,7 +133683,7 @@ var toId2String = (value, fallback = ID_ZERO) => {
   return String(Math.max(0, Math.trunc(parsed))).padStart(2, "0");
 };
 var toRequestData = (response) => response?.data ?? response ?? {};
-var ALL_TANK_DELIVERY_ITEM_IDS = Array.from(
+var ALL_TANK_DELIVERY_ITEM_IDS2 = Array.from(
   { length: 29 },
   (_, index) => String(index + 1).padStart(2, "0")
 );
@@ -128591,8 +134111,9 @@ function rememberGatewaySnapshot(kind, response, usedSubCode) {
   return envelope;
 }
 async function readFpStatus(client, timeoutMs, fpId, preferredSubCode) {
-  const requested = String(preferredSubCode ?? "03H").trim().toUpperCase();
-  const variants = [requested, "03H", "01H", "00H"].filter((value, index, list) => list.indexOf(value) === index).map((subCode) => ({ subCode, data: { FpId: fpId } }));
+  const variants = buildFpStatusSubCodePreference(preferredSubCode).map(
+    (subCode) => ({ subCode, data: { FpId: fpId } })
+  );
   const result = await requestWithSubCodeFallback(client, {
     name: "FpStatus_req",
     variants,
@@ -128712,7 +134233,7 @@ async function readTankDeliveryData(client, timeoutMs, tgId, posId, itemIds) {
           TgId: tgId,
           PosId: posId,
           ZERO: 1,
-          TankDeliveryDataItemId: itemIds?.length ? itemIds : ALL_TANK_DELIVERY_ITEM_IDS
+          TankDeliveryDataItemId: itemIds?.length ? itemIds : ALL_TANK_DELIVERY_ITEM_IDS2
         }
       }
     ],
@@ -128735,6 +134256,17 @@ async function clearTankDeliveryData(client, timeoutMs, payload) {
     timeoutMs,
     timeoutMessage: "Timed out clearing tank delivery data"
   });
+}
+async function sendSimpleWetstockCommand(client, timeoutMs, action, payload, timeoutMessage) {
+  const request = buildJplCommandRequest(action, payload);
+  if (!request) throw new Error(`Unable to build ${action} request`);
+  const response = await requestWithTimeout(
+    client,
+    request,
+    timeoutMs,
+    timeoutMessage
+  );
+  return { request, response };
 }
 function isUnknownSubCodeError(error, messageName, subCode) {
   const info = getProtocolErrorText(error).toLowerCase();
@@ -129028,8 +134560,8 @@ var mergePriceBank = (base, entries) => {
     userId: base.userId
   };
 };
-async function jplHealth(stationId2) {
-  await assertPosBackendAllowed(stationId2, ["jpl"]);
+async function jplHealth(stationId2, options = {}) {
+  await assertJplAccessAllowedForMode(stationId2, options.accessMode ?? "pos");
   const state = getJplGatewayState();
   const gatewayState = getJplGatewayState();
   return {
@@ -129066,8 +134598,8 @@ async function jplHealth(stationId2) {
     error: gatewayState.apcs?.apc1?.connected ? void 0 : "JPL gateway not started"
   };
 }
-async function jplSendPosCommand(stationId2, cmd2) {
-  await assertPosBackendAllowed(stationId2, ["jpl"]);
+async function jplSendPosCommand(stationId2, cmd2, options = {}) {
+  await assertJplAccessAllowedForMode(stationId2, options.accessMode ?? "pos");
   const gw = getJplGatewayState();
   if (!gw.started) {
     try {
@@ -129125,6 +134657,7 @@ async function jplSendPosCommand(stationId2, cmd2) {
             pumpErrorDiagnostics: gatewayState.pumpErrorDiagnostics ?? [],
             replayCapabilities: replayStatus.replayCapabilities,
             pendingReplayClears: replayStatus.pendingReplayClears,
+            transactionCheckpoints: replayStatus.transactionCheckpoints ?? [],
             pumpStatuses: gatewayState.pumpStatuses ?? [],
             fpInfo: gatewayState.fpInfo ?? [],
             fuellingData: gatewayState.fuellingData ?? [],
@@ -129251,38 +134784,101 @@ async function jplSendPosCommand(stationId2, cmd2) {
       if (cmd2.type === "PRESET_FUEL_AUTH") {
         const payload = cmd2.payload ?? {};
         const { pumpId, nozzleId } = resolvePumpNozzle(payload);
+        const request = buildJplCommandRequest("PRESET_FUEL_AUTH", {
+          ...payload,
+          pumpNumber: pumpId,
+          posId
+        });
+        if (!request)
+          throw new Error("Unable to build preset authorize request");
         const response = await requestWithTimeout(
           client,
-          {
-            name: "authorize_Fp_req",
-            subCode: "01H",
-            data: {
-              FpId: toId22(pumpId),
-              PosId: posId,
-              PresetType: String(
-                pick2(payload, ["presetType", "PresetType"]) ?? "00H"
-              ).trim() || "00H",
-              VoidPresetLimit: String(
-                pick2(payload, ["voidPresetLimit", "VoidPresetLimit"]) ?? "0"
-              ),
-              VolumePresetLimit: String(
-                pick2(payload, ["volumePresetLimit", "VolumePresetLimit"]) ?? "0"
-              ),
-              MoneyPresetLimit: String(
-                pick2(payload, ["moneyPresetLimit", "MoneyPresetLimit"]) ?? "0"
-              ),
-              FloorPresetLimit: String(
-                pick2(payload, ["floorPresetLimit", "FloorPresetLimit"]) ?? "0"
-              )
-            }
-          },
+          request,
           timeoutMs,
           "Timed out sending preset authorize command"
         );
         return {
           ok: true,
           accepted: true,
-          data: { pumpId, nozzleId, response }
+          data: {
+            pumpId,
+            nozzleId,
+            response,
+            ...describeJplAuthorizeRequest("PRESET_FUEL_AUTH", payload)
+          }
+        };
+      }
+      if (cmd2.type === "OPEN_TANK_CONTROLLER") {
+        const payload = cmd2.payload ?? {};
+        const tankId = toId2String(
+          pick2(payload, ["tankId", "TankId", "tgId", "TgId"]),
+          ""
+        );
+        if (!tankId) throw new Error("TankId is required");
+        const result = await sendSimpleWetstockCommand(
+          client,
+          timeoutMs,
+          "OPEN_TANK_CONTROLLER",
+          { ...payload, tankId, posId },
+          `Timed out opening tank controller ${tankId}`
+        );
+        return {
+          ok: true,
+          accepted: true,
+          data: { tankId, response: result.response }
+        };
+      }
+      if (cmd2.type === "CLOSE_TANK_CONTROLLER") {
+        const payload = cmd2.payload ?? {};
+        const tankId = toId2String(
+          pick2(payload, ["tankId", "TankId", "tgId", "TgId"]),
+          ID_ZERO
+        );
+        const result = await sendSimpleWetstockCommand(
+          client,
+          timeoutMs,
+          "CLOSE_TANK_CONTROLLER",
+          { ...payload, tankId },
+          `Timed out closing tank controller ${tankId}`
+        );
+        return {
+          ok: true,
+          accepted: true,
+          data: { tankId, response: result.response }
+        };
+      }
+      if (cmd2.type === "START_DELIVERY_PROCESS") {
+        const payload = cmd2.payload ?? {};
+        const tankId = toId2String(pick2(payload, ["tankId", "TankId"]), "");
+        if (!tankId) throw new Error("TankId is required");
+        const result = await sendSimpleWetstockCommand(
+          client,
+          timeoutMs,
+          "START_DELIVERY_PROCESS",
+          { ...payload, tankId, posId },
+          `Timed out starting delivery process for tank ${tankId}`
+        );
+        return {
+          ok: true,
+          accepted: true,
+          data: { tankId, response: result.response }
+        };
+      }
+      if (cmd2.type === "STOP_DELIVERY_PROCESS") {
+        const payload = cmd2.payload ?? {};
+        const tankId = toId2String(pick2(payload, ["tankId", "TankId"]), "");
+        if (!tankId) throw new Error("TankId is required");
+        const result = await sendSimpleWetstockCommand(
+          client,
+          timeoutMs,
+          "STOP_DELIVERY_PROCESS",
+          { ...payload, tankId, posId },
+          `Timed out stopping delivery process for tank ${tankId}`
+        );
+        return {
+          ok: true,
+          accepted: true,
+          data: { tankId, response: result.response }
         };
       }
       if (cmd2.type === "GET_TG_STATUS") {
@@ -129332,7 +134928,12 @@ async function jplSendPosCommand(stationId2, cmd2) {
         return {
           ok: true,
           accepted: true,
-          data: { pumpId, nozzleId, response }
+          data: {
+            pumpId,
+            nozzleId,
+            response,
+            ...describeJplAuthorizeRequest("EXTENDED_FUEL_AUTH", payload)
+          }
         };
       }
       if (cmd2.type === "PREPARE_TRANSACTION") {
@@ -129354,7 +134955,12 @@ async function jplSendPosCommand(stationId2, cmd2) {
         return {
           ok: true,
           accepted: true,
-          data: { pumpId, nozzleId, response }
+          data: {
+            pumpId,
+            nozzleId,
+            response,
+            ...describeJplAuthorizeRequest("PREPARE_TRANSACTION", payload)
+          }
         };
       }
       if (cmd2.type === "GET_SITE_DELIVERY_STATUS") {
@@ -129599,7 +135205,15 @@ async function jplSendPosCommand(stationId2, cmd2) {
           timeoutMs,
           "Timed out sending authorize command"
         );
-        return { ok: true, accepted: true, data: { pumpId, nozzleId } };
+        return {
+          ok: true,
+          accepted: true,
+          data: {
+            pumpId,
+            nozzleId,
+            ...describeJplAuthorizeRequest("AUTHORIZE_FP", payload)
+          }
+        };
       }
       if (cmd2.type === "CLOSE_FPS") {
         const payload = cmd2.payload ?? {};
@@ -129747,7 +135361,7 @@ async function jplSendPosCommand(stationId2, cmd2) {
         const tgIds = await resolveConfiguredTankGaugeIds(stationId3);
         if (!tgIds.length) {
           throw new Error(
-            "No configured JPL tank ids found. Set jplTankId (or numeric tank code) for each tank in tank settings."
+            "No configured DOMS tank ids found. Set domsTankId (or numeric tank code) for each tank in tank settings."
           );
         }
         const responses = [];
@@ -129776,6 +135390,30 @@ async function jplSendPosCommand(stationId2, cmd2) {
           const firstError = errors[0]?.error ?? "Failed to request tank gauge data";
           throw new Error(firstError);
         }
+        let tankStatusSnapshot = null;
+        try {
+          const statusResult = await requestWithSubCodeFallback(client, {
+            name: "TgStatus_req",
+            variants: [
+              { subCode: "02H", data: { TgId: ID_ZERO } },
+              { subCode: "01H", data: { TgId: ID_ZERO } },
+              { subCode: "00H", data: { TgId: ID_ZERO } }
+            ],
+            timeoutMs,
+            timeoutMessage: "Timed out requesting tank status snapshot"
+          });
+          tankStatusSnapshot = {
+            response: statusResult.response,
+            usedSubCode: statusResult.usedSubCode
+          };
+          rememberGatewaySnapshot(
+            "TgStatus_resp",
+            statusResult.response,
+            statusResult.usedSubCode
+          );
+        } catch (error) {
+          tankStatusSnapshot = { error: getProtocolErrorText(error) };
+        }
         return {
           ok: true,
           accepted: true,
@@ -129783,7 +135421,8 @@ async function jplSendPosCommand(stationId2, cmd2) {
             requestedTgIds: tgIds,
             responses,
             normalized,
-            errors
+            errors,
+            tankStatusSnapshot
           }
         };
       }
@@ -130132,7 +135771,7 @@ async function jplSendPosCommand(stationId2, cmd2) {
                   TgId: tgId,
                   PosId: posId,
                   ZERO: 1,
-                  TankDeliveryDataItemId: ALL_TANK_DELIVERY_ITEM_IDS
+                  TankDeliveryDataItemId: ALL_TANK_DELIVERY_ITEM_IDS2
                 }
               },
               timeoutMs,
@@ -130143,6 +135782,27 @@ async function jplSendPosCommand(stationId2, cmd2) {
             errors.push({ tgId, error: getProtocolErrorText(error) });
           }
         }
+        const normalizedDeliveries = deliveries.map((entry) => ({
+          tgId: entry.tgId,
+          normalized: normalizeTankDeliveryDataPayload(entry.response, "00H"),
+          response: entry.response
+        })).filter((entry) => Boolean(entry.normalized?.tgId));
+        const checkpointSummary = normalizedDeliveries.map((entry) => {
+          const normalized = entry.normalized;
+          const deliveryReportSeqNo = String(
+            normalized?.deliveryReportSeqNo ?? ""
+          ).trim();
+          const tankDeliverySeqNo = String(
+            normalized?.tankDeliverySeqNo ?? ""
+          ).trim();
+          if (!deliveryReportSeqNo || !tankDeliverySeqNo) return null;
+          return {
+            tgId: String(normalized?.tgId ?? "").trim().padStart(2, "0"),
+            deliveryReportSeqNo,
+            tankDeliverySeqNo,
+            clearStatus: "pending_clear"
+          };
+        }).filter(Boolean);
         return {
           ok: true,
           accepted: true,
@@ -130153,6 +135813,8 @@ async function jplSendPosCommand(stationId2, cmd2) {
             tgStatusSubCode,
             tgIds: uniqueTgIds,
             deliveries,
+            normalizedDeliveries,
+            checkpointSummary,
             errors
           }
         };
@@ -130175,17 +135837,22 @@ function parsePath(pathValue) {
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
   return { pathname, searchParams: url.searchParams };
 }
+var matchesPath = (pathname, ...candidates) => candidates.includes(pathname);
 function toCommand(pathValue, opts) {
   const { pathname, searchParams } = parsePath(pathValue);
   const method = String(opts.method ?? "GET").trim().toUpperCase();
   const payload = opts.body;
-  if (method === "GET" && pathname === "/health") {
+  if (method === "GET" && matchesPath(pathname, "/health", "/api/healthz")) {
     return { kind: "health" };
   }
-  if (method === "GET" && pathname === "/pos/status") {
+  if (method === "GET" && matchesPath(pathname, "/pos/status", "/api/pos/status")) {
     return { kind: "command", type: "POS_STATUS" };
   }
-  if (pathname === "/pos/doms/getGradePrices") {
+  if (matchesPath(
+    pathname,
+    "/pos/doms/getGradePrices",
+    "/api/pos/doms/getGradePrices"
+  )) {
     return {
       kind: "command",
       type: "GET_GRADE_PRICES",
@@ -130195,37 +135862,133 @@ function toCommand(pathValue, opts) {
       }
     };
   }
-  if (pathname === "/pos/doms/changeGradePrices") {
+  if (matchesPath(
+    pathname,
+    "/pos/doms/changeGradePrices",
+    "/api/pos/doms/changeGradePrices"
+  )) {
     return { kind: "command", type: "CHANGE_GRADE_PRICES", payload };
   }
-  if (method === "GET" && pathname === "/pos/doms/getAllTankDeliveryData") {
+  if (method === "GET" && matchesPath(
+    pathname,
+    "/pos/doms/getAllTankDeliveryData",
+    "/api/pos/doms/getAllTankDeliveryData"
+  )) {
     return { kind: "command", type: "GET_ALL_TANK_DELIVERY_DATA" };
   }
-  if (method === "GET" && pathname === "/pos/doms/getAllTgData") {
-    return { kind: "command", type: "GET_ALL_TG_DATA" };
+  if (method === "GET" && matchesPath(
+    pathname,
+    "/pos/doms/getAllTgData",
+    "/api/pos/doms/getAllTgData"
+  )) {
+    return { kind: "command", type: "GET_ALL_TG_DATA", payload };
   }
-  if (pathname === "/pos/doms/changeDynamicTankData") {
+  if (method === "GET" && matchesPath(
+    pathname,
+    "/pos/doms/getSiteDeliveryStatus",
+    "/api/pos/doms/getSiteDeliveryStatus"
+  )) {
+    return {
+      kind: "command",
+      type: "GET_SITE_DELIVERY_STATUS",
+      payload: {
+        ...payload ?? {},
+        ...searchParams.get("subCode") ? { subCode: searchParams.get("subCode") } : {}
+      }
+    };
+  }
+  if (method === "GET" && matchesPath(pathname, "/pos/doms/getTgStatus", "/api/pos/doms/getTgStatus")) {
+    return {
+      kind: "command",
+      type: "GET_TG_STATUS",
+      payload: {
+        ...payload ?? {},
+        ...searchParams.get("tgId") ? { tgId: searchParams.get("tgId") } : {},
+        ...searchParams.get("subCode") ? { subCode: searchParams.get("subCode") } : {}
+      }
+    };
+  }
+  if (matchesPath(
+    pathname,
+    "/pos/doms/clearTankDeliveryData",
+    "/api/pos/doms/clearTankDeliveryData"
+  )) {
+    return { kind: "command", type: "CLEAR_TANK_DELIVERY_DATA", payload };
+  }
+  if (matchesPath(
+    pathname,
+    "/pos/doms/openTankController",
+    "/api/pos/doms/openTankController"
+  )) {
+    return { kind: "command", type: "OPEN_TANK_CONTROLLER", payload };
+  }
+  if (matchesPath(
+    pathname,
+    "/pos/doms/closeTankController",
+    "/api/pos/doms/closeTankController"
+  )) {
+    return { kind: "command", type: "CLOSE_TANK_CONTROLLER", payload };
+  }
+  if (matchesPath(
+    pathname,
+    "/pos/doms/startDeliveryProcess",
+    "/api/pos/doms/startDeliveryProcess"
+  )) {
+    return { kind: "command", type: "START_DELIVERY_PROCESS", payload };
+  }
+  if (matchesPath(
+    pathname,
+    "/pos/doms/stopDeliveryProcess",
+    "/api/pos/doms/stopDeliveryProcess"
+  )) {
+    return { kind: "command", type: "STOP_DELIVERY_PROCESS", payload };
+  }
+  if (matchesPath(
+    pathname,
+    "/pos/doms/changeDynamicTankData",
+    "/api/pos/doms/changeDynamicTankData"
+  )) {
     return { kind: "command", type: "CHANGE_DYNAMIC_TANK_DATA", payload };
   }
-  if (pathname === "/pos/doms/getTgErrorMsg") {
+  if (matchesPath(
+    pathname,
+    "/pos/doms/getTgErrorMsg",
+    "/api/pos/doms/getTgErrorMsg"
+  )) {
     return { kind: "command", type: "GET_TG_ERROR_MSG", payload };
   }
-  if (pathname === "/pos/control/openFps") {
+  if (matchesPath(pathname, "/pos/control/openFps", "/api/pos/control/openFps")) {
     return { kind: "command", type: "OPEN_FPS", payload };
   }
-  if (pathname === "/pos/control/closeFps") {
+  if (matchesPath(pathname, "/pos/control/closeFps", "/api/pos/control/closeFps")) {
     return { kind: "command", type: "CLOSE_FPS", payload };
   }
-  if (pathname === "/pos/control/attendantAuth") {
+  if (matchesPath(
+    pathname,
+    "/pos/control/attendantAuth",
+    "/api/pos/control/attendantAuth"
+  )) {
     return { kind: "command", type: "ATTENDANT_AUTH", payload };
   }
-  if (pathname === "/pos/control/preFuelCustomer") {
+  if (matchesPath(
+    pathname,
+    "/pos/control/preFuelCustomer",
+    "/api/pos/control/preFuelCustomer"
+  )) {
     return { kind: "command", type: "PREFUEL_CUSTOMER", payload };
   }
-  if (pathname === "/pos/control/clearPreFuelCustomer") {
+  if (matchesPath(
+    pathname,
+    "/pos/control/clearPreFuelCustomer",
+    "/api/pos/control/clearPreFuelCustomer"
+  )) {
     return { kind: "command", type: "CLEAR_PREFUEL_CUSTOMER", payload };
   }
-  if (pathname === "/pos/control/clearFpError") {
+  if (matchesPath(
+    pathname,
+    "/pos/control/clearFpError",
+    "/api/pos/control/clearFpError"
+  )) {
     return { kind: "command", type: "CLEAR_FP_ERROR", payload };
   }
   if (pathname === "/pos/command") {
@@ -130244,16 +136007,22 @@ function toCommand(pathValue, opts) {
     pathname
   });
 }
-async function jplRequest(stationId2, path20, opts = {}) {
+async function jplRequest(stationId2, path20, opts = {}, requestOptions = {}) {
   const normalizedStationId = requireNonEmptyString(stationId2, "stationId");
   const target = toCommand(requireNonEmptyString(path20, "path"), opts);
   if (target.kind === "health") {
-    return await jplHealth(normalizedStationId);
+    return await jplHealth(normalizedStationId, {
+      accessMode: requestOptions.accessMode ?? "pos"
+    });
   }
-  const result = await jplSendPosCommand(normalizedStationId, {
-    type: target.type,
-    payload: target.payload
-  });
+  const result = await jplSendPosCommand(
+    normalizedStationId,
+    {
+      type: target.type,
+      payload: target.payload
+    },
+    { accessMode: requestOptions.accessMode ?? "pos" }
+  );
   if (!result.ok) {
     throw Object.assign(
       new Error(result.error ?? result.message ?? "JPL request failed"),
@@ -130293,10 +136062,15 @@ async function readSnapshotFromDomsJson(stationId2, cfg) {
   if (!jplCfg?.host) {
     throw new Error("JPL is not configured");
   }
-  return await jplRequest(stationId2, cfg.snapshotPath, {
-    method: cfg.snapshotMethod ?? "POST",
-    body: cfg.snapshotBody ?? void 0
-  });
+  return await jplRequest(
+    stationId2,
+    cfg.snapshotPath,
+    {
+      method: cfg.snapshotMethod ?? "POST",
+      body: cfg.snapshotBody ?? void 0
+    },
+    { accessMode: "forecourt" }
+  );
 }
 async function readSnapshotFromDomsXml(_stationId, _cfg) {
   throw new Error(
@@ -130305,9 +136079,14 @@ async function readSnapshotFromDomsXml(_stationId, _cfg) {
 }
 async function readTankStatusFromDoms(stationId2, cfg) {
   if (!cfg.tankStatusPath) return null;
-  return await jplRequest(stationId2, cfg.tankStatusPath, {
-    method: cfg.tankStatusMethod ?? "GET"
-  });
+  return await jplRequest(
+    stationId2,
+    cfg.tankStatusPath,
+    {
+      method: cfg.tankStatusMethod ?? "GET"
+    },
+    { accessMode: "forecourt" }
+  );
 }
 
 // src/modules/forecourt/infrastructure/configSync/utils.ts
@@ -131196,6 +136975,7 @@ function startForecourtConfigSyncWorker(opts) {
 init_postgres();
 
 // src/platform/integrations/posGateway.ts
+init_posBackend();
 async function sendPosCommand(stationId2, cmd2) {
   const backend = await getEffectivePosBackend(stationId2);
   if (backend === "jpl") {
@@ -131516,35 +137296,6 @@ var sendEscposRaw = async (payload, config) => {
   });
 };
 
-// src/modules/printing/infrastructure/textFormat.ts
-function wrapTextToWidth(text, width) {
-  if (!width || width < 8) return text;
-  const lines = [];
-  const raw = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  for (const l of raw) {
-    let line2 = l;
-    while (line2.length > width) {
-      let idx = line2.lastIndexOf(" ", width);
-      if (idx <= 0) idx = width;
-      lines.push(line2.slice(0, idx).trimEnd());
-      line2 = line2.slice(idx).trimStart();
-    }
-    lines.push(line2);
-  }
-  return lines.join("\n");
-}
-function makeWidthRuler(width) {
-  const w = Math.max(16, Math.min(96, width || 48));
-  const tens = Array.from(
-    { length: Math.ceil(w / 10) },
-    (_, i) => String((i + 1) * 10).padStart(10, "-")
-  ).join("");
-  const ones = Array.from({ length: w }, (_, i) => String((i + 1) % 10)).join(
-    ""
-  );
-  return [`WIDTH TEST (w=${w})`, tens.slice(0, w), ones.slice(0, w)].join("\n");
-}
-
 // src/modules/printing/infrastructure/printJobsRepo.ts
 init_postgres();
 
@@ -131556,6 +137307,17 @@ var printJobsSql = {
        AND device_type = 'printer'
        AND enabled = TRUE
      ORDER BY (device_key = 'default') DESC, updated_at DESC
+     LIMIT 1`,
+  selectEnabledPrinterConfigs: `SELECT device_key, config_json, updated_at
+     FROM device_configs
+     WHERE station_id = $1
+       AND device_type = 'printer'
+       AND enabled = TRUE
+     ORDER BY updated_at DESC, device_key ASC`,
+  selectTransactionPumpNumber: `SELECT pump_number
+     FROM transactions
+     WHERE station_id = $1
+       AND id = $2::uuid
      LIMIT 1`,
   markDone: "UPDATE print_jobs SET status='DONE', completed_at=NOW(), last_error=NULL, updated_at=NOW() WHERE id=$1",
   markFailed: "UPDATE print_jobs SET status='FAILED', completed_at=NOW(), last_error=$2, updated_at=NOW() WHERE id=$1",
@@ -131575,7 +137337,7 @@ var printJobsSql = {
 			attempts = attempts + 1,
 			updated_at = NOW()
 		WHERE id IN (SELECT id FROM next)
-		RETURNING id, station_id, job_type, payload`,
+		RETURNING id, station_id, job_type, payload, source_transaction_id`,
   claimNextForWorker: `WITH next AS (
       SELECT id FROM print_jobs
       WHERE status = 'PENDING'
@@ -131592,7 +137354,7 @@ var printJobsSql = {
           updated_at=NOW()
     FROM next
     WHERE pj.id = next.id
-    RETURNING pj.id, pj.station_id, pj.job_type, pj.payload, pj.attempts, pj.max_attempts`,
+    RETURNING pj.id, pj.station_id, pj.job_type, pj.payload, pj.attempts, pj.max_attempts, pj.source_transaction_id`,
   scheduleRetry: `UPDATE print_jobs
     SET status='PENDING',
         last_error=$2,
@@ -131607,6 +137369,19 @@ var printJobsRepo = {
     return await queryOne(printJobsSql.selectDefaultPrinterConfig, [
       stationId2
     ]);
+  },
+  async listEnabledPrinterConfigRows(stationId2) {
+    return await queryAll(printJobsSql.selectEnabledPrinterConfigs, [
+      stationId2
+    ]);
+  },
+  async getTransactionPumpNumber(stationId2, transactionId) {
+    const row = await queryOne(
+      printJobsSql.selectTransactionPumpNumber,
+      [stationId2, transactionId]
+    );
+    const pumpNumber = row?.pump_number;
+    return pumpNumber == null ? null : Number(pumpNumber);
   },
   async markDone(id) {
     await query(printJobsSql.markDone, [id]);
@@ -131638,11 +137413,110 @@ var printJobsRepo = {
   }
 };
 
-// src/modules/printing/infrastructure/printJobs.ts
-async function getDefaultPrinterConfig(stationId2) {
-  const row = await printJobsRepo.getDefaultPrinterConfigRow(stationId2);
+// src/modules/printing/infrastructure/resolvePrinterForTransaction.ts
+var toFiniteNumber2 = (value) => {
+  const n = Number(String(value ?? "").trim());
+  return Number.isFinite(n) ? n : null;
+};
+var parseAssignedPumpIds = (configJson) => {
+  const raw = configJson?.fpIds ?? configJson?.assignedPumpIds ?? configJson?.pumpIds;
+  if (Array.isArray(raw)) {
+    return Array.from(
+      new Set(
+        raw.map((item) => toFiniteNumber2(item)).filter((item) => item != null && item > 0)
+      )
+    );
+  }
+  if (typeof raw === "string") {
+    return Array.from(
+      new Set(
+        raw.split(/[\s,]+/g).map((item) => toFiniteNumber2(item)).filter((item) => item != null && item > 0)
+      )
+    );
+  }
+  return [];
+};
+var isDefaultPrinterRow = (row) => {
+  const cfg = row?.config_json ?? {};
+  return cfg?.isDefault === true || String(row?.device_key ?? "") === "default";
+};
+var rowToResolved = (row) => {
   if (!row) return null;
-  const parsed = parsePrinterDeviceConfig(row.config_json || {});
+  const config = parsePrinterDeviceConfig(row.config_json || {});
+  if (!config?.host) return null;
+  return {
+    deviceKey: String(row.device_key ?? "").trim(),
+    config
+  };
+};
+async function resolvePrinterForTransaction(args) {
+  const { stationId: stationId2 } = args;
+  if (!stationId2) return null;
+  const rows = await printJobsRepo.listEnabledPrinterConfigRows(
+    stationId2
+  );
+  if (!rows.length) return null;
+  const explicitKey = String(args.explicitPrinterKey ?? "").trim();
+  if (explicitKey) {
+    const match = rows.find(
+      (row) => String(row?.device_key ?? "").trim() === explicitKey
+    );
+    const resolved = rowToResolved(match);
+    if (resolved) return resolved;
+  }
+  let pumpNumber = args.pumpNumberHint ?? null;
+  if ((pumpNumber == null || pumpNumber <= 0) && args.transactionId) {
+    pumpNumber = await printJobsRepo.getTransactionPumpNumber(
+      stationId2,
+      args.transactionId
+    );
+  }
+  if (pumpNumber != null && pumpNumber > 0) {
+    const assigned = rows.find(
+      (row) => parseAssignedPumpIds(row.config_json || {}).includes(pumpNumber)
+    );
+    const resolved = rowToResolved(assigned);
+    if (resolved) return resolved;
+  }
+  const defaultRow = rows.find(isDefaultPrinterRow) ?? rows[0];
+  return rowToResolved(defaultRow);
+}
+
+// src/modules/printing/infrastructure/textFormat.ts
+function wrapTextToWidth(text, width) {
+  if (!width || width < 8) return text;
+  const lines = [];
+  const raw = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  for (const l of raw) {
+    let line2 = l;
+    while (line2.length > width) {
+      let idx = line2.lastIndexOf(" ", width);
+      if (idx <= 0) idx = width;
+      lines.push(line2.slice(0, idx).trimEnd());
+      line2 = line2.slice(idx).trimStart();
+    }
+    lines.push(line2);
+  }
+  return lines.join("\n");
+}
+function makeWidthRuler(width) {
+  const w = Math.max(16, Math.min(96, width || 48));
+  const tens = Array.from(
+    { length: Math.ceil(w / 10) },
+    (_, i) => String((i + 1) * 10).padStart(10, "-")
+  ).join("");
+  const ones = Array.from({ length: w }, (_, i) => String((i + 1) % 10)).join(
+    ""
+  );
+  return [`WIDTH TEST (w=${w})`, tens.slice(0, w), ones.slice(0, w)].join("\n");
+}
+
+// src/modules/printing/infrastructure/printJobs.ts
+var toFiniteNumber3 = (value) => {
+  const n = Number(String(value ?? "").trim());
+  return Number.isFinite(n) ? n : null;
+};
+var toConnectionPrinter = (parsed) => {
   if (!parsed?.host) return null;
   return {
     ip: parsed.host,
@@ -131650,6 +137524,79 @@ async function getDefaultPrinterConfig(stationId2) {
     width: parsed.width,
     timeoutMs: parsed.timeoutMs
   };
+};
+async function getDefaultPrinterConfig(stationId2) {
+  const row = await printJobsRepo.getDefaultPrinterConfigRow(stationId2);
+  if (!row) return null;
+  return toConnectionPrinter(parsePrinterDeviceConfig(row.config_json || {}));
+}
+function extractTransactionId(payload) {
+  const candidates = [
+    payload?.transactionId,
+    payload?.sourceTransactionId,
+    payload?.state?.transactionId,
+    payload?.printable?.transactionId,
+    payload?.data?.transactionId,
+    payload?.data?.receipt?.transactionId,
+    payload?.receipt?.transactionId
+  ];
+  for (const candidate of candidates) {
+    const value = String(candidate ?? "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+function extractPumpNumberFromPayload(payload) {
+  const candidates = [
+    payload?.pumpNumber,
+    payload?.pump_number,
+    payload?.fpId,
+    payload?.FpId,
+    payload?.state?.pumpNumber,
+    payload?.state?.pump_number,
+    payload?.state?.fpId,
+    payload?.data?.pumpNumber,
+    payload?.data?.pump_number,
+    payload?.data?.fpId,
+    payload?.data?.receipt?.pump_number,
+    payload?.data?.receipt?.pumpNumber,
+    payload?.receipt?.pump_number,
+    payload?.receipt?.pumpNumber,
+    payload?.printable?.pumpNumber,
+    payload?.printable?.pump_number,
+    payload?.printable?.fpId,
+    payload?.printable?.receipt?.pump_number,
+    payload?.printable?.receipt?.pumpNumber
+  ];
+  for (const candidate of candidates) {
+    const numeric = toFiniteNumber3(candidate);
+    if (numeric != null && numeric > 0) return numeric;
+  }
+  return null;
+}
+async function resolveJobPumpNumber(job) {
+  const fromPayload = extractPumpNumberFromPayload(job.payload);
+  if (fromPayload != null) return fromPayload;
+  const transactionId = String(job.source_transaction_id ?? "").trim() || extractTransactionId(job.payload);
+  if (!transactionId) return null;
+  return await printJobsRepo.getTransactionPumpNumber(
+    job.station_id,
+    transactionId
+  );
+}
+async function resolveAssignedPrinterConfig(job) {
+  const explicitPrinterKey = String(
+    job.payload?.printerKey ?? job.payload?.printer_key ?? job.payload?.deviceKey ?? ""
+  ).trim();
+  const pumpNumberHint = extractPumpNumberFromPayload(job.payload) ?? await resolveJobPumpNumber(job);
+  const resolved = await resolvePrinterForTransaction({
+    stationId: job.station_id,
+    transactionId: String(job.source_transaction_id ?? "").trim() || extractTransactionId(job.payload),
+    explicitPrinterKey,
+    pumpNumberHint
+  });
+  if (!resolved) return null;
+  return toConnectionPrinter(resolved.config);
 }
 async function printText(stationId2, printer, text) {
   const width = printer.width || 48;
@@ -131679,7 +137626,10 @@ async function handlePrintJob(job) {
   if (payloadIp) {
     printer = { ip: payloadIp, port: payloadPort, width: payloadWidth };
   } else {
-    printer = await getDefaultPrinterConfig(job.station_id);
+    printer = await resolveAssignedPrinterConfig(job);
+    if (!printer) {
+      printer = await getDefaultPrinterConfig(job.station_id);
+    }
     if (printer && payloadWidth) printer.width = payloadWidth;
   }
   if (!printer?.ip) {
@@ -132145,6 +138095,7 @@ function startReportQueueWorker(opts) {
 // src/modules/runtime/infrastructure/inProcessRuntime.ts
 init_app_config();
 init_stationKv();
+init_safeAsync();
 init_busListeners();
 
 // src/modules/transactions/infrastructure/fiscalization/transactionFiscalizationSchedulerWorker.ts
@@ -132682,12 +138633,12 @@ function buildClaimEligibleProxyFiscalizationTransactionsSql(input) {
 }
 
 // src/modules/transactions/infrastructure/persistence/transaction-status.repository.ts
-var queryOneMaybeTx = async (client, sql3, params) => {
+var queryOneMaybeTx = async (client, sql4, params) => {
   if (client) {
-    const result = await txQuery(client, sql3, params);
+    const result = await txQuery(client, sql4, params);
     return result.rows?.[0] ?? null;
   }
-  return await queryOne(sql3, params);
+  return await queryOne(sql4, params);
 };
 var transactionStatusRepository = {
   async getStatusSnapshot(input) {
@@ -132743,6 +138694,8 @@ init_postgres();
 
 // src/platform/config/index.ts
 init_app_config();
+init_defaults2();
+init_effective();
 init_env();
 init_env_db();
 
@@ -132750,40 +138703,23 @@ init_env_db();
 init_postgres();
 
 // src/platform/config/index.ts
+init_loader();
 init_station_settings();
 
 // src/shared/branding/settings.ts
 init_postgres();
 init_uuid();
 var MAX_LOGO_BYTES = 2 * 1024 * 1024;
-
-// src/shared/receipts/normalizeReceipt.ts
-init_numbers();
-init_decimalSettings();
-
-// src/modules/transactions/infrastructure/persistence/transaction-read.repository.ts
-init_stationKv();
-async function getTransactionDetailsRepo(stationId2, transactionId) {
-  const transaction = await queryOne(getTransactionDetailsSql, [
-    stationId2,
-    transactionId
-  ]);
-  if (!transaction) return null;
-  const [lines, transactionQueue] = await Promise.all([
-    queryAll(getTransactionLinesSql, [stationId2, transactionId]),
-    queryOne(getTransactionQueueSql, [stationId2, transactionId])
-  ]);
-  return { ...transaction, lines, transactionQueue };
-}
-
-// src/modules/transactions/infrastructure/persistence/transaction-write.repository.ts
-init_postgres();
-init_shortenUUID();
-init_uuid();
-
-// src/modules/transactions/infrastructure/fiscalization/transaction-fiscalization.repository.ts
-init_postgres();
-init_envDb();
+var BRANDING_ASSET_ROUTE_BASE = "/api/branding";
+var normalizeBrandLogoPath = (pathValue) => {
+  const normalized = String(pathValue ?? "").trim();
+  if (!normalized) return null;
+  if (normalized.startsWith(`${BRANDING_ASSET_ROUTE_BASE}/`)) return normalized;
+  if (normalized.startsWith("/branding/")) {
+    return `${BRANDING_ASSET_ROUTE_BASE}/${normalized.split("/").pop()}`;
+  }
+  return normalized;
+};
 
 // src/modules/transactions/infrastructure/fiscalization/receiptGenerator.ts
 init_postgres();
@@ -133664,12 +139600,39 @@ var generateReceipt = async (params) => {
       stationDisplayName: branding.station_display_name,
       receiptHeaderText: branding.receipt_header_text,
       receiptFooterText: branding.receipt_footer_text,
-      logoPath: branding.logo_path
+      logoPath: normalizeBrandLogoPath(branding.logo_path)
     } : void 0
   };
 };
 
+// src/shared/receipts/normalizeReceipt.ts
+init_numbers();
+init_decimalSettings();
+
+// src/modules/transactions/infrastructure/persistence/transaction-read.repository.ts
+init_stationKv();
+init_uuid();
+async function getTransactionDetailsRepo(stationId2, transactionId) {
+  const transaction = await queryOne(getTransactionDetailsSql, [
+    stationId2,
+    transactionId
+  ]);
+  if (!transaction) return null;
+  const [lines, transactionQueue] = await Promise.all([
+    queryAll(getTransactionLinesSql, [stationId2, transactionId]),
+    queryOne(getTransactionQueueSql, [stationId2, transactionId])
+  ]);
+  return { ...transaction, lines, transactionQueue };
+}
+
+// src/modules/transactions/infrastructure/persistence/transaction-write.repository.ts
+init_postgres();
+init_shortenUUID();
+init_uuid();
+
 // src/modules/transactions/infrastructure/fiscalization/transaction-fiscalization.repository.ts
+init_postgres();
+init_envDb();
 init_uuid();
 async function completeTransactionFiscalizationRepo(input) {
   const { stationId: stationId2, transactionId, fiscalResult } = input;
@@ -133705,51 +139668,61 @@ async function completeTransactionFiscalizationRepo(input) {
       `SELECT id FROM receipts WHERE transaction_id = $1 AND station_id = $2 LIMIT 1`,
       [transactionId, stationId2]
     );
-    if (!existingReceipt.rows?.[0]) {
+    const stationSettings = await txQuery(
+      client,
+      `SELECT auto_print_receipts FROM station_settings WHERE station_id = $1`,
+      [stationId2]
+    );
+    const autoPrintReceipts = stationSettings.rows?.[0]?.auto_print_receipts === true;
+    if (!existingReceipt.rows?.[0] || autoPrintReceipts) {
       const receiptPayload = await generateReceipt({ stationId: stationId2, transactionId });
-      await txQuery(
-        client,
-        `
-          INSERT INTO receipts (
-            id, transaction_id, station_id, receipt_number,
-            html_content, plain_text_content, fiscal_data, branding_snapshot
-          )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-        `,
-        [
-          uuidv4(),
-          transactionId,
-          stationId2,
-          receiptPayload.receiptNumber,
-          receiptPayload.htmlContent,
-          receiptPayload.plainTextContent || null,
-          JSON.stringify(receiptPayload.fiscalData),
-          receiptPayload.brandingSnapshot ? JSON.stringify(receiptPayload.brandingSnapshot) : null
-        ]
-      );
-      await txQuery(
-        client,
-        `
-          INSERT INTO print_jobs (
-            id, station_id, job_type, payload, priority,
-            idempotency_key, source_transaction_id
-          )
-          VALUES ($1, $2, 'print.receipt', $3::jsonb, 10, $4, $5)
-          ON CONFLICT (station_id, idempotency_key) DO UPDATE
-          SET updated_at = CURRENT_TIMESTAMP
-        `,
-        [
-          uuidv4(),
-          stationId2,
-          JSON.stringify({
-            type: "receiptData",
-            data: receiptPayload,
-            state: { transactionId }
-          }),
-          `receipt:${transactionId}:default`,
-          transactionId
-        ]
-      );
+      if (!existingReceipt.rows?.[0]) {
+        await txQuery(
+          client,
+          `
+            INSERT INTO receipts (
+              id, transaction_id, station_id, receipt_number,
+              html_content, plain_text_content, fiscal_data, branding_snapshot
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          `,
+          [
+            uuidv4(),
+            transactionId,
+            stationId2,
+            receiptPayload.receiptNumber,
+            receiptPayload.htmlContent,
+            receiptPayload.plainTextContent || null,
+            JSON.stringify(receiptPayload.fiscalData),
+            receiptPayload.brandingSnapshot ? JSON.stringify(receiptPayload.brandingSnapshot) : null
+          ]
+        );
+      }
+      if (autoPrintReceipts) {
+        await txQuery(
+          client,
+          `
+            INSERT INTO print_jobs (
+              id, station_id, job_type, payload, priority,
+              idempotency_key, source_transaction_id
+            )
+            VALUES ($1, $2, 'print.receipt', $3::jsonb, 10, $4, $5)
+            ON CONFLICT (station_id, idempotency_key) DO UPDATE
+            SET updated_at = CURRENT_TIMESTAMP
+          `,
+          [
+            uuidv4(),
+            stationId2,
+            JSON.stringify({
+              type: "receiptData",
+              data: receiptPayload,
+              state: { transactionId }
+            }),
+            `receipt:${transactionId}:default`,
+            transactionId
+          ]
+        );
+      }
     }
     return { success: true, transactionId };
   });
@@ -134676,6 +140649,36 @@ async function markFiscalMessageProcessed(args) {
 
 // src/shared/runtime/fiscalInbox.ts
 init_bus();
+async function enqueueFiscalInboxReviewItem(args) {
+  const stationId2 = requireNonEmptyString(args.stationId, "stationId");
+  const transactionId = requireNonEmptyString(
+    args.transactionId,
+    "transactionId"
+  );
+  const errorText = String(args.errorText || "Requires manual fiscal review");
+  const id = await enqueueFiscalInboxMessage({
+    stationId: stationId2,
+    topic: "external_fiscalization",
+    requestId: args.requestId ?? `txn-review:${transactionId}`,
+    message: {
+      type: "transactionFiscalizationReviewRequired",
+      stationId: stationId2,
+      transactionId,
+      error: errorText,
+      requiresManualReview: true,
+      at: Date.now(),
+      ...ensurePlainObject(args.message ?? {}, {})
+    }
+  });
+  if (id != null) {
+    await fiscalInboxRepository.markDeadById({
+      id: Number(id),
+      stationId: stationId2,
+      errorText
+    });
+  }
+  return id;
+}
 async function enqueueFiscalInboxMessage(args) {
   return await fiscalInboxRepository.enqueue({
     stationId: requireNonEmptyString(args.stationId, "stationId"),
@@ -134683,6 +140686,23 @@ async function enqueueFiscalInboxMessage(args) {
     requestId: args.requestId != null ? String(args.requestId) : null,
     message: ensurePlainObject(args.message, args.message)
   });
+}
+async function enqueueFiscalInboxReviewFailure(args) {
+  const stationId2 = requireNonEmptyString(args.stationId, "stationId");
+  const id = await fiscalInboxRepository.enqueue({
+    stationId: stationId2,
+    topic: args.topic ?? "external_fiscalization",
+    requestId: args.requestId != null ? String(args.requestId) : null,
+    message: ensurePlainObject(args.message, args.message)
+  });
+  if (!id) return null;
+  const errorText = String(args.error?.message ?? args.error);
+  if (args.markDead ?? true) {
+    await fiscalInboxRepository.markDeadById({ id, stationId: stationId2, errorText });
+  } else {
+    await fiscalInboxRepository.markFailedById({ id, stationId: stationId2, errorText });
+  }
+  return id;
 }
 async function claimBatch(limit) {
   return await fiscalInboxRepository.claimBatch(limit);
@@ -134928,11 +140948,31 @@ async function completeTransactionFiscalization(input) {
 // src/modules/transactions/application/commands/fail-transaction-fiscalization.ts
 init_inputs();
 async function failTransactionFiscalization(input) {
-  return await failTransactionFiscalizationRepo({
-    stationId: requireNonEmptyString(input.stationId, "stationId"),
-    transactionId: requireNonEmptyString(input.transactionId, "transactionId"),
+  const stationId2 = requireNonEmptyString(input.stationId, "stationId");
+  const transactionId = requireNonEmptyString(
+    input.transactionId,
+    "transactionId"
+  );
+  const result = await failTransactionFiscalizationRepo({
+    stationId: stationId2,
+    transactionId,
     fiscalResult: input.fiscalResult
   });
+  await enqueueFiscalInboxReviewItem({
+    stationId: stationId2,
+    transactionId,
+    requestId: `txn-review:${transactionId}`,
+    errorText: input.fiscalResult.errorMessage || "Fiscalization failed",
+    message: {
+      source: "failTransactionFiscalization",
+      engine: input.fiscalResult.engine,
+      requestPayload: input.fiscalResult.requestPayload ?? null,
+      responsePayload: input.fiscalResult.responsePayload ?? null,
+      rawResponse: input.fiscalResult.rawResponse ?? null
+    }
+  }).catch(() => {
+  });
+  return result;
 }
 
 // src/modules/transactions/application/commands/mark-transaction-fiscalizing.ts
@@ -135311,11 +141351,13 @@ async function ensureTransactionFromQueue(row) {
 }
 async function processOne2(row) {
   const maxRetries = Number(process.env.VPOS_TX_MAX_RETRIES ?? "5");
+  let txnForReview = null;
   try {
     if (!row.payload || typeof row.payload !== "object") {
       throw new Error("Invalid transaction payload (expected object)");
     }
     const txn = await ensureTransactionFromQueue(row);
+    txnForReview = txn;
     if (txn?.status === "FISCALIZED" && txn?.fiscalization_reference) {
       await markDone2(row.id, row.station_id, {
         transactionId: row.payload?.transactionId ?? null
@@ -135411,6 +141453,27 @@ async function processOne2(row) {
     });
   } catch (e) {
     const msg = String(e?.message || e);
+    await enqueueFiscalInboxReviewFailure({
+      stationId: row.station_id,
+      topic: "external_fiscalization",
+      requestId: txnForReview?.id ? `txn-fiscalization-review:${txnForReview.id}` : `queue-fiscalization-review:${row.id}`,
+      error: e,
+      message: {
+        type: "transactionFiscalizationReviewRequired",
+        stationId: row.station_id,
+        transactionId: txnForReview?.id ?? null,
+        queueId: row.id,
+        payload: row.payload ?? null,
+        error: msg,
+        at: Date.now()
+      }
+    }).catch((err) => {
+      logger.error("[vpos-transactions]", {
+        msg: "Failed to enqueue fiscal inbox review item",
+        error: err,
+        queueId: row.id
+      });
+    });
     await markFailed3({
       id: row.id,
       retryCount: row.retry_count ?? 0,
@@ -135623,13 +141686,17 @@ function startInProcessRuntime(stationId2, opts) {
 }
 
 // src/modules/runtime/infrastructure/supervisorMonitorWorker.ts
+init_loader2();
+init_safeAsync();
 init_busListeners();
 init_fiscalRecoveryPolicy();
 
 // src/modules/supervisor/infrastructure/supervisorRuntime.ts
 var import_os = __toESM(require("os"));
 init_postgres();
+init_loader2();
 init_stationKv();
+init_safeAsync();
 init_fiscalRecoveryPolicy();
 
 // src/modules/runtime/infrastructure/runtimeState.ts
@@ -135763,11 +141830,12 @@ var SupervisorRuntime = class {
       getSystemConfiguration: deps.getSystemConfiguration ?? getSystemConfiguration2,
       getRuntimeState: deps.getRuntimeState ?? getRuntimeState,
       setRuntimeState: deps.setRuntimeState ?? setRuntimeState,
-      withLock: deps.withLock ?? this.withLock
+      withLock: deps.withLock
     };
   }
   async withLock(key, fn) {
-    if (this.deps.withLock) return await this.deps.withLock(key, fn);
+    const externalWithLock = this.deps.withLock;
+    if (externalWithLock) return await externalWithLock(key, fn);
     await this.deps.query(`SELECT pg_advisory_lock(hashtext($1))`, [key]);
     try {
       return await fn();
@@ -136055,8 +142123,8 @@ var SupervisorRuntime = class {
         try {
           const cfg = await this.deps.getSystemConfiguration(this.stationId);
           const raw = JSON.stringify(cfg ?? {});
-          const crypto10 = await import("crypto");
-          checksum = crypto10.createHash("sha256").update(raw).digest("hex");
+          const crypto11 = await import("crypto");
+          checksum = crypto11.createHash("sha256").update(raw).digest("hex");
         } catch (e) {
           error = e?.message ?? String(e);
         }
@@ -136130,7 +142198,9 @@ function startSupervisorMonitorWorker(stationId2, opts) {
         );
         const supervisorCfg = cfg?.supervisor ?? {};
         const processConfig = cfg?.processes?.process ?? {};
-        const status = await supervisor.getStatus().catch(() => ({ processes: {} }));
+        const status = await supervisor.getStatus().catch(() => ({
+          processes: {}
+        }));
         const processes = status.processes ?? {};
         await safeAsync(
           drainFiscalInbox({ limitPerBatch: 50, maxLoops: 3 }),
@@ -136546,6 +142616,7 @@ init_bus();
 init_users();
 init_getStationId();
 init_logger();
+init_safeAsync();
 init_uuid();
 
 // src/modules/tank-levels/application/legacyTransactionSync.ts
@@ -136569,7 +142640,20 @@ async function syncDeductionForTransaction2(stationIdOrArgs, transactionId) {
 
 // src/modules/transactions/application/commands/mark-transaction-failed.ts
 async function markTransactionFailed(input) {
-  return await markTransactionFailedRepo(input);
+  const result = await markTransactionFailedRepo(input);
+  await enqueueFiscalInboxReviewItem({
+    stationId: input.stationId,
+    transactionId: input.transactionId,
+    requestId: `txn-review:${input.transactionId}`,
+    errorText: input.lastError || "Transaction fiscalization failed",
+    message: {
+      source: "markTransactionFailed",
+      fiscalDocumentId: input.fiscalDocumentId ?? null,
+      fiscalizationResponse: input.fiscalizationResponse && typeof input.fiscalizationResponse === "object" ? input.fiscalizationResponse : input.fiscalizationResponse != null ? { value: String(input.fiscalizationResponse) } : null
+    }
+  }).catch(() => {
+  });
+  return result;
 }
 
 // src/modules/transactions/application/commands/mark-transaction-fiscalized.ts
@@ -137341,6 +143425,30 @@ async function sendClaimedTransactionToProxy(input) {
           fiscalDocumentId: docId,
           fiscalizationResponse: res.data ?? {}
         });
+        await enqueueFiscalInboxReviewFailure({
+          stationId: stationId2,
+          topic: "external_fiscalization",
+          requestId: `proxy-fiscalization-review:${txn.id}`,
+          error: extractFailureMessage(res.data) || "Proxy fiscalization failed",
+          message: {
+            type: "proxyFiscalizationReviewRequired",
+            stationId: stationId2,
+            transactionId: String(txn.id),
+            documentId: docId,
+            documentNumber: docNo,
+            response: res.data ?? null,
+            at: Date.now()
+          }
+        }).catch((err) => {
+          logger.error(
+            `[${WORKER_NAME6}] failed to enqueue fiscal inbox review`,
+            {
+              stationId: stationId2,
+              transactionId: String(txn.id),
+              error: String(err?.message || err)
+            }
+          );
+        });
       } else if (hasFinalPayload) {
         await markTransactionFiscalized({
           stationId: stationId2,
@@ -137460,6 +143568,27 @@ async function sendClaimedTransactionToProxy(input) {
       incrementRetryCount: true,
       fiscalDocumentId: docId
     }).catch(() => {
+    });
+    await enqueueFiscalInboxReviewFailure({
+      stationId: stationId2,
+      topic: "external_fiscalization",
+      requestId: `proxy-fiscalization-review:${txn.id}`,
+      error: e,
+      message: {
+        type: "proxyFiscalizationReviewRequired",
+        stationId: stationId2,
+        transactionId: String(txn.id),
+        documentId: docId,
+        trigger,
+        error: String(e?.message || e),
+        at: Date.now()
+      }
+    }).catch((err) => {
+      logger.error(`[${WORKER_NAME6}] failed to enqueue fiscal inbox review`, {
+        stationId: stationId2,
+        transactionId: String(txn.id),
+        error: String(err?.message || err)
+      });
     });
     return { ok: false, error: String(e?.message || e) };
   }
@@ -137758,6 +143887,7 @@ function startLocalServerRuntime(stationId2) {
 }
 
 // src/shared/forecourt/adapters.ts
+init_runtime();
 function getJplTcpAdapterState() {
   return getJplAdapterState();
 }
@@ -137766,11 +143896,12 @@ function getJplTcpBufferHealth() {
 }
 
 // server.ts
+init_runtime();
 init_getStationId();
 init_logger();
 
 // node_modules/socket.io/wrapper.mjs
-var import_dist = __toESM(require_dist7(), 1);
+var import_dist = __toESM(require_dist8(), 1);
 var { Server, Namespace, Socket } = import_dist.default;
 
 // server/forecourtWs.ts
@@ -138071,6 +144202,7 @@ var startForecourtCommandProcessor = () => {
 };
 
 // server/forecourtWs.ts
+init_runtime();
 init_sharedState();
 
 // src/modules/pumps/infrastructure/pumpStore.ts
@@ -138079,7 +144211,7 @@ init_bus();
 init_logger();
 
 // src/modules/pumps/infrastructure/transactionHandler.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 init_postgres();
 init_runtimeConfig2();
 init_numbers();
@@ -138355,7 +144487,7 @@ var computeTotals = (session, unitPrice) => {
   return { volume, amount: roundedAmount };
 };
 var deterministicUuid = (input) => {
-  const hash = (0, import_node_crypto5.createHash)("sha1").update(input).digest();
+  const hash = (0, import_node_crypto6.createHash)("sha1").update(input).digest();
   const bytes = Array.from(hash.slice(0, 16));
   bytes[6] = bytes[6] & 15 | 80;
   bytes[8] = bytes[8] & 63 | 128;
@@ -139014,6 +145146,16 @@ var sendSnapshot = (socket, snapshot) => {
 var sendEnvelope = (socket, payload) => {
   socket.emit("message", payload);
 };
+var sendProtocolHealth = (socket, stationId2) => {
+  const gatewayState = getJplGatewayState();
+  sendEnvelope(socket, {
+    type: "forecourt:protocol",
+    data: {
+      stationId: stationId2,
+      ...gatewayState?.protocolHealth ?? gatewayState?.protocol ?? {}
+    }
+  });
+};
 var FORECOURT_STALE_MS2 = 5 * 6e4;
 var isRiskyAction = (action) => !SAFE_OFFLINE_ACTIONS.has(action.trim().toUpperCase());
 var isRecord = (value) => typeof value === "object" && value !== null;
@@ -139203,6 +145345,7 @@ function attachForecourtWs(server) {
             reconnectAttempts: status.reconnectAttempts
           }
         });
+        sendProtocolHealth(socket, meta.stationId);
       }
     })();
     const buf = getJplTcpBufferHealth();
@@ -139272,6 +145415,7 @@ function attachForecourtWs(server) {
           reconnectAttempts: connStatus.reconnectAttempts
         }
       });
+      sendProtocolHealth(socket, stationId2);
       const handleCommandEnvelope = (payload) => {
         void (async () => {
           const parsed = normalizeEnvelope(payload);

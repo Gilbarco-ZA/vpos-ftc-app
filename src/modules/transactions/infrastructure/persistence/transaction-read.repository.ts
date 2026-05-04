@@ -1,8 +1,10 @@
 import { queryAll, queryOne, queryPaginated } from '@/src/platform/db/postgres'
 import { getBrandingSettings } from '@/src/shared/branding/settings'
+import { generateReceipt } from '@/src/shared/receipts/generate'
 import { normalizeReceipt } from '@/src/shared/receipts/normalizeReceipt'
 import { KV_KEYS } from '@/src/shared/setup/keys'
 import { kvGet } from '@/src/shared/storage/stationKv'
+import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import type {
   EditableTransactionLine,
@@ -173,6 +175,47 @@ export async function getLatestTransactionReceiptRepo(
      LIMIT 1`,
     [stationId, transactionId],
   )
+}
+
+export async function createTransactionReceiptRepo(
+  stationId: string,
+  transactionId: string,
+) {
+  const receiptPayload = await generateReceipt({ stationId, transactionId })
+  return await queryOne<any>(
+    `
+      INSERT INTO receipts (
+        id, transaction_id, station_id, receipt_number,
+        html_content, plain_text_content, fiscal_data, branding_snapshot
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING *
+    `,
+    [
+      uuidv4(),
+      transactionId,
+      stationId,
+      receiptPayload.receiptNumber,
+      receiptPayload.htmlContent,
+      receiptPayload.plainTextContent ?? null,
+      JSON.stringify(receiptPayload.fiscalData),
+      receiptPayload.brandingSnapshot
+        ? JSON.stringify(receiptPayload.brandingSnapshot)
+        : null,
+    ],
+  )
+}
+
+export async function getOrCreateLatestTransactionReceiptRepo(
+  stationId: string,
+  transactionId: string,
+) {
+  const existing = await getLatestTransactionReceiptRepo(
+    stationId,
+    transactionId,
+  )
+  if (existing) return existing
+  return await createTransactionReceiptRepo(stationId, transactionId)
 }
 
 export async function getCreditNoteDetailsRepo(

@@ -22,7 +22,7 @@ const normalizeBasePath = (raw: string) => {
   const trimmed = String(raw || '').trim()
   if (!trimmed || trimmed === '/') return ''
   const withSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
-  return withSlash.replace(/\/+$/, '')
+  return withSlash.replace(/\/+$/, '');
 }
 
 const normalizePath = (raw: string) => {
@@ -49,7 +49,7 @@ const resolveProxyBaseUrl = async (stationId?: string) => {
     throw new Error('VPOS_PROXY_URL is not configured')
   }
 
-  return raw.replace(/\/+$/, '')
+  return raw.replace(/\/+$/, '');
 }
 
 const requestOnce = async (

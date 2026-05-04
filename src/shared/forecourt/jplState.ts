@@ -78,6 +78,63 @@ export type JplTcpAdapterState = {
     at: number
   }>
   lastServiceMessages?: Array<{ seqNo?: string; message?: string; at: number }>
+
+  lastPpStatuses?: Array<{
+    ppId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastPpErrors?: Array<{
+    ppId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastWashStatuses?: Array<{
+    wpId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastWashErrors?: Array<{
+    wpId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastDigitalIoStatuses?: Array<{
+    diopId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastSensorStatuses?: Array<{
+    sensorId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastVendingStatuses?: Array<{
+    vmId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastVendingErrors?: Array<{
+    vmId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
   lastBackOfficeRecords?: Array<{
     seqNo?: string
     formatId?: string

@@ -35,6 +35,7 @@ import {
   buildReadUnsupervisedTransactionRequest,
 } from '@/src/modules/forecourt/infrastructure/jpl/transactionService'
 import { forecourtJplReplayRepo } from '@/src/modules/forecourt/infrastructure/repositories/forecourtJplReplayRepo'
+import { forecourtJplTransactionCheckpointRepo } from '@/src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionCheckpointRepo'
 import { forecourtJplTransactionsRepo } from '@/src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionsRepo'
 import { getStationLinkingWindowSecondsSafe } from '@/src/modules/transactions/infrastructure/linkingWindow'
 
@@ -79,7 +80,7 @@ export const isAccessReject = (err: any) => {
     err?.data?.RejectCode?.value ??
     null
 
-  return rejectCode === '03H' || /request rejected/i.test(text)
+  return rejectCode === '03H' || /request rejected/i.test(text);
 }
 
 const getRejectData = (err: unknown): Record<string, any> | null => {
@@ -243,6 +244,14 @@ async function upsertTransactionFromNormalized(
   })
 }
 
+const checkpointErrorText = (err: unknown) => {
+  const serialized = serializeError(err)
+  if (serialized == null) return null
+  return typeof serialized === 'string'
+    ? serialized
+    : JSON.stringify(serialized)
+}
+
 export const pullAndClearSupervisedTransactions = async (args: {
   stationId: string
   bufferEntries: JplReplayEntry[]
@@ -277,6 +286,19 @@ export const pullAndClearSupervisedTransactions = async (args: {
       await withReplayLock(`sup:${fpId}`, async () => {
         if (globalThis.__jplSeenTransactions?.has(seenKey)) return
 
+        await forecourtJplTransactionCheckpointRepo.upsert({
+          stationId,
+          sourceMode: 'supervised',
+          fpId,
+          transSeqNo,
+          lifecycleStage: 'discovered',
+          lockId,
+          ownerPosId: currentPosId,
+          blockedByForeignPos: false,
+          lastAttemptAt: new Date().toISOString(),
+          lastError: null,
+        })
+
         if (lockId && lockId !== '00' && lockId !== currentPosId) {
           logger.warn('[jplTcp]', {
             msg: 'supervised tx locked by another POS; skipping',
@@ -284,6 +306,18 @@ export const pullAndClearSupervisedTransactions = async (args: {
             transSeqNo: seq4,
             lockId,
             currentPosId,
+          })
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId,
+            sourceMode: 'supervised',
+            fpId,
+            transSeqNo,
+            lifecycleStage: 'blocked_by_foreign_pos',
+            lockId,
+            ownerPosId: currentPosId,
+            blockedByForeignPos: true,
+            lastAttemptAt: new Date().toISOString(),
+            lastError: `Locked by POS ${lockId}`,
           })
           return
         }
@@ -348,6 +382,21 @@ export const pullAndClearSupervisedTransactions = async (args: {
               clearFieldsJson: clearFields,
               lastError: null,
             })
+            await forecourtJplTransactionCheckpointRepo.upsert({
+              stationId,
+              sourceMode: 'supervised',
+              fpId,
+              transSeqNo,
+              lifecycleStage: 'read_locked',
+              lockId: currentPosId,
+              ownerPosId: currentPosId,
+              blockedByForeignPos: false,
+              readAttemptsIncrement: 1,
+              lastAttemptAt: new Date().toISOString(),
+              readPayloadJson: txData,
+              clearPayloadJson: clearFields,
+              lastError: null,
+            })
           }
         } else {
           const tx = await (client as any).request({
@@ -372,6 +421,21 @@ export const pullAndClearSupervisedTransactions = async (args: {
             lockId: currentPosId,
             readPayloadJson: txData,
             clearFieldsJson: clearFields,
+            lastError: null,
+          })
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId,
+            sourceMode: 'supervised',
+            fpId,
+            transSeqNo,
+            lifecycleStage: 'read_locked',
+            lockId: currentPosId,
+            ownerPosId: currentPosId,
+            blockedByForeignPos: false,
+            readAttemptsIncrement: 1,
+            lastAttemptAt: new Date().toISOString(),
+            readPayloadJson: txData,
+            clearPayloadJson: clearFields,
             lastError: null,
           })
         }
@@ -455,12 +519,39 @@ export const pullAndClearSupervisedTransactions = async (args: {
             capturedAt: new Date().toISOString(),
             lastError: null,
           })
+          await forecourtJplTransactionCheckpointRepo.upsert({
+            stationId,
+            sourceMode: 'supervised',
+            fpId,
+            transSeqNo,
+            lifecycleStage: 'captured',
+            lockId: currentPosId,
+            ownerPosId: currentPosId,
+            blockedByForeignPos: false,
+            lastSuccessAt: new Date().toISOString(),
+            lastError: null,
+          })
         }
 
         const clearSeqNo = resolveClearSeqNo({
           fallbackSeqNo: transSeqNo,
           txData,
           replayRow,
+        })
+
+        await forecourtJplTransactionCheckpointRepo.upsert({
+          stationId,
+          sourceMode: 'supervised',
+          fpId,
+          transSeqNo,
+          lifecycleStage: 'clear_requested',
+          lockId: currentPosId,
+          ownerPosId: currentPosId,
+          blockedByForeignPos: false,
+          clearAttemptsIncrement: 1,
+          lastAttemptAt: new Date().toISOString(),
+          clearPayloadJson: { PaymentParameters: {}, ...clearFields },
+          lastError: null,
         })
 
         await (client as any).request({
@@ -485,6 +576,18 @@ export const pullAndClearSupervisedTransactions = async (args: {
           transSeqNo,
           // transLockId: currentPosId,
         })
+        await forecourtJplTransactionCheckpointRepo.upsert({
+          stationId,
+          sourceMode: 'supervised',
+          fpId,
+          transSeqNo,
+          lifecycleStage: 'cleared',
+          lockId: currentPosId,
+          ownerPosId: currentPosId,
+          blockedByForeignPos: false,
+          lastSuccessAt: new Date().toISOString(),
+          lastError: null,
+        })
       })
     } catch (err) {
       const kind = classifyReplayReject(err)
@@ -492,6 +595,18 @@ export const pullAndClearSupervisedTransactions = async (args: {
         markReplayCapability('supervised', 'denied')
       }
       markBufferError('supervised', fpId, err)
+      await forecourtJplTransactionCheckpointRepo.upsert({
+        stationId,
+        sourceMode: 'supervised',
+        fpId,
+        transSeqNo,
+        lifecycleStage: 'failed',
+        lockId,
+        ownerPosId: currentPosId,
+        blockedByForeignPos: false,
+        lastAttemptAt: new Date().toISOString(),
+        lastError: checkpointErrorText(err),
+      })
       logger.error('[jplTcp]', {
         msg: `supervised pull/clear failed fpId=${fpId} seq=${transSeqNo}`,
         replayReject: kind,
@@ -532,6 +647,17 @@ export const pullAndClearUnsupervisedTransactions = async (args: {
     if (!beginReplayKey(key)) continue
 
     try {
+      await forecourtJplTransactionCheckpointRepo.upsert({
+        stationId,
+        sourceMode: 'unsupervised',
+        fpId,
+        transSeqNo,
+        lifecycleStage: 'discovered',
+        ownerPosId: currentPosId,
+        blockedByForeignPos: false,
+        lastAttemptAt: new Date().toISOString(),
+        lastError: null,
+      })
       markBufferRead('unsupervised', fpId, transSeqNo)
 
       const tx = await (client as any).request(
@@ -543,6 +669,19 @@ export const pullAndClearUnsupervisedTransactions = async (args: {
       )
 
       const txData = tx?.data ?? {}
+      await forecourtJplTransactionCheckpointRepo.upsert({
+        stationId,
+        sourceMode: 'unsupervised',
+        fpId,
+        transSeqNo,
+        lifecycleStage: 'read_locked',
+        ownerPosId: currentPosId,
+        blockedByForeignPos: false,
+        readAttemptsIncrement: 1,
+        lastAttemptAt: new Date().toISOString(),
+        readPayloadJson: txData,
+        lastError: null,
+      })
       const moneyDue = Number(
         txData?.MoneyDue ??
           txData?.Money ??
@@ -566,6 +705,20 @@ export const pullAndClearUnsupervisedTransactions = async (args: {
         moneyDue: Number.isFinite(moneyDue) ? moneyDue : null,
       })
 
+      await forecourtJplTransactionCheckpointRepo.upsert({
+        stationId,
+        sourceMode: 'unsupervised',
+        fpId,
+        transSeqNo,
+        lifecycleStage: 'clear_requested',
+        ownerPosId: currentPosId,
+        blockedByForeignPos: false,
+        clearAttemptsIncrement: 1,
+        lastAttemptAt: new Date().toISOString(),
+        clearPayloadJson: txData,
+        lastError: null,
+      })
+
       await (client as any).request(
         buildClearUnsupervisedTransactionRequest({
           fpId: fpId2,
@@ -584,9 +737,31 @@ export const pullAndClearUnsupervisedTransactions = async (args: {
         fpId,
         transSeqNo,
       })
+      await forecourtJplTransactionCheckpointRepo.upsert({
+        stationId,
+        sourceMode: 'unsupervised',
+        fpId,
+        transSeqNo,
+        lifecycleStage: 'cleared',
+        ownerPosId: currentPosId,
+        blockedByForeignPos: false,
+        lastSuccessAt: new Date().toISOString(),
+        lastError: null,
+      })
     } catch (err) {
       if (isAccessReject(err)) {
         markReplayCapability('unsupervised', 'denied')
+        await forecourtJplTransactionCheckpointRepo.upsert({
+          stationId,
+          sourceMode: 'unsupervised',
+          fpId,
+          transSeqNo,
+          lifecycleStage: 'failed',
+          ownerPosId: currentPosId,
+          blockedByForeignPos: false,
+          lastAttemptAt: new Date().toISOString(),
+          lastError: checkpointErrorText(err),
+        })
         logger.error('[jplTcp]', {
           msg: `unsupervised replay denied by controller fpId=${fpId} seq=${transSeqNo}`,
           error: serializeError(err),
@@ -596,6 +771,17 @@ export const pullAndClearUnsupervisedTransactions = async (args: {
 
       globalThis.__jplSeenTransactions?.delete(key)
       markBufferError('unsupervised', fpId, err)
+      await forecourtJplTransactionCheckpointRepo.upsert({
+        stationId,
+        sourceMode: 'unsupervised',
+        fpId,
+        transSeqNo,
+        lifecycleStage: 'failed',
+        ownerPosId: currentPosId,
+        blockedByForeignPos: false,
+        lastAttemptAt: new Date().toISOString(),
+        lastError: checkpointErrorText(err),
+      })
       logger.error('[jplTcp]', {
         msg: `unsupervised pull/clear failed fpId=${fpId} seq=${transSeqNo}`,
         error: err,
