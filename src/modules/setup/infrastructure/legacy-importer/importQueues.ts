@@ -16,6 +16,7 @@ import {
   sha256File,
 } from '@/src/modules/setup/infrastructure/legacy-importer/ledger'
 import { moveAside } from '@/src/modules/setup/infrastructure/legacy-importer/moveAside'
+import { extractFiscalTzQueueItems } from '@/src/modules/tanzania-fiscal/infrastructure/fiscalTzLegacy'
 
 export async function importQueueFile(opts: {
   ctx: ImportContext
@@ -38,7 +39,10 @@ export async function importQueueFile(opts: {
     onWarn,
   } = opts
 
-  const filePath = path.join(legacyPermDir, queueFileName)
+  const filePath = path.join(
+    /*turbopackIgnore: true*/ legacyPermDir,
+    queueFileName,
+  )
   if (!(await pathExists(filePath))) return
 
   const meta = await getFileMeta(filePath)
@@ -97,24 +101,73 @@ export async function importQueueFile(opts: {
     return
   }
 
-  const root = json.data ? json.data : json
-
   try {
+    const items = extractFiscalTzQueueItems({
+      stationId,
+      fileName: queueFileName,
+      kind,
+      json,
+    })
+
     if (kind === 'transaction') {
-      const items = Array.isArray(root.transactions) ? root.transactions : []
       for (const item of items) {
         await query(
-          `INSERT INTO transaction_queue (id, station_id, status, payload) VALUES ($1, $2, 'PENDING', $3)`,
-          [uuidv4(), stationId, item],
+          `INSERT INTO transaction_queue (
+              id, station_id, status, payload, retry_count, last_error,
+              legacy_source_key
+            )
+            VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
+            ON CONFLICT (station_id, legacy_source_key)
+            WHERE legacy_source_key IS NOT NULL
+            DO UPDATE SET status = CASE
+                             WHEN transaction_queue.status = 'DONE'
+                             THEN transaction_queue.status
+                             ELSE EXCLUDED.status
+                           END,
+                          payload = EXCLUDED.payload,
+                          retry_count = GREATEST(transaction_queue.retry_count, EXCLUDED.retry_count),
+                          last_error = COALESCE(transaction_queue.last_error, EXCLUDED.last_error),
+                          updated_at = NOW()`,
+          [
+            uuidv4(),
+            stationId,
+            item.status,
+            JSON.stringify(item.payload),
+            item.retryCount,
+            item.lastError,
+            item.sourceKey,
+          ],
         )
         onInserted()
       }
     } else {
-      const items = Array.isArray(root.reports) ? root.reports : []
       for (const item of items) {
         await query(
-          `INSERT INTO report_queue (id, station_id, status, payload) VALUES ($1, $2, 'PENDING', $3)`,
-          [uuidv4(), stationId, item],
+          `INSERT INTO report_queue (
+              id, station_id, status, payload, retry_count, last_error,
+              legacy_source_key
+            )
+            VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
+            ON CONFLICT (station_id, legacy_source_key)
+            WHERE legacy_source_key IS NOT NULL
+            DO UPDATE SET status = CASE
+                             WHEN report_queue.status = 'DONE'
+                             THEN report_queue.status
+                             ELSE EXCLUDED.status
+                           END,
+                          payload = EXCLUDED.payload,
+                          retry_count = GREATEST(report_queue.retry_count, EXCLUDED.retry_count),
+                          last_error = COALESCE(report_queue.last_error, EXCLUDED.last_error),
+                          updated_at = NOW()`,
+          [
+            uuidv4(),
+            stationId,
+            item.status,
+            JSON.stringify(item.payload),
+            item.retryCount,
+            item.lastError,
+            item.sourceKey,
+          ],
         )
         onInserted()
       }

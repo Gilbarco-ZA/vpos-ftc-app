@@ -19,12 +19,12 @@ export type LedgerEntry = {
 }
 
 export async function sha256File(filePath: string): Promise<string> {
-  const buf = await fs.readFile(filePath)
+  const buf = await fs.readFile(/*turbopackIgnore: true*/ filePath)
   return crypto.createHash('sha256').update(buf).digest('hex')
 }
 
 export async function getFileMeta(filePath: string) {
-  const st = await fs.stat(filePath)
+  const st = await fs.stat(/*turbopackIgnore: true*/ filePath)
   // compat: older importer variants used bytes + mtimeMs
   return {
     size: st.size,

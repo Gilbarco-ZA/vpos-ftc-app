@@ -1,6 +1,6 @@
 import type { BufferMode } from '@/src/modules/forecourt/infrastructure/jpl/types'
 
-import { query, queryAll } from '@/src/platform/db/postgres'
+import { query, queryAll, queryOne } from '@/src/platform/db/postgres'
 
 export type TransactionCheckpointStage =
   | 'discovered'
@@ -30,6 +30,26 @@ export type TransactionCheckpointRow = {
   last_error: string | null
   updated_at: string
 }
+
+const selectColumns = `
+  station_id,
+  source_mode,
+  fp_id,
+  trans_seq_no,
+  lifecycle_stage,
+  lock_id,
+  owner_pos_id,
+  blocked_by_foreign_pos,
+  read_attempts,
+  clear_attempts,
+  first_seen_at,
+  last_attempt_at,
+  last_success_at,
+  read_payload_json,
+  clear_payload_json,
+  last_error,
+  updated_at
+`
 
 const sql = {
   upsert: `
@@ -75,25 +95,19 @@ const sql = {
       last_error = EXCLUDED.last_error,
       updated_at = NOW()
   `,
+  getByKey: `
+    SELECT
+      ${selectColumns}
+    FROM forecourt_jpl_transaction_checkpoints
+    WHERE station_id = $1
+      AND source_mode = $2
+      AND fp_id = $3
+      AND trans_seq_no = $4
+    LIMIT 1
+  `,
   listActiveByStation: `
     SELECT
-      station_id,
-      source_mode,
-      fp_id,
-      trans_seq_no,
-      lifecycle_stage,
-      lock_id,
-      owner_pos_id,
-      blocked_by_foreign_pos,
-      read_attempts,
-      clear_attempts,
-      first_seen_at,
-      last_attempt_at,
-      last_success_at,
-      read_payload_json,
-      clear_payload_json,
-      last_error,
-      updated_at
+      ${selectColumns}
     FROM forecourt_jpl_transaction_checkpoints
     WHERE station_id = $1
       AND (
@@ -103,9 +117,44 @@ const sql = {
       )
     ORDER BY updated_at ASC
   `,
+  listRecoverableByStation: `
+    SELECT
+      ${selectColumns}
+    FROM forecourt_jpl_transaction_checkpoints
+    WHERE station_id = $1
+      AND blocked_by_foreign_pos = FALSE
+      AND lifecycle_stage IN ('read_locked', 'captured', 'clear_requested', 'failed')
+      AND (clear_attempts < $2 OR lifecycle_stage <> 'failed')
+    ORDER BY updated_at ASC
+    LIMIT $3
+  `,
+  listStaleForeignLocksByStation: `
+    SELECT
+      ${selectColumns}
+    FROM forecourt_jpl_transaction_checkpoints
+    WHERE station_id = $1
+      AND blocked_by_foreign_pos = TRUE
+      AND lifecycle_stage = 'blocked_by_foreign_pos'
+      AND updated_at <= NOW() - make_interval(secs => $2)
+    ORDER BY updated_at ASC
+    LIMIT $3
+  `,
 } as const
 
 export const forecourtJplTransactionCheckpointRepo = {
+  async getByKey(args: {
+    stationId: string
+    sourceMode: BufferMode
+    fpId: number
+    transSeqNo: number
+  }) {
+    return await queryOne<TransactionCheckpointRow>(sql.getByKey, [
+      args.stationId,
+      args.sourceMode,
+      args.fpId,
+      args.transSeqNo,
+    ])
+  },
   async upsert(args: {
     stationId: string
     sourceMode: BufferMode
@@ -149,5 +198,33 @@ export const forecourtJplTransactionCheckpointRepo = {
     return await queryAll<TransactionCheckpointRow>(sql.listActiveByStation, [
       args.stationId,
     ])
+  },
+  async listRecoverableByStation(args: {
+    stationId: string
+    maxClearAttempts?: number
+    limit?: number
+  }) {
+    return await queryAll<TransactionCheckpointRow>(
+      sql.listRecoverableByStation,
+      [
+        args.stationId,
+        Math.max(1, Number(args.maxClearAttempts ?? 5)),
+        Math.max(1, Math.min(200, Number(args.limit ?? 50))),
+      ],
+    )
+  },
+  async listStaleForeignLocksByStation(args: {
+    stationId: string
+    staleAfterSeconds?: number
+    limit?: number
+  }) {
+    return await queryAll<TransactionCheckpointRow>(
+      sql.listStaleForeignLocksByStation,
+      [
+        args.stationId,
+        Math.max(60, Number(args.staleAfterSeconds ?? 900)),
+        Math.max(1, Math.min(200, Number(args.limit ?? 50))),
+      ],
+    )
   },
 }

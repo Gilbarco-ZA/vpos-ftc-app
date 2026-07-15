@@ -1,6 +1,6 @@
 import type { NormalizedReceipt } from '@/src/shared/receipts/normalizeReceipt'
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import {
   queryAll as pgAll,
@@ -58,33 +58,79 @@ export const GET = async (req: Request) => {
         )
       }
 
-      const [station, taxPinKv, siteProfile, transactionLines, branding] =
-        await Promise.all([
-          pgOne<any>(`SELECT * FROM fuel_stations WHERE id = $1`, [
+      const [
+        station,
+        taxPinKv,
+        siteProfile,
+        fallbackProduct,
+        transactionLines,
+        branding,
+      ] = await Promise.all([
+        pgOne<any>(`SELECT * FROM fuel_stations WHERE id = $1`, [
+          user.stationId,
+        ]),
+        kvGet<any>(user.stationId, 'tax_pin'),
+        kvGet<any>(user.stationId, KV_KEYS.SITE_PROFILE),
+        pgOne<any>(
+          `SELECT COALESCE(ext_product_code, product_code) AS product_code,
+                    sku,
+                    COALESCE(ext_tax_code, tax_code) AS tax_code,
+                    tax_rate
+               FROM products
+              WHERE station_id = $1
+                AND (
+                  product_id = NULLIF(BTRIM(CAST($2 AS text)), '')
+                  OR product_code = NULLIF(BTRIM(CAST($2 AS text)), '')
+                  OR ext_product_code = NULLIF(BTRIM(CAST($2 AS text)), '')
+                  OR LOWER(COALESCE(product_name, '')) = LOWER(NULLIF(BTRIM(CAST($3 AS text)), ''))
+                  OR LOWER(COALESCE(product_name, '')) = LOWER(NULLIF(BTRIM(CAST($4 AS text)), ''))
+                )
+              ORDER BY CASE WHEN product_id = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+                       CASE WHEN product_code = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+                       CASE WHEN ext_product_code = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+                       product_name ASC
+              LIMIT 1`,
+          [
             user.stationId,
-          ]),
-          kvGet<any>(user.stationId, 'tax_pin'),
-          kvGet<any>(user.stationId, KV_KEYS.SITE_PROFILE),
-          pgAll<any>(
-            `
+            transaction.grade_id,
+            transaction.grade_name,
+            transaction.fuel_type,
+          ],
+        ),
+        pgAll<any>(
+          `
           SELECT
             tl.quantity,
             COALESCE(p.ext_unit_price, tl.unit_price, p.unit_price) AS unit_price,
             (tl.quantity * COALESCE(p.ext_unit_price, tl.unit_price, p.unit_price)) AS line_total,
             p.product_name,
-            p.tax_code,
-            p.ext_tax_code
+            COALESCE(p.ext_product_code, p.product_code, t.grade_id) AS product_code,
+            p.sku,
+            COALESCE(tl.tax_code, p.tax_code) AS tax_code,
+            p.ext_tax_code,
+            COALESCE(tl.tax_rate, p.tax_rate) AS tax_rate
           FROM transaction_lines tl
+          JOIN transactions t
+            ON t.id = tl.transaction_id
+            AND t.station_id = $1
           LEFT JOIN products p
-            ON p.id = tl.product_id
-            AND p.station_id = $1
+            ON p.station_id = $1
+            AND (
+              p.id = tl.product_id
+              OR p.product_id = tl.product_id::text
+              OR p.product_code = tl.product_id::text
+              OR p.ext_product_code = tl.product_id::text
+              OR p.product_id = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+              OR p.product_code = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+              OR p.ext_product_code = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+            )
           WHERE tl.transaction_id = $2::uuid
           ORDER BY tl.created_at ASC
           `,
-            [user.stationId, transaction.id],
-          ),
-          getBrandingSettings(user.stationId),
-        ])
+          [user.stationId, transaction.id],
+        ),
+        getBrandingSettings(user.stationId),
+      ])
 
       const stationSettings = await pgOne<any>(
         `SELECT volume_decimals, money_decimals, unit_price_decimals FROM station_settings WHERE station_id = $1`,
@@ -108,7 +154,14 @@ export const GET = async (req: Request) => {
 
       const rawResponse = transaction?.fiscalization_response
       const receipt = normalizeReceipt({
-        transaction,
+        transaction: {
+          ...transaction,
+          product_code:
+            fallbackProduct?.product_code ?? transaction.product_code,
+          sku: fallbackProduct?.sku ?? transaction.sku,
+          tax_code: fallbackProduct?.tax_code ?? transaction.tax_code,
+          tax_rate: fallbackProduct?.tax_rate ?? transaction.tax_rate,
+        },
         stationName: station?.name,
         station,
         stationTaxNumber,

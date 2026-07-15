@@ -48,14 +48,19 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
   const taxMap = (receiptCountry === 'TZ' ? TZ_DATASET : KE_DATASET).taxTypes
 
   const summaryByCode = receipt.items.reduce<
-    Record<string, { taxable: number; tax: number }>
+    Record<string, { name: string; rate: number; taxable: number; tax: number }>
   >((acc, item) => {
     const code = (item.taxType || 'B').toUpperCase()
     const map = taxMap.find((entry) => entry.code === code) || taxMap[1]
+    const rate =
+      item.taxRate != null && Number.isFinite(Number(item.taxRate))
+        ? Number(item.taxRate)
+        : map.rate
     const amount = buildAmount(item.qty, item.unitPrice, item.amount) || 0
-    const taxable = amount / (1 + map.rate / 100)
+    const taxable = amount / (1 + rate / 100)
     const tax = amount - taxable
-    if (!acc[map.code]) acc[map.code] = { taxable: 0, tax: 0 }
+    if (!acc[map.code])
+      acc[map.code] = { name: map.name, rate, taxable: 0, tax: 0 }
     acc[map.code].taxable += taxable
     acc[map.code].tax += tax
     return acc
@@ -63,6 +68,8 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
 
   const taxRows = taxMap.map((entry) => ({
     ...entry,
+    rate: summaryByCode[entry.code]?.rate ?? entry.rate,
+    name: summaryByCode[entry.code]?.name ?? entry.name,
     taxable: summaryByCode[entry.code]?.taxable ?? 0,
     tax: summaryByCode[entry.code]?.tax ?? 0,
   }))
@@ -278,28 +285,37 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
           </div>
           <div className="mt-2 space-y-2">
             {receipt.items.map((item, idx) => (
-              <div
-                key={`${item.description}-${idx}`}
-                className="grid grid-cols-8 gap-2"
-              >
-                <div className="col-span-3">
-                  <div className="font-medium">{item.description}</div>
+              <div key={`${item.description}-${idx}`}>
+                <div className="grid grid-cols-8 gap-2">
+                  <div className="col-span-3 font-medium">
+                    {item.description}
+                  </div>
+                  <span className="text-right text-xs">
+                    {item.taxType ?? 'B'}
+                  </span>
+                  <span className="text-right text-xs">
+                    {formatQty(item.qty, decimals.volume)}
+                  </span>
+                  <span className="text-right text-xs">
+                    {formatMoney(item.unitPrice, decimals.unitPrice)}
+                  </span>
+                  <span className="col-span-2 text-right text-xs">
+                    {formatMoney(
+                      buildAmount(item.qty, item.unitPrice, item.amount),
+                      decimals.money,
+                    )}
+                  </span>
                 </div>
-                <span className="text-right text-xs">
-                  {item.taxType ?? 'B'}
-                </span>
-                <span className="text-right text-xs">
-                  {formatQty(item.qty, decimals.volume)}
-                </span>
-                <span className="text-right text-xs">
-                  {formatMoney(item.unitPrice, decimals.unitPrice)}
-                </span>
-                <span className="col-span-2 text-right text-xs">
-                  {formatMoney(
-                    buildAmount(item.qty, item.unitPrice, item.amount),
-                    decimals.money,
-                  )}
-                </span>
+                {item.productCode ? (
+                  <div className="mt-0.5 break-all text-xs leading-tight text-black">
+                    {item.productCode}
+                  </div>
+                ) : null}
+                {item.sku ? (
+                  <div className="break-all text-xs leading-tight text-black">
+                    SKU: {item.sku}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -315,7 +331,9 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
           </div>
           {taxRows.map((row) => (
             <div key={row.code} className="grid grid-cols-3 gap-2">
-              <span>{row.name}</span>
+              <span>
+                {row.code} - {row.rate > 0 ? `${row.rate}%` : row.name}
+              </span>
               <span className="text-right">
                 {formatMoney(row.taxable, decimals.money)}
               </span>

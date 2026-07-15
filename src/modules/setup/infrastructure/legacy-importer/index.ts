@@ -5,6 +5,7 @@ import type {
   ImportResult,
 } from '@/src/modules/setup/infrastructure/legacy-importer/types'
 
+import { getLegacyArchiveDir } from '@/src/platform/config/app-config'
 import { query } from '@/src/platform/db/postgres'
 
 import { scanAndUpsertPluginCatalog } from '@/src/modules/admin-config/infrastructure/pluginCatalogStore'
@@ -22,6 +23,7 @@ import {
 import {
   importCertificates,
   importFiscalDevice,
+  importFiscalToken,
   importPrinterQueues,
   importRemoteUploadState,
 } from '@/src/modules/setup/infrastructure/legacy-importer/importExtras'
@@ -36,7 +38,6 @@ import {
   makeRunId,
 } from '@/src/modules/setup/infrastructure/legacy-importer/moveAside'
 import {
-  ARCHIVE_ROOT,
   LEGACY,
   LEGACY_EXTRA,
   VPOS_APP_FILES,
@@ -55,18 +56,25 @@ export async function importLegacyIfPresent(opts: {
   legacyPermDir: string
   moveAsideRoot?: string
   sourceType?: 'vpos-app' | 'vpos-console' | 'unknown'
+  onProgress?: (progress: {
+    message: string
+    progress: number
+    detail?: string
+  }) => void
 }): Promise<ImportResult | null> {
   const { stationId, legacyPermDir } = opts
   const runId = makeRunId()
-  const moveAsideRoot =
-    opts.moveAsideRoot ?? path.join(legacyPermDir, ARCHIVE_ROOT)
+  const moveAsideRoot = opts.moveAsideRoot ?? getLegacyArchiveDir()
   const sourceType = opts.sourceType ?? 'unknown'
+  const report = (message: string, progress: number, detail?: string) =>
+    opts.onProgress?.({ message, progress, detail })
   const ctx: ImportContext = { runId, moveAsideRoot, sourceType }
 
   await query(`SELECT pg_advisory_lock(hashtext($1))`, [
     `legacy_import:${stationId}`,
   ])
   try {
+    report('Scanning legacy station files', 52)
     if (!(await pathExists(legacyPermDir))) return null
 
     const hasWork = await hasLegacyWork(legacyPermDir)
@@ -86,6 +94,7 @@ export async function importLegacyIfPresent(opts: {
       obj[k] = (obj[k] || 0) + n
     }
 
+    report('Importing configuration and users', 56)
     // 0) Config/users/fiscal
     await importVposConfigAndUsersAndFiscal({
       ctx,
@@ -98,12 +107,12 @@ export async function importLegacyIfPresent(opts: {
 
     // 0.5) Plugin catalog
     const pluginRoots = [
-      path.join(legacyPermDir, 'plugins'),
-      path.join(legacyPermDir, 'src', 'plugins'),
+      path.join(/*turbopackIgnore: true*/ legacyPermDir, 'plugins'),
+      path.join(/*turbopackIgnore: true*/ legacyPermDir, 'src', 'plugins'),
     ]
     for (const root of pluginRoots) {
       try {
-        const st = await fs.stat(root)
+        const st = await fs.stat(/*turbopackIgnore: true*/ root)
         if (!st.isDirectory()) continue
         const seeded = await scanAndUpsertPluginCatalog(root)
         bump(res.inserted, 'process_catalog', seeded.processes)
@@ -113,6 +122,7 @@ export async function importLegacyIfPresent(opts: {
       } catch {}
     }
 
+    report('Importing legacy transactions', 64)
     // 0.75) Monolithic transactions/reports (older vpos-console)
     await importMonolithicTransactionsAndReportsIfPresent({
       ctx,
@@ -150,18 +160,24 @@ export async function importLegacyIfPresent(opts: {
       onWarn: (w) => res.warnings.push(w),
     })
 
-    // 3) transaction queue file
-    await importQueueFile({
-      ctx,
-      stationId,
+    // 3) transaction queue files, including rotated *.old* retry files.
+    for (const queueFileName of await findLegacyQueueFiles(
       legacyPermDir,
-      queueFileName: LEGACY.FILES.TRANSACTION_QUEUE,
-      kind: 'transaction',
-      onInserted: () => bump(res.inserted, 'transaction_queue'),
-      onMoved: () => bump(res.moved, 'transaction_queue_file'),
-      onWarn: (w) => res.warnings.push(w),
-    })
+      LEGACY.FILES.TRANSACTION_QUEUE,
+    )) {
+      await importQueueFile({
+        ctx,
+        stationId,
+        legacyPermDir,
+        queueFileName,
+        kind: 'transaction',
+        onInserted: () => bump(res.inserted, 'transaction_queue'),
+        onMoved: () => bump(res.moved, 'transaction_queue_file'),
+        onWarn: (w) => res.warnings.push(w),
+      })
+    }
 
+    report('Importing fiscal reports', 72)
     // 4) reports
     await importReportsFolder({
       ctx,
@@ -174,18 +190,24 @@ export async function importLegacyIfPresent(opts: {
       onWarn: (w) => res.warnings.push(w),
     })
 
-    // 5) report queue file
-    await importQueueFile({
-      ctx,
-      stationId,
+    // 5) report queue files, including rotated *.old* retry files.
+    for (const queueFileName of await findLegacyQueueFiles(
       legacyPermDir,
-      queueFileName: LEGACY.FILES.REPORT_QUEUE,
-      kind: 'report',
-      onInserted: () => bump(res.inserted, 'report_queue'),
-      onMoved: () => bump(res.moved, 'report_queue_file'),
-      onWarn: (w) => res.warnings.push(w),
-    })
+      LEGACY.FILES.REPORT_QUEUE,
+    )) {
+      await importQueueFile({
+        ctx,
+        stationId,
+        legacyPermDir,
+        queueFileName,
+        kind: 'report',
+        onInserted: () => bump(res.inserted, 'report_queue'),
+        onMoved: () => bump(res.moved, 'report_queue_file'),
+        onWarn: (w) => res.warnings.push(w),
+      })
+    }
 
+    report('Importing EWURA data', 78)
     // 6) EWURA config + registration
     await importEwuraConfigAndRegistration({
       ctx,
@@ -229,6 +251,7 @@ export async function importLegacyIfPresent(opts: {
       onWarn: (w) => res.warnings.push(w),
     })
 
+    report('Importing certificates and device files', 83)
     // 8) Certificates
     await importCertificates({
       ctx,
@@ -249,7 +272,18 @@ export async function importLegacyIfPresent(opts: {
       onWarn: (w) => res.warnings.push(w),
     })
 
-    // 10) Printer queues
+    // 10) Fiscal token artifact
+    await importFiscalToken({
+      ctx,
+      stationId,
+      legacyPermDir,
+      onInserted: () => bump(res.inserted, 'fiscal_token'),
+      onMoved: () => bump(res.moved, 'fiscal_token_file'),
+      onWarn: (w) => res.warnings.push(w),
+    })
+
+    report('Importing printer and upload queues', 86)
+    // 11) Printer queues
     await importPrinterQueues({
       ctx,
       stationId,
@@ -259,7 +293,7 @@ export async function importLegacyIfPresent(opts: {
       onWarn: (w) => res.warnings.push(w),
     })
 
-    // 11) Remote upload state
+    // 12) Remote upload state
     await importRemoteUploadState({
       ctx,
       stationId,
@@ -269,11 +303,39 @@ export async function importLegacyIfPresent(opts: {
       onWarn: (w) => res.warnings.push(w),
     })
 
+    report('Finalizing imported files', 87)
     return res
   } finally {
     await query(`SELECT pg_advisory_unlock(hashtext($1))`, [
       `legacy_import:${stationId}`,
     ])
+  }
+}
+
+async function findLegacyQueueFiles(permDir: string, baseName: string) {
+  try {
+    const entries = await fs.readdir(/*turbopackIgnore: true*/ permDir, {
+      withFileTypes: true,
+    })
+    const prefix = baseName.replace(/\.json$/i, '')
+    return entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .filter((name) => {
+        const lower = name.toLowerCase()
+        return (
+          lower === baseName.toLowerCase() ||
+          lower.startsWith(`${prefix.toLowerCase()}.old`) ||
+          lower.startsWith(`${prefix.toLowerCase()}.old_`)
+        )
+      })
+      .sort((a, b) => {
+        if (a === baseName) return -1
+        if (b === baseName) return 1
+        return a.localeCompare(b)
+      })
+  } catch {
+    return []
   }
 }
 
@@ -289,7 +351,7 @@ async function hasLegacyWork(permDir: string): Promise<boolean> {
   ]
 
   for (const f of folders) {
-    const p = path.join(permDir, f)
+    const p = path.join(/*turbopackIgnore: true*/ permDir, f)
     if (await folderHasJsonFiles(p)) return true
   }
 
@@ -308,18 +370,47 @@ async function hasLegacyWork(permDir: string): Promise<boolean> {
   ]
 
   for (const name of queueFiles) {
-    const fp = path.join(permDir, name)
+    const fp = path.join(/*turbopackIgnore: true*/ permDir, name)
     if (await fileHasContent(fp)) return true
+
+    for (const queueFileName of await findLegacyQueueFiles(permDir, name)) {
+      const queuePath = path.join(
+        /*turbopackIgnore: true*/ permDir,
+        queueFileName,
+      )
+      if (await fileHasContent(queuePath)) return true
+    }
   }
 
   const extraFiles = [
-    path.join(permDir, LEGACY_EXTRA.FISCAL_DEVICE),
-    path.join(permDir, LEGACY_EXTRA.PRINTER_TRANSACTION_QUEUE),
-    path.join(permDir, LEGACY_EXTRA.PRINTER_REPORT_QUEUE),
-    path.join(permDir, LEGACY_EXTRA.REMOTE_UPLOAD_QUEUE),
-    path.join(permDir, LEGACY_EXTRA.REMOTE_UPLOAD_STATUS),
-    path.join(permDir, LEGACY_EXTRA.CERT_DIR, LEGACY_EXTRA.CERT_PFX),
-    path.join(permDir, LEGACY_EXTRA.CERT_DIR, LEGACY_EXTRA.CERT_PASS),
+    path.join(/*turbopackIgnore: true*/ permDir, LEGACY_EXTRA.FISCAL_DEVICE),
+    path.join(/*turbopackIgnore: true*/ permDir, LEGACY_EXTRA.FISCAL_TOKEN),
+    path.join(
+      /*turbopackIgnore: true*/ permDir,
+      LEGACY_EXTRA.PRINTER_TRANSACTION_QUEUE,
+    ),
+    path.join(
+      /*turbopackIgnore: true*/ permDir,
+      LEGACY_EXTRA.PRINTER_REPORT_QUEUE,
+    ),
+    path.join(
+      /*turbopackIgnore: true*/ permDir,
+      LEGACY_EXTRA.REMOTE_UPLOAD_QUEUE,
+    ),
+    path.join(
+      /*turbopackIgnore: true*/ permDir,
+      LEGACY_EXTRA.REMOTE_UPLOAD_STATUS,
+    ),
+    path.join(
+      /*turbopackIgnore: true*/ permDir,
+      LEGACY_EXTRA.CERT_DIR,
+      LEGACY_EXTRA.CERT_PFX,
+    ),
+    path.join(
+      /*turbopackIgnore: true*/ permDir,
+      LEGACY_EXTRA.CERT_DIR,
+      LEGACY_EXTRA.CERT_PASS,
+    ),
   ]
   for (const fp of extraFiles) {
     if (await fileHasContent(fp)) return true

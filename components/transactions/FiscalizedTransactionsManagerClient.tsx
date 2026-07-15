@@ -1,9 +1,9 @@
 'use client'
 
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Copy } from 'lucide-react'
 
 import { safeCopy } from '@/src/shared/utils/clipboard'
@@ -63,6 +63,9 @@ export default function FiscalizedTransactionsManagerClient(props: {
   decimals: DecimalSettings
 }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentSearchParams = searchParams ?? new URLSearchParams()
   const [csrfToken, setCsrfToken] = useState('')
   const [creditNoteViewId, setCreditNoteViewId] = useState<string | null>(null)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
@@ -100,6 +103,32 @@ export default function FiscalizedTransactionsManagerClient(props: {
     setCreditNoteTransaction(row)
   }
 
+  useEffect(() => {
+    const view = currentSearchParams.get('view')
+    const transactionId =
+      currentSearchParams.get('transactionId')?.trim() || null
+    if (view === 'credit-note' && transactionId) {
+      setCreditNoteViewId(transactionId)
+    }
+  }, [currentSearchParams])
+
+  const openCreditNoteViewer = (transactionId: string) => {
+    const params = new URLSearchParams(currentSearchParams.toString())
+    params.set('status', 'fiscalized')
+    params.set('view', 'credit-note')
+    params.set('transactionId', transactionId)
+    router.push(`${pathname}?${params.toString()}`)
+    setCreditNoteViewId(transactionId)
+  }
+
+  const closeCreditNoteViewer = () => {
+    const params = new URLSearchParams(currentSearchParams.toString())
+    params.delete('view')
+    params.delete('transactionId')
+    router.replace(`${pathname}?${params.toString()}`)
+    setCreditNoteViewId(null)
+  }
+
   const submitCreditNote = async () => {
     if (!creditNoteTransaction?.id) return
     setIsCreatingCreditNote(true)
@@ -115,6 +144,7 @@ export default function FiscalizedTransactionsManagerClient(props: {
           },
           body: JSON.stringify({
             csrf_token: csrfToken,
+            transactionId: creditNoteTransaction.id,
             reason_code: creditReasonCode.trim() || undefined,
             notes: creditNotes.trim() || undefined,
           }),
@@ -200,7 +230,7 @@ export default function FiscalizedTransactionsManagerClient(props: {
                       </DropdownMenuItem>
                       {(t.status || '').toUpperCase() === 'CREDITED' && (
                         <DropdownMenuItem
-                          onSelect={() => setCreditNoteViewId(t.id)}
+                          onSelect={() => openCreditNoteViewer(t.id)}
                         >
                           View credit note
                         </DropdownMenuItem>
@@ -353,7 +383,7 @@ export default function FiscalizedTransactionsManagerClient(props: {
         transactionId={creditNoteViewId}
         csrfToken={csrfToken}
         onOpenChange={(open) => {
-          if (!open) setCreditNoteViewId(null)
+          if (!open) closeCreditNoteViewer()
         }}
       />
     </>

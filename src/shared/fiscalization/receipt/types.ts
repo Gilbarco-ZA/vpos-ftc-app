@@ -27,6 +27,8 @@ export type ReceiptCustomer = {
 
 export type ReceiptItem = {
   name: string
+  productCode?: string | null
+  sku?: string | null
   taxCode: string
   quantity: number
   unitPrice: number

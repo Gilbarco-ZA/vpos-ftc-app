@@ -4,6 +4,7 @@ import type { UserRole } from '@/src/shared/types'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { ChevronDown } from 'lucide-react'
 
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { CsrfHiddenInput } from '@/components/security/CsrfHiddenInput'
@@ -24,42 +25,42 @@ export type SidebarBranding = {
   logoPath?: string | null
 }
 
-const getNavSections = (role: UserRole): NavSection[] => {
-  const common: NavSection[] = [
-    {
-      items: [{ label: 'Dashboard', href: '/dashboard' }],
-    },
-  ]
+export const getNavSections = (role: UserRole): NavSection[] => {
+  const dashboard: NavSection = {
+    items: [{ label: 'Dashboard', href: '/dashboard' }],
+  }
+
+  const dailyOperations: NavSection = {
+    label: 'Daily Operations',
+    items: [
+      { label: 'POS', href: '/pos' },
+      { label: 'Transactions', href: '/transactions' },
+      { label: 'Receipts', href: '/receipts' },
+      { label: 'Reports', href: '/reports' },
+      { label: 'Customers', href: '/customers' },
+    ],
+  }
 
   if (role === 'tenant') {
     return [
-      ...common,
+      dashboard,
       {
-        label: 'Operations',
-        items: [
-          { label: 'Customers', href: '/customers' },
-          { label: 'Transactions', href: '/transactions' },
-          { label: 'POS', href: '/pos' },
-          { label: 'Receipts', href: '/receipts' },
-        ],
+        ...dailyOperations,
+        items: dailyOperations.items.filter((item) =>
+          ['/pos', '/transactions', '/receipts', '/customers'].includes(
+            item.href,
+          ),
+        ),
       },
     ]
   }
 
   if (role === 'manager') {
     return [
-      ...common,
+      dashboard,
+      dailyOperations,
       {
-        label: 'Operations',
-        items: [
-          { label: 'Customers', href: '/customers' },
-          { label: 'POS', href: '/pos' },
-          { label: 'Receipts', href: '/receipts' },
-          { label: 'Reports', href: '/reports' },
-        ],
-      },
-      {
-        label: 'Fiscalization',
+        label: 'Transaction Review',
         items: [
           {
             label: 'Non-fiscalized',
@@ -70,10 +71,11 @@ const getNavSections = (role: UserRole): NavSection[] => {
             label: 'Receipt Viewer',
             href: '/transactions?status=fiscalized&view=receipt',
           },
+          { label: 'Receipt Lookup', href: '/manager/receipt' },
         ],
       },
       {
-        label: 'Devices',
+        label: 'Forecourt',
         items: [
           { label: 'Pumps', href: '/pumps' },
           { label: 'Tanks', href: '/tanks' },
@@ -81,24 +83,25 @@ const getNavSections = (role: UserRole): NavSection[] => {
         ],
       },
       {
-        label: 'Configuration',
+        label: 'Setup & Configuration',
         items: [
           { label: 'Pump Settings', href: '/settings/pumps' },
           { label: 'Tank Settings', href: '/settings/tanks' },
           { label: 'Tank Grades', href: '/settings/tank-grades' },
           { label: 'Forecourt Setup', href: '/setup/forecourt' },
+          { label: 'Forecourt Pricing', href: '/setup/forecourt/pricing' },
         ],
       },
     ]
   }
 
   return [
-    ...common,
+    dashboard,
+    dailyOperations,
     {
-      label: 'Fiscalization',
+      label: 'Transaction Review',
       items: [
         { label: 'Fiscal Inbox', href: '/transaction/fiscal-inbox' },
-        { label: 'POS', href: '/pos' },
         {
           label: 'Non-fiscalized',
           href: '/transactions?status=non-fiscalized',
@@ -108,46 +111,53 @@ const getNavSections = (role: UserRole): NavSection[] => {
           label: 'Receipt Viewer',
           href: '/transactions?status=fiscalized&view=receipt',
         },
-        { label: 'Receipts', href: '/receipts' },
-        { label: 'Reports', href: '/reports' },
+        { label: 'Receipt Lookup', href: '/manager/receipt' },
       ],
     },
     {
-      label: 'Setup',
+      label: 'Forecourt Operations',
+      items: [
+        { label: 'Pumps', href: '/pumps' },
+        { label: 'Tanks', href: '/tanks' },
+        { label: 'Tank Levels', href: '/tank-levels' },
+        { label: 'Forecourt Monitor', href: '/admin/forecourt' },
+        { label: 'Device Status', href: '/admin/device-setup' },
+        { label: 'Diagnostics', href: '/admin/diagnostics' },
+      ],
+    },
+    {
+      label: 'Fiscal Services',
+      items: [
+        { label: 'EWURA', href: '/admin/ewura' },
+        { label: 'Tanzania Fiscal', href: '/admin/tanzania-fiscal' },
+        { label: 'Proxy Settings', href: '/admin/proxy-settings' },
+      ],
+    },
+    {
+      label: 'Administration',
+      items: [
+        { label: 'Users', href: '/admin/users' },
+        { label: 'Control', href: '/admin/control' },
+        { label: 'Sync', href: '/admin/sync' },
+      ],
+    },
+    {
+      label: 'Setup & Configuration',
       items: [
         { label: 'Setup Wizard', href: '/admin/setup' },
         { label: 'Forecourt Setup', href: '/setup/forecourt' },
+        { label: 'Forecourt Pricing', href: '/setup/forecourt/pricing' },
         { label: 'Products', href: '/admin/products' },
-        { label: 'Branding', href: '/admin/branding' },
-        { label: 'Station Config', href: '/admin/config' },
-        { label: 'Printers', href: '/admin/config/printers' },
-      ],
-    },
-    {
-      label: 'Operations',
-      items: [
-        { label: 'Users', href: '/admin/users' },
-        { label: 'Customers', href: '/customers' },
-        { label: 'Station Settings', href: '/admin/settings' },
-        { label: 'Proxy Settings', href: '/admin/proxy-settings' },
-        { label: 'Sync', href: '/admin/sync' },
-        { label: 'Control', href: '/admin/control' },
-        { label: 'Forecourt Monitor', href: '/admin/forecourt' },
-        { label: 'EWURA', href: '/admin/ewura' },
-      ],
-    },
-    {
-      label: 'Devices',
-      items: [
-        { label: 'Pumps', href: '/pumps' },
         { label: 'Pump Settings', href: '/settings/pumps' },
         { label: 'Pump Mode', href: '/admin/settings/pump-mode' },
-        { label: 'Tanks', href: '/tanks' },
         { label: 'Tank Settings', href: '/settings/tanks' },
         { label: 'Tank Grades', href: '/settings/tank-grades' },
-        { label: 'Tank Levels', href: '/tank-levels' },
-        { label: 'Device Status', href: '/admin/device-setup' },
-        { label: 'Diagnostics', href: '/admin/diagnostics' },
+        { label: 'Station Settings', href: '/admin/settings' },
+        { label: 'Station Config', href: '/admin/config' },
+        { label: 'Printers', href: '/admin/config/printers' },
+        { label: 'Country Datasets', href: '/admin/datasets' },
+        { label: 'Languages', href: '/admin/languages' },
+        { label: 'Branding', href: '/admin/branding' },
       ],
     },
   ]
@@ -200,8 +210,24 @@ export const SidebarContent = ({
 }: SidebarContentProps) => {
   const pathname = usePathname() ?? '/'
   const searchParams = useSearchParams()
-  const sections = getNavSections(role)
+  const sections = useMemo(() => getNavSections(role), [role])
+  const currentSearchParams = useMemo(
+    () => new URLSearchParams(searchParams?.toString() || ''),
+    [searchParams],
+  )
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(['Daily Operations']),
+  )
   const [csrfToken, setCsrfToken] = useState('')
+
+  const toggleSection = (label: string) => {
+    setOpenSections((current) => {
+      const next = new Set(current)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
+      return next
+    })
+  }
 
   const brandInitials = useMemo(() => {
     const source = String(branding?.stationDisplayName || 'VPOS FTC').trim()
@@ -287,65 +313,103 @@ export const SidebarContent = ({
       </div>
 
       {/* Navigation */}
-      <nav className="min-h-0 flex-1 space-y-6 overflow-y-auto px-3 py-4">
-        {sections.map((section, index) => (
-          <div
-            key={`${section.label ?? 'section'}-${index}`}
-            className="space-y-1.5"
-          >
-            {section.label && (
-              <div
-                className={
-                  'mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] ' +
-                  (collapsed ? 'sr-only' : '')
-                }
-              >
-                {section.label}
-              </div>
-            )}
+      <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4">
+        {sections.map((section, index) => {
+          const sectionKey = section.label ?? `primary-${index}`
+          const hasActiveItem = section.items.some((item) =>
+            isActiveRoute(pathname, currentSearchParams, item.href),
+          )
+          const expanded =
+            !section.label ||
+            collapsed ||
+            hasActiveItem ||
+            openSections.has(sectionKey)
 
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const active = isActiveRoute(
-                  pathname,
-                  new URLSearchParams(searchParams?.toString() || ''),
-                  item.href,
-                )
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={onNavigate}
-                    className={
-                      'group relative flex items-center rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200 ' +
-                      (active
-                        ? 'bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-sm'
-                        : 'text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]') +
-                      (collapsed ? ' justify-center' : '')
-                    }
-                    title={collapsed ? item.label : undefined}
-                  >
-                    {/* Active indicator */}
-                    {active && (
-                      <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-blue-500 transition-all duration-300" />
-                    )}
-                    <span className={collapsed ? 'sr-only' : ''}>
-                      {item.label}
+          return (
+            <div key={sectionKey} className="space-y-1">
+              {section.label ? (
+                <button
+                  type="button"
+                  onClick={() => toggleSection(sectionKey)}
+                  aria-expanded={expanded}
+                  className={
+                    'flex w-full items-center rounded-lg px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors ' +
+                    (hasActiveItem
+                      ? 'text-[var(--text-primary)]'
+                      : 'text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]') +
+                    (collapsed ? ' justify-center px-2' : ' justify-between')
+                  }
+                  title={collapsed ? section.label : undefined}
+                >
+                  <span className={collapsed ? 'sr-only' : ''}>
+                    {section.label}
+                  </span>
+                  {collapsed ? (
+                    <span aria-hidden className="text-[10px] tracking-wide">
+                      {section.label.slice(0, 2).toUpperCase()}
                     </span>
-                    {collapsed ? (
-                      <span
-                        aria-hidden
-                        className="text-[10px] font-semibold tracking-wide"
+                  ) : (
+                    <ChevronDown
+                      className={
+                        'h-3.5 w-3.5 transition-transform duration-200 ' +
+                        (expanded ? 'rotate-0' : '-rotate-90')
+                      }
+                    />
+                  )}
+                </button>
+              ) : null}
+
+              {expanded ? (
+                <div
+                  className={
+                    'space-y-0.5 ' +
+                    (section.label && !collapsed
+                      ? 'ml-2 border-l border-[var(--border-default)] pl-2'
+                      : '')
+                  }
+                >
+                  {section.items.map((item) => {
+                    const active = isActiveRoute(
+                      pathname,
+                      currentSearchParams,
+                      item.href,
+                    )
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={onNavigate}
+                        className={
+                          'group relative flex items-center rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200 ' +
+                          (active
+                            ? 'bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-sm'
+                            : 'text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]') +
+                          (collapsed ? ' justify-center px-2' : '')
+                        }
+                        title={collapsed ? item.label : undefined}
                       >
-                        {item.label.slice(0, 2).toUpperCase()}
-                      </span>
-                    ) : null}
-                  </Link>
-                )
-              })}
+                        {active ? (
+                          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-blue-500 transition-all duration-300" />
+                        ) : null}
+                        <span className={collapsed ? 'sr-only' : ''}>
+                          {item.label}
+                        </span>
+                        {collapsed ? (
+                          <span
+                            aria-hidden
+                            className="text-[10px] font-semibold tracking-wide"
+                          >
+                            {item.label.slice(0, 2).toUpperCase()}
+                          </span>
+                        ) : null}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </nav>
 
       <div className="mt-auto border-t border-[var(--border-default)] px-3 py-4">

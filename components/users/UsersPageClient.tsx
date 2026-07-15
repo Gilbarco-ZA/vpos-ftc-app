@@ -156,7 +156,36 @@ export const UsersPageClient = () => {
     }
   }, [roleOptions, createForm.role])
 
+  const createFormErrors = useMemo(() => {
+    const errors: string[] = []
+    const username = createForm.username.trim()
+    const email = createForm.email.trim()
+    const password = createForm.password.trim()
+
+    if (username.length < 3) {
+      errors.push('Username must be at least 3 characters')
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.push('Enter a valid email address')
+    }
+    if (password.length < 8) {
+      errors.push('Password must be at least 8 characters')
+    }
+    if (!createForm.role) {
+      errors.push('Role is required')
+    }
+
+    return errors
+  }, [createForm])
+
+  const canCreateUser = Boolean(csrfToken) && createFormErrors.length === 0
+
   const handleCreate = async () => {
+    if (createFormErrors.length > 0) {
+      showToast('error', createFormErrors[0])
+      return
+    }
+
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
@@ -167,8 +196,8 @@ export const UsersPageClient = () => {
         body: JSON.stringify({
           csrf_token: csrfToken,
           username: createForm.username.trim(),
-          email: createForm.email.trim(),
-          password: createForm.password,
+          email: createForm.email.trim().toLowerCase(),
+          password: createForm.password.trim(),
           role: createForm.role,
           fullName: createForm.fullName.trim() || undefined,
         }),
@@ -354,9 +383,10 @@ export const UsersPageClient = () => {
           />
           <div className="flex justify-end md:col-span-3">
             <Button
+              type="button"
               variant="primary"
               onClick={handleCreate}
-              disabled={!csrfToken}
+              disabled={!canCreateUser}
             >
               Create user
             </Button>

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { PSS_XML_KEYS } from '@/src/shared/integrations/pssXml/keys'
 import { KV_KEYS, storeStationKv } from '@/src/shared/setup/api'

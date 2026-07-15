@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { EventEmitter } from 'node:events'
 
 import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
 
@@ -14,6 +15,11 @@ import {
   normalizeJplInboundEnvelope,
   validateJplOutboundMessage,
 } from '@/src/modules/forecourt/infrastructure/jpl/protocol/schema'
+import {
+  inspectJplFrame,
+  JPL_ETX,
+  JPL_STX,
+} from '@/src/modules/forecourt/infrastructure/jpl/protocol/framing'
 import { buildJplCommandRequest } from '@/src/modules/forecourt/infrastructure/jpl/protocol/commands'
 import { getJplGatewayState } from '@/src/platform/integrations/jpl/gateway'
 import { setJplAdapterState, setJplBufferHealth } from '@/src/shared/forecourt/jplState'
@@ -227,6 +233,78 @@ test('unwrapMultiMessage decodes lowercase messages arrays', () => {
     ],
   })
   assert.equal(messages?.[0]?.__eventType, 'FpStatus_resp_00H')
+})
+
+test('inspectJplFrame validates STX/ETX framed JPL payloads', () => {
+  const envelope = {
+    name: 'FpStatus_resp',
+    subCode: '00H',
+    solicited: false,
+    data: { FpId: '01' },
+    correlationId: 'test-correlation',
+  }
+  const frame = Buffer.concat([
+    Buffer.from([JPL_STX]),
+    Buffer.from(JSON.stringify(envelope), 'utf8'),
+    Buffer.from([JPL_ETX]),
+  ])
+
+  const diagnostic = inspectJplFrame(frame)
+  assert.equal(diagnostic.valid, true)
+  assert.equal(diagnostic.code, 'ok')
+  assert.equal(diagnostic.name, 'FpStatus_resp')
+  assert.equal(diagnostic.subCode, '00H')
+  assert.equal(diagnostic.correlationId, 'test-correlation')
+})
+
+test('inspectJplFrame accepts decoded JSON envelopes with delimiters already removed', () => {
+  const diagnostic = inspectJplFrame(
+    JSON.stringify({
+      correlationId: 'decoded-correlation',
+      name: 'MultiMessage_resp',
+      subCode: '01H',
+      solicited: true,
+      data: { messages: [] },
+    }),
+  )
+
+  assert.equal(diagnostic.valid, true)
+  assert.equal(diagnostic.code, 'ok')
+  assert.equal(diagnostic.name, 'MultiMessage_resp')
+  assert.equal(diagnostic.subCode, '01H')
+  assert.equal(diagnostic.correlationId, 'decoded-correlation')
+  assert.match(diagnostic.message, /delimiters were removed/i)
+})
+
+test('inspectJplFrame reports malformed framed JPL payloads', () => {
+  assert.equal(inspectJplFrame('{not-json').code, 'missing_stx')
+
+  assert.equal(
+    inspectJplFrame(
+      JSON.stringify({ name: 'FpStatus_resp', subCode: '00H' }),
+    ).code,
+    'missing_stx',
+  )
+
+  assert.equal(
+    inspectJplFrame(Buffer.from([JPL_STX, 0x7b, 0x7d])).code,
+    'missing_etx',
+  )
+
+  assert.equal(
+    inspectJplFrame(Buffer.from([JPL_STX, 0x7b, JPL_ETX])).code,
+    'json_parse_error',
+  )
+
+  const invalidEnvelope = Buffer.concat([
+    Buffer.from([JPL_STX]),
+    Buffer.from(
+      JSON.stringify({ name: 'FpStatus_resp', subcode: '00H', data: {} }),
+      'utf8',
+    ),
+    Buffer.from([JPL_ETX]),
+  ])
+  assert.equal(inspectJplFrame(invalidEnvelope).code, 'invalid_envelope')
 })
 
 
@@ -504,6 +582,39 @@ test('buildJplCommandRequest builds wetstock control commands', () => {
   })
   assert.equal(stopDelivery?.name, 'stop_DeliveryProcess_req')
   assert.equal(stopDelivery?.data?.PosId, '00')
+
+  const deliveryData = buildJplCommandRequest('GET_TANK_DELIVERY_DATA', {
+    tgId: 4,
+    posId: 0,
+    tankDeliveryDataItemId: [1, '2'],
+  })
+  assert.equal(deliveryData?.name, 'TankDeliveryData_req')
+  assert.equal(deliveryData?.data?.TgId, '04')
+  assert.equal(deliveryData?.data?.PosId, '00')
+  assert.equal(deliveryData?.data?.ZERO, 0)
+  assert.deepEqual(deliveryData?.data?.TankDeliveryDataItemId, ['01', '02'])
+
+  const clearDelivery = buildJplCommandRequest('CLEAR_TANK_DELIVERY_DATA', {
+    posId: 0,
+    deliveryReportSeqNo: 0,
+    tankDeliveries: [{ tgId: 4, tankDeliverySeqNo: 2 }],
+  })
+  assert.equal(clearDelivery?.name, 'clear_TankDeliveryData_req')
+  assert.equal(clearDelivery?.data?.PosId, '00')
+  assert.equal(clearDelivery?.data?.DeliveryReportSeqNo, 0)
+  assert.deepEqual(clearDelivery?.data?.TankDeliveries, [
+    { TgId: '04', TankDeliverySeqNo: '02' },
+  ])
+
+  const clearDeliveryWithSequence = buildJplCommandRequest(
+    'CLEAR_TANK_DELIVERY_DATA',
+    {
+      posId: 3,
+      deliveryReportSeqNo: 7,
+      tankDeliveries: [{ TgId: '04', TankDeliverySeqNo: '02' }],
+    },
+  )
+  assert.equal(clearDeliveryWithSequence?.data?.DeliveryReportSeqNo, '07')
 })
 test('buildJplCommandRequest builds preset authorize and pump reads', () => {
   const preset = buildJplCommandRequest('PRESET_FUEL_AUTH', {
@@ -894,6 +1005,54 @@ test('getJplGatewayState keeps last reject and protocol health in sync', () => {
   ;(globalThis as any).__jplTcpClient = previousClient
 })
 
+test('getJplGatewayState exposes frame diagnostics and health issue', () => {
+  const previousClient = (globalThis as any).__jplTcpClient
+  const client = new EventEmitter() as EventEmitter & {
+    getServerJplVersion: () => string
+    getServerSupportsCorrelationIds: () => boolean
+    getRequestDispatchMode: () => 'correlated-concurrent'
+  }
+  client.getServerJplVersion = () => '470-02-1.08'
+  client.getServerSupportsCorrelationIds = () => true
+  client.getRequestDispatchMode = () => 'correlated-concurrent'
+  client.on('rawFrame', () => undefined)
+  ;(globalThis as any).__jplTcpClient = client
+
+  const diagnostic = {
+    valid: false,
+    code: 'missing_etx',
+    message: 'JPL frame is missing the ETX delimiter octet',
+    byteLength: 24,
+    hasStx: true,
+    hasEtx: false,
+    stxIndex: 0,
+    etxIndex: -1,
+    preview: '<STX>{"name":"heartbeat"',
+    at: Date.now(),
+  }
+
+  setJplAdapterState({
+    connected: true,
+    loggedOn: true,
+    secureMode: false,
+    welcomeVersion: '470-02-1.08',
+    lastFrameDiagnostic: diagnostic,
+    frameDiagnostics: [diagnostic],
+    lastReject: null,
+  })
+
+  const state = getJplGatewayState()
+  assert.equal(state.protocol?.rawFrameDiagnosticsEnabled, true)
+  assert.equal(state.protocol?.lastFrameDiagnostic?.code, 'missing_etx')
+  assert.equal(state.protocol?.recentFrameDiagnostics?.length, 1)
+  assert.equal(
+    state.protocolHealth?.issues.some((issue) => issue.code === 'recent-frame-error'),
+    true,
+  )
+
+  ;(globalThis as any).__jplTcpClient = previousClient
+})
+
 
 test('dispense helpers classify authorize flows and fp status fallback order', () => {
   assert.equal(resolveDispenseAuthorizeMode('AUTHORIZE_FP', {}), 'standard')
@@ -962,3 +1121,286 @@ test('buildJplCommandRequest builds optional module commands', () => {
   assert.equal(buildJplCommandRequest('CLEAR_SERIAL_SERVER_INSTALLATION', { serialServerId: 0 })?.data?.ExtendedInstallMsgCode, '0201H')
 })
 
+
+test('prepareJplOutboundMessage adds correlation ids to outbound requests', async () => {
+  const { prepareJplOutboundMessage } = await import('@/src/modules/forecourt/infrastructure/jpl/protocol/schema')
+  const request = prepareJplOutboundMessage({
+    name: 'FpStatus_req',
+    subCode: '03H',
+    data: { FpId: '01' },
+  })
+  assert.equal(request.name, 'FpStatus_req')
+  assert.equal(typeof request.correlationId, 'string')
+  assert.ok(request.correlationId.length > 0)
+})
+
+test('buildJplCommandRequest builds price-bank requests with protocol-shaped data', () => {
+  const status = buildJplCommandRequest('READ_PRICE_SET_STATUS', { subCode: '01H' })
+  assert.equal(status?.name, 'FcPriceSetStatus_req')
+  assert.equal(status?.subCode, '01H')
+
+  const current = buildJplCommandRequest('READ_CURRENT_PRICE_SET', { subCode: '04H' })
+  assert.equal(current?.name, 'FcPriceSet_req')
+  assert.equal(current?.data?.PriceSetType, '00H')
+  assert.equal(current?.data?.FcPriceSetId, '00')
+  assert.equal(current?.data?.PriceSetActivationDateAndTime, '00000000000000')
+
+  const pending = buildJplCommandRequest('READ_PENDING_PRICE_SET', {
+    subCode: '04H',
+    fcPriceSetId: 7,
+    activationAt: '20260707120000',
+  })
+  assert.equal(pending?.data?.PriceSetType, '01H')
+  assert.equal(pending?.data?.FcPriceSetId, '07')
+  assert.equal(pending?.data?.PriceSetActivationDateAndTime, '20260707120000')
+
+  const change = buildJplCommandRequest('CHANGE_PRICE_SET', {
+    subCode: '04H',
+    userId: 'Ben',
+    fcPriceSetId: 8,
+    fcPriceGroupIds: [1, 2],
+    fcGradeIds: [3, 4],
+    fcPriceGroups: [
+      ['123456', '234567'],
+      ['345678', '456789'],
+    ],
+    activationAt: '20260707123000',
+  })
+  assert.equal(change?.name, 'change_FcPriceSet_req')
+  assert.deepEqual(change?.data?.FcPriceGroupId, ['01', '02'])
+  assert.deepEqual(change?.data?.FcGradeId, ['03', '04'])
+
+  const clear = buildJplCommandRequest('CLEAR_PENDING_PRICE_SET', {
+    fcPriceSetId: 8,
+    activationAt: '20260707123000',
+  })
+  assert.equal(clear?.name, 'clear_PendingFcPriceSet_req')
+  assert.equal(clear?.data?.FcPriceSetId, '08')
+})
+
+test('JPL CODE helpers convert decimal input to hexadecimal protocol codes', async () => {
+  const { normalizeJplCode1, normalizeJplCode2 } = await import('@/src/modules/forecourt/infrastructure/jpl/protocol/types')
+  assert.equal(normalizeJplCode1(31), '1FH')
+  assert.equal(normalizeJplCode2(1700), '06A4H')
+  assert.equal(normalizeJplCode2('76A4H'), '76A4H')
+})
+
+test('buildJplCommandRequest builds production-module JPL requests', () => {
+  assert.deepEqual(buildJplCommandRequest('GET_FP_GRADE_TOTALS', { fpId: 2 })?.data, {
+    FpId: '02',
+  })
+  assert.equal(
+    buildJplCommandRequest('GET_PUMP_GRADE_BLEND_TOTALS', { fpId: 2 })?.name,
+    'PumpGradeBlendTotals_req',
+  )
+  assert.deepEqual(
+    buildJplCommandRequest('CLEAR_FALLBACK_TOTALS', {
+      fbTotalsSeqNo: 7,
+      totalNoFbTransactions: 42,
+    })?.data,
+    { FbTotalsSeqNo: '07', TotalNoFbTransactions: '000042' },
+  )
+})
+
+test('buildJplCommandRequest builds wetstock lifecycle and tank error requests', () => {
+  assert.deepEqual(
+    buildJplCommandRequest('GET_TANK_CONTROL_STATUS', { tankId: 0 })?.data,
+    { TankId: '00' },
+  )
+  assert.deepEqual(buildJplCommandRequest('BLOCK_TANK', { tankId: 3 })?.data, {
+    TankId: '03',
+  })
+  assert.deepEqual(
+    buildJplCommandRequest('CLEAR_TG_ERROR', { tgId: 4, tgErrorCode: 99 })?.data,
+    { TgId: '04', TgErrorCode: '99' },
+  )
+  assert.equal(buildJplCommandRequest('MARK_DELIVERY_FINISHED', { posId: 0 })?.data?.PosId, '00')
+})
+
+test('buildJplCommandRequest builds general forecourt utility requests', () => {
+  assert.equal(buildJplCommandRequest('GET_FC_DATE_TIME', {})?.name, 'FcDateAndTime_req')
+  assert.deepEqual(
+    buildJplCommandRequest('CHANGE_FC_DATE_TIME', {
+      fcDateAndTime: '20260707120000',
+    })?.data,
+    { FcDateAndTime: '20260707120000' },
+  )
+  assert.equal(
+    buildJplCommandRequest('CHANGE_FC_OPERATION_MODE', { fcOperationModeNo: 2 })?.data
+      ?.FcOperationModeNo,
+    2,
+  )
+  assert.deepEqual(buildJplCommandRequest('UTIL_ECHO', { echoData: [1, 2, 3] })?.data, {
+    EchoData: [1, 2, 3],
+  })
+})
+
+test('buildJplCommandRequest builds DOMS special-function requests', () => {
+  assert.equal(buildJplCommandRequest('GET_FC_STATUS', {})?.name, 'FcStatus_req')
+  assert.equal(
+    buildJplCommandRequest('CHANGE_FC_STATUS_UPDATE_MODE', { statusUpdateCode: 3 })?.data
+      ?.StatusUpdateCode,
+    3,
+  )
+  assert.equal(
+    buildJplCommandRequest('GET_POS_CONNECTION_STATUS', {})?.name,
+    'PosConnectionStatus_req',
+  )
+  assert.equal(
+    buildJplCommandRequest('GET_PSS_PERIPHERALS_STATUS', {})?.name,
+    'PssPeripheralsStatus_req',
+  )
+  assert.equal(
+    buildJplCommandRequest('GET_FC_SERVICE_MESSAGE', {})?.name,
+    'FcServiceMsg_req',
+  )
+  assert.deepEqual(
+    buildJplCommandRequest('CLEAR_FC_SERVICE_MESSAGE', { fcServiceMsgSeqNo: 7 })?.data,
+    { FcServiceMsgSeqNo: '07' },
+  )
+  assert.equal(
+    buildJplCommandRequest('GET_BACK_OFFICE_RECORD', { subCode: '02H' })?.subCode,
+    '02H',
+  )
+  assert.deepEqual(
+    buildJplCommandRequest('STORE_BACK_OFFICE_RECORD', {
+      borClientType: '01H',
+      borClientId: 0,
+      borDataType: '02H',
+      borData: 'payload',
+    })?.data,
+    {
+      BorClientType: '01H',
+      BorClientId: '00',
+      BorDataType: '02H',
+      BorData: 'payload',
+    },
+  )
+  assert.deepEqual(
+    buildJplCommandRequest('CLEAR_BACK_OFFICE_RECORD', { borSeqNo: 12 })?.data,
+    { BorSeqNo: '12' },
+  )
+})
+
+test('buildJplCommandRequest builds DOMS client backup and tank data requests', () => {
+  assert.deepEqual(
+    buildJplCommandRequest('GET_CLIENT_DATA', {
+      posId: 0,
+      clientDataOffset: 4,
+      clientDataLen: 8,
+    })?.data,
+    { PosId: '00', ClientDataOffset: 4, ClientDataLen: 8 },
+  )
+  assert.deepEqual(
+    buildJplCommandRequest('STORE_CLIENT_DATA', {
+      posId: 3,
+      clientDataOffset: 4,
+      clientData: [31, '20H'],
+    })?.data,
+    { PosId: '03', ClientDataOffset: 4, ClientData: ['1FH', '20H'] },
+  )
+  assert.deepEqual(
+    buildJplCommandRequest('GET_TG_DATA', { tgId: 9, tankDataItemId: [1, 44] })?.data,
+    { TgId: '09', TankDataItemId: ['01', '44'] },
+  )
+  assert.equal(
+    buildJplCommandRequest('GET_TG_ERROR', { tgId: 9 })?.name,
+    'TgErrorMsg_req',
+  )
+  assert.deepEqual(
+    buildJplCommandRequest('CHANGE_DYNAMIC_TANK_DATA', {
+      tankId: 9,
+      dtdPars: {
+        EnteredDensity: {
+          DensityValue: '745',
+          ExpireDateAndTime: '20260710120000',
+          ScrollingSpeed: '00H',
+          Text: 'manual density',
+        },
+      },
+      requestedRole: 'administrator',
+      reason: 'Gauge density unavailable',
+    })?.data,
+    {
+      TankId: '09',
+      DtdPars: {
+        EnteredDensity: {
+          DensityValue: '000000000745',
+          ExpireDateAndTime: '20260710120000',
+          ScrollingSpeed: '00H',
+          Text: 'manual density',
+        },
+      },
+    },
+  )
+})
+
+test('buildJplCommandRequest builds operation-mode and wash transaction requests', () => {
+  const fpMode = buildJplCommandRequest('CHANGE_FP_OPERATION_MODE_SET', {
+    fpId: 2,
+    fpOperationModes: [
+      {
+        fpOperationModeNo: 1,
+        fpOperationType: 1,
+        fpServiceModes: [{ smId: 21, fmgId: 1, fcPriceGroupId: 1 }],
+      },
+    ],
+  })
+  assert.equal(fpMode?.name, 'change_FpOperationModeSet_req')
+  assert.equal(fpMode?.data?.FpOperationModes?.[0]?.FpServiceModes?.[0]?.SmId, '21')
+
+  const wpMode = buildJplCommandRequest('CHANGE_WP_OPERATION_MODE_SET', {
+    wpId: 3,
+    wpOperationModes: [
+      {
+        wpOperationModeNo: 1,
+        wpOperationType: 1,
+        wpServiceModes: [{ wpSmId: 81, wpWmgId: 1, fcPriceGroupId: 1 }],
+      },
+    ],
+  })
+  assert.equal(wpMode?.name, 'change_WpOperationModeSet_req')
+  assert.equal(wpMode?.data?.WpOperationModes?.[0]?.WpServiceModes?.[0]?.WpSmId, '81')
+
+  const openWp = buildJplCommandRequest('OPEN_WP', {
+    wpId: 3,
+    posId: 2,
+    wpOperationModeNo: 0,
+  })
+  assert.equal(openWp?.name, 'open_Wp_req')
+  assert.deepEqual(openWp?.data, { WpId: '03', PosId: '02', WpOperationModeNo: 0 })
+
+  const closeAllWp = buildJplCommandRequest('CLOSE_WP', { wpId: 0 })
+  assert.deepEqual(closeAllWp?.data, { WpId: '00' })
+
+  const readWashTrans = buildJplCommandRequest('GET_WP_UNSUPERVISED_TRANSACTION', {
+    wpId: 3,
+    transSeqNo: 9,
+    posId: 0,
+    wpTransParId: [41],
+    rcpItemIdEptRd: [1],
+  })
+  assert.equal(readWashTrans?.name, 'WpUnSupTrans_req')
+  assert.deepEqual(readWashTrans?.data?.WpTransParId, ['41'])
+  assert.deepEqual(readWashTrans?.data?.RcpItemIdEptRd, ['01'])
+
+  const unlockWashTrans = buildJplCommandRequest('UNLOCK_WP_UNSUPERVISED_TRANSACTION', {
+    wpId: 3,
+    transSeqNo: 9,
+    posId: 0,
+  })
+  assert.equal(unlockWashTrans?.name, 'unlock_WpUnSupTrans_req')
+
+  const clearWashTrans = buildJplCommandRequest('CLEAR_WP_UNSUPERVISED_TRANSACTION', {
+    wpId: 3,
+    transSeqNo: 9,
+    posId: 2,
+    money: '000123',
+  })
+  assert.deepEqual(clearWashTrans?.data, {
+    WpId: '03',
+    PosId: '02',
+    TransSeqNo: '0009',
+    Money: '000123',
+  })
+})

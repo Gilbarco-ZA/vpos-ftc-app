@@ -1,6 +1,14 @@
 'use client'
 
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react'
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
@@ -34,6 +42,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { TableSkeleton } from '@/components/ui/table-skeleton'
 import {
   ToastItem,
   ToastMessage,
@@ -233,7 +242,7 @@ const FiscalInboxPageClient = ({
     setToast({ id: `${Date.now()}`, variant, message })
   }
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setBusy(true)
     setErr(null)
     try {
@@ -258,7 +267,13 @@ const FiscalInboxPageClient = ({
     } finally {
       setBusy(false)
     }
-  }
+  }, [endDate, filter, startDate, status])
+
+  useEffect(() => {
+    void refresh()
+    // Initial API hydration only. Filter changes remain explicit via Refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const filtered = useMemo(() => {
     if (!filter) return rows
@@ -376,9 +391,12 @@ const FiscalInboxPageClient = ({
         </Card>
 
         {busy ? (
-          <Card className="p-6 text-sm text-[var(--text-secondary)]">
-            Loading...
-          </Card>
+          <TableSkeleton
+            rows={6}
+            columns={8}
+            showHeader={false}
+            showFilters={false}
+          />
         ) : filtered.length === 0 ? (
           <EmptyState
             title="No fiscal inbox rows"

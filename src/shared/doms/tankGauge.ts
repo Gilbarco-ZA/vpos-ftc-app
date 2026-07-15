@@ -1,4 +1,5 @@
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
+import { normalizeJplTankGaugeData } from '@/src/shared/doms/tankGaugeProtocol'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 export type NormalizedTgData = {
@@ -25,6 +26,16 @@ export type NormalizedTgData = {
   tankTempSensor2C: number | null
   tankTempSensor3C: number | null
   tankPressure: number | null
+  tankAdjustedVolume?: number | null
+  tankAdjustedTCVolume?: number | null
+  tankDeliveredVol?: number | null
+  tankDeliveredTcVol?: number | null
+  tankDeliveredMass?: number | null
+  tankDeliveredQuantity?: number | null
+  tgProductCode?: string | null
+  tankGroupId?: string | null
+  tankGaugeType?: string | null
+  tankInflowControlMode?: string | null
   sourcePayload: Record<string, unknown>
 }
 
@@ -97,70 +108,47 @@ export async function resolveTankRecordsByGaugeIds(stationId: string) {
   return byGaugeId
 }
 
-const toNumberOrNull = (value: unknown) => {
-  if (value === null || value === undefined || value === '') return null
-  const num = Number(value)
-  return Number.isFinite(num) ? num : null
-}
-
-export const decodeSignedTemperature = (value: unknown): number | null => {
-  if (!value || typeof value !== 'object') return null
-  const temp = toNumberOrNull((value as any).Temperature)
-  if (temp === null) return null
-  const sign = String((value as any)?.FcSign?.value ?? '00H').toUpperCase()
-  const signed = temp / 10
-  return sign === '80H' ? -signed : signed
-}
-
-export const parseFcDateAndTime = (value: unknown): string | null => {
-  const raw = String(value ?? '').replace(/\D/g, '')
-  if (raw.length !== 14) return null
-  const iso = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}T${raw.slice(8, 10)}:${raw.slice(10, 12)}:${raw.slice(12, 14)}Z`
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
-}
-
 export const normalizeTgDataPayload = (
   payload: unknown,
 ): NormalizedTgData | null => {
-  const data = (payload as any)?.data ?? payload
-  const tgId = String((data as any)?.TgId ?? (data as any)?.TankId ?? '').trim()
-  if (!tgId) return null
-  const items = (data as any)?.TankDataItems ?? {}
+  const normalized = normalizeJplTankGaugeData(payload)
+  if (!normalized) return null
+
   return {
-    tgId,
-    tankProductLevel: toNumberOrNull((items as any).TankProductLevel),
-    tankWaterLevel: toNumberOrNull((items as any).TankWaterLevel),
-    tankTotalObservedVol: toNumberOrNull((items as any).TankTotalObservedVol),
-    tankWaterVol: toNumberOrNull((items as any).TankWaterVol),
-    tankGrossObservedVol: toNumberOrNull((items as any).TankGrossObservedVol),
-    tankGrossStdVol: toNumberOrNull((items as any).TankGrossStdVol),
-    tankAvailableRoom: toNumberOrNull((items as any).TankAvailableRoom),
-    tankAverageTempC: decodeSignedTemperature((items as any).TankAverageTemp),
-    tankDataLastUpdateAt: parseFcDateAndTime(
-      (items as any).TankDataLastUpdateDateAndTime,
-    ),
-    tankMaxSafeFillCapacity: toNumberOrNull(
-      (items as any).TankMaxSafeFillCapacity,
-    ),
-    tankShellCapacity: toNumberOrNull((items as any).TankShellCapacity),
-    tankProductMass: toNumberOrNull((items as any).TankProductMass),
-    tankProductDensity: toNumberOrNull((items as any).TankProductDensity),
-    tankProductTcDensity: toNumberOrNull((items as any).TankProductTcDensity),
-    tankDensityProbeTempC: decodeSignedTemperature(
-      (items as any).TankDensityProbeTemp,
-    ),
-    tankSludgeLevel: toNumberOrNull((items as any).TankSludgeLevel),
-    tankOilSepOilThickness: toNumberOrNull(
-      (items as any).TankOilSepOilThickness,
-    ),
-    tankOilSepOilVolume: toNumberOrNull((items as any).TankOilSepOilVolume),
-    tankTempSensor1C: decodeSignedTemperature((items as any).TankTempSensor1),
-    tankTempSensor2C: decodeSignedTemperature((items as any).TankTempSensor2),
-    tankTempSensor3C: decodeSignedTemperature((items as any).TankTempSensor3),
-    tankPressure: toNumberOrNull((items as any).TankPressure),
-    sourcePayload:
-      data && typeof data === 'object' ? (data as Record<string, unknown>) : {},
+    tgId: normalized.tgId,
+    tankProductLevel: normalized.productLevel,
+    tankWaterLevel: normalized.waterLevel,
+    tankTotalObservedVol: normalized.totalObservedVolume,
+    tankWaterVol: normalized.waterVolume,
+    tankGrossObservedVol: normalized.grossObservedVolume,
+    tankGrossStdVol: normalized.grossStandardVolume,
+    tankAvailableRoom: normalized.availableRoom,
+    tankAverageTempC: normalized.averageTemperatureC,
+    tankDataLastUpdateAt: normalized.lastUpdatedAt,
+    tankMaxSafeFillCapacity: normalized.maxSafeFillCapacity,
+    tankShellCapacity: normalized.shellCapacity,
+    tankProductMass: normalized.productMass,
+    tankProductDensity: normalized.productDensity,
+    tankProductTcDensity: normalized.productTcDensity,
+    tankDensityProbeTempC: normalized.densityProbeTemperatureC,
+    tankSludgeLevel: normalized.sludgeLevel,
+    tankOilSepOilThickness: normalized.oilSeparatorOilThickness,
+    tankOilSepOilVolume: normalized.oilSeparatorOilVolume,
+    tankTempSensor1C: normalized.tempSensor1C,
+    tankTempSensor2C: normalized.tempSensor2C,
+    tankTempSensor3C: normalized.tempSensor3C,
+    tankPressure: normalized.pressure,
+    tankAdjustedVolume: normalized.adjustedVolume,
+    tankAdjustedTCVolume: normalized.adjustedTcVolume,
+    tankDeliveredVol: normalized.deliveredVolume,
+    tankDeliveredTcVol: normalized.deliveredTcVolume,
+    tankDeliveredMass: normalized.deliveredMass,
+    tankDeliveredQuantity: normalized.deliveredQuantity,
+    tgProductCode: normalized.productCode ?? null,
+    tankGroupId: normalized.groupId ?? null,
+    tankGaugeType: normalized.gaugeType ?? null,
+    tankInflowControlMode: normalized.inflowControlMode ?? null,
+    sourcePayload: normalized.raw,
   }
 }
 

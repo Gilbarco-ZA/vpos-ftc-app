@@ -3,6 +3,7 @@ import * as fs from 'fs/promises'
 import path from 'path'
 
 import { getPool } from '@/src/platform/db/postgres'
+import { ensurePostgresDatabase } from '@/src/platform/db/postgres/database-bootstrap'
 import { logger } from '@/src/shared/utils/logger'
 
 const MIGRATIONS_DIR = path.join(
@@ -39,6 +40,7 @@ export const ensurePostgresMigrations = async (): Promise<void | null> => {
 }
 
 const runMigrations = async (): Promise<void> => {
+  await ensurePostgresDatabase()
   const pool = getPool()
   const client = await pool.connect()
 
@@ -135,7 +137,7 @@ const runMigrations = async (): Promise<void> => {
 }
 
 const canonicalizeLf = (value: string): string => {
-  return value.replace(/\r\n/g, '\n');
+  return value.replace(/\r\n/g, '\n')
 }
 
 const hashString = (value: string): string => {

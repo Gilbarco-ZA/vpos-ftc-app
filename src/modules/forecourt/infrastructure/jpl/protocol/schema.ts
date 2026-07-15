@@ -5,6 +5,36 @@ const id2Schema = z
   .trim()
   .regex(/^\d{2}$/, 'Expected ID2 string')
 
+const id2OrZeroSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{2}$/, 'Expected ID2 or ID_ZERO string')
+
+const dec2OrZeroSchema = z.union([
+  z
+    .string()
+    .trim()
+    .regex(/^\d{1,2}$/),
+  z.literal(0),
+])
+
+const dec4Schema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}$/, 'Expected DEC4 string')
+
+const dec6Schema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/)
+
+const num2Schema = z.number().int().nonnegative()
+
+const fcDateTimeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{14}$/, 'Expected FC_DATE_AND_TIME string')
+
 const code1Schema = z
   .string()
   .trim()
@@ -19,6 +49,7 @@ const code2Schema = z
 
 const nameSchema = z.string().trim().min(1)
 const objectDataSchema = z.record(z.any())
+const priceSetTypeSchema = z.enum(['00H', '01H'])
 
 const envelopeSchema = z
   .object({
@@ -121,6 +152,40 @@ const supportedRequestSchemas = {
     subCode: z.literal('00H'),
     data: z.object({ FpId: id2Schema, FpErrorCode: z.string().trim().min(2) }),
   }),
+
+  FpGradeTotals_req: requestEnvelopeSchema.extend({
+    name: z.literal('FpGradeTotals_req'),
+    subCode: z.enum(['00H', '01H']),
+    data: z.object({ FpId: id2Schema }).passthrough(),
+  }),
+  PumpGradeTotals_req: requestEnvelopeSchema.extend({
+    name: z.literal('PumpGradeTotals_req'),
+    subCode: z.enum(['00H', '01H']),
+    data: z.object({ FpId: id2Schema }).passthrough(),
+  }),
+  PumpGradeBlendTotals_req: requestEnvelopeSchema.extend({
+    name: z.literal('PumpGradeBlendTotals_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ FpId: id2Schema }).passthrough(),
+  }),
+  FbTotals_req: requestEnvelopeSchema.extend({
+    name: z.literal('FbTotals_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ FpId: id2Schema }).passthrough(),
+  }),
+  clear_FallbackTotals_req: requestEnvelopeSchema.extend({
+    name: z.literal('clear_FallbackTotals_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        FbTotalsSeqNo: z
+          .string()
+          .trim()
+          .regex(/^\d{2}$/),
+        TotalNoFbTransactions: dec6Schema,
+      })
+      .passthrough(),
+  }),
   FpSupTrans_req: requestEnvelopeSchema.extend({
     name: z.literal('FpSupTrans_req'),
     subCode: z.literal('00H'),
@@ -174,6 +239,36 @@ const supportedRequestSchemas = {
     subCode: z.literal('00H'),
     data: z.object({}).passthrough(),
   }),
+
+  FcDateAndTime_req: requestEnvelopeSchema.extend({
+    name: z.literal('FcDateAndTime_req'),
+    subCode: z.literal('00H'),
+    data: z.object({}).passthrough(),
+  }),
+  change_FcDateAndTime_req: requestEnvelopeSchema.extend({
+    name: z.literal('change_FcDateAndTime_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ FcDateAndTime: fcDateTimeSchema }).passthrough(),
+  }),
+  FcOperationModeStatus_req: requestEnvelopeSchema.extend({
+    name: z.literal('FcOperationModeStatus_req'),
+    subCode: z.literal('00H'),
+    data: z.object({}).passthrough(),
+  }),
+  change_FcOperationModeNo_req: requestEnvelopeSchema.extend({
+    name: z.literal('change_FcOperationModeNo_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({ FcOperationModeNo: z.number().int().min(0).max(9) })
+      .passthrough(),
+  }),
+  UtilEcho_req: requestEnvelopeSchema.extend({
+    name: z.literal('UtilEcho_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({ EchoData: z.array(z.number().int().min(0).max(255)) })
+      .passthrough(),
+  }),
   PosConnectionStatus_req: requestEnvelopeSchema.extend({
     name: z.literal('PosConnectionStatus_req'),
     subCode: z.literal('00H'),
@@ -201,10 +296,44 @@ const supportedRequestSchemas = {
     subCode: z.enum(['00H', '01H', '02H']),
     data: z.object({}).passthrough(),
   }),
+  store_BackOfficeRecord_req: requestEnvelopeSchema.extend({
+    name: z.literal('store_BackOfficeRecord_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        BorClientType: code1Schema,
+        BorClientId: id2OrZeroSchema,
+        BorDataType: code1Schema,
+        BorData: z.string(),
+      })
+      .passthrough(),
+  }),
   clear_BackOfficeRecord_req: requestEnvelopeSchema.extend({
     name: z.literal('clear_BackOfficeRecord_req'),
     subCode: z.literal('00H'),
     data: z.object({ BorSeqNo: z.string().trim().min(1) }).passthrough(),
+  }),
+  ClientData_req: requestEnvelopeSchema.extend({
+    name: z.literal('ClientData_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        PosId: id2OrZeroSchema,
+        ClientDataOffset: num2Schema,
+        ClientDataLen: num2Schema,
+      })
+      .passthrough(),
+  }),
+  store_ClientData_req: requestEnvelopeSchema.extend({
+    name: z.literal('store_ClientData_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        PosId: id2OrZeroSchema,
+        ClientDataOffset: num2Schema,
+        ClientData: z.array(code1Schema),
+      })
+      .passthrough(),
   }),
   FpUnSupTrans_req: requestEnvelopeSchema.extend({
     name: z.literal('FpUnSupTrans_req'),
@@ -246,6 +375,93 @@ const supportedRequestSchemas = {
           .string()
           .trim()
           .regex(/^\d{4}$/, 'Expected DEC4 TransSeqNo'),
+      })
+      .passthrough(),
+  }),
+
+  FcPriceSetStatus_req: requestEnvelopeSchema.extend({
+    name: z.literal('FcPriceSetStatus_req'),
+    subCode: z.enum(['00H', '01H']),
+    data: z.object({}).passthrough(),
+  }),
+  FcPriceSet_req: requestEnvelopeSchema.extend({
+    name: z.literal('FcPriceSet_req'),
+    subCode: z.enum(['02H', '03H', '04H']),
+    data: z
+      .object({
+        PriceSetType: priceSetTypeSchema.optional(),
+        FcPriceSetId: id2OrZeroSchema.optional(),
+        PriceSetActivationDateAndTime: fcDateTimeSchema.optional(),
+      })
+      .passthrough(),
+  }),
+  change_FcPriceSet_req: requestEnvelopeSchema.extend({
+    name: z.literal('change_FcPriceSet_req'),
+    subCode: z.enum(['02H', '03H', '04H']),
+    data: z
+      .object({
+        UserId: z.string().trim().optional(),
+        FcPriceSetId: id2Schema,
+        FcPriceGroupId: z.array(id2Schema).min(1),
+        FcGradeId: z.array(id2Schema).min(1),
+        FcPriceGroups: z.array(z.array(z.string().trim().min(1))).min(1),
+        PriceSetActivationDateAndTime: fcDateTimeSchema,
+      })
+      .passthrough(),
+  }),
+  clear_PendingFcPriceSet_req: requestEnvelopeSchema.extend({
+    name: z.literal('clear_PendingFcPriceSet_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        FcPriceSetId: id2OrZeroSchema,
+        PriceSetActivationDateAndTime: fcDateTimeSchema,
+      })
+      .passthrough(),
+  }),
+
+  change_FpOperationModeSet_req: requestEnvelopeSchema.extend({
+    name: z.literal('change_FpOperationModeSet_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        FpId: id2Schema,
+        FpOperationModes: z
+          .array(
+            z
+              .object({
+                FpOperationModeNo: z.number().int().nonnegative(),
+                FpOperationType: z.number().int().nonnegative(),
+                FpServiceModes: z
+                  .array(
+                    z
+                      .object({
+                        SmId: id2Schema,
+                        FmgId: id2Schema,
+                        FcPriceGroupId: id2Schema,
+                      })
+                      .passthrough(),
+                  )
+                  .min(1),
+              })
+              .passthrough(),
+          )
+          .min(1),
+      })
+      .passthrough(),
+  }),
+
+  install_Fp_req: requestEnvelopeSchema.extend({
+    name: z.literal('install_Fp_req'),
+    subCode: z.enum(['00H', '01H', '02H', '03H']),
+    data: z
+      .object({
+        FpId: id2Schema,
+        FpInstallPars: z.record(z.any()).optional(),
+        PumpInterfaceType: z.number().int().optional(),
+        PssChannelNo: z.number().int().optional(),
+        PhysicalAddress: z.number().int().optional(),
+        FpGradeOptions: z.array(z.record(z.any())).optional(),
       })
       .passthrough(),
   }),
@@ -293,6 +509,52 @@ const supportedRequestSchemas = {
     subCode: z.literal('00H'),
     data: z.object({ PpId: id2Schema }).passthrough(),
   }),
+  change_WpOperationModeSet_req: requestEnvelopeSchema.extend({
+    name: z.literal('change_WpOperationModeSet_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        WpId: id2Schema,
+        WpOperationModes: z
+          .array(
+            z
+              .object({
+                WpOperationModeNo: z.number().int().nonnegative(),
+                WpOperationType: z.number().int().nonnegative(),
+                WpServiceModes: z
+                  .array(
+                    z
+                      .object({
+                        WpSmId: id2Schema,
+                        WpWmgId: id2Schema,
+                        FcPriceGroupId: id2Schema,
+                      })
+                      .passthrough(),
+                  )
+                  .min(1),
+              })
+              .passthrough(),
+          )
+          .min(1),
+      })
+      .passthrough(),
+  }),
+  open_Wp_req: requestEnvelopeSchema.extend({
+    name: z.literal('open_Wp_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        WpId: id2Schema,
+        PosId: id2OrZeroSchema,
+        WpOperationModeNo: z.number().int().nonnegative(),
+      })
+      .passthrough(),
+  }),
+  close_Wp_req: requestEnvelopeSchema.extend({
+    name: z.literal('close_Wp_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ WpId: id2OrZeroSchema }).passthrough(),
+  }),
   WpStatus_req: requestEnvelopeSchema.extend({
     name: z.literal('WpStatus_req'),
     subCode: z.literal('00H'),
@@ -322,6 +584,42 @@ const supportedRequestSchemas = {
     name: z.literal('cancel_WpStop_req'),
     subCode: z.literal('00H'),
     data: z.object({ WpId: id2Schema, PosId: id2Schema }).passthrough(),
+  }),
+  WpUnSupTrans_req: requestEnvelopeSchema.extend({
+    name: z.literal('WpUnSupTrans_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        WpId: id2Schema,
+        TransSeqNo: dec4Schema,
+        PosId: id2OrZeroSchema,
+        WpTransParId: z.array(id2Schema).min(1),
+        RcpItemIdEptRd: z.array(id2Schema).optional(),
+      })
+      .passthrough(),
+  }),
+  unlock_WpUnSupTrans_req: requestEnvelopeSchema.extend({
+    name: z.literal('unlock_WpUnSupTrans_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        WpId: id2Schema,
+        PosId: id2OrZeroSchema,
+        TransSeqNo: dec4Schema,
+      })
+      .passthrough(),
+  }),
+  clear_WpUnSupTrans_req: requestEnvelopeSchema.extend({
+    name: z.literal('clear_WpUnSupTrans_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        WpId: id2Schema,
+        PosId: id2OrZeroSchema,
+        TransSeqNo: dec4Schema,
+        Money: z.string().trim().min(1),
+      })
+      .passthrough(),
   }),
   WpErrorMsg_req: requestEnvelopeSchema.extend({
     name: z.literal('WpErrorMsg_req'),
@@ -392,7 +690,7 @@ const supportedRequestSchemas = {
   }),
   FcInstallStatus_req: requestEnvelopeSchema.extend({
     name: z.literal('FcInstallStatus_req'),
-    subCode: z.literal('00H'),
+    subCode: z.enum(['00H', '01H', '02H']),
     data: z.object({}).passthrough(),
   }),
   TgData_req: requestEnvelopeSchema.extend({
@@ -406,7 +704,20 @@ const supportedRequestSchemas = {
   change_DynamicTankData_req: requestEnvelopeSchema.extend({
     name: z.literal('change_DynamicTankData_req'),
     subCode: z.literal('00H'),
-    data: z.object({ TankId: id2Schema, DtdPars: z.record(z.any()) }),
+    data: z.object({
+      TankId: id2Schema,
+      DtdPars: z.object({
+        EnteredDensity: z.object({
+          DensityValue: z
+            .string()
+            .trim()
+            .regex(/^\d{12}$/),
+          ExpireDateAndTime: fcDateTimeSchema,
+          ScrollingSpeed: code1Schema,
+          Text: z.string().max(80),
+        }),
+      }),
+    }),
   }),
   TgErrorMsg_req: requestEnvelopeSchema.extend({
     name: z.literal('TgErrorMsg_req'),
@@ -414,17 +725,51 @@ const supportedRequestSchemas = {
     data: z.object({ TgId: id2Schema }),
   }),
 
+  clear_TgError_req: requestEnvelopeSchema.extend({
+    name: z.literal('clear_TgError_req'),
+    subCode: z.literal('00H'),
+    data: z
+      .object({
+        TgId: id2Schema,
+        TgErrorCode: z
+          .string()
+          .trim()
+          .regex(/^\d{2}$/),
+      })
+      .passthrough(),
+  }),
+  reset_Tg_req: requestEnvelopeSchema.extend({
+    name: z.literal('reset_Tg_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ TgId: id2Schema }).passthrough(),
+  }),
+
   open_TankController_req: requestEnvelopeSchema.extend({
     name: z.literal('open_TankController_req'),
     subCode: z.literal('00H'),
     data: z.object({
       TankId: id2Schema,
-      PosId: id2Schema,
+      PosId: id2OrZeroSchema,
       TankOperationModeNo: z.number().int().min(0).max(255),
     }),
   }),
   close_TankController_req: requestEnvelopeSchema.extend({
     name: z.literal('close_TankController_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ TankId: id2OrZeroSchema }).passthrough(),
+  }),
+  TankControlStatus_req: requestEnvelopeSchema.extend({
+    name: z.literal('TankControlStatus_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ TankId: id2OrZeroSchema }).passthrough(),
+  }),
+  block_Tank_req: requestEnvelopeSchema.extend({
+    name: z.literal('block_Tank_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ TankId: id2Schema }).passthrough(),
+  }),
+  unblock_Tank_req: requestEnvelopeSchema.extend({
+    name: z.literal('unblock_Tank_req'),
     subCode: z.literal('00H'),
     data: z.object({ TankId: id2Schema }).passthrough(),
   }),
@@ -433,7 +778,7 @@ const supportedRequestSchemas = {
     subCode: z.literal('00H'),
     data: z.object({
       TankId: id2Schema,
-      PosId: id2Schema,
+      PosId: id2OrZeroSchema,
       FcProductId: id2Schema,
       StartDeliveryProcessPars: z
         .object({
@@ -449,8 +794,18 @@ const supportedRequestSchemas = {
     subCode: z.literal('00H'),
     data: z.object({
       TankId: id2Schema,
-      PosId: id2Schema,
+      PosId: id2OrZeroSchema,
     }),
+  }),
+  mark_DeliveryStarting_req: requestEnvelopeSchema.extend({
+    name: z.literal('mark_DeliveryStarting_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ PosId: id2OrZeroSchema }).passthrough(),
+  }),
+  mark_DeliveryFinished_req: requestEnvelopeSchema.extend({
+    name: z.literal('mark_DeliveryFinished_req'),
+    subCode: z.literal('00H'),
+    data: z.object({ PosId: id2OrZeroSchema }).passthrough(),
   }),
   SiteDeliveryStatus_req: requestEnvelopeSchema.extend({
     name: z.literal('SiteDeliveryStatus_req'),
@@ -468,8 +823,8 @@ const supportedRequestSchemas = {
     data: z
       .object({
         TgId: id2Schema,
-        PosId: id2Schema,
-        ZERO: z.number().int(),
+        PosId: id2OrZeroSchema,
+        ZERO: z.literal(0),
         TankDeliveryDataItemId: z.array(id2Schema).min(1),
       })
       .passthrough(),
@@ -479,8 +834,8 @@ const supportedRequestSchemas = {
     subCode: z.literal('00H'),
     data: z
       .object({
-        PosId: id2Schema,
-        DeliveryReportSeqNo: z.string().trim().min(1),
+        PosId: id2OrZeroSchema,
+        DeliveryReportSeqNo: dec2OrZeroSchema,
         TankDeliveries: z
           .array(
             z.object({
@@ -602,6 +957,13 @@ export const validateJplOutboundMessage = (message: unknown) => {
     envelope,
     `Invalid outbound JPL message for ${envelope.name}`,
   )
+}
+
+export const prepareJplOutboundMessage = (message: unknown) => {
+  const envelope = validateJplOutboundMessage(message)
+  if (envelope.name === 'heartbeat') return envelope
+  if (envelope.correlationId != null) return envelope
+  return { ...envelope, correlationId: createCorrelationId() }
 }
 
 export const normalizeJplInboundEnvelope = (message: unknown) => {

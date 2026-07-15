@@ -2,7 +2,7 @@ import { listTransactionsCsvRows } from '@/src/modules/reports/infrastructure/re
 
 function escapeCsv(value: unknown) {
   const s = value == null ? '' : String(value)
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
 export async function exportTransactionsCsv(

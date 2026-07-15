@@ -144,8 +144,11 @@ async function resolveEnrichmentFromTables(
   const line = await queryOne<{
     unit_price: number | string | null
     tax_rate: number | string | null
+    tax_code: string | null
   }>(
-    `SELECT tl.unit_price, p.tax_rate
+    `SELECT tl.unit_price,
+            COALESCE(tl.tax_rate, p.tax_rate) AS tax_rate,
+            tl.tax_code
      FROM transaction_lines tl
      LEFT JOIN products p
        ON p.id = tl.product_id
@@ -192,7 +195,7 @@ async function resolveEnrichmentFromTables(
           ? Number(bestProduct.tax_rate)
           : null,
     currency: bestProduct?.ext_currency ?? null,
-    taxCode: bestProduct?.ext_tax_code ?? null,
+    taxCode: line?.tax_code ?? bestProduct?.ext_tax_code ?? null,
     commodityCode: bestProduct?.commodity_code ?? null,
     hazardousIndicator:
       bestProduct?.ext_hazardous_indicator != null

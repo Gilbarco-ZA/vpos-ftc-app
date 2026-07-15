@@ -37,8 +37,15 @@ function extractStatusData(input: any) {
 function isoToFcDateTime(value: unknown): string {
   const date = new Date(String(value ?? ''))
   if (Number.isNaN(date.getTime())) return ''
-  const iso = date.toISOString().replace(/[-:TZ.]/g, '')
-  return iso.slice(0, 14)
+  const iso = date
+    .toISOString()
+    .replaceAll('-', '')
+    .replaceAll(':', '')
+    .replaceAll('T', '')
+    .replaceAll('Z', '')
+    .replaceAll('.', '')
+    .slice(0, 14)
+  return iso
 }
 
 type PendingView = {
@@ -125,8 +132,27 @@ export async function getPosDomsCommandResult(
   let payload: Record<string, unknown> | undefined
 
   if (command === 'getGradePrices') {
-    const type = new URL(req.url).searchParams.get('type') ?? undefined
-    payload = { type }
+    const params = new URL(req.url).searchParams
+    const type = params.get('type') ?? undefined
+    payload = {
+      type,
+      ...(params.get('fcPriceSetId')
+        ? { fcPriceSetId: params.get('fcPriceSetId') }
+        : {}),
+      ...(params.get('priceSetId')
+        ? { priceSetId: params.get('priceSetId') }
+        : {}),
+      ...(params.get('activationAt')
+        ? { activationAt: params.get('activationAt') }
+        : {}),
+      ...(params.get('priceSetActivationDateAndTime')
+        ? {
+            priceSetActivationDateAndTime: params.get(
+              'priceSetActivationDateAndTime',
+            ),
+          }
+        : {}),
+    }
   }
 
   if (command === 'getAllTgData') {
@@ -146,6 +172,21 @@ export async function getPosDomsCommandResult(
     payload = {
       ...(params.get('subCode') ? { subCode: params.get('subCode') } : {}),
     }
+  }
+
+  if (
+    command === 'getFpGradeTotals' ||
+    command === 'getPumpGradeTotals' ||
+    command === 'getPumpGradeBlendTotals' ||
+    command === 'getFallbackTotals' ||
+    command === 'getTankControlStatus'
+  ) {
+    const params = new URL(req.url).searchParams
+    payload = Object.fromEntries(params.entries())
+  }
+
+  if (command === 'getFcDateTime' || command === 'getFcOperationModeStatus') {
+    payload = {}
   }
 
   const result = await dispatchPosDomsCommand(stationId, command, payload)

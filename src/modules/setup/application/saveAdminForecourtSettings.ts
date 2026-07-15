@@ -1,5 +1,5 @@
 import type { SaveForecourtSettingsInput } from '@/src/shared/forecourt/settings'
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { saveForecourtSettings } from '@/src/shared/forecourt/settings'
 

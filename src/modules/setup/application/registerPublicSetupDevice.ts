@@ -1,5 +1,6 @@
 import { storeStationKv } from '@/src/shared/setup/api'
 import { registerDeviceViaProxy } from '@/src/shared/setup/proxy'
+import { validateRegistrationCode } from '@/src/shared/setup/validate'
 
 export async function registerPublicSetupDevice(
   stationId: string,
@@ -8,12 +9,13 @@ export async function registerPublicSetupDevice(
   const registrationCode = String(
     payload?.RegistrationCode || payload?.registrationCode || '',
   ).trim()
-  if (!registrationCode) {
-    return { success: false, error: 'Registration code is required' }
+  const validation = validateRegistrationCode(registrationCode)
+  if (!validation.ok) {
+    return { success: false, status: 400, error: validation.error }
   }
 
   const result = await registerDeviceViaProxy(stationId, {
-    RegistrationCode: registrationCode,
+    RegistrationCode: validation.code,
   })
 
   if (!result.ok) {

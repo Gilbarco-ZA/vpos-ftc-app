@@ -1,9 +1,18 @@
 import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
 
 import { padId2 } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
+import { getJplBufferHealth } from '@/src/shared/forecourt/jplState'
 
 import { validateJplOutboundMessage } from '@/src/modules/forecourt/infrastructure/jpl/protocol/schema'
+import {
+  normalizeJplDec4,
+  normalizeJplId2OrZero,
+} from '@/src/modules/forecourt/infrastructure/jpl/protocol/types'
 import { getReplayCapabilities } from '@/src/modules/forecourt/infrastructure/jpl/replayState'
+import {
+  extractJplUnattendedReceiptCapture,
+  resolveJplEptReceiptItems,
+} from '@/src/modules/forecourt/infrastructure/jpl/unattendedTransactions'
 
 const buildFpSupTransEnvelope = (DomsPosJpl as any).buildFpSupTransEnvelope as
   | ((input: {
@@ -30,48 +39,24 @@ const buildUnlockFpSupTransEnvelope = (DomsPosJpl as any)
   | ((input: { fpId: string; posId: string; transSeqNo: string }) => any)
   | undefined
 
-export const DEFAULT_TRANSACTION_PAR_IDS = [
-  '30',
-  '31',
-  '41',
-  '42',
-  '43',
-  '44',
-  '45',
-  '46',
-  '49',
-  '51',
-  '52',
-  '53',
-  '54',
-  '61',
-  '62',
-  '63',
-  '64',
-  '65',
-  '66',
-] as const
+export const DEFAULT_TRANSACTION_PAR_IDS = ['51', '64', '65', '66'] as const
 
 const toId2 = (value: unknown, fallback = '00') => {
-  const text = String(value ?? '').trim()
-  if (/^\d+$/.test(text)) {
-    return text.padStart(2, '0')
+  const selected = String(value ?? '').trim() || fallback
+  if (!selected) return ''
+  try {
+    return normalizeJplId2OrZero(selected)
+  } catch {
+    return fallback
   }
-  const parsed = Number(value)
-  if (Number.isFinite(parsed)) {
-    return String(Math.max(0, Math.trunc(parsed))).padStart(2, '0')
-  }
-  return fallback
 }
 
 const toDec4 = (value: unknown) => {
-  const text = String(value ?? '').trim()
-  if (/^\d+$/.test(text)) return text.padStart(4, '0')
-  const parsed = Number(value)
-  if (Number.isFinite(parsed)) {
-    return String(Math.max(0, Math.trunc(parsed))).padStart(4, '0')
+  try {
+    return normalizeJplDec4(value)
+  } catch {
+    return ''
   }
-  return ''
 }
 
 const pick = (value: any, keys: string[]) => {
@@ -294,15 +279,21 @@ export const buildClearUnsupervisedTransactionRequest = (args: {
   txData?: any
   payload?: any
 }) => {
-  const extra = extractExtendedClearFields(args.txData ?? args.payload)
-  const eptReceiptFormatId = pick(args.payload, [
-    'EptReceiptFormatId',
-    'eptReceiptFormatId',
-  ])
-  const eptReceiptItems = pick(args.payload, [
-    'EptReceiptItems',
-    'eptReceiptItems',
-  ])
+  const txPayload = {
+    ...(args.txData && typeof args.txData === 'object' ? args.txData : {}),
+    ...(args.payload && typeof args.payload === 'object' ? args.payload : {}),
+  }
+  const extra = extractExtendedClearFields(txPayload)
+  const unattendedCapture = extractJplUnattendedReceiptCapture(txPayload)
+  const rawEptReceiptItems = resolveJplEptReceiptItems(txPayload)
+  const eptReceiptFormatId =
+    pick(args.payload, ['EptReceiptFormatId', 'eptReceiptFormatId']) ??
+    pick(args.txData, ['EptReceiptFormatId', 'eptReceiptFormatId']) ??
+    unattendedCapture.eptReceiptFormatId
+  const eptReceiptItems =
+    pick(args.payload, ['EptReceiptItems', 'eptReceiptItems']) ??
+    pick(args.txData, ['EptReceiptItems', 'eptReceiptItems']) ??
+    (Object.keys(rawEptReceiptItems).length ? rawEptReceiptItems : undefined)
   const useExtended = Boolean(
     extra.Vol_e || extra.Money_e || eptReceiptFormatId || eptReceiptItems,
   )
@@ -332,15 +323,48 @@ export const getReplayStatusSummary = async (stationId: string) => {
     await import('@/src/modules/forecourt/infrastructure/repositories/forecourtJplReplayRepo')
   const { forecourtJplTransactionCheckpointRepo } =
     await import('@/src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionCheckpointRepo')
-  const [pendingRows, checkpointRows] = await Promise.all([
+  const { forecourtJplTransactionRecoveryRepo } =
+    await import('@/src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionRecoveryRepo')
+  const [pendingRows, checkpointRows, recoveryRuns] = await Promise.all([
     forecourtJplReplayRepo.listPendingClearRows({
       stationId,
     }),
     forecourtJplTransactionCheckpointRepo.listActiveByStation({ stationId }),
+    forecourtJplTransactionRecoveryRepo.listRecentByStation({
+      stationId,
+      limit: 10,
+    }),
   ])
   const capabilities = getReplayCapabilities()
+  const bufferHealth = getJplBufferHealth()
+  const inMemorySupervisedDepth = Object.values(
+    bufferHealth.supervised ?? {},
+  ).reduce((sum, entry: any) => sum + Number(entry?.depth ?? 0), 0)
+  const inMemoryUnsupervisedDepth = Object.values(
+    bufferHealth.unsupervised ?? {},
+  ).reduce((sum, entry: any) => sum + Number(entry?.depth ?? 0), 0)
+  const failedClearCount = checkpointRows.filter(
+    (row) => row.lifecycle_stage === 'failed' || row.last_error,
+  ).length
+  const staleLockCount = checkpointRows.filter((row) =>
+    Boolean(row.blocked_by_foreign_pos),
+  ).length
+  const pendingCheckpointCount = checkpointRows.filter(
+    (row) => row.lifecycle_stage !== 'cleared',
+  ).length
 
   return {
+    metrics: {
+      inMemorySupervisedDepth,
+      inMemoryUnsupervisedDepth,
+      inMemoryBacklogDepth: inMemorySupervisedDepth + inMemoryUnsupervisedDepth,
+      pendingReplayClearCount: pendingRows.length,
+      activeCheckpointCount: checkpointRows.length,
+      pendingCheckpointCount,
+      staleLockCount,
+      failedClearCount,
+      lastBufferHealthAt: bufferHealth.updatedAt ?? null,
+    },
     replayCapabilities: {
       supervised: capabilities.supervised,
       unsupervised: capabilities.unsupervised,
@@ -364,6 +388,19 @@ export const getReplayStatusSummary = async (stationId: string) => {
       readAttempts: Number(row.read_attempts ?? 0),
       clearAttempts: Number(row.clear_attempts ?? 0),
       updatedAt: row.updated_at,
+      lastError: row.last_error,
+    })),
+    transactionRecoveryRuns: recoveryRuns.map((row) => ({
+      id: row.id,
+      triggerSource: row.trigger_source,
+      status: row.status,
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      rowsScanned: Number(row.rows_scanned ?? 0),
+      retriesAttempted: Number(row.retries_attempted ?? 0),
+      clearSuccessCount: Number(row.clear_success_count ?? 0),
+      blockedCount: Number(row.blocked_count ?? 0),
+      failedCount: Number(row.failed_count ?? 0),
       lastError: row.last_error,
     })),
   }

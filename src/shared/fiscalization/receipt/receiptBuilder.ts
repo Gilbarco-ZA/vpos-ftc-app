@@ -44,6 +44,12 @@ const pickFirst = (...values: Array<any>) => {
   return ''
 }
 
+const scuIdFromReceiptNumber = (value: any) => {
+  const receiptNumber = coerceString(value)
+  if (!receiptNumber || !receiptNumber.includes('/')) return ''
+  return receiptNumber.split('/')[0]?.trim() || ''
+}
+
 const extractSource = (raw: any) => {
   if (!raw || typeof raw !== 'object') return raw
   return (
@@ -53,6 +59,96 @@ const extractSource = (raw: any) => {
     raw.data?.receipt ||
     raw.payload?.receipt ||
     raw
+  )
+}
+
+const pickScuId = (raw: any, fiscalSource: any, fiscalDevice: any) => {
+  const details =
+    raw?.details ||
+    raw?.data?.details ||
+    raw?.payload?.details ||
+    raw?.result?.details ||
+    raw?.response?.details
+  const data = raw?.data || raw?.payload || raw?.result || raw?.response
+  const receipt =
+    details?.receipt ||
+    raw?.receipt ||
+    raw?.receiptData ||
+    raw?.fiscalReceipt ||
+    data?.receipt ||
+    data?.receiptData ||
+    fiscalSource
+  const device =
+    raw?.device ||
+    raw?.fiscalDevice ||
+    raw?.fiscal_device ||
+    data?.device ||
+    data?.fiscalDevice ||
+    data?.fiscal_device ||
+    details?.device ||
+    details?.fiscalDevice ||
+    details?.fiscal_device ||
+    receipt?.device ||
+    receipt?.fiscalDevice ||
+    receipt?.fiscal_device
+
+  const receiptNumber = pickFirst(
+    receipt?.receiptNumber,
+    receipt?.receipt_number,
+    details?.receiptNumber,
+    details?.receipt_number,
+    data?.receiptNumber,
+    data?.receipt_number,
+    raw?.receiptNumber,
+    raw?.receipt_number,
+  )
+
+  return pickFirst(
+    raw?.scu_id,
+    raw?.scuId,
+    raw?.scuID,
+    raw?.SCUID,
+    raw?.device_id,
+    raw?.deviceId,
+    data?.scu_id,
+    data?.scuId,
+    data?.scuID,
+    data?.SCUID,
+    data?.device_id,
+    data?.deviceId,
+    details?.scu_id,
+    details?.scuId,
+    details?.scuID,
+    details?.SCUID,
+    details?.device_id,
+    details?.deviceId,
+    fiscalSource?.scu_id,
+    fiscalSource?.scuId,
+    fiscalSource?.scuID,
+    fiscalSource?.SCUID,
+    fiscalSource?.device_id,
+    fiscalSource?.deviceId,
+    receipt?.scu_id,
+    receipt?.scuId,
+    receipt?.scuID,
+    receipt?.SCUID,
+    receipt?.device_id,
+    receipt?.deviceId,
+    device?.scu_id,
+    device?.scuId,
+    device?.scuID,
+    device?.SCUID,
+    device?.device_id,
+    device?.deviceId,
+    device?.cloud_device_id,
+    device?.cloudDeviceId,
+    fiscalDevice?.config_json?.cloud_device_id,
+    fiscalDevice?.config_json?.cloudDeviceId,
+    fiscalDevice?.config_json?.device_id,
+    fiscalDevice?.config_json?.deviceId,
+    fiscalDevice?.config_json?.scu_id,
+    fiscalDevice?.config_json?.scuId,
+    scuIdFromReceiptNumber(receiptNumber),
   )
 }
 
@@ -91,6 +187,14 @@ const extractItems = (
           line?.fuel_type,
           'Item',
         ),
+        productCode:
+          coerceString(
+            line?.product_code ??
+              line?.productCode ??
+              line?.ext_product_code ??
+              line?.extProductCode,
+          ) ?? null,
+        sku: coerceString(line?.sku) ?? null,
         taxCode: taxCode.toUpperCase(),
         quantity,
         unitPrice,
@@ -126,10 +230,27 @@ const extractItems = (
     return [
       {
         name: fallbackName || 'Fuel',
-        taxCode: 'B',
+        productCode:
+          coerceString(
+            fallback?.product_code ??
+              fallback?.productCode ??
+              fallback?.ext_product_code ??
+              fallback?.extProductCode ??
+              fallback?.grade_id ??
+              fallback?.gradeId,
+          ) ?? null,
+        sku: coerceString(fallback?.sku) ?? null,
+        taxCode: pickFirst(
+          fallback?.tax_code,
+          fallback?.taxCode,
+          fallback?.ext_tax_code,
+          fallback?.extTaxCode,
+          'B',
+        ).toUpperCase(),
         quantity: fbQty,
         unitPrice: fbUnitPrice,
         amount: fbAmount,
+        taxRate: coerceNumber(fallback?.tax_rate ?? fallback?.taxRate) ?? null,
       },
     ]
   }
@@ -158,10 +279,19 @@ const extractItems = (
         item?.name,
         item?.description,
         item?.product_name,
+        item?.productName,
         item?.fuelType,
         item?.fuel_type,
         'Item',
       ),
+      productCode:
+        coerceString(
+          item?.product_code ??
+            item?.productCode ??
+            item?.ext_product_code ??
+            item?.extProductCode,
+        ) ?? null,
+      sku: coerceString(item?.sku) ?? null,
       taxCode: taxCode.toUpperCase(),
       quantity,
       unitPrice,
@@ -210,7 +340,10 @@ const buildTaxSummary = (
     const code = item.taxCode || 'B'
     const rate = Number(item.taxRate ?? fallbackRate)
     const amount = Number(item.amount ?? 0)
-    const taxAmount = (amount * rate) / 100
+    const taxAmount =
+      item.taxAmount != null && Number.isFinite(Number(item.taxAmount))
+        ? Number(item.taxAmount)
+        : amount - amount / (1 + rate / 100)
     const taxable = amount - taxAmount
 
     const existing = byCode.get(code)
@@ -344,10 +477,36 @@ export const buildFiscalReceipt = async (params: {
   const queuePayload = await pgOne<any>(
     `SELECT payload FROM transaction_queue
      WHERE station_id = $1
-       AND (transaction_id = $2::uuid OR payload->>'transactionId' = $2::text OR payload->>'transaction_id' = $2::text)
+       AND (
+         transaction_id = NULLIF(BTRIM(CAST($2 AS text)), '')::uuid
+         OR payload->>'transactionId' = $2::text
+         OR payload->>'transaction_id' = $2::text
+       )
      ORDER BY created_at DESC
      LIMIT 1`,
     [params.stationId, params.transactionId],
+  )
+
+  const fallbackProduct = await pgOne<any>(
+    `SELECT COALESCE(ext_product_code, product_code) AS product_code,
+            sku,
+            COALESCE(ext_tax_code, tax_code) AS tax_code,
+            tax_rate
+       FROM products
+      WHERE station_id = $1
+        AND (
+          product_id = NULLIF(BTRIM(CAST($2 AS text)), '')
+          OR product_code = NULLIF(BTRIM(CAST($2 AS text)), '')
+          OR ext_product_code = NULLIF(BTRIM(CAST($2 AS text)), '')
+          OR LOWER(COALESCE(product_name, '')) = LOWER(NULLIF(BTRIM(CAST($3 AS text)), ''))
+          OR LOWER(COALESCE(product_name, '')) = LOWER(NULLIF(BTRIM(CAST($4 AS text)), ''))
+        )
+      ORDER BY CASE WHEN product_id = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+               CASE WHEN product_code = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+               CASE WHEN ext_product_code = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+               product_name ASC
+      LIMIT 1`,
+    [params.stationId, txn.grade_id, txn.grade_name, txn.fuel_type],
   )
 
   const transactionLines = await pgOne<any>(
@@ -357,15 +516,29 @@ export const buildFiscalReceipt = async (params: {
           'unit_price', COALESCE(p.ext_unit_price, tl.unit_price, p.unit_price),
           'line_total', (tl.quantity * COALESCE(p.ext_unit_price, tl.unit_price, p.unit_price)),
           'product_name', p.product_name,
-          'tax_code', COALESCE(p.ext_tax_code, p.tax_code),
-          'tax_rate', p.tax_rate
+          'product_code', COALESCE(p.ext_product_code, p.product_code, t.grade_id),
+          'sku', p.sku,
+          'grade_id', t.grade_id,
+          'tax_code', COALESCE(tl.tax_code, p.ext_tax_code, p.tax_code),
+          'tax_rate', COALESCE(tl.tax_rate, p.tax_rate)
         )
       ) AS lines
      FROM transaction_lines tl
+     JOIN transactions t
+       ON t.id = tl.transaction_id
+      AND t.station_id = $1
      LEFT JOIN products p
-       ON p.id = tl.product_id
-      AND p.station_id = $1
-     WHERE tl.transaction_id = $2::uuid`,
+       ON p.station_id = $1
+      AND (
+        p.id = tl.product_id
+        OR p.product_id = tl.product_id::text
+        OR p.product_code = tl.product_id::text
+        OR p.ext_product_code = tl.product_id::text
+        OR p.product_id = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+        OR p.product_code = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+        OR p.ext_product_code = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+      )
+     WHERE tl.transaction_id = NULLIF(BTRIM(CAST($2 AS text)), '')::uuid`,
     [params.stationId, params.transactionId],
   )
 
@@ -474,7 +647,13 @@ export const buildFiscalReceipt = async (params: {
   const items = extractItems(
     queuePayload?.payload,
     fiscalSource,
-    txn,
+    {
+      ...txn,
+      product_code: fallbackProduct?.product_code ?? txn.product_code,
+      sku: fallbackProduct?.sku ?? txn.sku,
+      tax_code: fallbackProduct?.tax_code ?? txn.tax_code,
+      tax_rate: fallbackProduct?.tax_rate ?? txn.tax_rate,
+    },
     transactionLines?.lines,
   )
   const taxSummary = buildTaxSummary(
@@ -508,16 +687,19 @@ export const buildFiscalReceipt = async (params: {
       ) ?? 'Ksh',
   }
 
-  const receiptNumber = `R-${Date.now()}-${String(txn.id).slice(0, 6)}`
+  const fallbackReceiptNumber = `R-${Date.now()}-${String(txn.id).slice(0, 6)}`
+  const receiptNumber = pickFirst(
+    templateModel?.receiptNumber,
+    fiscalSource?.receiptNumber,
+    fiscalSource?.receipt_number,
+    fiscalSource?.receiptNo,
+    fiscalSource?.receipt_no,
+    fiscalSource?.number,
+    fallbackReceiptNumber,
+  )
 
   const fiscalMeta: FiscalMeta = {
-    scuId: pickFirst(
-      fiscalSource?.scu_id,
-      fiscalSource?.device_id,
-      fiscalDevice?.config_json?.cloud_device_id,
-      fiscalDevice?.config_json?.device_id,
-      fiscalDevice?.config_json?.scu_id,
-    ),
+    scuId: pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
     cuInvoiceNo: pickFirst(
       fiscalSource?.cu_invoice_no,
       fiscalSource?.cuInvoiceNo,

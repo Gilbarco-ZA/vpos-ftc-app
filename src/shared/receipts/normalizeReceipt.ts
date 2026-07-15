@@ -42,10 +42,13 @@ export type NormalizedReceipt = {
   }
   items: Array<{
     description: string
+    productCode?: string
+    sku?: string
     qty?: number
     unitPrice?: number
     amount?: number
     taxType?: string
+    taxRate?: number
   }>
   totals: {
     amount?: number
@@ -96,6 +99,13 @@ const pickFirst = (...values: any[]) => {
     if (v) return v
   }
   return undefined
+}
+
+const scuIdFromReceiptNumber = (value: any) => {
+  const receiptNumber = toStringSafe(value)
+  if (!receiptNumber || !receiptNumber.includes('/')) return undefined
+  const prefix = receiptNumber.split('/')[0]?.trim()
+  return prefix || undefined
 }
 
 const extractReceipt = (raw: any) => {
@@ -162,6 +172,84 @@ const buildReceiptDateTime = (receipt: any, fallback?: string) => {
   if (date && time) return `${date} ${time}`
   if (date) return date
   return fallback
+}
+
+const pickScuId = (
+  parsed: any,
+  receipt: any,
+  fallbackReceiptNumber?: string,
+) => {
+  const details =
+    parsed?.details ||
+    parsed?.data?.details ||
+    parsed?.payload?.details ||
+    parsed?.result?.details ||
+    parsed?.response?.details
+  const data =
+    parsed?.data || parsed?.payload || parsed?.result || parsed?.response
+  const device =
+    parsed?.device ||
+    parsed?.fiscalDevice ||
+    parsed?.fiscal_device ||
+    data?.device ||
+    data?.fiscalDevice ||
+    data?.fiscal_device ||
+    details?.device ||
+    details?.fiscalDevice ||
+    details?.fiscal_device ||
+    receipt?.device ||
+    receipt?.fiscalDevice ||
+    receipt?.fiscal_device
+
+  const receiptNumber = pickFirst(
+    receipt?.receiptNumber,
+    receipt?.receipt_number,
+    details?.receiptNumber,
+    details?.receipt_number,
+    data?.receiptNumber,
+    data?.receipt_number,
+    parsed?.receiptNumber,
+    parsed?.receipt_number,
+  )
+
+  return (
+    pickFirst(
+      parsed?.scu_id,
+      parsed?.scuId,
+      parsed?.scuID,
+      parsed?.SCUID,
+      parsed?.device_id,
+      parsed?.deviceId,
+      data?.scu_id,
+      data?.scuId,
+      data?.scuID,
+      data?.SCUID,
+      data?.device_id,
+      data?.deviceId,
+      details?.scu_id,
+      details?.scuId,
+      details?.scuID,
+      details?.SCUID,
+      details?.device_id,
+      details?.deviceId,
+      receipt?.scu_id,
+      receipt?.scuId,
+      receipt?.scuID,
+      receipt?.SCUID,
+      receipt?.device_id,
+      receipt?.deviceId,
+      device?.scu_id,
+      device?.scuId,
+      device?.scuID,
+      device?.SCUID,
+      device?.device_id,
+      device?.deviceId,
+      device?.cloud_device_id,
+      device?.cloudDeviceId,
+    ) ||
+    scuIdFromReceiptNumber(receiptNumber) ||
+    scuIdFromReceiptNumber(fallbackReceiptNumber)
+  )
 }
 
 export const normalizeReceipt = (opts: {
@@ -279,6 +367,7 @@ export const normalizeReceipt = (opts: {
           line?.ext_tax_code,
           line?.extTaxCode,
         )
+        const taxRate = toNumberSafe(line?.tax_rate ?? line?.taxRate)
         return {
           description:
             pickFirst(
@@ -290,10 +379,18 @@ export const normalizeReceipt = (opts: {
             ) ||
             pickFirst(transaction?.fuel_type, transaction?.fuelType) ||
             'Item',
+          productCode: pickFirst(
+            line?.product_code,
+            line?.productCode,
+            line?.ext_product_code,
+            line?.extProductCode,
+          ),
+          sku: pickFirst(line?.sku),
           qty,
           unitPrice,
           amount,
           taxType: taxType ? taxType.toUpperCase() : undefined,
+          taxRate,
         }
       })
     : itemsSource.length
@@ -314,6 +411,9 @@ export const normalizeReceipt = (opts: {
             item?.taxCode,
             item?.tax_code,
           )
+          const taxRate = toNumberSafe(
+            item?.tax_rate ?? item?.taxRate ?? item?.vat_rate ?? item?.vatRate,
+          )
           return {
             description:
               pickFirst(
@@ -324,10 +424,18 @@ export const normalizeReceipt = (opts: {
                 item?.fuelType,
                 item?.fuel_type,
               ) || 'Item',
+            productCode: pickFirst(
+              item?.productCode,
+              item?.product_code,
+              item?.extProductCode,
+              item?.ext_product_code,
+            ),
+            sku: pickFirst(item?.sku),
             qty,
             unitPrice,
             amount,
             taxType: taxType ? taxType.toUpperCase() : undefined,
+            taxRate,
           }
         })
       : (() => {
@@ -342,10 +450,29 @@ export const normalizeReceipt = (opts: {
               description:
                 pickFirst(transaction?.fuel_type, transaction?.fuelType) ||
                 'Fuel',
+              productCode: pickFirst(
+                transaction?.product_code,
+                transaction?.productCode,
+                transaction?.ext_product_code,
+                transaction?.extProductCode,
+                transaction?.grade_id,
+                transaction?.gradeId,
+              ),
+              sku: pickFirst(transaction?.sku),
               qty: fbQty,
               unitPrice: fbUnitPrice ?? undefined,
               amount: fbAmount,
-              taxType: undefined,
+              taxType: pickFirst(
+                transaction?.tax_type,
+                transaction?.taxType,
+                transaction?.tax_code,
+                transaction?.taxCode,
+                transaction?.ext_tax_code,
+                transaction?.extTaxCode,
+              )?.toUpperCase(),
+              taxRate: toNumberSafe(
+                transaction?.tax_rate ?? transaction?.taxRate,
+              ),
             },
           ]
         })()
@@ -374,6 +501,14 @@ export const normalizeReceipt = (opts: {
   )
 
   const decimals = resolveDecimalSettings(decimalOverrides)
+  const receiptNumber = pickFirst(
+    receipt?.receiptNumber,
+    receipt?.receipt_number,
+    transaction?.receipt_number,
+    transaction?.receiptNumber,
+    transaction?.fiscalization_reference,
+    transaction?.fiscalizationReference,
+  )
 
   return {
     header: {
@@ -421,14 +556,7 @@ export const normalizeReceipt = (opts: {
       ),
     },
     meta: {
-      receiptNumber: pickFirst(
-        receipt?.receiptNumber,
-        receipt?.receipt_number,
-        transaction?.receipt_number,
-        transaction?.receiptNumber,
-        transaction?.fiscalization_reference,
-        transaction?.fiscalizationReference,
-      ),
+      receiptNumber,
       receiptZNumber: pickFirst(
         receipt?.receiptZNumber,
         receipt?.receipt_z_number,
@@ -445,16 +573,7 @@ export const normalizeReceipt = (opts: {
         transaction?.fiscalizationReference,
       ),
       attendant: attendantName,
-      scuId: pickFirst(
-        parsed?.scu_id,
-        parsed?.scuId,
-        parsed?.details?.scu_id,
-        parsed?.details?.scuId,
-        receipt?.scu_id,
-        receipt?.scuId,
-        receipt?.device_id,
-        receipt?.deviceId,
-      ),
+      scuId: pickScuId(parsed, receipt, receiptNumber),
       isOfflineFiscalization,
       offlinePending: isOfflinePending,
       fiscalizationStatus: transactionStatus || undefined,
@@ -490,6 +609,7 @@ export const normalizeReceipt = (opts: {
       net: netAmount,
       currency: pickFirst(
         transaction?.currency,
+        dbLines?.[0]?.currency,
         parsed?.currency,
         parsed?.details?.currency,
       ),

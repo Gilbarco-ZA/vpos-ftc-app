@@ -1,10 +1,26 @@
 import { z } from 'zod'
 
-const loggerParamsSchema = z.object({
-  label: z.string(),
-  level: z.string(),
-  console: z.boolean(),
-})
+const booleanishSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') return false
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true
+    if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false
+  }
+  return value
+}, z.boolean())
+
+const loggerParamsSchema = z
+  .object({
+    label: z.string().default('VPOS'),
+    level: z.string().default('warn'),
+    console: booleanishSchema.default(false),
+    outputToConsole: booleanishSchema.optional(),
+    consoleOverride: booleanishSchema.optional(),
+  })
+  .passthrough()
 
 const pluginDefinitionSchema = z.object({
   name: z.string(),

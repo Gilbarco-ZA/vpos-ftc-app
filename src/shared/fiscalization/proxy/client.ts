@@ -37,7 +37,7 @@ async function baseUrl(stationId: string) {
       '',
   ).trim()
   if (!raw) throw new Error('VPOS_PROXY_URL is not configured')
-  return raw.replace(/\/+$/, '');
+  return raw.replace(/\/+$/, '')
 }
 
 async function basePath(stationId: string) {
@@ -46,7 +46,36 @@ async function basePath(stationId: string) {
   ).trim()
   if (!raw) return ''
   const p = raw.startsWith('/') ? raw : `/${raw}`
-  return p.replace(/\/+$/, '');
+  return p.replace(/\/+$/, '')
+}
+
+async function parseProxyResponse(res: Response): Promise<any> {
+  const contentType = res.headers.get('content-type')?.toLowerCase() ?? ''
+  const body = await res.text()
+
+  if (!body) return null
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(body)
+    } catch {
+      return {
+        error: true,
+        message: 'Invalid JSON response from proxy',
+        rawBody: body,
+      }
+    }
+  }
+
+  try {
+    return JSON.parse(body)
+  } catch {
+    return {
+      error: true,
+      message: 'Unexpected non-JSON response from proxy',
+      rawBody: body,
+    }
+  }
 }
 
 export async function submitInvoiceToProxy(
@@ -69,9 +98,7 @@ export async function submitInvoiceToProxy(
     body: JSON.stringify(stripNulls(toSampleInvoicePayload(invoice))),
   })
 
-  const data = await res
-    .json()
-    .catch(() => ({ error: true, message: 'Invalid JSON response from proxy' }))
+  const data = await parseProxyResponse(res)
 
   return { ok: res.ok, status: res.status, data }
 }
@@ -84,7 +111,7 @@ export async function submitCreditNotesToProxy(
   const url =
     (await baseUrl(stationId)) +
     (await basePath(stationId)) +
-    '/api/credit-notes'
+    '/api/creditnotes'
 
   const res = await fetch(url, {
     method: 'POST',
@@ -99,9 +126,7 @@ export async function submitCreditNotesToProxy(
     body: JSON.stringify(stripNulls(payload)),
   })
 
-  const data = await res
-    .json()
-    .catch(() => ({ error: true, message: 'Invalid JSON response from proxy' }))
+  const data = await parseProxyResponse(res)
 
   return { ok: res.ok, status: res.status, data }
 }
@@ -125,9 +150,7 @@ export async function submitProductToProxy(
     body: JSON.stringify(stripNulls(product)),
   })
 
-  const data = await res
-    .json()
-    .catch(() => ({ error: true, message: 'Invalid JSON response from proxy' }))
+  const data = await parseProxyResponse(res)
 
   return { ok: res.ok, status: res.status, data }
 }
@@ -152,9 +175,7 @@ export async function submitStockInToProxy(
     body: JSON.stringify(stripNulls(payload)),
   })
 
-  const data = await res
-    .json()
-    .catch(() => ({ error: true, message: 'Invalid JSON response from proxy' }))
+  const data = await parseProxyResponse(res)
 
   return { ok: res.ok, status: res.status, data }
 }

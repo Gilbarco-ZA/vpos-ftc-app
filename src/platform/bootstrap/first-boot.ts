@@ -1,5 +1,9 @@
 import { importLegacyIfPresent } from '@/src/platform/bootstrap/legacy-importer'
 import { ensurePostgresMigrations } from '@/src/platform/bootstrap/postgres-migrations'
+import {
+  getLegacyArchiveDir,
+  getLegacyPermDir,
+} from '@/src/platform/config/app-config'
 import { bootstrapStationConfig } from '@/src/platform/config/loader'
 import { getPool } from '@/src/platform/db/postgres'
 import { logger } from '@/src/shared/utils/logger'
@@ -149,11 +153,20 @@ const runFirstBoot = async (
     if (stationId) {
       const imported = await importLegacyIfPresent({
         stationId,
-        legacyPermDir:
-          process.env.LEGACY_PERM_DIR || '/opt/fccapps/vpos-perm/vposfiscal',
-        moveAsideRoot: process.env.LEGACY_IMPORT_DIR,
+        legacyPermDir: getLegacyPermDir(),
+        moveAsideRoot: getLegacyArchiveDir(),
       })
       didImportLegacy = Boolean(imported)
+
+      if (didImportLegacy) {
+        const { recomputeDailyTotalsRange } =
+          await import('@/src/modules/transactions/infrastructure/dailyTotals')
+        const to = new Date().toISOString().slice(0, 10)
+        const fromDate = new Date()
+        fromDate.setUTCDate(fromDate.getUTCDate() - 90)
+        const from = fromDate.toISOString().slice(0, 10)
+        await recomputeDailyTotalsRange(stationId, from, to)
+      }
     }
 
     if (stationId) {

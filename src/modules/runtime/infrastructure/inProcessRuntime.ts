@@ -13,6 +13,7 @@ import {
   startPosBusListener,
 } from '@/src/modules/runtime/infrastructure/busListeners'
 // import { startSupervisorMonitorWorker } from '@/src/modules/runtime/infrastructure/supervisorMonitorWorker'
+import { startEwuraRetryWorker } from '@/src/modules/tanzania-fiscal/infrastructure/ewuraRetryWorker'
 import { startTransactionFiscalizationSchedulerWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionFiscalizationSchedulerWorker'
 import { startTransactionQueueWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionQueueWorker'
 
@@ -82,6 +83,12 @@ export function startInProcessRuntime(
             start: () => startTransactionQueueWorker(),
             staleMs: 25_000,
             backoffMs: 3_000,
+          },
+          {
+            name: 'ewuraRetryWorker',
+            start: () => startEwuraRetryWorker(),
+            staleMs: 60_000,
+            backoffMs: 5_000,
           },
         ]
       : []),

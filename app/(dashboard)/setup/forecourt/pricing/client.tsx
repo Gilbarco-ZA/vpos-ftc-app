@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
 import { PageHeader } from '@/components/layout/page-header'
+import PssConfigurationVerification from '@/components/setup/PssConfigurationVerification'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -335,6 +336,8 @@ export default function ForecourtPricingClient() {
           </>
         }
       />
+
+      <PssConfigurationVerification compact />
       {isLoading ? (
         <Card>
           <CardContent className="space-y-3">
@@ -609,5 +612,5 @@ export default function ForecourtPricingClient() {
         </>
       )}
     </div>
-  );
+  )
 }

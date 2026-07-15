@@ -1,6 +1,8 @@
 import {
+  getPreferredNetworkHost,
   normalizeForecourtHost,
   normalizeForecourtPort,
+  resolveProductionHost,
 } from '@/src/shared/forecourt/runtimeConfigShared'
 import { kvGet } from '@/src/shared/storage/stationKv'
 
@@ -32,9 +34,9 @@ export type LegacyForecourtNetworkConfig = {
 
 export const getLegacyForecourtNetworkConfig =
   (): LegacyForecourtNetworkConfig => ({
-    simHost: normalizeForecourtHost(
+    simHost: resolveProductionHost(
       process.env.FORECOURT_TCP_HOST,
-      '127.0.0.1',
+      getPreferredNetworkHost(),
     ),
     simPort: normalizeForecourtPort(process.env.FORECOURT_TCP_PORT, 10000),
   })

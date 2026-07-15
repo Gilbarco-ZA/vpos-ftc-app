@@ -1,6 +1,6 @@
 'use client'
 
-import type { ForecourtEventRow } from '@/src/modules/forecourt/infrastructure/adminRepo'
+import type { ForecourtEventRow } from '@/src/modules/forecourt/contracts/admin'
 import type {
   BufferSeverity,
   ForecourtConnectionStatus,
@@ -26,6 +26,18 @@ import {
   useForecourtConnection,
 } from '@/src/modules/forecourt/client/useForecourtConnection'
 
+import { JplCommissioningReadinessPanel } from '@/components/admin/forecourt/JplCommissioningReadinessPanel'
+import { JplDiagnosticsPanel } from '@/components/admin/forecourt/JplDiagnosticsPanel'
+import { JplFieldValidationPanel } from '@/components/admin/forecourt/JplFieldValidationPanel'
+import { JplMaintenanceExecutionGatePanel } from '@/components/admin/forecourt/JplMaintenanceExecutionGatePanel'
+import { JplMaintenanceGatePanel } from '@/components/admin/forecourt/JplMaintenanceGatePanel'
+import { JplMaintenancePlanPanel } from '@/components/admin/forecourt/JplMaintenancePlanPanel'
+import { JplMaintenancePreviewPanel } from '@/components/admin/forecourt/JplMaintenancePreviewPanel'
+import { JplOperationalReadinessPanel } from '@/components/admin/forecourt/JplOperationalReadinessPanel'
+import { JplProductionControls } from '@/components/admin/forecourt/JplProductionControls'
+import { JplReconciliationPanel } from '@/components/admin/forecourt/JplReconciliationPanel'
+import { JplSupportBundlePanel } from '@/components/admin/forecourt/JplSupportBundlePanel'
+import { JplWorkflowReviewPanel } from '@/components/admin/forecourt/JplWorkflowReviewPanel'
 import { PageHeader } from '@/components/layout/page-header'
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { Badge } from '@/components/ui/badge'
@@ -208,7 +220,12 @@ export default function AdminForecourtPage() {
         return
       }
 
-      if (t === 'cmd:confirmed' || t === 'cmd:timeout' || t === 'cmd:result') {
+      if (
+        t === 'cmd:confirmed' ||
+        t === 'cmd:timeout' ||
+        t === 'cmd:result' ||
+        String(t || '').startsWith('jpl.')
+      ) {
         setLive((prev) => {
           const next: LiveItem[] = [
             { ts: Date.now(), type: t, data: payload.data },
@@ -403,6 +420,30 @@ export default function AdminForecourtPage() {
         </CardContent>
       </Card>
 
+      <JplDiagnosticsPanel />
+
+      <JplOperationalReadinessPanel />
+
+      <JplCommissioningReadinessPanel />
+
+      <JplProductionControls />
+
+      <JplWorkflowReviewPanel />
+
+      <JplReconciliationPanel />
+
+      <JplMaintenancePlanPanel />
+
+      <JplMaintenanceGatePanel />
+
+      <JplMaintenancePreviewPanel />
+
+      <JplMaintenanceExecutionGatePanel />
+
+      <JplFieldValidationPanel />
+
+      <JplSupportBundlePanel />
+
       <Card>
         <CardContent className="space-y-3 p-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
@@ -538,10 +579,15 @@ export default function AdminForecourtPage() {
                   </TableCell>
                   <TableCell>{badgeForType(r.event_type)}</TableCell>
                   <TableCell className="text-sm">
-                    {r.payload?.action ?? ''}
+                    {typeof r.payload?.action === 'string'
+                      ? r.payload.action
+                      : ''}
                   </TableCell>
                   <TableCell className="text-sm">
-                    {r.payload?.pumpId ?? ''}
+                    {typeof r.payload?.pumpId === 'string' ||
+                    typeof r.payload?.pumpId === 'number'
+                      ? String(r.payload.pumpId)
+                      : ''}
                   </TableCell>
                   <TableCell className="text-sm">{r.source}</TableCell>
                   <TableCell>

@@ -121,13 +121,12 @@ export const buildReceiptLines = (
 
   model.items.forEach((item) => {
     const itemLines = wrapText(item.name, 18)
-    itemLines.forEach((itemLine) => lines.push(line(itemLine)))
     lines.push(
       line(
         formatColumns({
           widths: [18, 4, 4, 8, 8],
           values: [
-            '',
+            itemLines[0] ?? '',
             item.taxCode,
             formatVolume(item.quantity, model.decimals.volume),
             formatMoney(item.unitPrice, model.decimals.unitPrice),
@@ -137,6 +136,17 @@ export const buildReceiptLines = (
         }),
       ),
     )
+    itemLines.slice(1).forEach((itemLine) => lines.push(line(itemLine)))
+    if (item.productCode) {
+      wrapText(item.productCode, WIDTH).forEach((itemLine) =>
+        lines.push(line(itemLine)),
+      )
+    }
+    if (item.sku) {
+      wrapText(`SKU: ${item.sku}`, WIDTH).forEach((itemLine) =>
+        lines.push(line(itemLine)),
+      )
+    }
   })
 
   lines.push(separator())

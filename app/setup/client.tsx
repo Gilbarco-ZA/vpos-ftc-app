@@ -43,6 +43,14 @@ type SiteProfile = {
   timezone?: string
 }
 
+type SetupCountryOption = SelectOption & {
+  countryCode?: string
+  countryName?: string
+  currencyCode?: string | null
+  timezone?: string | null
+  defaultLanguageCode?: string | null
+}
+
 const SetupWizard = ({
   proxyReachable,
   proxyUrl,
@@ -61,16 +69,23 @@ const SetupWizard = ({
   const [didSync, setDidSync] = useState(false)
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem('vpos.setup.step')
-      if (stored === 'register' || stored === 'country' || stored === 'admin') {
-        // If the device is already registered, never force the wizard back to register.
-        if (isRegistered && stored === 'register') return
-        setStep(stored)
-      }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const restoreStoredStep = window.setTimeout(() => {
+      try {
+        const stored = window.localStorage.getItem('vpos.setup.step')
+        if (
+          stored === 'register' ||
+          stored === 'country' ||
+          stored === 'admin'
+        ) {
+          // If the device is already registered, never force the wizard back to register.
+          if (isRegistered && stored === 'register') return
+          setStep(stored)
+        }
+      } catch {}
+    }, 0)
+
+    return () => window.clearTimeout(restoreStoredStep)
+  }, [isRegistered])
 
   useEffect(() => {
     try {
@@ -83,7 +98,7 @@ const SetupWizard = ({
 
   const [siteProfile, setSiteProfile] = useState<SiteProfile | null>(null)
   const [needsCountry, setNeedsCountry] = useState(false)
-  const [countryOptions, setCountryOptions] = useState<SelectOption[]>([])
+  const [countryOptions, setCountryOptions] = useState<SetupCountryOption[]>([])
   const [loadingCountries, setLoadingCountries] = useState(true)
   const [country, setCountry] = useState('')
 
@@ -102,7 +117,7 @@ const SetupWizard = ({
           cache: 'no-store',
         })
         const json = await res.json().catch(() => ({}))
-        const options = readOptions(json)
+        const options = readOptions(json) as SetupCountryOption[]
         setCountryOptions(options)
         if (!country && options.length > 0) {
           setCountry(options[0].value)
@@ -116,8 +131,7 @@ const SetupWizard = ({
     safeAsync(loadCountries(), 'setup.loadCountries')
   }, [])
 
-  const registrationCodeValid =
-    registrationCode.trim().length >= 6 && registrationCode.trim().length <= 10
+  const registrationCodeValid = registrationCode.trim().length >= 6
 
   const adminValid =
     username.trim().length >= 3 &&
@@ -145,7 +159,6 @@ const SetupWizard = ({
   ]
 
   const syncSiteProfile = async () => {
-    if (!csrfToken) return
     setSiteSyncing(true)
     setError(null)
 
@@ -202,10 +215,9 @@ const SetupWizard = ({
   }, [csrfToken])
 
   useEffect(() => {
-    if (!isRegistered || !csrfToken || didSync) return
-    setRegistrationSuccess(true)
+    if (!isRegistered || didSync) return
     safeAsync(syncSiteProfile(), 'setup.syncSiteProfile')
-  }, [csrfToken, didSync, isRegistered])
+  }, [didSync, isRegistered])
 
   const handleRegisterDevice = async () => {
     if (!registrationCodeValid) return
@@ -484,16 +496,24 @@ const SetupWizard = ({
                 label="Registration Code"
                 error={
                   registrationCode && !registrationCodeValid
-                    ? 'Registration code must be 6-10 characters'
+                    ? 'Registration code must be at least 6 characters'
                     : undefined
                 }
               >
                 <Input
                   id="registrationCode"
+                  name="registrationCode"
                   value={registrationCode}
-                  onChange={(e) => setRegistrationCode(e.target.value)}
-                  placeholder="Enter 6-10 character code"
-                  maxLength={10}
+                  onChange={(e) =>
+                    setRegistrationCode(e.target.value.toUpperCase())
+                  }
+                  onBlur={(e) => {
+                    const v = e.target.value.toUpperCase()
+                    if (v !== registrationCode) setRegistrationCode(v)
+                  }}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="Enter registration code"
                   autoFocus
                 />
               </FormField>
@@ -506,7 +526,7 @@ const SetupWizard = ({
 
             <Button
               onClick={handleRegisterDevice}
-              disabled={!registrationCodeValid || isSubmitting || !csrfToken}
+              disabled={!registrationCodeValid || isSubmitting}
               variant="primary"
               className="w-full"
             >
@@ -515,7 +535,7 @@ const SetupWizard = ({
 
             <Button
               onClick={syncSiteProfile}
-              disabled={siteSyncing || !csrfToken}
+              disabled={siteSyncing}
               variant="secondary"
               className="w-full"
             >
@@ -569,7 +589,7 @@ const SetupWizard = ({
               </Button>
               <Button
                 onClick={handleSetCountry}
-                disabled={!country || isSubmitting || !csrfToken}
+                disabled={!country || isSubmitting}
                 variant="primary"
                 className="w-full"
               >
@@ -577,7 +597,7 @@ const SetupWizard = ({
               </Button>
               <Button
                 onClick={syncSiteProfile}
-                disabled={siteSyncing || !csrfToken}
+                disabled={siteSyncing}
                 variant="secondary"
                 className="w-full"
               >

@@ -1,5 +1,5 @@
 import type { SessionUser } from '@/src/shared/types'
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server'
 
 import { query, queryOne } from '@/src/platform/db/postgres'
 import { readBody } from '@/src/platform/web/api/request'
@@ -22,8 +22,11 @@ const asType = (t: string): EwuraType | null => {
   return null
 }
 
-export const GET = async (req: NextRequest, props: { params: Promise<{ type: string }> }) => {
-  const params = await props.params;
+export const GET = async (
+  req: NextRequest,
+  props: { params: Promise<{ type: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
@@ -86,8 +89,11 @@ export const GET = async (req: NextRequest, props: { params: Promise<{ type: str
     return await serverError(err, { stationId: user?.stationId })
   }
 }
-export const POST = async (req: NextRequest, props: { params: Promise<{ type: string }> }) => {
-  const params = await props.params;
+export const POST = async (
+  req: NextRequest,
+  props: { params: Promise<{ type: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])

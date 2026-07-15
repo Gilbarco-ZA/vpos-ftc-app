@@ -17,11 +17,14 @@ declare global {
   var __jplTcpFallbackPollTimer: NodeJS.Timeout | undefined
   var __jplTcpFallbackPollInFlight: boolean | undefined
   var __jplTcpAcceptedAccessCode: string | undefined
+  var __jplPosSessionOwnerId: string | undefined
+  var __jplPosSessionHeartbeatTimer: NodeJS.Timeout | undefined
   var __jplPersistDedupe: Map<string, number> | undefined
   var __jplReplayLocks: Map<string, Promise<void>> | undefined
   var __jplInFlightReplayKeys: Set<string> | undefined
   var __jplServiceDrainInFlight: Promise<any> | undefined
   var __jplBorDrainInFlight: Promise<any> | undefined
+  var __jplTxRecoveryInFlightByStation: Map<string, Promise<any>> | undefined
   var __jplReplayCapabilities:
     | {
         supervised: 'unknown' | 'allowed' | 'denied'

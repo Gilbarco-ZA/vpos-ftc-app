@@ -91,6 +91,7 @@ export async function saveStationSettingsRepo(args: {
   linkingWindowSeconds?: number | null
   unallocatedHandling?: string | null
   fiscalizationEngine?: string | null
+  fiscalizationTransport?: string | null
   autoFiscalizeEnabled?: boolean | null
   autoPrintReceipts?: boolean | null
   syncEnabled?: boolean | null

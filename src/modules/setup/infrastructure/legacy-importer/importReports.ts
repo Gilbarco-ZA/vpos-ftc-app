@@ -41,21 +41,23 @@ export async function importReportsFolder(opts: {
     onMoved,
     onWarn,
   } = opts
-  const dir = path.join(legacyPermDir, srcFolder)
+  const dir = path.join(/*turbopackIgnore: true*/ legacyPermDir, srcFolder)
   if (!(await pathExists(dir))) return
 
-  const files = (await fs.readdir(dir, { withFileTypes: true }))
+  const files = (
+    await fs.readdir(/*turbopackIgnore: true*/ dir, { withFileTypes: true })
+  )
     .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.json'))
     .map((e) => e.name)
     .sort()
 
   for (const filename of files) {
-    const filePath = path.join(dir, filename)
+    const filePath = path.join(/*turbopackIgnore: true*/ dir, filename)
     const meta = await getFileMeta(filePath)
     const sha = await sha256File(filePath)
     const rel =
       relativeToPermDir(legacyPermDir, filePath) ??
-      path.join(srcFolder, filename)
+      path.join(/*turbopackIgnore: true*/ srcFolder, filename)
 
     const prior = await ledgerFind(stationId, sha, meta.size)
     if (prior && (prior.status === 'imported' || prior.status === 'skipped')) {
@@ -107,7 +109,7 @@ export async function importReportsFolder(opts: {
 
     const fileObj = json.data ? json.data : json
     const report = fileObj.report || fileObj
-    const stat = await fs.stat(filePath)
+    const stat = await fs.stat(/*turbopackIgnore: true*/ filePath)
     const reportDateTime = toDateTime(report.date, report.time, stat.mtime)
 
     const reportType = report?.znum !== undefined ? 'ZREPORT' : 'UNKNOWN'

@@ -1,6 +1,8 @@
-import crypto from 'crypto'
-
-import { getSecureArtifactPayload } from '@/src/platform/security/secure-artifacts'
+import { readTanzaniaFiscalConfig } from '@/src/modules/tanzania-fiscal/infrastructure/config'
+import { assertStationIsTanzania } from '@/src/modules/tanzania-fiscal/infrastructure/country'
+import { sendEwuraSalesTransactionFromDb } from '@/src/modules/tanzania-fiscal/infrastructure/ewura'
+import { getEwuraPartialFiscalizationPolicy } from '@/src/modules/tanzania-fiscal/infrastructure/ewuraRetry'
+import { sendTraReceiptFromDb } from '@/src/modules/tanzania-fiscal/infrastructure/tra'
 
 import type {
   FiscalAdapter,
@@ -8,112 +10,109 @@ import type {
   FiscalRunResult,
 } from './types'
 
-function assertEnv(name: string): string {
-  const v = process.env[name]
-  if (!v) throw new Error(`${name} is not configured`)
-  return v
-}
-
 export const tzAdapter: FiscalAdapter = {
   engine: 'TZ',
   async run(req: FiscalizationRequest): Promise<FiscalRunResult> {
-    // Minimal, production-safe adapter skeleton:
-    // - loads cert material from secure_artifacts (if present) for future mTLS usage
-    // - calls a station-independent HTTP endpoint if configured (TZ_FISCAL_ENDPOINT)
-    // You can swap this implementation to your real TZ engine client.
-
-    let certData: Buffer | null = null
-    let certPass: Buffer | null = null
-    try {
-      certData = await getSecureArtifactPayload(
-        req.stationId,
-        'vpos.cert',
-        'data',
-      )
-    } catch {}
-    try {
-      certPass = await getSecureArtifactPayload(
-        req.stationId,
-        'vpos.cert',
-        'passphrase',
-      )
-    } catch {}
-
-    const endpoint = assertEnv('TZ_FISCAL_ENDPOINT')
-
-    const requestPayload = {
+    const requestPayload: Record<string, any> = {
       stationId: req.stationId,
-      transaction: req.transaction,
-      customer: req.customer
-        ? {
-            tin: req.customer.tin ?? null,
-            buyer_name: req.customer.buyer_name ?? null,
-          }
-        : null,
-      // Not used yet, but kept for traceability
-      cert_present: !!certData,
-      cert_passphrase_present: !!certPass,
+      transactionId: req.transaction?.id ?? null,
     }
 
     try {
-      const idempotencyKey =
-        String(
-          (req.transaction &&
-            (req.transaction.id ||
-              req.transaction.source_queue_id ||
-              req.transaction.sourceQueueId)) ||
-            '',
-        ) ||
-        crypto
-          .createHash('sha256')
-          .update(JSON.stringify(requestPayload))
-          .digest('hex')
+      await assertStationIsTanzania(req.stationId)
 
-      const resp = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'idempotency-key': idempotencyKey,
-        },
-        body: JSON.stringify(requestPayload),
+      const tra = await sendTraReceiptFromDb({
+        stationId: req.stationId,
+        transaction: req.transaction,
+        customer: req.customer,
       })
 
-      const raw = await resp.text()
-      if (!resp.ok) {
+      requestPayload.tra = tra.request
+
+      if (!tra.ok) {
         return {
           status: 'FAILED',
-          rawResponse: raw,
           engine: 'TZ',
+          reference: tra.reference ?? undefined,
+          rawResponse: tra.rawResponse,
           requestPayload,
-          errorMessage: `TZ fiscal endpoint returned ${resp.status}`,
+          responsePayload: {
+            ...tra.response,
+            verificationUrl: tra.verificationUrl ?? null,
+          },
+          errorMessage:
+            tra.error || `TRA fiscalization failed (${tra.httpStatus})`,
         }
       }
 
-      let parsed: any = null
+      const tanzaniaConfig = await readTanzaniaFiscalConfig(req.stationId)
+      let ewura: any = null
       try {
-        parsed = JSON.parse(raw)
-      } catch {}
-      const reference =
-        parsed?.reference ||
-        parsed?.data?.reference ||
-        parsed?.fiscalization_reference
+        ewura = await sendEwuraSalesTransactionFromDb({
+          stationId: req.stationId,
+          transaction: req.transaction,
+          customer: req.customer,
+          traRequest: tra.request,
+        })
+      } catch (e: any) {
+        // TRA receipt fiscalization remains successful. The EWURA DB row is either
+        // already marked FAILED by the sender or the error is preserved here for audit.
+        ewura = {
+          ok: false,
+          error: String(e?.message || e),
+        }
+      }
+
+      const ewuraPolicy = getEwuraPartialFiscalizationPolicy({
+        failureMode: tanzaniaConfig.ewura.failureMode,
+        ewuraOk: !!ewura?.ok,
+      })
+
+      const commonResponse = {
+        tra: {
+          ...tra.response,
+          verificationUrl: tra.verificationUrl ?? null,
+        },
+        ewura,
+        tanzaniaFiscalizationState: ewuraPolicy.fiscalizationState,
+        ewuraFailureMode: ewuraPolicy.failureMode,
+        ewuraAuditMessage: ewuraPolicy.auditMessage,
+      }
+
+      if (ewuraPolicy.blockTransaction) {
+        return {
+          status: 'FAILED',
+          engine: 'TZ',
+          reference: tra.reference ?? undefined,
+          rawResponse: JSON.stringify(commonResponse),
+          requestPayload: {
+            ...requestPayload,
+            ewura: ewura?.requestPayload ?? null,
+          },
+          responsePayload: commonResponse,
+          errorMessage: ewura?.error || ewuraPolicy.auditMessage,
+        }
+      }
 
       return {
-        status: 'SUCCESS',
-        reference: reference ? String(reference) : undefined,
-        rawResponse: raw,
+        status: ewuraPolicy.responseStatus,
         engine: 'TZ',
-        requestPayload,
-        responsePayload: parsed ?? raw,
+        reference: tra.reference ?? undefined,
+        rawResponse: JSON.stringify(commonResponse),
+        requestPayload: {
+          ...requestPayload,
+          ewura: ewura?.requestPayload ?? null,
+        },
+        responsePayload: commonResponse,
       }
     } catch (e: any) {
       return {
         status: 'FAILED',
+        engine: 'TZ',
         rawResponse: JSON.stringify({
           ok: false,
           error: String(e?.message || e),
         }),
-        engine: 'TZ',
         requestPayload,
         errorMessage: String(e?.message || e),
       }

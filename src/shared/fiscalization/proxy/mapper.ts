@@ -285,11 +285,7 @@ export function mapTransactionToProxyInvoice(args: {
         ? String(args.currency)
         : txn.currency != null
           ? String(txn.currency)
-          : country === 'KE'
-            ? 'KES'
-            : country === 'TZ'
-              ? 'TZS'
-              : 'KES'
+          : process.env.DEFAULT_CURRENCY?.trim() || 'USD'
 
   const vatRate = normalizeRate(args.vatRate, 0.16)
   const hasExplicitLines =
@@ -727,16 +723,65 @@ export function mapTransactionToProxyCreditNote(
 
   const reasonCode = (() => {
     const raw = String(args.reasonCode ?? '').trim()
-    return raw.length ? raw : null
+    return raw.length ? raw : '13'
   })()
 
   const documentReference = (() => {
-    const raw = String(args.documentReference ?? '').trim()
+    const raw = String(
+      args.documentReference ??
+        invoice.documentNumber ??
+        invoice.documentId ??
+        '',
+    ).trim()
     return raw.length ? raw : null
   })()
 
-  // Build credit note lines - keep original Sale line type and values.
+  const createdByName =
+    strOrNull(args.createdByName ?? invoice.createdByName) ?? 'VPOS-LITE'
+
+  const isOnline = invoice.isOnline ?? true
+
+  const documentNumber = (() => {
+    const raw = String(
+      args.documentNumber ??
+        invoice.documentNumber ??
+        documentReference ??
+        args.creditNoteId,
+    ).trim()
+    return raw.length ? raw : null
+  })()
+
+  const reason = (() => {
+    const raw = String(args.notes ?? invoice.notes ?? '').trim()
+    return raw.length ? raw : 'Credit note issued'
+  })()
+
+  // Build credit note lines in the shape expected by proxy/cloud contract.
   const Lines = (invoice.lines ?? []).map((line) => {
+    const product = line?.product
+      ? {
+          productId: line.product.productId ?? null,
+          productCode: line.product.productCode ?? null,
+          productClassCode: line.product.productClassCode ?? null,
+          productTypeCode: line.product.productTypeCode ?? null,
+          description: line.product.description ?? null,
+          unitOfMeasure: line.product.unitOfMeasure ?? null,
+          unitOfPackaging: line.product.unitOfPackaging ?? null,
+          quantity: Number(line.product.quantity ?? 0),
+          unitPrice: line.product.unitPrice ?? null,
+          hazardousIndicator: line.product.hazardousIndicator ?? null,
+          fuel: line.product.fuel
+            ? {
+                gradeId: line.product.fuel.gradeId ?? null,
+                gradeName: line.product.fuel.gradeName ?? null,
+                tankId: line.product.fuel.tankId ?? null,
+                pumpId: line.product.fuel.pumpId ?? null,
+                nozzleId: line.product.fuel.nozzleId ?? null,
+              }
+            : null,
+        }
+      : null
+
     const taxes = (line?.taxes ?? []).map((t) => ({
       type: t?.type ?? null,
       rate: t?.rate ?? 16,
@@ -744,7 +789,7 @@ export function mapTransactionToProxyCreditNote(
 
     return {
       lineType: line?.lineType ?? 'Sale',
-      product: line?.product ?? null,
+      product,
       taxes,
     }
   })
@@ -752,14 +797,21 @@ export function mapTransactionToProxyCreditNote(
   return {
     creditNotes: [
       {
+        IsOnline: isOnline,
+        isOnline,
         DocumentId: String(args.creditNoteId),
+        documentId: String(args.creditNoteId),
+        documentNumber,
         documentReference,
+        documentType: 'Return',
+        modificationType: 'None',
         issueDateTime: invoice.issueDateTime,
-        createdByName: 'VPOS-LITE',
+        createdByName,
         reasonCode,
-        // The proxy sample expects capitalized Lines.
+        reason,
         Lines,
-      } as any,
+        lines: Lines,
+      },
     ],
   }
 }

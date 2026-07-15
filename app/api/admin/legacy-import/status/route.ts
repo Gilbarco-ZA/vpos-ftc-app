@@ -14,7 +14,7 @@ const LEGACY_PERM_DIR =
 
 async function pathExists(p: string) {
   try {
-    await fs.access(p)
+    await fs.access(/*turbopackIgnore: true*/ p)
     return true
   } catch {
     return false
@@ -38,11 +38,13 @@ async function hasLegacyWork(permDir: string) {
   ]
 
   for (const c of candidates) {
-    const p = path.join(permDir, c)
+    const p = path.join(/*turbopackIgnore: true*/ permDir, c)
     if (!(await pathExists(p))) continue
-    const st = await fs.stat(p)
+    const st = await fs.stat(/*turbopackIgnore: true*/ p)
     if (st.isDirectory()) {
-      const entries = await fs.readdir(p, { withFileTypes: true })
+      const entries = await fs.readdir(/*turbopackIgnore: true*/ p, {
+        withFileTypes: true,
+      })
       if (entries.some((e) => e.isFile() && e.name.endsWith('.json')))
         return true
     } else if (st.isFile() && st.size > 5) return true

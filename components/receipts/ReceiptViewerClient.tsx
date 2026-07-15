@@ -333,12 +333,12 @@ const ReceiptViewerClient = ({
         </div>
       ) : null}
 
-      {selected && (
+      {selectedId && (
         <div className="space-y-4">
           <div className="no-print flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="primary"
-              onClick={() => void printReceipt(selected.id, true)}
+              onClick={() => void printReceipt(selectedId, true)}
               disabled={!csrfToken || printing}
               title={!csrfToken ? 'Loading security token…' : undefined}
             >
@@ -384,7 +384,7 @@ const ReceiptViewerClient = ({
               <div className="no-print">
                 <div className="text-sm text-[var(--text-muted)]">
                   Receipt #{receipt.meta.receiptNumber ?? '—'} •{' '}
-                  {selected.posReference ?? selected.id}
+                  {selected?.posReference ?? selectedId}
                 </div>
               </div>
               <Receipt80mm receipt={receipt} />

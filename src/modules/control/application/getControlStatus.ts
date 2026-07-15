@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { getControlRuntimeStatus } from '@/src/shared/control/runtime'
 import { requireNonEmptyString } from '@/src/shared/utils/inputs'

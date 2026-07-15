@@ -1,7 +1,13 @@
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
 import { getEnvValue } from '@/src/shared/config/envDb'
-import { submitInvoiceToProxy } from '@/src/shared/fiscalization/proxy/client'
-import { mapTransactionToProxyInvoice } from '@/src/shared/fiscalization/proxy/mapper'
+import {
+  submitCreditNotesToProxy,
+  submitInvoiceToProxy,
+} from '@/src/shared/fiscalization/proxy/client'
+import {
+  mapTransactionToProxyCreditNote,
+  mapTransactionToProxyInvoice,
+} from '@/src/shared/fiscalization/proxy/mapper'
 import {
   getFiscalizationResultsSinceViaProxy,
   getOfflineQueueItemViaProxy,
@@ -18,6 +24,7 @@ import { safeAsync } from '@/src/shared/utils/safeAsync'
 import { isUuid } from '@/src/shared/utils/uuid'
 
 import { syncDeductionForTransaction } from '@/src/modules/tank-levels/application/legacyTransactionSync'
+import { getStationFiscalizationRoute } from '@/src/modules/tanzania-fiscal/infrastructure/route'
 import { markTransactionFailed } from '@/src/modules/transactions/application/commands/mark-transaction-failed'
 import { markTransactionFiscalized } from '@/src/modules/transactions/application/commands/mark-transaction-fiscalized'
 import { getStationLinkingWindowSeconds } from '@/src/modules/transactions/infrastructure/linkingWindow'
@@ -87,18 +94,21 @@ async function tryClaimTransactionForImmediateProxySend(input: {
   transactionId: string
 }) {
   return await queryOne<any>(
-    `UPDATE transactions
+    `UPDATE transactions t
         SET status = 'FISCALIZING',
             linking_window_expires_at = NOW(),
             last_error = NULL,
             updated_at = NOW()
-      WHERE station_id = $1
-        AND id = $2::uuid
-        AND deleted_at IS NULL
-        AND cloud_transaction_id IS NULL
-        AND (fiscalization_reference IS NULL OR btrim(fiscalization_reference) = '')
-        AND status IN ('OPEN','ALLOCATED','PENDING','FAILED')
-    RETURNING *`,
+       FROM station_settings ss
+      WHERE t.station_id = $1
+        AND t.id = $2::uuid
+        AND ss.station_id = t.station_id
+        AND ss.fiscalization_transport = 'proxy'
+        AND t.deleted_at IS NULL
+        AND t.cloud_transaction_id IS NULL
+        AND (t.fiscalization_reference IS NULL OR btrim(t.fiscalization_reference) = '')
+        AND t.status IN ('OPEN','ALLOCATED','PENDING','FAILED')
+    RETURNING t.*`,
     [input.stationId, input.transactionId],
   )
 }
@@ -120,6 +130,15 @@ const FINAL_FAILURE_STATUSES = new Set([
   'CANCELLED',
   'CANCELED',
   'VOIDED',
+])
+
+const SUCCESS_RESPONSE_CODES = new Set([
+  '200',
+  '201',
+  '202',
+  'OK',
+  'SUCCESS',
+  'OFFLINE_SUCCESS',
 ])
 
 function getPath(source: any, path: string) {
@@ -375,6 +394,36 @@ function extractFailureMessage(source: any): string | null {
   )
 }
 
+function hasSuccessEnvelope(source: any): boolean {
+  const status = extractProxyStatus(source)
+  if (status && FINAL_SUCCESS_STATUSES.has(status)) return true
+
+  const responseCode = upperTrim(
+    extractFirstString(source, [
+      'responseCode',
+      'ResponseCode',
+      'details.responseCode',
+      'details.ResponseCode',
+      'data.responseCode',
+      'data.ResponseCode',
+      'payload.responseCode',
+      'payload.ResponseCode',
+      'response.responseCode',
+      'response.ResponseCode',
+      'final.responseCode',
+      'final.ResponseCode',
+      'submission.responseCode',
+      'submission.ResponseCode',
+    ]),
+  )
+  if (responseCode && SUCCESS_RESPONSE_CODES.has(responseCode)) return true
+
+  const message = upperTrim(extractFailureMessage(source))
+  if (message && ['SUCCESS', 'OK', 'COMPLETED'].includes(message)) return true
+
+  return false
+}
+
 function extractProxyCorrelationKeys(source: any): string[] {
   return Array.from(
     new Set(
@@ -512,7 +561,7 @@ function isFailedFiscalizationPayload(source: any): boolean {
   const finalError = getPath(source, 'final.error')
   const submissionError = getPath(source, 'submission.error')
 
-  return [
+  const hasErrorFlag = [
     explicitError,
     nestedError,
     dataError,
@@ -521,6 +570,15 @@ function isFailedFiscalizationPayload(source: any): boolean {
     finalError,
     submissionError,
   ].some((value) => value === true)
+
+  if (!hasErrorFlag) return false
+
+  // Some proxy/cloud envelopes set error=true while still returning
+  // success-coded outcomes (e.g. message="Success"). Do not treat those
+  // as terminal failures unless a real failure status is present.
+  if (hasSuccessEnvelope(source)) return false
+
+  return true
 }
 
 function mergeFiscalizationResponses(submission: any, final: any) {
@@ -1126,6 +1184,16 @@ export async function sendTransactionToProxyNow(input: {
   stationId: string
   transactionId: string
 }) {
+  const route = await getStationFiscalizationRoute(input.stationId)
+  if (route.route === 'local_tz') {
+    return {
+      ok: false as const,
+      skipped: true as const,
+      reason:
+        'Proxy send is disabled because this station is using local Tanzania fiscalization.',
+    }
+  }
+
   const station = await safeAsync(
     loadStation(input.stationId),
     'proxySenderWorker.sendNow.loadStation',
@@ -1151,6 +1219,283 @@ export async function sendTransactionToProxyNow(input: {
     trigger: 'sendNow',
   })
 }
+
+// ─── Credit Note Queue Helpers ──────────────────────────────────────────────
+
+async function claimCreditNoteQueueItems(stationId: string, limit: number) {
+  return await queryAll<{
+    id: string
+    station_id: string
+    payload: any
+    retry_count: number
+    transaction_id: string | null
+  }>(
+    `WITH claimed AS (
+      SELECT tq.id
+        FROM transaction_queue tq
+        JOIN station_settings ss ON ss.station_id = tq.station_id
+       WHERE tq.station_id = $1
+         AND tq.status = 'PENDING'
+         AND ss.fiscalization_transport = 'proxy'
+         AND tq.payload->>'kind' = 'CREDIT_NOTE'
+         AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
+       ORDER BY tq.created_at ASC
+       FOR UPDATE OF tq SKIP LOCKED
+       LIMIT $2
+    )
+    UPDATE transaction_queue tq
+       SET status = 'PROCESSING',
+           processing_started_at = NOW(),
+           updated_at = NOW()
+      FROM claimed
+     WHERE tq.id = claimed.id
+    RETURNING tq.id, tq.station_id, tq.payload, tq.retry_count, tq.transaction_id`,
+    [stationId, limit],
+  )
+}
+
+async function markCreditNoteQueueDone(queueId: string) {
+  await queryOne(
+    `UPDATE transaction_queue
+        SET status = 'DONE', last_error = NULL, next_attempt_at = NULL, updated_at = NOW()
+      WHERE id = $1`,
+    [queueId],
+  )
+}
+
+async function markCreditNoteQueueFailed(
+  queueId: string,
+  retryCount: number,
+  error: string,
+  retryDelaySeconds?: number,
+) {
+  if (retryDelaySeconds != null && retryDelaySeconds > 0) {
+    await queryOne(
+      `UPDATE transaction_queue
+          SET status = 'PENDING',
+              retry_count = $2,
+              last_error = $3,
+              next_attempt_at = NOW() + ($4 * INTERVAL '1 second'),
+              updated_at = NOW()
+        WHERE id = $1`,
+      [queueId, retryCount + 1, error, retryDelaySeconds],
+    )
+  } else {
+    await queryOne(
+      `UPDATE transaction_queue
+          SET status = 'FAILED',
+              retry_count = $2,
+              last_error = $3,
+              next_attempt_at = NULL,
+              updated_at = NOW()
+        WHERE id = $1`,
+      [queueId, retryCount + 1, error],
+    )
+  }
+}
+
+async function updateCreditNoteStatus(
+  stationId: string,
+  creditNoteId: string,
+  status: string,
+  opts?: { proxyResponse?: unknown; lastError?: string | null },
+) {
+  await queryOne(
+    `UPDATE credit_notes
+        SET status = $3,
+            proxy_response = COALESCE($4::jsonb, proxy_response),
+            last_error = $5,
+            updated_at = NOW()
+      WHERE station_id = $1 AND id = $2`,
+    [
+      stationId,
+      creditNoteId,
+      status,
+      opts?.proxyResponse != null ? JSON.stringify(opts.proxyResponse) : null,
+      opts?.lastError ?? null,
+    ],
+  )
+}
+
+async function sendCreditNoteQueueItemToProxy(input: {
+  stationId: string
+  station: any
+  queueItem: {
+    id: string
+    payload: any
+    retry_count: number
+    transaction_id: string | null
+  }
+}) {
+  const { stationId, station, queueItem } = input
+  const payload =
+    typeof queueItem.payload === 'string'
+      ? JSON.parse(queueItem.payload)
+      : queueItem.payload
+
+  const creditNoteId = String(payload?.creditNoteId ?? '')
+  const transactionId = String(
+    payload?.transactionId ?? queueItem.transaction_id ?? '',
+  )
+  const reasonCode = payload?.reasonCode ?? null
+  const notes = payload?.notes ?? null
+
+  if (!creditNoteId || !transactionId) {
+    logger.error(
+      `[${WORKER_NAME}] credit note queue item missing creditNoteId or transactionId`,
+      { stationId, queueId: queueItem.id, payload },
+    )
+    await markCreditNoteQueueFailed(
+      queueItem.id,
+      queueItem.retry_count,
+      'Missing creditNoteId or transactionId in queue payload',
+    )
+    return {
+      ok: false as const,
+      error: 'Missing required queue payload fields',
+    }
+  }
+
+  try {
+    const country = station?.country
+      ? String(station.country).toUpperCase()
+      : null
+    const defaultTaxType = await loadDefaultTaxType()
+    const vatRate =
+      defaultTaxType?.rate != null
+        ? Number(defaultTaxType.rate)
+        : await vatRateForCountry(stationId, country)
+
+    const fullTxn =
+      (await loadTransactionForProxySend(stationId, transactionId)) ??
+      (await queryOne<any>(
+        `SELECT * FROM transactions WHERE station_id = $1 AND id = $2::uuid AND deleted_at IS NULL`,
+        [stationId, transactionId],
+      ))
+
+    if (!fullTxn) {
+      throw new Error(`Transaction ${transactionId} not found`)
+    }
+
+    await updateCreditNoteStatus(stationId, creditNoteId, 'PENDING', {
+      lastError: null,
+    })
+
+    const customer =
+      fullTxn.customer_id != null
+        ? await loadCustomer(stationId, fullTxn.customer_id)
+        : null
+    const pumpNumber =
+      fullTxn.pump_number != null ? Number(fullTxn.pump_number) : null
+    const enrichment = await resolveEnrichmentFromTables(
+      stationId,
+      transactionId,
+      pumpNumber,
+      fullTxn.fuel_type ?? null,
+    )
+
+    const documentReference =
+      trimString(fullTxn.fiscalization_reference) ??
+      trimString(fullTxn.fiscal_document_id)
+
+    const creditNotePayload = mapTransactionToProxyCreditNote({
+      transaction: fullTxn,
+      customer,
+      station,
+      vatRate,
+      taxType: defaultTaxType?.code ?? null,
+      taxRate: defaultTaxType?.rate ?? null,
+      createdByName: null,
+      enrichment,
+      creditNoteId,
+      documentReference,
+      reasonCode,
+      notes,
+    })
+
+    logger.info(`[${WORKER_NAME}] submitting credit note to proxy`, {
+      stationId,
+      transactionId,
+      creditNoteId,
+      queueId: queueItem.id,
+    })
+
+    const res = await submitCreditNotesToProxy(stationId, creditNotePayload, {
+      idempotencyKey: `${stationId}:cn:${creditNoteId}`,
+    })
+
+    if (!res.ok) {
+      throw new Error(
+        `Proxy credit note submit failed: ${res.status} ${JSON.stringify(res.data)}`,
+      )
+    }
+
+    const hasFinalPayload = hasFinalFiscalizationPayload(res.data)
+    const hasFailurePayload = isFailedFiscalizationPayload(res.data)
+
+    if (hasFailurePayload) {
+      await updateCreditNoteStatus(stationId, creditNoteId, 'FAILED', {
+        proxyResponse: res.data ?? null,
+        lastError:
+          extractFailureMessage(res.data) ||
+          'Proxy credit note submission failed',
+      })
+      await markCreditNoteQueueFailed(
+        queueItem.id,
+        queueItem.retry_count,
+        extractFailureMessage(res.data) ||
+          'Proxy credit note submission failed',
+      )
+      logger.warn(`[${WORKER_NAME}] proxy returned failure for credit note`, {
+        stationId,
+        transactionId,
+        creditNoteId,
+        status: extractProxyStatus(res.data),
+        message: extractFailureMessage(res.data),
+      })
+      return { ok: false as const, error: 'Proxy returned failure response' }
+    }
+
+    await updateCreditNoteStatus(stationId, creditNoteId, 'SENT', {
+      proxyResponse: res.data ?? null,
+      lastError: null,
+    })
+    await markCreditNoteQueueDone(queueItem.id)
+
+    logger.info(`[${WORKER_NAME}] credit note proxy submit succeeded`, {
+      stationId,
+      transactionId,
+      creditNoteId,
+      documentId: extractProxyDocumentId(res.data),
+      documentNumber: extractProxyDocumentNumber(res.data),
+      finalized: hasFinalPayload,
+    })
+
+    return { ok: true as const, finalized: hasFinalPayload }
+  } catch (e: any) {
+    const errMsg = String(e?.message || e)
+    logger.error(`[${WORKER_NAME}] credit note proxy submit failed`, {
+      stationId,
+      transactionId,
+      creditNoteId,
+      queueId: queueItem.id,
+      error: errMsg,
+    })
+    await updateCreditNoteStatus(stationId, creditNoteId, 'FAILED', {
+      lastError: errMsg,
+    }).catch(() => {})
+    const retryDelay = queueItem.retry_count < 3 ? 30 : 120
+    await markCreditNoteQueueFailed(
+      queueItem.id,
+      queueItem.retry_count,
+      errMsg,
+      retryDelay,
+    )
+    return { ok: false as const, error: errMsg }
+  }
+}
+
+// ─── End Credit Note Queue Helpers ───────────────────────────────────────────
 
 async function loadDefaultTaxType() {
   const row = await queryOne<{ code: string; rate: number | string | null }>(
@@ -1267,8 +1612,11 @@ async function resolveEnrichmentFromTables(
   const line = await queryOne<{
     unit_price: number | string | null
     tax_rate: number | string | null
+    tax_code: string | null
   }>(
-    `SELECT tl.unit_price, p.tax_rate
+    `SELECT tl.unit_price,
+            COALESCE(tl.tax_rate, p.tax_rate) AS tax_rate,
+            tl.tax_code
      FROM transaction_lines tl
      LEFT JOIN products p
        ON p.id = tl.product_id
@@ -1316,7 +1664,7 @@ async function resolveEnrichmentFromTables(
           ? Number(bestProduct.tax_rate)
           : null,
     currency: bestProduct?.ext_currency ?? null,
-    taxCode: bestProduct?.ext_tax_code ?? null,
+    taxCode: line?.tax_code ?? bestProduct?.ext_tax_code ?? null,
     commodityCode: bestProduct?.commodity_code ?? null,
     hazardousIndicator:
       bestProduct?.ext_hazardous_indicator != null
@@ -1352,8 +1700,10 @@ export function startProxyFiscalSenderWorker(opts?: {
 
   let stopped = false
   let tickRunning = false
+  let creditNoteTickRunning = false
   let lastReconcileAt = 0
   const inFlight = new Map<string, Promise<unknown>>()
+  const cnInFlight = new Map<string, Promise<unknown>>()
 
   logger.info(`[${WORKER_NAME}] starting`, {
     stationId,
@@ -1390,6 +1740,26 @@ export function startProxyFiscalSenderWorker(opts?: {
         loadStation(stationId),
         'proxySenderWorker.loadStation',
       )
+      const route = await getStationFiscalizationRoute(stationId)
+      if (route.route === 'local_tz') {
+        await upsertProcessHeartbeat({
+          stationId,
+          processName: WORKER_NAME,
+          status: 'idle',
+          connected: true,
+          metrics: {
+            pollMs,
+            maxInFlight,
+            inFlight: inFlight.size,
+            cnInFlight: cnInFlight.size,
+            reconcilePollMs,
+            route: route.route,
+            skipped: 'local_tz_route',
+          },
+        }).catch(() => {})
+        return
+      }
+
       const linkingWindowSeconds =
         await getStationLinkingWindowSeconds(stationId)
 
@@ -1436,6 +1806,53 @@ export function startProxyFiscalSenderWorker(opts?: {
     }
   }
 
+  async function creditNoteTick() {
+    if (stopped || creditNoteTickRunning) return
+    creditNoteTickRunning = true
+    try {
+      const station = await safeAsync(
+        loadStation(stationId),
+        'proxySenderWorker.creditNoteTick.loadStation',
+      )
+      const route = await getStationFiscalizationRoute(stationId)
+      if (route.route === 'local_tz') return
+
+      const capacity = Math.max(0, maxInFlight - cnInFlight.size)
+      if (capacity <= 0) return
+
+      const items = await claimCreditNoteQueueItems(stationId, capacity)
+
+      if (items.length > 0) {
+        logger.info(`[${WORKER_NAME}] claimed credit note queue batch`, {
+          stationId,
+          count: items.length,
+          creditNoteIds: items.map((i) => {
+            const p =
+              typeof i.payload === 'string' ? JSON.parse(i.payload) : i.payload
+            return p?.creditNoteId
+          }),
+        })
+      }
+
+      for (const item of items) {
+        const p =
+          typeof item.payload === 'string'
+            ? JSON.parse(item.payload)
+            : item.payload
+        const key = String(p?.creditNoteId ?? item.id)
+        if (cnInFlight.has(key)) continue
+        const run = sendCreditNoteQueueItemToProxy({
+          stationId,
+          station,
+          queueItem: item,
+        }).finally(() => cnInFlight.delete(key))
+        cnInFlight.set(key, run)
+      }
+    } finally {
+      creditNoteTickRunning = false
+    }
+  }
+
   const hbTimer = setInterval(
     () =>
       upsertProcessHeartbeat({
@@ -1447,6 +1864,7 @@ export function startProxyFiscalSenderWorker(opts?: {
           pollMs,
           maxInFlight,
           inFlight: inFlight.size,
+          cnInFlight: cnInFlight.size,
           reconcilePollMs,
         },
       }).catch(() => {}),
@@ -1454,10 +1872,13 @@ export function startProxyFiscalSenderWorker(opts?: {
   )
 
   const timer = setInterval(() => tick().catch(() => {}), pollMs)
+  const cnTimer = setInterval(() => creditNoteTick().catch(() => {}), pollMs)
   tick().catch(() => {})
+  creditNoteTick().catch(() => {})
   return () => {
     stopped = true
     clearInterval(timer)
+    clearInterval(cnTimer)
     clearInterval(hbTimer)
   }
 }

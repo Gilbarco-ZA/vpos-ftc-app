@@ -20,6 +20,7 @@ import {
 } from '@/src/modules/setup/infrastructure/legacy-importer/ledger'
 import { moveAside } from '@/src/modules/setup/infrastructure/legacy-importer/moveAside'
 import { LEGACY_EXTRA } from '@/src/modules/setup/infrastructure/legacy-importer/types'
+import { fiscalTzArtifactKvValue } from '@/src/modules/tanzania-fiscal/infrastructure/fiscalTzLegacy'
 
 export async function importCertificates(opts: {
   ctx: ImportContext
@@ -30,9 +31,18 @@ export async function importCertificates(opts: {
   onWarn: (w: string) => void
 }) {
   const { ctx, stationId, legacyPermDir } = opts
-  const certDir = path.join(legacyPermDir, LEGACY_EXTRA.CERT_DIR)
-  const pfxPath = path.join(certDir, LEGACY_EXTRA.CERT_PFX)
-  const passPath = path.join(certDir, LEGACY_EXTRA.CERT_PASS)
+  const certDir = path.join(
+    /*turbopackIgnore: true*/ legacyPermDir,
+    LEGACY_EXTRA.CERT_DIR,
+  )
+  const pfxPath = path.join(
+    /*turbopackIgnore: true*/ certDir,
+    LEGACY_EXTRA.CERT_PFX,
+  )
+  const passPath = path.join(
+    /*turbopackIgnore: true*/ certDir,
+    LEGACY_EXTRA.CERT_PASS,
+  )
 
   const hasPfx = await fileHasContent(pfxPath)
   const hasPass = await fileHasContent(passPath)
@@ -72,7 +82,9 @@ export async function importCertificates(opts: {
       return
     }
 
-    const buf: Buffer = (await fs.readFile(filePath)) as Buffer
+    const buf: Buffer = (await fs.readFile(
+      /*turbopackIgnore: true*/ filePath,
+    )) as Buffer
     await upsertSecureArtifact({
       stationId,
       artifactType: 'cert',
@@ -118,7 +130,10 @@ export async function importFiscalDevice(opts: {
   onMoved: () => void
   onWarn: (w: string) => void
 }) {
-  const fp = path.join(opts.legacyPermDir, LEGACY_EXTRA.FISCAL_DEVICE)
+  const fp = path.join(
+    /*turbopackIgnore: true*/ opts.legacyPermDir,
+    LEGACY_EXTRA.FISCAL_DEVICE,
+  )
   if (!(await fileHasContent(fp))) return
 
   await importSingleJsonFile({
@@ -132,6 +147,44 @@ export async function importFiscalDevice(opts: {
     onWarn: opts.onWarn,
     handler: async (json) => {
       await kvSet(opts.stationId, 'legacy.fiscal.device', json)
+      await kvSet(
+        opts.stationId,
+        'vpos.device.data',
+        fiscalTzArtifactKvValue(LEGACY_EXTRA.FISCAL_DEVICE, json),
+      )
+    },
+  })
+}
+
+export async function importFiscalToken(opts: {
+  ctx: ImportContext
+  stationId: string
+  legacyPermDir: string
+  onInserted: () => void
+  onMoved: () => void
+  onWarn: (w: string) => void
+}) {
+  const fp = path.join(
+    /*turbopackIgnore: true*/ opts.legacyPermDir,
+    LEGACY_EXTRA.FISCAL_TOKEN,
+  )
+  if (!(await fileHasContent(fp))) return
+
+  await importSingleJsonFile({
+    ctx: opts.ctx,
+    stationId: opts.stationId,
+    legacyPermDir: opts.legacyPermDir,
+    fileName: LEGACY_EXTRA.FISCAL_TOKEN,
+    kind: 'legacy_fiscal_token',
+    onInserted: opts.onInserted,
+    onMoved: opts.onMoved,
+    onWarn: opts.onWarn,
+    handler: async (json) => {
+      await kvSet(
+        opts.stationId,
+        'vpos.tra.token',
+        fiscalTzArtifactKvValue(LEGACY_EXTRA.FISCAL_TOKEN, json),
+      )
     },
   })
 }
@@ -149,7 +202,7 @@ export async function importPrinterQueues(opts: {
     jobType: 'print.receipt' | 'print.report',
     insertedKey: string,
   ) => {
-    const fp = path.join(opts.legacyPermDir, fileName)
+    const fp = path.join(/*turbopackIgnore: true*/ opts.legacyPermDir, fileName)
     if (!(await fileHasContent(fp))) return
 
     await importSingleJsonFile({
@@ -199,7 +252,7 @@ export async function importRemoteUploadState(opts: {
     kvKey: string,
     insertedKey: string,
   ) => {
-    const fp = path.join(opts.legacyPermDir, fileName)
+    const fp = path.join(/*turbopackIgnore: true*/ opts.legacyPermDir, fileName)
     if (!(await fileHasContent(fp))) return
 
     await importSingleJsonFile({

@@ -6,7 +6,7 @@ CREATE TABLE fuel_stations (
     name NVARCHAR(255) NOT NULL,
     address NVARCHAR(MAX),
     city NVARCHAR(100),
-    country NVARCHAR(2) NOT NULL CHECK (country IN ('TZ', 'KE')),
+    country NVARCHAR(3) NOT NULL,
     phone NVARCHAR(50),
     email NVARCHAR(255),
     is_active BIT NOT NULL DEFAULT 1,

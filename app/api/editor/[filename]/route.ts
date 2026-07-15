@@ -1,7 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { readBody } from '@/src/platform/web/api/request'
 import { serverError } from '@/src/platform/web/api/response'
@@ -23,11 +23,14 @@ function safeJoin(root: string, name: string) {
   const clean = name.replace(/\\/g, '/')
   if (clean.includes('..') || clean.startsWith('/'))
     throw new Error('Invalid filename')
-  return path.join(root, clean)
+  return path.join(/*turbopackIgnore: true*/ root, clean)
 }
 
-export const GET = async (req: Request, props: { params: Promise<{ filename: string }> }) => {
-  const params = await props.params;
+export const GET = async (
+  req: Request,
+  props: { params: Promise<{ filename: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])
@@ -39,15 +42,18 @@ export const GET = async (req: Request, props: { params: Promise<{ filename: str
       process.env.LEGACY_PERM_DIR ||
       '/opt/fccapps/vpos-perm/vposfiscal'
     const fp = safeJoin(root, params.filename)
-    const content = await fs.readFile(fp, 'utf8')
+    const content = await fs.readFile(/*turbopackIgnore: true*/ fp, 'utf8')
     return NextResponse.json({ filename: params.filename, content })
   } catch (err) {
     return await serverError(err, { req, stationId: user?.stationId })
   }
 }
 
-export const POST = async (req: Request, props: { params: Promise<{ filename: string }> }) => {
-  const params = await props.params;
+export const POST = async (
+  req: Request,
+  props: { params: Promise<{ filename: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])
@@ -65,15 +71,22 @@ export const POST = async (req: Request, props: { params: Promise<{ filename: st
       process.env.LEGACY_PERM_DIR ||
       '/opt/fccapps/vpos-perm/vposfiscal'
     const fp = safeJoin(root, params.filename)
-    await fs.writeFile(fp, body?.content ?? '', 'utf8')
+    await fs.writeFile(
+      /*turbopackIgnore: true*/ fp,
+      body?.content ?? '',
+      'utf8',
+    )
     return NextResponse.json({ success: true })
   } catch (err) {
     return await serverError(err, { req, stationId: user?.stationId })
   }
 }
 
-export const DELETE = async (req: Request, props: { params: Promise<{ filename: string }> }) => {
-  const params = await props.params;
+export const DELETE = async (
+  req: Request,
+  props: { params: Promise<{ filename: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])
@@ -93,7 +106,7 @@ export const DELETE = async (req: Request, props: { params: Promise<{ filename: 
       process.env.LEGACY_PERM_DIR ||
       '/opt/fccapps/vpos-perm/vposfiscal'
     const fp = safeJoin(root, params.filename)
-    await fs.unlink(fp)
+    await fs.unlink(/*turbopackIgnore: true*/ fp)
     return NextResponse.json({ success: true })
   } catch (err) {
     return await serverError(err, { req, stationId: user?.stationId })

@@ -1,4 +1,5 @@
 import {
+  getPreferredNetworkHost,
   FORECOURT_RUNTIME_KV_KEYS as KEY,
   normalizeBooleanFlag,
   normalizeForecourtHost,
@@ -6,6 +7,7 @@ import {
   normalizeJplOperationMode,
   normalizeProtocolFamilyList,
   parseCsvStringList,
+  resolveProductionHost,
   toInt,
 } from '@/src/shared/forecourt/runtimeConfigShared'
 import { kvGetMany } from '@/src/shared/storage/stationKv'
@@ -42,6 +44,12 @@ export type ForecourtRuntimeConfig = {
   jplRequestDispatchPolicy?: RequestDispatchPolicy
   jplIntegrationScope?: string
   jplTlsRequired?: boolean
+  jplTlsRejectUnauthorized?: boolean
+  jplTlsServername?: string
+  jplTlsCaPath?: string
+  jplTlsClientCertPath?: string
+  jplTlsClientKeyPath?: string
+  jplTlsMinVersion?: 'TLSv1.2' | 'TLSv1.3'
   jplOptionalProtocolFamilies?: string[]
 
   // Buffer health thresholds (minutes + depths)
@@ -110,7 +118,10 @@ const resolveFromEnv = (): ForecourtRuntimeConfig => {
     throw new Error(`Invalid JPL_TCP_PORT="${portRaw}"`)
   }
 
-  const jplHost = String(process.env.JPL_TCP_HOST || '127.0.0.1')
+  const jplHost = resolveProductionHost(
+    process.env.JPL_TCP_HOST,
+    getPreferredNetworkHost(),
+  )
   const jplPort = port
   const jplPosId = String(process.env.JPL_POS_ID || '01')
   const jplAccessCode = String(process.env.JPL_FC_ACCESS_CODE || 'POS')
@@ -158,6 +169,22 @@ const resolveFromEnv = (): ForecourtRuntimeConfig => {
     process.env.JPL_TLS_REQUIRED,
     false,
   )
+  const jplTlsRejectUnauthorized = normalizeBooleanFlag(
+    process.env.JPL_TLS_REJECT_UNAUTHORIZED,
+    true,
+  )
+  const jplTlsServername = String(process.env.JPL_TLS_SERVERNAME ?? '').trim()
+  const jplTlsCaPath = String(process.env.JPL_TLS_CA_PATH ?? '').trim()
+  const jplTlsClientCertPath = String(
+    process.env.JPL_TLS_CLIENT_CERT_PATH ?? '',
+  ).trim()
+  const jplTlsClientKeyPath = String(
+    process.env.JPL_TLS_CLIENT_KEY_PATH ?? '',
+  ).trim()
+  const jplTlsMinVersion =
+    String(process.env.JPL_TLS_MIN_VERSION ?? '').trim() === 'TLSv1.3'
+      ? 'TLSv1.3'
+      : 'TLSv1.2'
   const jplOptionalProtocolFamilies = normalizeProtocolFamilyList(
     process.env.JPL_OPTIONAL_PROTOCOL_FAMILIES,
   )
@@ -182,6 +209,12 @@ const resolveFromEnv = (): ForecourtRuntimeConfig => {
     jplRequestDispatchPolicy,
     jplIntegrationScope,
     jplTlsRequired,
+    jplTlsRejectUnauthorized,
+    jplTlsServername,
+    jplTlsCaPath,
+    jplTlsClientCertPath,
+    jplTlsClientKeyPath,
+    jplTlsMinVersion,
     jplOptionalProtocolFamilies,
     bufferWarnDepthSup: toInt(process.env.BUFFER_WARN_DEPTH_SUP, 2),
     bufferCritDepthSup: toInt(process.env.BUFFER_CRIT_DEPTH_SUP, 5),
@@ -240,6 +273,12 @@ const isSameConfig = (
     a.jplRequestDispatchPolicy === b.jplRequestDispatchPolicy &&
     a.jplIntegrationScope === b.jplIntegrationScope &&
     a.jplTlsRequired === b.jplTlsRequired &&
+    a.jplTlsRejectUnauthorized === b.jplTlsRejectUnauthorized &&
+    a.jplTlsServername === b.jplTlsServername &&
+    a.jplTlsCaPath === b.jplTlsCaPath &&
+    a.jplTlsClientCertPath === b.jplTlsClientCertPath &&
+    a.jplTlsClientKeyPath === b.jplTlsClientKeyPath &&
+    a.jplTlsMinVersion === b.jplTlsMinVersion &&
     JSON.stringify(a.jplOptionalProtocolFamilies) ===
       JSON.stringify(b.jplOptionalProtocolFamilies) &&
     a.bufferWarnDepthSup === b.bufferWarnDepthSup &&
@@ -286,6 +325,12 @@ export const loadForecourtRuntimeConfigFromDb = async (stationId: string) => {
     EXTRA_REQUEST_POLICY_KEY,
     KEY.JPL_INTEGRATION_SCOPE,
     KEY.JPL_TLS_REQUIRED,
+    KEY.JPL_TLS_REJECT_UNAUTHORIZED,
+    KEY.JPL_TLS_SERVERNAME,
+    KEY.JPL_TLS_CA_PATH,
+    KEY.JPL_TLS_CLIENT_CERT_PATH,
+    KEY.JPL_TLS_CLIENT_KEY_PATH,
+    KEY.JPL_TLS_MIN_VERSION,
     KEY.JPL_OPTIONAL_PROTOCOL_FAMILIES,
     KEY.BUFFER_WARN_DEPTH_SUP,
     KEY.BUFFER_CRIT_DEPTH_SUP,
@@ -316,6 +361,12 @@ export const loadForecourtRuntimeConfigFromDb = async (stationId: string) => {
     jplRequestDispatchPolicy,
     jplIntegrationScope,
     jplTlsRequired,
+    jplTlsRejectUnauthorized,
+    jplTlsServername,
+    jplTlsCaPath,
+    jplTlsClientCertPath,
+    jplTlsClientKeyPath,
+    jplTlsMinVersion,
     jplOptionalProtocolFamilies,
     bufferWarnDepthSup,
     bufferCritDepthSup,
@@ -402,6 +453,31 @@ export const loadForecourtRuntimeConfigFromDb = async (stationId: string) => {
       jplTlsRequired != null
         ? normalizeBooleanFlag(jplTlsRequired, base.jplTlsRequired ?? false)
         : (base.jplTlsRequired ?? false),
+    jplTlsRejectUnauthorized:
+      jplTlsRejectUnauthorized != null
+        ? normalizeBooleanFlag(
+            jplTlsRejectUnauthorized,
+            base.jplTlsRejectUnauthorized ?? true,
+          )
+        : (base.jplTlsRejectUnauthorized ?? true),
+    jplTlsServername:
+      jplTlsServername != null
+        ? String(jplTlsServername).trim()
+        : base.jplTlsServername,
+    jplTlsCaPath:
+      jplTlsCaPath != null ? String(jplTlsCaPath).trim() : base.jplTlsCaPath,
+    jplTlsClientCertPath:
+      jplTlsClientCertPath != null
+        ? String(jplTlsClientCertPath).trim()
+        : base.jplTlsClientCertPath,
+    jplTlsClientKeyPath:
+      jplTlsClientKeyPath != null
+        ? String(jplTlsClientKeyPath).trim()
+        : base.jplTlsClientKeyPath,
+    jplTlsMinVersion:
+      String(jplTlsMinVersion ?? base.jplTlsMinVersion) === 'TLSv1.3'
+        ? 'TLSv1.3'
+        : 'TLSv1.2',
     jplOptionalProtocolFamilies:
       jplOptionalProtocolFamilies != null
         ? normalizeProtocolFamilyList(

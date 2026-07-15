@@ -135,6 +135,7 @@ export const SYNC_TABLE_SPECS: TableSpec[] = [
       'linking_window_seconds',
       'unallocated_handling',
       'fiscalization_engine',
+      'fiscalization_transport',
       'auto_fiscalize_enabled',
       'auto_print_receipts',
       'sync_enabled',

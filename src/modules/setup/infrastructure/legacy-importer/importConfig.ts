@@ -7,12 +7,14 @@ import {
   upsertDeviceConfig,
   upsertPluginConfig,
 } from '@/src/shared/config/pluginDevice'
+import { kvSet } from '@/src/shared/storage/stationKv'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import { fileHasContent } from '@/src/modules/setup/infrastructure/legacy-importer/helpers'
 import { relativeToPermDir } from '@/src/modules/setup/infrastructure/legacy-importer/ledger'
 import { moveAside } from '@/src/modules/setup/infrastructure/legacy-importer/moveAside'
 import { VPOS_APP_FILES } from '@/src/modules/setup/infrastructure/legacy-importer/types'
+import { fiscalTzArtifactKvValue } from '@/src/modules/tanzania-fiscal/infrastructure/fiscalTzLegacy'
 
 import {
   looksLikeEngineConfig,
@@ -30,8 +32,12 @@ export async function importVposConfigAndUsersAndFiscal(opts: {
   const { ctx, stationId, legacyPermDir, onInserted, onMoved, onWarn } = opts
 
   // Config: prefer vpos.config.json, fallback engine.config.json
-  const vposConfigPath = path.join(legacyPermDir, VPOS_APP_FILES.VPOS_CONFIG)
+  const vposConfigPath = path.join(
+    /*turbopackIgnore: true*/ legacyPermDir,
+    VPOS_APP_FILES.VPOS_CONFIG,
+  )
   const engineConfigPath = path.join(
+    /*turbopackIgnore: true*/
     legacyPermDir,
     VPOS_APP_FILES.ENGINE_CONFIG,
   )
@@ -43,7 +49,10 @@ export async function importVposConfigAndUsersAndFiscal(opts: {
 
   if (configPath) {
     try {
-      const raw = await fs.readFile(configPath, 'utf-8')
+      const raw = await fs.readFile(
+        /*turbopackIgnore: true*/ configPath,
+        'utf-8',
+      )
       const parsed = JSON.parse(raw)
 
       const configJson = looksLikeEngineConfig(parsed)
@@ -84,10 +93,16 @@ export async function importVposConfigAndUsersAndFiscal(opts: {
   }
 
   // Users
-  const usersPath = path.join(legacyPermDir, VPOS_APP_FILES.USERS)
+  const usersPath = path.join(
+    /*turbopackIgnore: true*/ legacyPermDir,
+    VPOS_APP_FILES.USERS,
+  )
   if (await fileHasContent(usersPath)) {
     try {
-      const raw = await fs.readFile(usersPath, 'utf-8')
+      const raw = await fs.readFile(
+        /*turbopackIgnore: true*/ usersPath,
+        'utf-8',
+      )
       const parsed = JSON.parse(raw)
       const users = Array.isArray(parsed)
         ? parsed
@@ -147,12 +162,16 @@ export async function importVposConfigAndUsersAndFiscal(opts: {
 
   // Fiscal config
   const fiscalConfigPath = path.join(
+    /*turbopackIgnore: true*/
     legacyPermDir,
     VPOS_APP_FILES.FISCAL_CONFIG,
   )
   if (await fileHasContent(fiscalConfigPath)) {
     try {
-      const raw = await fs.readFile(fiscalConfigPath, 'utf-8')
+      const raw = await fs.readFile(
+        /*turbopackIgnore: true*/ fiscalConfigPath,
+        'utf-8',
+      )
       const parsed = JSON.parse(raw)
       await query(
         `INSERT INTO fiscal_config (station_id, config_json)
@@ -161,6 +180,11 @@ export async function importVposConfigAndUsersAndFiscal(opts: {
 				 DO UPDATE SET config_json = EXCLUDED.config_json,
 				               updated_at = NOW()`,
         [stationId, parsed],
+      )
+      await kvSet(
+        stationId,
+        'vpos.tra.config',
+        fiscalTzArtifactKvValue(VPOS_APP_FILES.FISCAL_CONFIG, parsed),
       )
       onInserted('fiscal_config')
       await moveAside({
@@ -178,12 +202,16 @@ export async function importVposConfigAndUsersAndFiscal(opts: {
 
   // Fiscal registration
   const fiscalRegPath = path.join(
+    /*turbopackIgnore: true*/
     legacyPermDir,
     VPOS_APP_FILES.FISCAL_REGISTRATION,
   )
   if (await fileHasContent(fiscalRegPath)) {
     try {
-      const raw = await fs.readFile(fiscalRegPath, 'utf-8')
+      const raw = await fs.readFile(
+        /*turbopackIgnore: true*/ fiscalRegPath,
+        'utf-8',
+      )
       const parsed = JSON.parse(raw)
       await query(
         `INSERT INTO fiscal_registration (id, station_id, status, registration_json)
@@ -193,6 +221,11 @@ export async function importVposConfigAndUsersAndFiscal(opts: {
 				               registration_json = EXCLUDED.registration_json,
 				               updated_at = NOW()`,
         [uuidv4(), stationId, String(parsed?.status ?? 'IMPORTED'), parsed],
+      )
+      await kvSet(
+        stationId,
+        'vpos.device.registration',
+        fiscalTzArtifactKvValue(VPOS_APP_FILES.FISCAL_REGISTRATION, parsed),
       )
       onInserted('fiscal_registration')
       await moveAside({

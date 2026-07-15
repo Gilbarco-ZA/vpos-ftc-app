@@ -13,7 +13,7 @@ export const createUserSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['administrator', 'manager', 'tenant']),
+  role: z.enum(['administrator', 'manager', 'tenant', 'field_engineer']),
   fullName: z.string().optional(),
 })
 
@@ -25,7 +25,9 @@ export const updateUserSchema = z
       .min(3, 'Username must be at least 3 characters')
       .optional(),
     email: z.string().email('Invalid email address').optional(),
-    role: z.enum(['administrator', 'manager', 'tenant']).optional(),
+    role: z
+      .enum(['administrator', 'manager', 'tenant', 'field_engineer'])
+      .optional(),
     fullName: z.string().optional(),
   })
   .refine(
@@ -220,6 +222,7 @@ export const stationSettingsSchema = z.object({
   linkingWindowSeconds: z.number().int().min(0).max(3600).optional(),
   unallocatedHandling: z.enum(['anonymous', 'placeholder']).optional(),
   fiscalizationEngine: z.enum(['TZ', 'KE', 'mock']).optional(),
+  fiscalizationTransport: z.enum(['proxy', 'local_tz']).optional(),
   autoFiscalizeEnabled: z.boolean().optional(),
   autoPrintReceipts: z.boolean().optional(),
   syncEnabled: z.boolean().optional(),
@@ -265,7 +268,9 @@ export const deviceConfigUpsertSchema = z.object({
 export const userUpdateSchema = z.object({
   email: z.string().email('Invalid email address').optional(),
   fullName: z.string().max(255).optional(),
-  role: z.enum(['administrator', 'manager', 'tenant']).optional(),
+  role: z
+    .enum(['administrator', 'manager', 'tenant', 'field_engineer'])
+    .optional(),
   isActive: z.boolean().optional(),
 })
 
@@ -276,7 +281,12 @@ export const createStationSchema = z.object({
   name: z.string().min(1).max(255),
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
-  country: z.enum(['TZ', 'KE']),
+  country: z
+    .string()
+    .trim()
+    .min(2)
+    .max(3)
+    .transform((value) => value.toUpperCase()),
   phone: z.string().max(50).optional(),
   email: z.string().email().optional(),
 })

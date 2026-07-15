@@ -1,6 +1,8 @@
 import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
 import type { ForecourtRuntimeConfig } from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 
+import { buildJplTlsClientOptions } from '@/src/modules/forecourt/infrastructure/jpl/tlsConfig'
+
 export const DEFAULT_JPL_REQUIRED_FLAGS = [
   'UNSO_INSTSTA_1',
   'UNSO_TRBUFSTA_3',
@@ -248,6 +250,8 @@ export const buildJplBootstrapConfig = (cfg: ForecourtRuntimeConfig) => {
       ? 3
       : requestedStatusUpdateCode
 
+  const tls = buildJplTlsClientOptions(cfg)
+
   return {
     posId,
     secureMode: Boolean(cfg.jplTlsRequired) || Number(cfg.jplPort) === 8889,
@@ -266,6 +270,7 @@ export const buildJplBootstrapConfig = (cfg: ForecourtRuntimeConfig) => {
       strictProtocolValidation: true,
       heartbeatIdleMs,
       inboundSilenceMs,
+      ...(tls ? { tls } : {}),
     },
     logonOptions: {
       accessCode,

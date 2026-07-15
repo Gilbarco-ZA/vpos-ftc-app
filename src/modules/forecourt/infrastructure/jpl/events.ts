@@ -33,6 +33,7 @@ import {
   pullAndClearUnsupervisedTransactions,
 } from '@/src/modules/forecourt/infrastructure/jpl/replay'
 import { resolveStationId } from '@/src/modules/forecourt/infrastructure/jpl/station'
+import { buildTransactionReplayKey } from '@/src/modules/forecourt/infrastructure/jpl/transactionReplayPolicy'
 import { normalizeForecourtEvent } from '@/src/modules/forecourt/infrastructure/normalize'
 import {
   resolveTransactionAmount,
@@ -156,7 +157,12 @@ export const handleNormalizedTransactions = async (
           ? ingestJplSupervisedTransaction
           : ingestJplUnsupervisedTransaction
 
-      const dedupeKey = `${stationId}:${sourceMode}:${domsFpId}:${transSeqNo}`
+      const dedupeKey = buildTransactionReplayKey({
+        stationId,
+        sourceMode,
+        fpId: domsFpId,
+        transSeqNo,
+      })
       if (seen.has(dedupeKey)) {
         logger.debug('[JPL]', {
           msg: 'skip tx: deduped',
@@ -177,8 +183,6 @@ export const handleNormalizedTransactions = async (
         })
         continue
       }
-      seen.add(dedupeKey)
-
       const cfg = getForecourtRuntimeConfig()
       const stationDecimals = await getStationDecimalSettingsCached(stationId)
       const resolvedVolume = resolveTransactionVolume(
@@ -217,6 +221,7 @@ export const handleNormalizedTransactions = async (
           occurredAt: null,
         })
 
+        if (persistedId) seen.add(dedupeKey)
         results.push({
           sourceMode,
           pumpNumber,
@@ -267,6 +272,7 @@ export const handleNormalizedTransactions = async (
           occurredAt: null,
         })
 
+        if (persistedId) seen.add(dedupeKey)
         results.push({
           sourceMode,
           pumpNumber,
@@ -323,6 +329,8 @@ export const handleNormalizedTransactions = async (
           'JPL transaction was not persisted; refusing to treat it as captured',
         )
       }
+
+      seen.add(dedupeKey)
 
       const eventPayload = {
         stationId,
@@ -406,6 +414,7 @@ export const handleJplEvent = async (eventType: string, payload: any) => {
     !String(eventType).startsWith('Fp') &&
     !String(eventType).startsWith('Fc') &&
     !String(eventType).startsWith('Tg') &&
+    !String(eventType).startsWith('Wp') &&
     !String(eventType).startsWith('SiteDeliveryStatus') &&
     !String(eventType).startsWith('MultiMessage')
   ) {
@@ -484,7 +493,11 @@ export const handleJplEvent = async (eventType: string, payload: any) => {
       }
     }
 
-    const fpIdForHealth = entries[0]?.fpId ?? null
+    const payloadFpId = Number(
+      (parsedPayload as any)?.FpId ?? (parsedPayload as any)?.fpId,
+    )
+    const fpIdForHealth =
+      entries[0]?.fpId ?? (Number.isFinite(payloadFpId) ? payloadFpId : null)
     updateBufferHealthFromPointerList(
       bufMode,
       fpIdForHealth,

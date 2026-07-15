@@ -17,7 +17,7 @@ type PublicMutationContext<B, P> = BaseContext<P> & { body: B }
 type BaseOptions<P> = {
   roles?: UserRole[]
   csrf?: boolean
-  getParams?: (ctx: any) => P
+  getParams?: (ctx: any) => P | Promise<P>
 }
 
 type RouteContext<P = Record<string, string>> = {
@@ -33,6 +33,13 @@ function defaultGetParams<P>(ctx: any): P {
   return ((ctx && typeof ctx === 'object' && 'params' in ctx
     ? ctx.params
     : {}) || {}) as P
+}
+
+async function resolveParams<P>(
+  getParams: (ctx: any) => P | Promise<P>,
+  frameworkCtx: any,
+): Promise<P> {
+  return await Promise.resolve(getParams(frameworkCtx))
 }
 
 function getCsrfHeader(request: Request) {
@@ -63,7 +70,10 @@ export function defineGetRoute<
   return async (req: Request, frameworkCtx?: any) => {
     try {
       const user = await requireAuth(opts.roles)
-      const params = (opts.getParams || defaultGetParams<P>)(frameworkCtx)
+      const params = await resolveParams(
+        opts.getParams || defaultGetParams<P>,
+        frameworkCtx,
+      )
       return await opts.handler(req, { user, params })
     } catch (err) {
       if (String((err as any)?.message || '').includes('CSRF')) {
@@ -78,12 +88,15 @@ export function defineGetRoute<
 export function definePublicGetRoute<
   P extends Record<string, string> = Record<string, string>,
 >(opts: {
-  getParams?: (ctx: any) => P
+  getParams?: (ctx: any) => P | Promise<P>
   handler: (req: Request, ctx: BaseContext<P>) => Promise<Response>
 }) {
   return async (req: Request, frameworkCtx?: any) => {
     try {
-      const params = (opts.getParams || defaultGetParams<P>)(frameworkCtx)
+      const params = await resolveParams(
+        opts.getParams || defaultGetParams<P>,
+        frameworkCtx,
+      )
       return await opts.handler(req, { params })
     } catch (err) {
       if (String((err as any)?.message || '').includes('CSRF')) {
@@ -107,7 +120,10 @@ export function defineMutationRoute<
     try {
       const user = await requireAuth(opts.roles)
       const body = (await readBody(req)) as B
-      const params = (opts.getParams || defaultGetParams<P>)(frameworkCtx)
+      const params = await resolveParams(
+        opts.getParams || defaultGetParams<P>,
+        frameworkCtx,
+      )
       if (opts.csrf !== false) {
         requireCsrfFromParts({
           headerToken: getCsrfHeader(req),
@@ -134,13 +150,16 @@ export function definePublicMutationRoute<
   P extends Record<string, string> = Record<string, string>,
 >(opts: {
   csrf?: boolean
-  getParams?: (ctx: any) => P
+  getParams?: (ctx: any) => P | Promise<P>
   handler: (req: Request, ctx: PublicMutationContext<B, P>) => Promise<Response>
 }) {
   return async (req: Request, frameworkCtx?: any) => {
     try {
       const body = (await readBody(req)) as B
-      const params = (opts.getParams || defaultGetParams<P>)(frameworkCtx)
+      const params = await resolveParams(
+        opts.getParams || defaultGetParams<P>,
+        frameworkCtx,
+      )
       if (opts.csrf) {
         requireCsrfFromParts({
           headerToken: getCsrfHeader(req),

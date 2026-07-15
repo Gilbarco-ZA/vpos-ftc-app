@@ -238,8 +238,26 @@ export type PosCommand =
   | { type: 'GET_FP_INFO'; payload?: any }
   | { type: 'GET_FP_FUELLING_DATA'; payload?: any }
   | { type: 'GET_FP_ERROR'; payload?: any }
+  | { type: 'GET_FP_GRADE_TOTALS'; payload?: any }
+  | { type: 'GET_PUMP_GRADE_TOTALS'; payload?: any }
+  | { type: 'GET_PUMP_GRADE_BLEND_TOTALS'; payload?: any }
+  | { type: 'GET_FALLBACK_TOTALS'; payload?: any }
+  | { type: 'CLEAR_FALLBACK_TOTALS'; payload?: any }
+  | { type: 'GET_TANK_CONTROL_STATUS'; payload?: any }
+  | { type: 'MARK_DELIVERY_STARTING'; payload?: any }
+  | { type: 'MARK_DELIVERY_FINISHED'; payload?: any }
+  | { type: 'BLOCK_TANK'; payload?: any }
+  | { type: 'UNBLOCK_TANK'; payload?: any }
+  | { type: 'CLEAR_TG_ERROR'; payload?: any }
+  | { type: 'RESET_TG'; payload?: any }
+  | { type: 'GET_FC_DATE_TIME'; payload?: any }
+  | { type: 'CHANGE_FC_DATE_TIME'; payload?: any }
+  | { type: 'GET_FC_OPERATION_MODE_STATUS'; payload?: any }
+  | { type: 'CHANGE_FC_OPERATION_MODE'; payload?: any }
+  | { type: 'UTIL_ECHO'; payload?: any }
   | { type: 'GET_GRADE_PRICES'; payload?: any }
   | { type: 'CHANGE_GRADE_PRICES'; payload?: any }
+  | { type: 'CLEAR_PENDING_PRICE_SET'; payload?: any }
   | { type: 'GET_ALL_TANK_DELIVERY_DATA'; payload?: any }
   | { type: 'GET_TANK_DELIVERY_DATA'; payload?: any }
   | { type: 'CLEAR_TANK_DELIVERY_DATA'; payload?: any }

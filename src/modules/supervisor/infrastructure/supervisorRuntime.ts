@@ -1,6 +1,7 @@
 import os from 'os'
 
 import { query } from '@/src/platform/db/postgres'
+import { getRuntimeUptimeSeconds } from '@/src/platform/runtime/nodeProcess'
 import { getSystemConfiguration } from '@/src/shared/config/loader'
 import { getFiscalInboxMetrics } from '@/src/shared/runtime/fiscalInbox'
 import {
@@ -125,7 +126,7 @@ export class SupervisorRuntime {
         status: 'running',
         connected: true,
         metrics: {
-          uptime: process.uptime(),
+          uptime: getRuntimeUptimeSeconds(),
           loadAvg: os.loadavg(),
         },
       }),
@@ -194,7 +195,7 @@ export class SupervisorRuntime {
       processes[name] = {
         status: isStale ? 'stale' : derivedStatus,
         pid: (hb as any)?.pid ?? (name === 'api' ? process.pid : undefined),
-        uptime: process.uptime(),
+        uptime: getRuntimeUptimeSeconds(),
         lastHealthCheck: override.lastHealthCheck ?? lastHbAt ?? now,
         connected:
           override.connected ??
@@ -229,10 +230,10 @@ export class SupervisorRuntime {
 
     return {
       processes,
-      uptime: process.uptime(),
+      uptime: getRuntimeUptimeSeconds(),
       timestamp: now,
       system: {
-        uptime: process.uptime(),
+        uptime: getRuntimeUptimeSeconds(),
         loadAvg: os.loadavg(),
         freeMemory: os.freemem(),
         totalMemory: os.totalmem(),

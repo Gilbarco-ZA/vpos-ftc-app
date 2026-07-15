@@ -92,6 +92,6 @@ export function transactionStatusLabel(status?: string | null): string {
       return status
         .toLowerCase()
         .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+        .replace(/\b\w/g, (c) => c.toUpperCase())
   }
 }

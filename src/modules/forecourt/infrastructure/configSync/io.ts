@@ -37,8 +37,8 @@ export async function readSnapshotFromFile(
 ) {
   const filePath = path.isAbsolute(pathValue)
     ? pathValue
-    : path.join(process.cwd(), pathValue)
-  const text = await fs.readFile(filePath, 'utf-8')
+    : path.join(/*turbopackIgnore: true*/ process.cwd(), pathValue)
+  const text = await fs.readFile(/*turbopackIgnore: true*/ filePath, 'utf-8')
   if (format === 'dps-xml') return text
   return JSON.parse(text)
 }

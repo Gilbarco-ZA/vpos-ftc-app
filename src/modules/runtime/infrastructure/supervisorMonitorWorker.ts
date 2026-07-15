@@ -1,3 +1,4 @@
+import { getRuntimeUptimeSeconds } from '@/src/platform/runtime/nodeProcess'
 import { getSystemConfiguration } from '@/src/shared/config/loader'
 import { drainFiscalInbox } from '@/src/shared/runtime/fiscalInbox'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
@@ -50,7 +51,7 @@ export function startSupervisorMonitorWorker(
             pid: process.pid,
             status: 'running',
             connected: true,
-            metrics: { uptime: process.uptime() },
+            metrics: { uptime: getRuntimeUptimeSeconds() },
           }),
           'supervisorMonitor.heartbeat',
         )
@@ -63,11 +64,12 @@ export function startSupervisorMonitorWorker(
         const supervisorCfg = cfg?.supervisor ?? {}
         const processConfig: Record<string, any> = cfg?.processes?.process ?? {}
 
-        const status = await supervisor
-          .getStatus()
-          .catch(() => (({
-          processes: {}
-        }) as any))
+        const status = await supervisor.getStatus().catch(
+          () =>
+            ({
+              processes: {},
+            }) as any,
+        )
         const processes = status.processes ?? {}
 
         await safeAsync(

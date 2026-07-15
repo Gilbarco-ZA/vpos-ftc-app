@@ -20,6 +20,7 @@ export type ProtocolHealthIssueCode =
   | 'correlation-unavailable'
   | 'single-flight-fallback'
   | 'recent-reject'
+  | 'recent-frame-error'
 
 export type ProtocolHealthIssue = {
   code: ProtocolHealthIssueCode
@@ -46,6 +47,12 @@ export type ProtocolHealthPayload = {
   lastReject?: RejectSummary
   defaultSubscriptions: ProtocolHealthDefaultSubscriptions
   rawFrameDiagnosticsEnabled: boolean
+  lastFrameDiagnostic?: {
+    valid: boolean
+    code: string
+    message: string
+    at?: number
+  }
 }
 
 const parseVersionTuple = (version: string) => {
@@ -81,6 +88,12 @@ export const buildProtocolHealth = (input: {
   lastReject?: RejectSummary
   defaultSubscriptions: ProtocolHealthDefaultSubscriptions
   rawFrameDiagnosticsEnabled: boolean
+  lastFrameDiagnostic?: {
+    valid: boolean
+    code: string
+    message: string
+    at?: number
+  }
 }): ProtocolHealthPayload => {
   const issues: ProtocolHealthIssue[] = []
 
@@ -133,6 +146,16 @@ export const buildProtocolHealth = (input: {
     })
   }
 
+  if (input.lastFrameDiagnostic && input.lastFrameDiagnostic.valid === false) {
+    issues.push({
+      code: 'recent-frame-error',
+      severity: 'warn',
+      message:
+        input.lastFrameDiagnostic.message ||
+        `recent malformed JPL frame observed: ${input.lastFrameDiagnostic.code}`,
+    })
+  }
+
   return {
     status: issues.length ? 'degraded' : 'healthy',
     issues,
@@ -145,5 +168,6 @@ export const buildProtocolHealth = (input: {
     lastReject: input.lastReject,
     defaultSubscriptions: input.defaultSubscriptions,
     rawFrameDiagnosticsEnabled: input.rawFrameDiagnosticsEnabled,
+    lastFrameDiagnostic: input.lastFrameDiagnostic,
   }
 }

@@ -7,8 +7,23 @@ import {
   readTrimmedEnv,
 } from '@/src/platform/config/env'
 
-const DEFAULT_DATA_ROOT =
-  process.env.PERM_DIR || '/opt/fccapps/vpos-perm/vposftc'
+export const DEFAULT_PERM_DIR = '/opt/fccapps/vpos-perm/vposftc'
+export const DEFAULT_LEGACY_PERM_DIR = '/opt/fccapps/vpos-perm/vposfiscal'
+export const DEFAULT_LEGACY_ARCHIVE_DIR = `${DEFAULT_PERM_DIR}/legacy-archive`
+
+const DEFAULT_DATA_ROOT = process.env.PERM_DIR || DEFAULT_PERM_DIR
+
+export const getLegacyPermDir = (): string => {
+  return readTrimmedEnv('LEGACY_PERM_DIR') ?? DEFAULT_LEGACY_PERM_DIR
+}
+
+export const getLegacyArchiveDir = (): string => {
+  const configured = readTrimmedEnv('LEGACY_IMPORT_DIR')
+  if (configured) return configured
+
+  const permDir = readTrimmedEnv('PERM_DIR') ?? DEFAULT_PERM_DIR
+  return `${permDir.replace(/\/+$/, '')}/legacy-archive`
+}
 
 const dedupe = (values: string[]): string[] => {
   return Array.from(new Set(values.filter((value) => value.trim().length > 0)))
@@ -21,6 +36,22 @@ export const getNodeEnv = (): string => {
 export const isProduction = (): boolean => getNodeEnv() === 'production'
 
 export const isDevelopment = (): boolean => getNodeEnv() === 'development'
+
+export const DEFAULT_POSTGRES_DATABASE = 'vpos_ftc'
+
+export const getPostgresDatabaseName = (): string => {
+  const connectionString = readTrimmedEnv('POSTGRES_URL')
+  if (connectionString) {
+    try {
+      const pathname = new URL(connectionString).pathname.replace(/^\//, '')
+      if (pathname) return decodeURIComponent(pathname)
+    } catch {
+      // Pool creation will report a malformed connection string with full context.
+    }
+  }
+
+  return readEnvOrDefault('POSTGRES_DATABASE', DEFAULT_POSTGRES_DATABASE)
+}
 
 export const getPostgresPoolConfig = (): PoolConfig => {
   const connectionString = readTrimmedEnv('POSTGRES_URL')
@@ -42,7 +73,7 @@ export const getPostgresPoolConfig = (): PoolConfig => {
     ...common,
     host: readEnvOrDefault('POSTGRES_HOST', '127.0.0.1'),
     port: readNumberEnv('POSTGRES_PORT', 5432),
-    database: readEnvOrDefault('POSTGRES_DATABASE', 'postgres'),
+    database: getPostgresDatabaseName(),
     user: readEnvOrDefault('POSTGRES_USER', 'postgres'),
     password: readEnvOrDefault('POSTGRES_PASSWORD', 'postgres'),
   }
@@ -66,22 +97,10 @@ export const shouldRunProxyWorker = (): boolean => {
 }
 
 export const shouldRunInternalFiscalizationWorkers = (): boolean => {
-  if (readBooleanEnv('VPOS_ALLOW_INTERNAL_FISCALIZATION', false)) {
-    return true
-  }
-
-  const flow = readEnvOrDefault(
-    'VPOS_FISCAL_FLOW',
-    shouldRunProxyWorker() ? 'proxy' : 'internal',
-  )
-    .trim()
-    .toLowerCase()
-
-  if (flow === 'proxy') {
-    return false
-  }
-
-  return !shouldRunProxyWorker()
+  // Production route selection is station-scoped in the database. Keep the
+  // internal workers available so Tanzania sites can switch between local TZ
+  // and proxy/cloud without needing shipped environment changes.
+  return !readBooleanEnv('VPOS_DISABLE_INTERNAL_FISCALIZATION_WORKERS', false)
 }
 
 export const getSessionCookieName = (): string => 'tin_capture_session'

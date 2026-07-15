@@ -90,12 +90,20 @@ export type ProxyCreditNoteLineDto = {
 }
 
 export type ProxyCreditNoteDto = {
+  IsOnline?: boolean | null
+  isOnline?: boolean | null
   DocumentId: string
+  documentId?: string | null
+  documentNumber?: string | null
   documentReference?: string | null
+  documentType?: string | null
+  modificationType?: string | null
   issueDateTime: string
   createdByName?: string | null
   reasonCode?: string | null
+  reason?: string | null
   Lines: ProxyCreditNoteLineDto[]
+  lines?: ProxyCreditNoteLineDto[]
 }
 
 export type ProxyCreditNotesRequest = {

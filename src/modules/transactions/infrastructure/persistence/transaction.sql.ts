@@ -60,8 +60,8 @@ export function buildClaimEligibleTransactionFiscalizationQueueSql(input: {
            OR status = 'PENDING'
          )
        ORDER BY transaction_date_time ASC
-       FOR UPDATE SKIP LOCKED
        LIMIT $2
+       FOR UPDATE SKIP LOCKED
     )
     UPDATE transactions t
        SET fiscal_queue_enqueued_at = NOW(),
@@ -110,8 +110,8 @@ export function buildClaimEligibleTransactionFiscalizationQueueSql(input: {
               )
          )
        ORDER BY transaction_date_time ASC
-       FOR UPDATE SKIP LOCKED
        LIMIT $2
+       FOR UPDATE SKIP LOCKED
     )
     UPDATE transactions t
        SET fiscal_queue_enqueued_at = NOW(),
@@ -338,7 +338,8 @@ export const getTransactionDetailsSql = `SELECT t.*, c.buyer_name, c.tin, c.buye
 export const getTransactionLinesSql = `SELECT
     tl.*,
     p.product_id AS product_external_id,
-    p.product_code,
+    COALESCE(p.ext_product_code, p.product_code) AS product_code,
+    p.sku,
     p.product_name,
     p.currency,
     COALESCE(p.ext_product_id, p.product_id) AS mapped_product_id,
@@ -350,15 +351,26 @@ export const getTransactionLinesSql = `SELECT
     p.category,
     COALESCE(p.ext_unit_of_measure, p.unit_of_measure) AS mapped_unit_of_measure,
     COALESCE(p.ext_unit_of_packaging, p.unit_of_packaging) AS mapped_unit_of_packaging,
-    COALESCE(p.ext_tax_code, p.tax_code) AS mapped_tax_code,
-    p.tax_rate AS mapped_tax_rate,
+    COALESCE(tl.tax_code, p.ext_tax_code, p.tax_code) AS mapped_tax_code,
+    COALESCE(tl.tax_rate, p.tax_rate) AS mapped_tax_rate,
     p.commodity_code AS mapped_commodity_code,
     COALESCE(p.ext_hazardous_indicator, p.hazardous_indicator) AS mapped_hazardous_indicator,
     (tl.quantity * tl.unit_price) AS line_total
   FROM transaction_lines tl
+  JOIN transactions t
+    ON t.id = tl.transaction_id
+   AND t.station_id = $1
   LEFT JOIN products p
-    ON p.id = tl.product_id
-   AND p.station_id = $1
+    ON p.station_id = $1
+   AND (
+     p.id = tl.product_id
+     OR p.product_id = tl.product_id::text
+     OR p.product_code = tl.product_id::text
+     OR p.ext_product_code = tl.product_id::text
+     OR p.product_id = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+     OR p.product_code = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+     OR p.ext_product_code = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+   )
  WHERE tl.transaction_id = $2
  ORDER BY tl.created_at ASC`
 
@@ -396,23 +408,25 @@ export function buildClaimEligibleProxyFiscalizationTransactionsSql(input: {
   return {
     sql: `
       WITH eligible AS (
-        SELECT id
-        FROM transactions
-        WHERE station_id = $1
-          AND deleted_at IS NULL
-          AND cloud_transaction_id IS NULL
-          AND fiscalization_reference IS NULL
-          AND status IN ('OPEN','ALLOCATED','PENDING')
+        SELECT t.id
+        FROM transactions t
+        JOIN station_settings ss ON ss.station_id = t.station_id
+        WHERE t.station_id = $1
+          AND ss.fiscalization_transport = 'proxy'
+          AND t.deleted_at IS NULL
+          AND t.cloud_transaction_id IS NULL
+          AND t.fiscalization_reference IS NULL
+          AND t.status IN ('OPEN','ALLOCATED','PENDING')
           AND (
-            customer_id IS NOT NULL
+            t.customer_id IS NOT NULL
             OR NOW() >= COALESCE(
-                 linking_window_expires_at,
-                 created_at + (COALESCE($2::int, 0) * INTERVAL '1 second')
+                 t.linking_window_expires_at,
+                 t.created_at + (COALESCE($2::int, 0) * INTERVAL '1 second')
                )
           )
-        ORDER BY transaction_date_time ASC
-        FOR UPDATE SKIP LOCKED
+        ORDER BY t.transaction_date_time ASC
         LIMIT $3
+        FOR UPDATE OF t SKIP LOCKED
       )
       UPDATE transactions t
       SET status = 'FISCALIZING',
@@ -469,6 +483,8 @@ export const loadValidatedProductsSql = `SELECT
     p.product_name,
     COALESCE(p.ext_unit_price, p.unit_price, 0) AS unit_price,
     COALESCE(p.ext_currency, p.currency) AS currency,
+    COALESCE(p.ext_tax_code, p.tax_code) AS tax_code,
+    p.tax_rate,
     p.category,
     COALESCE(pc.name, p.category) AS category_name
   FROM products p
@@ -528,6 +544,8 @@ export const deleteTransactionLinesByProductSql = `DELETE FROM transaction_lines
 export const updateTransactionLineSql = `UPDATE transaction_lines
     SET quantity = $3,
         unit_price = $4,
+        tax_code = $5,
+        tax_rate = $6,
         updated_at = NOW()
   WHERE id = $1
     AND transaction_id = $2`
@@ -542,9 +560,11 @@ export const insertTransactionLineSql = `INSERT INTO transaction_lines (
   product_id,
   quantity,
   unit_price,
+  tax_code,
+  tax_rate,
   created_at,
   updated_at
-) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`
+) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`
 
 export const countRemainingTransactionLinesSql = `SELECT COUNT(*) AS line_count
    FROM transaction_lines

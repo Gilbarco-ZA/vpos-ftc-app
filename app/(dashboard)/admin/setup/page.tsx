@@ -9,6 +9,7 @@ import { api } from '@/src/shared/api/fetch'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
 import { PageHeader } from '@/components/layout/page-header'
+import PssConfigurationVerification from '@/components/setup/PssConfigurationVerification'
 import TankConfigClient from '@/components/tanks/TankConfigClient'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +29,16 @@ import {
 } from './setup-sections'
 import { setupSteps, useSetupStepNavigation } from './use-setup-step-navigation'
 
+type SetupCountryOption = {
+  value: string
+  label: string
+  countryCode?: string
+  countryName?: string
+  currencyCode?: string | null
+  timezone?: string | null
+  defaultLanguageCode?: string | null
+}
+
 export default function SetupWizardPage() {
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -46,13 +57,39 @@ export default function SetupWizardPage() {
   const [siteName, setSiteName] = useState('')
   const [taxNumber, setTaxNumber] = useState('')
   const [address, setAddress] = useState('')
-  const [country, setCountry] = useState('KE')
-  const [currency, setCurrency] = useState('KES')
-  const [timezone, setTimezone] = useState('Africa/Johannesburg')
+  const [countryOptions, setCountryOptions] = useState<SetupCountryOption[]>([])
+  const [country, setCountry] = useState('')
+  const [currency, setCurrency] = useState('')
+  const [timezone, setTimezone] = useState('')
 
   const [mapping, setMapping] = useState<
     Record<string, Record<string, string>>
   >({})
+
+  const loadCountryOptions = async () => {
+    const r = await api<{ options: SetupCountryOption[] }>(
+      '/api/config/setup-countries',
+    )
+    if (r.success && Array.isArray((r.data as any)?.options)) {
+      const options = (r.data as any).options as SetupCountryOption[]
+      setCountryOptions(options)
+      if (!country && options[0]?.value) {
+        setCountry(options[0].value)
+        if (options[0].currencyCode) setCurrency(options[0].currencyCode)
+        if (options[0].timezone) setTimezone(options[0].timezone)
+      }
+      return options
+    }
+    setToast(r.error || 'Failed to load country datasets')
+    return []
+  }
+
+  const applyCountrySelection = (value: string) => {
+    setCountry(value)
+    const option = countryOptions.find((item) => item.value === value)
+    if (option?.currencyCode) setCurrency(option.currencyCode)
+    if (option?.timezone) setTimezone(option.timezone)
+  }
 
   const refresh = async () => {
     const r = await api<SetupCurrent>('/api/admin/setup/current')
@@ -63,9 +100,9 @@ export default function SetupWizardPage() {
         setSiteName(sp.siteName || '')
         setTaxNumber(sp.taxNumber || '')
         setAddress(sp.address || '')
-        setCountry(sp.country || 'KE')
-        setCurrency(sp.currency || 'KES')
-        setTimezone(sp.timezone || 'Africa/Johannesburg')
+        setCountry(sp.country || '')
+        setCurrency(sp.currency || '')
+        setTimezone(sp.timezone || '')
       }
       if (r.data.pumps?.liveState) setPumpSnapshot(r.data.pumps.liveState)
 
@@ -109,6 +146,7 @@ export default function SetupWizardPage() {
   }
 
   useEffect(() => {
+    void loadCountryOptions()
     refresh()
     refreshProducts()
     refreshPumps()
@@ -340,6 +378,8 @@ export default function SetupWizardPage() {
         ) : null}
       </div>
 
+      <PssConfigurationVerification compact />
+
       <SetupOverviewSection
         steps={setupSteps}
         activeStep={activeStep}
@@ -408,11 +448,20 @@ export default function SetupWizardPage() {
                 onChange={(e) => setAddress(e.target.value)}
               />
             </Field>
-            <Field label="Country code">
-              <Input
+            <Field label="Country">
+              <Select
                 value={country}
-                onChange={(e) => setCountry(e.target.value)}
-              />
+                onChange={(e) => applyCountrySelection(e.target.value)}
+              >
+                {countryOptions.length === 0 ? (
+                  <option value="">No active country datasets</option>
+                ) : null}
+                {countryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field label="Currency">
               <Input

@@ -22,13 +22,17 @@ const normalizeBasePath = (raw: string) => {
   const trimmed = String(raw || '').trim()
   if (!trimmed || trimmed === '/') return ''
   const withSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
-  return withSlash.replace(/\/+$/, '');
+  return withSlash.replace(/\/+$/, '')
 }
 
 const normalizePath = (raw: string) => {
   const trimmed = String(raw || '').trim()
   if (!trimmed) return ''
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+}
+
+const isAbortError = (err: unknown) => {
+  return err instanceof Error && err.name === 'AbortError'
 }
 
 const resolveProxyBaseUrl = async (stationId?: string) => {
@@ -49,7 +53,7 @@ const resolveProxyBaseUrl = async (stationId?: string) => {
     throw new Error('VPOS_PROXY_URL is not configured')
   }
 
-  return raw.replace(/\/+$/, '');
+  return raw.replace(/\/+$/, '')
 }
 
 const requestOnce = async (
@@ -89,14 +93,30 @@ const requestOnce = async (
     ? setTimeout(() => controller.abort(), opts.timeoutMs)
     : null
 
-  const res = await fetch(url.toString(), {
-    method: opts.method,
-    headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    signal: controller?.signal,
-  })
-
-  if (timeoutId) clearTimeout(timeoutId)
+  let res: Response
+  try {
+    res = await fetch(url.toString(), {
+      method: opts.method,
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: controller?.signal,
+    })
+  } catch (err) {
+    if (isAbortError(err) && controller?.signal.aborted) {
+      return {
+        ok: false,
+        status: 504,
+        data: {
+          error: true,
+          message: `Proxy request timed out after ${opts.timeoutMs}ms`,
+        },
+        url: url.toString(),
+      }
+    }
+    throw err
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
 
   const contentType = res.headers.get('content-type') || ''
   const raw = await res.text()

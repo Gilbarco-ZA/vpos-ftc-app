@@ -92,7 +92,7 @@ type LegacyPluginJson = {
 
 async function safeReadJson(fp: string): Promise<any | null> {
   try {
-    const raw = await fs.readFile(fp, 'utf8')
+    const raw = await fs.readFile(/*turbopackIgnore: true*/ fp, 'utf8')
     return JSON.parse(raw)
   } catch {
     return null
@@ -108,20 +108,28 @@ export async function scanAndUpsertPluginCatalog(pluginRoot: string): Promise<{
   let processes = 0
   let plugins = 0
 
-  const entries = await fs.readdir(pluginRoot, { withFileTypes: true })
+  const entries = await fs.readdir(/*turbopackIgnore: true*/ pluginRoot, {
+    withFileTypes: true,
+  })
   for (const procDir of entries) {
     if (!procDir.isDirectory()) continue
     const processType = procDir.name
-    const processPath = path.join(pluginRoot, processType)
+    const processPath = path.join(
+      /*turbopackIgnore: true*/ pluginRoot,
+      processType,
+    )
     const processJson = await safeReadJson(
-      path.join(processPath, 'process.json'),
+      path.join(/*turbopackIgnore: true*/ processPath, 'process.json'),
     )
     const schemaJson = (processJson?.configSchema ?? processJson ?? {}) as any
 
     await upsertProcessCatalog({
       processType,
       schemaJson,
-      sourcePath: path.join(processPath, 'process.json'),
+      sourcePath: path.join(
+        /*turbopackIgnore: true*/ processPath,
+        'process.json',
+      ),
     })
     processes += 1
 
@@ -130,8 +138,14 @@ export async function scanAndUpsertPluginCatalog(pluginRoot: string): Promise<{
       .catch(() => [])
     for (const plDir of pluginDirs) {
       if (!plDir.isDirectory()) continue
-      const plPath = path.join(processPath, plDir.name)
-      const pluginJsonPath = path.join(plPath, 'plugin.json')
+      const plPath = path.join(
+        /*turbopackIgnore: true*/ processPath,
+        plDir.name,
+      )
+      const pluginJsonPath = path.join(
+        /*turbopackIgnore: true*/ plPath,
+        'plugin.json',
+      )
       const meta = (await safeReadJson(
         pluginJsonPath,
       )) as LegacyPluginJson | null
@@ -144,7 +158,10 @@ export async function scanAndUpsertPluginCatalog(pluginRoot: string): Promise<{
         const t = String(pt?.type ?? processType)
         const schemaRef = pt?.configSchema
         if (schemaRef) {
-          const schemaFp = path.join(plPath, schemaRef)
+          const schemaFp = path.join(
+            /*turbopackIgnore: true*/ plPath,
+            schemaRef,
+          )
           const schema = await safeReadJson(schemaFp)
           if (schema) schemasByProcess[t] = schema
           else warnings.push(`Missing schema for ${meta.name}: ${schemaFp}`)

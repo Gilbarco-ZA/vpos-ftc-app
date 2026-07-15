@@ -129,7 +129,7 @@ export default function DiagnosticsPage() {
   const loadRestartLog = async () => {
     setErr('')
     try {
-      const res = await api<any>('/api/admin/vpos/restart-log-content', {
+      const res = await api<any>('/api/vpos/restart-log-content', {
         cache: 'no-store',
       })
       if (!res.success)
@@ -205,7 +205,7 @@ export default function DiagnosticsPage() {
   const clearRestartLog = async () => {
     setErr('')
     try {
-      const res = await api('/api/admin/vpos/restart-log-clear', {
+      const res = await api('/api/vpos/restart-log-clear', {
         method: 'POST',
       })
       if (!res.success)

@@ -1,5 +1,5 @@
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { query } from '@/src/platform/db/postgres'
 import { serverError } from '@/src/platform/web/api/response'
@@ -9,7 +9,10 @@ import { getUserById, userExists } from '@/src/shared/server/users'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const GET = async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
+export const GET = async (
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
@@ -39,7 +42,10 @@ export const GET = async (req: Request, ctx: { params: Promise<{ id: string }> }
   }
 }
 
-export const DELETE = async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
+export const DELETE = async (
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])

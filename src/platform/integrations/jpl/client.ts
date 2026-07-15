@@ -12,7 +12,7 @@ import {
   getJplGatewayState,
 } from '@/src/platform/integrations/jpl/gateway'
 import {
-  normalizeTgDataPayload,
+  normalizeTgDataPayload as normalizeSharedTgDataPayload,
   resolveConfiguredTankGaugeIds,
 } from '@/src/shared/doms/tankGauge'
 import {
@@ -23,6 +23,7 @@ import { assertJplAccessAllowed } from '@/src/shared/integrations/jplAccess'
 import { logger } from '@/src/shared/utils/logger'
 
 import { buildFpStatusSubCodePreference } from '@/src/modules/forecourt/infrastructure/jpl/dispense'
+import { normalizeDomsDynamicTankDataRequest } from '@/src/modules/forecourt/infrastructure/jpl/dynamicTankData'
 import {
   buildJplCommandRequest,
   describeJplAuthorizeRequest,
@@ -34,8 +35,15 @@ import {
   normalizeFpStatusPayload,
   normalizeSiteDeliveryStatusPayload,
   normalizeTankDeliveryDataPayload,
+  normalizeTgDataPayload,
   normalizeTgStatusPayload,
 } from '@/src/modules/forecourt/infrastructure/jpl/protocol/normalize'
+import { prepareJplOutboundMessage } from '@/src/modules/forecourt/infrastructure/jpl/protocol/schema'
+import {
+  isEmptyDomsBackOfficeRecord,
+  normalizeDomsBackOfficeRecord,
+  normalizeDomsServiceMessageRecord,
+} from '@/src/modules/forecourt/infrastructure/jpl/specialRecords'
 import {
   buildClearSupervisedTransactionRequest,
   buildClearUnsupervisedTransactionRequest,
@@ -47,6 +55,7 @@ import {
   getReplayStatusSummary,
   resolveTransactionParIds,
 } from '@/src/modules/forecourt/infrastructure/jpl/transactionService'
+import { forecourtJplSpecialRecordsRepo } from '@/src/modules/forecourt/infrastructure/repositories/forecourtJplSpecialRecordsRepo'
 
 function timeout<T>(ms: number, message: string): Promise<T> {
   return new Promise((_, reject) => {
@@ -171,17 +180,15 @@ const extractMultiMessageEntries = (response: any): any[] => {
 }
 
 const extractDeliveryTgIdsFromSiteStatus = (response: any): string[] => {
-  const envelope = toResponseEnvelopeData(response)
-
+  const normalized = normalizeSiteDeliveryStatusPayload(
+    toResponseEnvelopeData(response),
+  )
   const candidates = [
-    envelope?.TankDeliveries,
-    envelope?.TankTicketedDeliveries,
-    envelope?.TgId,
-    envelope?.TgIds,
-    envelope?.TankGauges,
-    envelope?.TankGaugeIds,
+    normalized.readyTgIds,
+    normalized.tankDeliveries,
+    normalized.tankTicketedDeliveries,
+    normalized.tgIds,
   ]
-
   const ids = candidates.flatMap((candidate) => coerceId2List(candidate))
   return Array.from(new Set(ids))
 }
@@ -535,22 +542,47 @@ async function requestWithTimeout(
   timeoutMs: number,
   timeoutMessage: string,
 ) {
+  const outbound = prepareJplOutboundMessage(message)
   return await Promise.race([
-    client.request(message, { timeoutMs }),
+    client.request(outbound, { timeoutMs }),
     timeout<any>(timeoutMs, timeoutMessage),
   ])
 }
 
+function getProtocolRejectDetails(error: any) {
+  const data =
+    error?.data ?? error?.payload?.data ?? error?.response?.data ?? {}
+  const rejectCode =
+    data?.RejectCode?.value ?? data?.rejectCode?.value ?? data?.RejectCode
+  return {
+    rejectCode: rejectCode != null ? String(rejectCode) : undefined,
+    rejectedExtendedMsgCode:
+      data?.RejectedExtendedMsgCode != null
+        ? String(data.RejectedExtendedMsgCode)
+        : undefined,
+    rejectedMsgSubc:
+      data?.RejectedMsgSubc != null ? String(data.RejectedMsgSubc) : undefined,
+    rejectInfo: data?.RejectInfo != null ? String(data.RejectInfo) : undefined,
+    rejectInfoText:
+      data?.RejectInfoText != null
+        ? String(data.RejectInfoText)
+        : data?.rejectInfoText != null
+          ? String(data.rejectInfoText)
+          : undefined,
+    correlationId:
+      error?.correlationId ??
+      error?.payload?.correlationId ??
+      error?.response?.correlationId ??
+      undefined,
+  }
+}
+
 function getProtocolErrorText(error: any) {
-  const rejectInfoText = String(
-    error?.data?.RejectInfoText ??
-      error?.data?.rejectInfoText ??
-      error?.payload?.data?.RejectInfoText ??
-      error?.payload?.data?.rejectInfoText ??
-      '',
-  ).trim()
+  const details = getProtocolRejectDetails(error)
   const message = String(error?.message ?? error ?? '').trim()
-  return [message, rejectInfoText].filter(Boolean).join(' | ')
+  return [message, details.rejectInfoText, details.rejectInfo]
+    .filter(Boolean)
+    .join(' | ')
 }
 
 function upsertSnapshotByKey(
@@ -669,6 +701,26 @@ function rememberGatewaySnapshot(
         48,
       ),
     })
+    return normalized
+  }
+
+  if (kind === 'TgData_resp') {
+    const normalized = normalizeTgDataPayload(envelope, usedSubCode)
+    const state = getJplAdapterState() as any
+    setJplAdapterState({
+      lastTgData: upsertSnapshotByKey(
+        state.lastTgData,
+        'tgId',
+        {
+          tgId: normalized.tgId,
+          subCode: usedSubCode,
+          normalized,
+          payload: envelope,
+          at,
+        },
+        48,
+      ),
+    } as any)
     return normalized
   }
 
@@ -874,17 +926,13 @@ async function readTankDeliveryData(
   const result = await requestWithSubCodeFallback(client, {
     name: 'TankDeliveryData_req',
     variants: [
-      {
-        subCode: '00H',
-        data: {
-          TgId: tgId,
-          PosId: posId,
-          ZERO: 1,
-          TankDeliveryDataItemId: itemIds?.length
-            ? itemIds
-            : ALL_TANK_DELIVERY_ITEM_IDS,
-        },
-      },
+      buildCommandVariant('READ_TANK_DELIVERY_DATA', {
+        tgId,
+        posId,
+        tankDeliveryDataItemId: itemIds?.length
+          ? itemIds
+          : ALL_TANK_DELIVERY_ITEM_IDS,
+      }),
     ],
     timeoutMs,
     timeoutMessage: `Timed out requesting tank delivery data for ${tgId}`,
@@ -952,6 +1000,58 @@ function isUnknownSubCodeError(
   )
 }
 
+const DIRECT_JPL_COMMAND_ACTIONS: Record<string, string> = {
+  GET_FP_GRADE_TOTALS: 'GET_FP_GRADE_TOTALS',
+  GET_PUMP_GRADE_TOTALS: 'GET_PUMP_GRADE_TOTALS',
+  GET_PUMP_GRADE_BLEND_TOTALS: 'GET_PUMP_GRADE_BLEND_TOTALS',
+  GET_FALLBACK_TOTALS: 'GET_FALLBACK_TOTALS',
+  CLEAR_FALLBACK_TOTALS: 'CLEAR_FALLBACK_TOTALS',
+  GET_TANK_CONTROL_STATUS: 'GET_TANK_CONTROL_STATUS',
+  MARK_DELIVERY_STARTING: 'MARK_DELIVERY_STARTING',
+  MARK_DELIVERY_FINISHED: 'MARK_DELIVERY_FINISHED',
+  BLOCK_TANK: 'BLOCK_TANK',
+  UNBLOCK_TANK: 'UNBLOCK_TANK',
+  CLEAR_TG_ERROR: 'CLEAR_TG_ERROR',
+  RESET_TG: 'RESET_TG',
+  GET_FC_DATE_TIME: 'GET_FC_DATE_TIME',
+  CHANGE_FC_DATE_TIME: 'CHANGE_FC_DATE_TIME',
+  GET_FC_OPERATION_MODE_STATUS: 'GET_FC_OPERATION_MODE_STATUS',
+  CHANGE_FC_OPERATION_MODE: 'CHANGE_FC_OPERATION_MODE',
+  UTIL_ECHO: 'UTIL_ECHO',
+}
+
+const DIRECT_JPL_COMMAND_TIMEOUTS: Record<string, string> = {
+  GET_FP_GRADE_TOTALS: 'Timed out requesting fuelling point grade totals',
+  GET_PUMP_GRADE_TOTALS: 'Timed out requesting pump grade totals',
+  GET_PUMP_GRADE_BLEND_TOTALS: 'Timed out requesting pump grade blend totals',
+  GET_FALLBACK_TOTALS: 'Timed out requesting fallback totals',
+  CLEAR_FALLBACK_TOTALS: 'Timed out clearing fallback totals',
+  GET_TANK_CONTROL_STATUS: 'Timed out requesting tank control status',
+  MARK_DELIVERY_STARTING: 'Timed out marking delivery start',
+  MARK_DELIVERY_FINISHED: 'Timed out marking delivery finish',
+  BLOCK_TANK: 'Timed out blocking tank',
+  UNBLOCK_TANK: 'Timed out unblocking tank',
+  CLEAR_TG_ERROR: 'Timed out clearing tank gauge error',
+  RESET_TG: 'Timed out resetting tank gauge',
+  GET_FC_DATE_TIME: 'Timed out requesting forecourt date and time',
+  CHANGE_FC_DATE_TIME: 'Timed out setting forecourt date and time',
+  GET_FC_OPERATION_MODE_STATUS:
+    'Timed out requesting forecourt operation mode status',
+  CHANGE_FC_OPERATION_MODE: 'Timed out changing forecourt operation mode',
+  UTIL_ECHO: 'Timed out sending JPL echo command',
+}
+
+function buildCommandVariant(action: string, payload: Record<string, unknown>) {
+  const request = buildJplCommandRequest(action, payload)
+  if (!request?.subCode) {
+    throw new Error(`Unable to build ${action} JPL request variant`)
+  }
+  return {
+    subCode: request.subCode,
+    data: request.data ?? {},
+  }
+}
+
 async function requestWithSubCodeFallback(
   client: any,
   options: {
@@ -984,6 +1084,7 @@ async function requestWithSubCodeFallback(
           name: options.name,
           subCode: variant.subCode,
           error: getProtocolErrorText(error),
+          reject: getProtocolRejectDetails(error),
         })
         throw error
       }
@@ -993,6 +1094,7 @@ async function requestWithSubCodeFallback(
         name: options.name,
         subCode: variant.subCode,
         error: getProtocolErrorText(error),
+        reject: getProtocolRejectDetails(error),
       })
     }
   }
@@ -1062,6 +1164,64 @@ function normalizeBackOfficeRecordResponse(response: any, usedSubCode: string) {
   }
 }
 
+const loggableError = (error: unknown) =>
+  error instanceof Error
+    ? { name: error.name, message: error.message, stack: error.stack }
+    : { message: String(error ?? 'Unknown error') }
+
+const persistCollectedServiceMessage = async (
+  stationId: string,
+  response: any,
+) => {
+  const payload = toResponseEnvelopeData(response) ?? {}
+  const seqNo = payload?.FcServiceMsgSeqNo
+  const message = payload?.FcServiceMsg
+  if (seqNo == null) return
+
+  try {
+    await forecourtJplSpecialRecordsRepo.upsertServiceMessage(
+      normalizeDomsServiceMessageRecord({
+        stationId,
+        seqNo,
+        message,
+        payload,
+      }),
+    )
+  } catch (error) {
+    logger.warn('[jpl]', {
+      action: 'persistServiceMessage',
+      stationId,
+      seqNo: String(seqNo),
+      error: loggableError(error),
+    })
+  }
+}
+
+const persistCollectedBackOfficeRecord = async (
+  stationId: string,
+  response: any,
+  usedSubCode: string,
+) => {
+  const payload = toResponseEnvelopeData(response) ?? {}
+  const record = normalizeDomsBackOfficeRecord({
+    stationId,
+    subCode: usedSubCode,
+    payload,
+  })
+  if (isEmptyDomsBackOfficeRecord(record)) return
+
+  try {
+    await forecourtJplSpecialRecordsRepo.upsertBackOfficeRecord(record)
+  } catch (error) {
+    logger.warn('[jpl]', {
+      action: 'persistBackOfficeRecord',
+      stationId,
+      borSeqNo: record.seqNo,
+      error: loggableError(error),
+    })
+  }
+}
+
 async function readBackOfficeRecord(
   client: any,
   timeoutMs: number,
@@ -1109,8 +1269,8 @@ async function readPriceSetStatus(client: any, timeoutMs: number) {
   const result = await requestWithSubCodeFallback(client, {
     name: 'FcPriceSetStatus_req',
     variants: [
-      { subCode: '01H', data: {} },
-      { subCode: '00H', data: {} },
+      buildCommandVariant('READ_PRICE_SET_STATUS', { subCode: '01H' }),
+      buildCommandVariant('READ_PRICE_SET_STATUS', { subCode: '00H' }),
     ],
     timeoutMs,
     timeoutMessage: 'Timed out requesting price set status',
@@ -1126,26 +1286,9 @@ async function readCurrentPriceSet(client: any, timeoutMs: number) {
   return await requestWithSubCodeFallback(client, {
     name: 'FcPriceSet_req',
     variants: [
-      {
-        subCode: '04H',
-        data: {
-          PriceSetType: CURRENT_PRICE_SET_TYPE,
-          FcPriceSetId: ID_ZERO,
-          PriceSetActivationDateAndTime: ZERO_FC_DATE_TIME,
-        },
-      },
-      {
-        subCode: '03H',
-        data: {
-          PriceSetType: CURRENT_PRICE_SET_TYPE,
-        },
-      },
-      {
-        subCode: '02H',
-        data: {
-          PriceSetType: CURRENT_PRICE_SET_TYPE,
-        },
-      },
+      buildCommandVariant('READ_CURRENT_PRICE_SET', { subCode: '04H' }),
+      buildCommandVariant('READ_CURRENT_PRICE_SET', { subCode: '03H' }),
+      buildCommandVariant('READ_CURRENT_PRICE_SET', { subCode: '02H' }),
     ],
     timeoutMs,
     timeoutMessage: 'Timed out requesting current price set',
@@ -1161,14 +1304,11 @@ async function readSpecificPriceSet(
   return await requestWithSubCodeFallback(client, {
     name: 'FcPriceSet_req',
     variants: [
-      {
+      buildCommandVariant('READ_PENDING_PRICE_SET', {
         subCode: '04H',
-        data: {
-          PriceSetType: PENDING_PRICE_SET_TYPE,
-          FcPriceSetId: fcPriceSetId,
-          PriceSetActivationDateAndTime: activationAt,
-        },
-      },
+        fcPriceSetId,
+        activationAt,
+      }),
     ],
     timeoutMs,
     timeoutMessage: 'Timed out requesting pending price set',
@@ -1190,38 +1330,9 @@ async function changePriceSet(
   const result = await requestWithSubCodeFallback(client, {
     name: 'change_FcPriceSet_req',
     variants: [
-      {
-        subCode: '04H',
-        data: {
-          UserId: payload.userId,
-          FcPriceSetId: payload.fcPriceSetId,
-          FcPriceGroupId: payload.fcPriceGroupIds,
-          FcGradeId: payload.fcGradeIds,
-          FcPriceGroups: payload.fcPriceGroups,
-          PriceSetActivationDateAndTime: payload.activationAt,
-        },
-      },
-      {
-        subCode: '03H',
-        data: {
-          UserId: payload.userId,
-          FcPriceSetId: payload.fcPriceSetId,
-          FcPriceGroupId: payload.fcPriceGroupIds,
-          FcGradeId: payload.fcGradeIds,
-          FcPriceGroups: payload.fcPriceGroups,
-          PriceSetActivationDateAndTime: payload.activationAt,
-        },
-      },
-      {
-        subCode: '02H',
-        data: {
-          FcPriceSetId: payload.fcPriceSetId,
-          FcPriceGroupId: payload.fcPriceGroupIds,
-          FcGradeId: payload.fcGradeIds,
-          FcPriceGroups: payload.fcPriceGroups,
-          PriceSetActivationDateAndTime: payload.activationAt,
-        },
-      },
+      buildCommandVariant('CHANGE_PRICE_SET', { ...payload, subCode: '04H' }),
+      buildCommandVariant('CHANGE_PRICE_SET', { ...payload, subCode: '03H' }),
+      buildCommandVariant('CHANGE_PRICE_SET', { ...payload, subCode: '02H' }),
     ],
     timeoutMs,
     timeoutMessage: 'Timed out scheduling price set change',
@@ -1242,13 +1353,10 @@ async function clearPendingPriceSet(
   return await requestWithSubCodeFallback(client, {
     name: 'clear_PendingFcPriceSet_req',
     variants: [
-      {
-        subCode: '00H',
-        data: {
-          FcPriceSetId: fcPriceSetId,
-          PriceSetActivationDateAndTime: activationAt,
-        },
-      },
+      buildCommandVariant('CLEAR_PENDING_PRICE_SET', {
+        fcPriceSetId,
+        activationAt,
+      }),
     ],
     timeoutMs,
     timeoutMessage: 'Timed out clearing pending price set',
@@ -1481,6 +1589,7 @@ export async function jplSendPosCommand(
 
       if (cmd.type === 'GET_FC_SERVICE_LOG') {
         const result = await readFcServiceMessage(client, timeoutMs)
+        await persistCollectedServiceMessage(stationId, result.response)
         return { ok: true, accepted: true, data: result }
       }
 
@@ -1508,6 +1617,11 @@ export async function jplSendPosCommand(
           client,
           timeoutMs,
           preferredSubCode || undefined,
+        )
+        await persistCollectedBackOfficeRecord(
+          stationId,
+          result.response,
+          result.usedSubCode,
         )
         return { ok: true, accepted: true, data: result }
       }
@@ -2243,7 +2357,8 @@ export async function jplSendPosCommand(
               `Timed out requesting tank gauge data for tank ${tgId}`,
             )
             responses.push({ tgId, response })
-            const parsed = normalizeTgDataPayload(response)
+            rememberGatewaySnapshot('TgData_resp', response, '00H')
+            const parsed = normalizeSharedTgDataPayload(response)
             if (parsed) normalized.push(parsed)
           } catch (error) {
             errors.push({ tgId, error: getProtocolErrorText(error) })
@@ -2296,34 +2411,15 @@ export async function jplSendPosCommand(
 
       if (cmd.type === 'CHANGE_DYNAMIC_TANK_DATA') {
         const payload = (cmd as any).payload ?? {}
-        const tankId = toId2(
-          toInt(payload.TankId ?? payload.tankId ?? payload.tgId, 0),
-        )
-        const densityValue = String(
-          payload.DensityValue ?? payload.densityValue ?? '',
-        )
-        const expireDateAndTime = String(
-          payload.ExpireDateAndTime ?? payload.expireDateAndTime ?? '',
-        )
-        const scrollingSpeed = String(
-          payload.ScrollingSpeed ?? payload.scrollingSpeed ?? '00H',
-        )
-        const textValue = String(payload.Text ?? payload.text ?? '')
+        const normalized = normalizeDomsDynamicTankDataRequest(payload)
         const response = await requestWithTimeout(
           client,
           {
             name: 'change_DynamicTankData_req',
             subCode: '00H',
             data: {
-              TankId: tankId,
-              DtdPars: {
-                EnteredDensity: {
-                  DensityValue: densityValue,
-                  ExpireDateAndTime: expireDateAndTime,
-                  ScrollingSpeed: scrollingSpeed,
-                  Text: textValue,
-                },
-              },
+              TankId: normalized.tankId,
+              DtdPars: normalized.dtdPars,
             },
           },
           timeoutMs,
@@ -2481,6 +2577,42 @@ export async function jplSendPosCommand(
         }
       }
 
+      if (cmd.type === 'CLEAR_PENDING_PRICE_SET') {
+        const payload = ((cmd as any).payload ?? {}) as Record<string, unknown>
+        const fcPriceSetId = toId2String(
+          payload.fcPriceSetId ?? payload.FcPriceSetId ?? payload.priceSetId,
+          '00',
+        )
+        const activationAt = toFcDateTime(
+          payload.activationAt ??
+            payload.priceSetActivationDateAndTime ??
+            payload.PriceSetActivationDateAndTime,
+        )
+        const responseResult = await clearPendingPriceSet(
+          client,
+          timeoutMs,
+          fcPriceSetId,
+          activationAt,
+        )
+        const statusAfterResult = await readPriceSetStatus(client, timeoutMs)
+        return {
+          ok: true,
+          accepted: true,
+          data: {
+            fcPriceSetId,
+            activationAt,
+            response: responseResult.response,
+            responseSubCode: responseResult.usedSubCode,
+            statusAfter: statusAfterResult.response,
+            capabilities: {
+              priceSetStatusSubCode: statusAfterResult.usedSubCode,
+              supportsPendingQueue: statusAfterResult.supportsPendingQueue,
+              clearPendingPriceSetSubCode: responseResult.usedSubCode,
+            },
+          },
+        }
+      }
+
       if (cmd.type === 'CHANGE_GRADE_PRICES') {
         const payload = ((cmd as any).payload ?? {}) as Record<string, unknown>
         const entries = extractEntries(payload)
@@ -2619,6 +2751,7 @@ export async function jplSendPosCommand(
 
       if (cmd.type === 'GET_ALL_TANK_DELIVERY_DATA') {
         let siteDeliveryStatus: any = null
+        let normalizedSiteDeliveryStatus: any = null
         let siteDeliveryStatusSubCode: string | null = null
         let tgStatusSnapshot: any = null
         let tgStatusSubCode: string | null = null
@@ -2640,6 +2773,11 @@ export async function jplSendPosCommand(
 
           siteDeliveryStatus = siteDeliveryStatusResult.response
           siteDeliveryStatusSubCode = siteDeliveryStatusResult.usedSubCode
+          normalizedSiteDeliveryStatus = rememberGatewaySnapshot(
+            'SiteDeliveryStatus_resp',
+            siteDeliveryStatusResult.response,
+            siteDeliveryStatusResult.usedSubCode,
+          )
           tgIds = extractDeliveryTgIdsFromSiteStatus(siteDeliveryStatus)
         } catch (error) {
           logger.warn('[jpl]', {
@@ -2681,16 +2819,11 @@ export async function jplSendPosCommand(
           try {
             const response = await requestWithTimeout(
               client,
-              {
-                name: 'TankDeliveryData_req',
-                subCode: '00H',
-                data: {
-                  TgId: tgId,
-                  PosId: posId,
-                  ZERO: 1,
-                  TankDeliveryDataItemId: ALL_TANK_DELIVERY_ITEM_IDS,
-                },
-              },
+              buildJplCommandRequest('READ_TANK_DELIVERY_DATA', {
+                tgId,
+                posId,
+                tankDeliveryDataItemId: ALL_TANK_DELIVERY_ITEM_IDS,
+              }),
               timeoutMs,
               `Timed out requesting tank delivery data for TgId ${tgId}`,
             )
@@ -2707,6 +2840,10 @@ export async function jplSendPosCommand(
             response: entry.response,
           }))
           .filter((entry) => Boolean(entry.normalized?.tgId))
+
+        const deliveryClearTargets = normalizedDeliveries
+          .map((entry) => entry.normalized?.clearTarget)
+          .filter(Boolean)
 
         const checkpointSummary = normalizedDeliveries
           .map((entry) => {
@@ -2734,14 +2871,46 @@ export async function jplSendPosCommand(
           accepted: true,
           data: {
             siteDeliveryStatus,
+            normalizedSiteDeliveryStatus,
             siteDeliveryStatusSubCode,
             tgStatusSnapshot,
             tgStatusSubCode,
             tgIds: uniqueTgIds,
             deliveries,
             normalizedDeliveries,
+            deliveryClearTargets,
             checkpointSummary,
             errors,
+          },
+        }
+      }
+
+      const directAction = DIRECT_JPL_COMMAND_ACTIONS[cmd.type]
+      if (directAction) {
+        const payload = ((cmd as any).payload ?? {}) as Record<string, unknown>
+        const request = buildJplCommandRequest(directAction, {
+          ...payload,
+          posId: pick(payload, ['posId', 'PosId']) ?? posId,
+        })
+        if (!request) throw new Error(`Unable to build ${directAction} request`)
+        const response = await requestWithTimeout(
+          client,
+          request,
+          timeoutMs,
+          DIRECT_JPL_COMMAND_TIMEOUTS[cmd.type] ??
+            `Timed out sending ${cmd.type}`,
+        )
+        return {
+          ok: true,
+          accepted: true,
+          data: {
+            request: {
+              name: request.name,
+              subCode: request.subCode,
+              data: request.data,
+              correlationId: request.correlationId,
+            },
+            response,
           },
         }
       }

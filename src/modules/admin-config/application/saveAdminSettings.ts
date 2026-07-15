@@ -17,6 +17,7 @@ export async function saveAdminSettings(args: {
     linkingWindowSeconds: toInt(args.body.linkingWindowSeconds),
     unallocatedHandling: args.body.unallocatedHandling,
     fiscalizationEngine: args.body.fiscalizationEngine,
+    fiscalizationTransport: args.body.fiscalizationTransport,
     autoFiscalizeEnabled: toBool(args.body.autoFiscalizeEnabled),
     autoPrintReceipts: toBool(args.body.autoPrintReceipts),
     syncEnabled: toBool(args.body.syncEnabled),

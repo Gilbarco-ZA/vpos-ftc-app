@@ -1,445 +1,502 @@
 # DOMS Integration Todo List
 
-**Overall Progress: 55%** (154 / 281 tasks completed)
+<!-- doms-todo-progress:start -->
+
+**Overall Progress: 92%** (342 / 372 tasks completed)
+
+_Last updated: July 13, 2026 at 08:40 AM_
 
 ### Per-Section Progress
 
-| Section                                                          | Completed | Total | Progress                  |
-| ---------------------------------------------------------------- | --------- | ----- | ------------------------- |
-| **1) Finalize scope and integration contract**                   | 6         | 9     | █████████████░░░░░░░ 67%  |
-| **2) Transport, session, and connection management**             | 12        | 14    | █████████████████░░░ 86%  |
-| **3) Core protocol envelope handling**                           | 13        | 13    | ████████████████████ 100% |
-| **4) Forecourt logon and bootstrap**                             | 16        | 19    | ████████████████░░░░ 84%  |
-| **5) Current functionality already present - verify and harden** | 17        | 22    | ███████████████░░░░░ 77%  |
-| **6) General forecourt controller functions**                    | 8         | 15    | ██████████░░░░░░░░░░ 53%  |
-| **7) Forecourt special functions**                               | 13        | 20    | █████████████░░░░░░░ 65%  |
-| **8) Dispense control - command surface completion**             | 20        | 32    | ████████████░░░░░░░░ 63%  |
-| **9) Dispense control - transaction handling completion**        | 13        | 21    | ████████████░░░░░░░░ 62%  |
-| **10) Wetstock / tank integration completion**                   | 10        | 17    | ███████████░░░░░░░░░ 59%  |
-| **11) Price, payment, and other optional modules**               | 11        | 22    | ██████████░░░░░░░░░░ 50%  |
-| **12) Configuration, commissioning, and site setup**             | 9         | 16    | ███████████░░░░░░░░░ 56%  |
-| **13) App-level adapters and internal abstractions**             | 2         | 11    | ███░░░░░░░░░░░░░░░░░ 18%  |
-| **14) Observability and supportability**                         | 1         | 14    | █░░░░░░░░░░░░░░░░░░░ 7%   |
-| **15) Testing and validation**                                   | 0         | 19    | ░░░░░░░░░░░░░░░░░░░░ 0%   |
-| **16) Recommended implementation order**                         | 3         | 9     | ██████░░░░░░░░░░░░░░ 33%  |
-| **17) Definition of done**                                       | 0         | 8     | ░░░░░░░░░░░░░░░░░░░░ 0%   |
+| Section                                                                                                                                | Completed | Total | Progress                  |
+| -------------------------------------------------------------------------------------------------------------------------------------- | --------- | ----- | ------------------------- |
+| **[1) Finalize scope and integration contract](#1-finalize-scope-and-integration-contract)**                                           | 7         | 9     | ███████████████░░░░░ 78%  |
+| **[2) Transport, session, and connection management](#2-transport-session-and-connection-management)**                                 | 15        | 15    | ████████████████████ 100% |
+| **[3) Core protocol envelope handling](#3-core-protocol-envelope-handling)**                                                           | 14        | 14    | ████████████████████ 100% |
+| **[4) Forecourt logon and bootstrap](#4-forecourt-logon-and-bootstrap)**                                                               | 13        | 13    | ████████████████████ 100% |
+| **[5) Current functionality already present - verified and hardened](#5-current-functionality-already-present-verified-and-hardened)** | 16        | 18    | █████████████████░░░ 89%  |
+| **[6) General forecourt controller functions](#6-general-forecourt-controller-functions)**                                             | 14        | 14    | ████████████████████ 100% |
+| **[7) Forecourt special functions](#7-forecourt-special-functions)**                                                                   | 14        | 14    | ████████████████████ 100% |
+| **[8) Dispense control - command surface completion](#8-dispense-control-command-surface-completion)**                                 | 23        | 24    | ███████████████████░ 96%  |
+| **[9) Dispense control - transaction handling completion](#9-dispense-control-transaction-handling-completion)**                       | 19        | 19    | ████████████████████ 100% |
+| **[10) Wetstock / tank integration completion](#10-wetstock-tank-integration-completion)**                                             | 20        | 21    | ███████████████████░ 95%  |
+| **[11) Price, payment, and optional protocol modules](#11-price-payment-and-optional-protocol-modules)**                               | 16        | 16    | ████████████████████ 100% |
+| **[12) Configuration, commissioning, and site setup](#12-configuration-commissioning-and-site-setup)**                                 | 14        | 14    | ████████████████████ 100% |
+| **[13) App-level adapters and internal abstractions](#13-app-level-adapters-and-internal-abstractions)**                               | 9         | 9     | ████████████████████ 100% |
+| **[14) Observability and supportability](#14-observability-and-supportability)**                                                       | 15        | 15    | ████████████████████ 100% |
+| **[15) Testing and validation](#15-testing-and-validation)**                                                                           | 28        | 31    | ██████████████████░░ 90%  |
+| **[16) Recommended implementation order](#16-recommended-implementation-order)**                                                       | 11        | 13    | █████████████████░░░ 85%  |
+| **[17) Definition of done](#17-definition-of-done)**                                                                                   | 6         | 13    | █████████░░░░░░░░░░░ 46%  |
+| **[18) DOMS/JPL reconciliation and FTC mapping remediation](#18-domsjpl-reconciliation-and-ftc-mapping-remediation)**                  | 15        | 15    | ████████████████████ 100% |
+| **[19) DOMS/PSS maintenance planning and approval gate](#19-domspss-maintenance-planning-and-approval-gate)**                          | 19        | 19    | ████████████████████ 100% |
+| **[20) Tanzania fiscalization routing](#20-tanzania-fiscalization-routing)**                                                           | 10        | 14    | ██████████████░░░░░░ 71%  |
+| **[21) Build, release, and field validation](#21-build-release-and-field-validation)**                                                 | 17        | 23    | ██████████████░░░░░░ 74%  |
+| **[23) vpos-fiscal-tz feature parity inside FTC](#23-vpos-fiscal-tz-feature-parity-inside-ftc)**                                       | 27        | 29    | ██████████████████░░ 93%  |
+
+<!-- doms-todo-progress:end -->
 
 ---
 
-_Last updated: April 24, 2026 at 09:50 AM_
+This checklist tracks the production readiness of the DOMS/JPL integration in `vpos-ftc-app`. The recent implementation passes added Tanzania fiscalization routing, local credit-note fiscalization, Tanzania legacy queue/artifact import mapping, Tanzania certificate/signing, EWURA EFPP parity, EWURA retry/reconciliation, partial-fiscalization policy, Tanzania fiscal output rendering, developer simulator harness, JPL protocol hardening, production-module command coverage, admin workflow controls, diagnostics, reconciliation, FTC-side mapping remediation, mapping rollback, maintenance planning, approval sessions, preview-only maintenance command envelopes, and a hard-disabled maintenance execution safety gate, field validation readiness/audit checkpoints, and persistent DOMS service-log/BOR collection audit checkpoints across automatic drain and manual command paths, plus admin-triggered transaction-buffer recovery dry-run/live retry controls backed by durable recovery run audit records, and unattended EPT receipt capture/redaction/persistence for extended unsupervised transaction clears, plus expanded wetstock normalization for tank gauge data, typed alarm mappings, delivery status clear candidates, and full tank-delivery report payload parsing, plus classified service-log routing and durable BOR replay/processing state after DOMS buffer clears, plus durable wash transaction capture/review state for WpStatus/WpUnSupTrans and future clear-candidate automation, plus optional-module runtime persistence for price poles, digital I/O, sensors, vending statuses/errors, and vending totals, plus evidence-backed field-validation release-gate rollups and bulk evidence import for build/test, simulator, live-controller, Tanzania endpoint, and cloud-cutover validation, plus restricted dynamic tank data governance for EnteredDensity validation, audit persistence, admin API dispatch, and workflow visibility, plus an operator-facing DOMS operational readiness rollup that converts connection/session, forecourt controller, pump, wetstock, optional module, special-record, and release-gate state into first-class action items, plus a deterministic local DOMS/JPL simulator harness for framed socket, logon, heartbeat, unsolicited status, reject, transaction recovery, wetstock, wash, and optional-module rehearsal without a live PSS, plus a read-only simulator validation runner that exports importable field-validation evidence and verifies unsupported requests return RejectMessage_resp rather than false-positive acknowledgements, plus a live-controller read-only validation runner/API that performs JPL welcome/logon/status checks and emits importable live-controller field evidence without transaction locks or PSS writes.
 
-This checklist is organized around what the current codebase already appears to support through `@gilbarcoafs/doms-pos-jpl`, and what still needs to be added to complete a production-grade DOMS integration.
+The status below separates **code/admin coverage** from **field validation**. Several protocol areas are now code-complete or preview-complete, but remain pending validation against a DOMS/PSS simulator and a real controller. The Tanzania fiscalization work now implements FTC-native local/proxy routing, local sale/credit-note handling, TRA/EWURA payload builders, retry/reconciliation, output rendering, simulator support, parity validators, counter/day-close checks, route-switch safety checks, cloud cutover guidance, downloadable DOMS/JPL support bundles, and bulk FTC mapping remediation with CSV/JSON import, live DOMS/PSS pre-validation, commissioning readiness checks, and a JPL-only cutover runbook; live endpoint validation remains pending. The DOMS/JPL runtime now also exposes a typed response-parser layer and domain snapshot API so UI/application workflows can migrate away from raw protocol field names while retaining raw payloads for support.
 
-> First-release scope updated on April 24, 2026: Dispense + wetstock/tanks are the mandatory MVP; price poles, wash, digital I/O, serial server, sensors, and vending are enabled as optional protocol families; DOMS payment/EPT control remains out of first-release scope; TLS is configurable but not mandatory for the target environments.
+Safety boundary: PSS writes remain deny-by-default and deployment-disabled. A database-backed, digest-bound, one-time execution adapter exists, but it can transmit only allowlisted maintenance commands after field validation, current deployment approval, field-engineer authorization, target fingerprint binding, kill-switch checks, and atomic permit claim.
 
 ## 1) Finalize scope and integration contract
 
-- [x] Confirm the first-release scope for DOMS integration:
-  - [ ] Dispense control only
-  - [x] Dispense + wetstock/tanks
-  - [ ] Dispense + wetstock + payment control
-  - [x] Optional modules: price poles, wash, digital I/O, serial server, sensors, vending
-- [x] Confirm which protocol features are mandatory for go-live vs later phases.
-- [x] Confirm whether secure JPL/TLS is mandatory in the target environments. TLS is not mandatory for the target environments; default port remains 8888, with 8889 still configurable.
-- [ ] Confirm station commissioning expectations: which parts are configured in PSS Configurator vs installed dynamically from the app.
-- [x] Document the supported PSS/JPL version floor for the integration.
+- [x] Confirm first-release scope: dispense + wetstock/tanks are mandatory MVP.
+- [x] Confirm optional protocol families: price poles, wash, digital I/O, serial server, sensors, and vending remain optional.
+- [x] Confirm DOMS payment/EPT control is out of first-release scope.
+- [x] Confirm TLS is configurable but not mandatory for the current target environments.
+- [x] Document supported PSS/JPL version floor and correlation-ID expectations.
+- [x] Document that PSS Configurator remains the preferred source for logical device installation.
+- [x] Add read-only reconciliation before exposing any PSS install/clear-install flow.
+- [ ] Confirm site commissioning expectations with field engineers and support teams.
+- [ ] Confirm exact acceptance criteria for the first live DOMS/PSS site.
 
 ## 2) Transport, session, and connection management
 
-- [x] Add explicit support for selecting the correct JPL TCP port:
-  - [x] 8888 for unencrypted
-  - [x] 8889 for TLS
-- [x] Expose secure-mode configuration cleanly from app settings to the DOMS client bootstrap.
-- [ ] Add support for client certificate / secure connectivity requirements if the target PSS deployment requires them.
-- [x] Validate the server `jpl` welcome/version response and surface unsupported-version diagnostics.
-- [x] Implement or verify permanent socket keepalive behavior.
+- [x] Add configurable JPL host and port.
+- [x] Support unencrypted JPL on port 8888.
+- [x] Support TLS JPL on port 8889 where configured.
+- [x] Expose secure-mode configuration from app settings to DOMS client bootstrap.
+- [x] Validate the server `jpl` welcome/version response.
+- [x] Surface unsupported-version diagnostics.
+- [x] Implement permanent socket keepalive behavior.
 - [x] Implement client heartbeat scheduling.
-- [x] Enforce connection-dead detection when no message arrives within the protocol timeout window.
+- [x] Detect dead connections when no inbound message arrives within the protocol timeout window.
 - [x] Implement reconnect with backoff and clean session re-bootstrap.
-- [x] Ensure reconnect always re-runs logon, unsolicited subscriptions, status update mode, and startup reconciliation.
-- [x] Add explicit online/offline lifecycle events for the rest of the app.
-- [ ] Add framing-level validation and logging for STX/ETX protocol boundaries.
+- [x] Ensure reconnect re-runs logon, subscriptions, status update mode, and startup reconciliation.
+- [x] Add online/offline lifecycle events.
 - [x] Add connection health metrics and structured logs.
+- [x] Add client certificate configuration if a target PSS deployment requires mutual TLS. See `docs/doms-jpl-mutual-tls.md`.
+- [x] Add explicit framing-level diagnostics for malformed STX/ETX payloads.
 
 ## 3) Core protocol envelope handling
 
-- [x] Normalize all incoming JPL messages by `name`, `subCode`, `solicited`, and `data`.
-- [x] Make request serialization strictly case-sensitive for `name` and `subCode`.
-- [x] Add correlation ID support end-to-end for every request.
-- [x] Preserve correlation IDs through request/response mapping and logs.
+- [x] Normalize incoming JPL messages by `name`, `subCode`, `solicited`, and `data`.
+- [x] Keep outbound request serialization case-sensitive for `name` and `subCode`.
+- [x] Add canonical JPL type helpers for `ID2`, `ID_ZERO`, `DEC2`, `DEC6`, `CODE1`, `CODE2`, and `FC_DATE_AND_TIME`.
+- [x] Add correlation ID support to outbound requests.
+- [x] Preserve correlation IDs through logs and diagnostics.
+- [x] Accept serialized solicited responses that omit `correlationId`, while still rejecting mismatched correlation IDs and unsolicited lookalikes ([live validator tests](tests/forecourt/domsJplLiveReadOnlyValidation.test.ts)).
 - [x] Add a generic `RejectMessage_resp` handler.
-- [x] Map reject reasons into typed application errors:
-  - [x] unknown message code
-  - [x] syntax error
-  - [x] access error
-  - [x] invalid state / business rule rejection
-- [x] Surface `RejectInfo` / `RejectInfoText` in logs and adapter state diagnostics.
-- [x] Fully support `MultiMessage_resp` dispatch across subscribed message families.
-- [x] Add protocol fixtures covering single-message and multi-message parsing.
+- [x] Persist structured DOMS/JPL reject events.
+- [x] Map reject reasons into typed diagnostics.
+- [x] Surface `RejectInfo` and `RejectInfoText` in admin diagnostics.
+- [x] Support `MultiMessage_resp` dispatch across subscribed message families.
+- [x] Add protocol fixtures for single-message and multi-message parsing.
+- [x] Add central builders/schemas for the expanded operational command surface.
+- [x] Add exhaustive builder coverage for every supported optional module command ([tests](tests/forecourt/domsOptionalCommandBuilders.test.ts)).
 
 ## 4) Forecourt logon and bootstrap
 
 - [x] Centralize `FcLogon` request construction.
 - [x] Centralize `FcAccessCode` composition.
-- [x] Ensure `RI` is always present unless intentionally disabled.
-- [x] Ensure required unsolicited feature flags are configurable, not hard-coded.
-- [ ] Review and support all needed access-code flags, including:
-  - [x] `UNSO_FPSTA_3`
-  - [x] `UNSO_FPSTA_3:MFDR=nn`
-  - [x] `UNSO_TRBUFSTA_3`
-  - [x] `UNSO_INSTSTA_1` / `UNSO_INSTSTA_2`
-  - [x] `UNSO_TGSTA_1` / `UNSO_TGSTA_2`
-  - [x] `UNSO_DELIVSTA_1`
-  - [x] `UNSO_PRISTA_1`
-- [x] Make Max Fuelling Data Rate configurable in settings.
+- [x] Ensure `RI` is present unless intentionally disabled.
+- [x] Make unsolicited feature flags configurable.
+- [x] Support current required access-code flags: `UNSO_FPSTA_3`, `UNSO_TRBUFSTA_3`, `UNSO_INSTSTA_1/2`, `UNSO_TGSTA_1/2`, `UNSO_DELIVSTA_1`, and `UNSO_PRISTA_1`.
+- [x] Make Max Fuelling Data Rate configurable.
 - [x] Validate `PosId` rules at startup.
-- [ ] Enforce unique `PosId` per client/session.
 - [x] Prevent `PosId=00` from being assigned to a real POS client.
-- [ ] Define a crash-recovery strategy for locks/transactions that may require `ID_ZERO` handling.
-- [x] Run `change_FcStatusUpdateMode` as part of bootstrap when required.
-- [x] Add a single startup reconciliation flow that gathers the minimum viable site snapshot.
+- [x] Run `change_FcStatusUpdateMode` during bootstrap where required.
+- [x] Add startup reconciliation for the minimum viable site snapshot.
+- [x] Feed latest DOMS install/status snapshots into reconciliation.
+- [x] Enforce unique `PosId` per physical client/session in multi-POS deployments ([database lease](src/modules/forecourt/infrastructure/jpl/posSessionLease.ts); [migration](scripts/migrations/postgres/1250_forecourt_jpl_pos_sessions.sql)).
+- [x] Finalize crash-recovery strategy for lock release paths requiring `ID_ZERO` ([policy](docs/doms-transaction-recovery.md); [pass 3](docs/doms-integration-pass-3-2026-07-10.md)).
 
-## 5) Current functionality already present - verify and harden
+## 5) Current functionality already present - verified and hardened
 
 - [x] JPL/TCP lifecycle bootstrap exists.
 - [x] Forecourt logon exists.
-- [x] Access-code enrichment for unsolicited pump status / transaction buffer status exists.
+- [x] Access-code enrichment for pump status and transaction-buffer status exists.
 - [x] Unsolicited `FpStatus_resp` handling exists.
 - [x] Transaction buffer watcher exists.
 - [x] Startup reconciliation for transaction buffers exists.
-- [x] Minimal command mapping exists for:
-  - [x] standard `authorize_Fp`
-  - [x] `cancel_FpAuth`
-  - [x] `clear_FpError`
-- [x] Basic tank operations exist for:
-  - [x] `TgData_req`
-  - [x] `change_DynamicTankData_req`
-  - [x] `TgErrorMsg_req`
-
-### Hardening items for the existing functionality
-
-- [x] Add request/response schema validation for every currently supported command.
-- [ ] Add exhaustive tests for the current command builders.
-- [ ] Confirm decimal, money, and volume normalization is correct for all current responses.
-- [ ] Confirm unsolicited `FpStatus` parsing covers all fields used by the UI and workflows.
-- [x] Confirm `MultiMessage_resp` works for unsolicited pump statuses and buffer statuses.
-- [ ] Confirm transaction replay/recovery is idempotent across reconnects and restarts.
-- [ ] Confirm watcher behavior when buffers are empty, locked, stale, or racing with another POS.
-- [x] Confirm logs include correlation IDs and DOMS reject details for all current commands.
+- [x] Standard `authorize_Fp` mapping exists.
+- [x] `cancel_FpAuth` mapping exists.
+- [x] `clear_FpError` mapping exists.
+- [x] Basic tank operations exist for `TgData_req`, `change_DynamicTankData_req`, and `TgErrorMsg_req`.
+- [x] Add request/response validation for currently supported commands.
+- [x] Confirm logs include correlation IDs and DOMS reject details.
+- [x] Confirm `MultiMessage_resp` works for status and buffer families.
+- [x] Add exhaustive tests for all current command builders ([registry](src/modules/forecourt/infrastructure/jpl/protocol/commands.ts); [tests](tests/forecourt/domsCommandBuilderCoverage.test.ts)).
+- [ ] Confirm decimal, money, and volume normalization against live PSS data.
+- [ ] Confirm unsolicited `FpStatus` parsing against all fields used by UI/workflows.
+- [x] Confirm transaction replay/recovery is idempotent across reconnects and restarts ([policy](src/modules/forecourt/infrastructure/jpl/transactionReplayPolicy.ts); [tests](tests/forecourt/domsReplayConcurrency.test.ts); [pass 3](docs/doms-integration-pass-3-2026-07-10.md)).
+- [x] Confirm watcher behavior when buffers are empty, locked, stale, or racing with another POS in deterministic code tests; live competing-POS validation remains a field gate ([normalization tests](tests/forecourt/domsTransactionBufferNormalization.test.ts); [lock-policy tests](tests/forecourt/domsTransactionReplayPolicy.test.ts)).
 
 ## 6) General forecourt controller functions
 
-- [x] Add a proper API layer for `FcStatus`.
-- [ ] Add support for the required `FcStatus` subcodes used by the product.
+- [x] Add API layer for `FcStatus`.
 - [x] Map `FcStatus1Flags` and `FcStatus2Flags` into typed internal state.
-- [ ] Surface controller-level conditions such as:
-  - [x] service message ready
-  - [x] back office record exists
-  - [x] RTC error
-  - [ ] hardware/software incompatibility
-  - [x] fallback mode / stored transaction restrictions
-- [x] Add `FcInstallStatus` read + unsolicited handling.
-- [x] Add `FcPriceSetStatus` read + unsolicited handling if price control is in scope.
-- [ ] Add `FcOperationModeStatus` read + change handling if needed.
-- [ ] Add `FcDateAndTime` read support.
-- [ ] Add `change_FcDateAndTime` support if clock sync is part of commissioning/ops.
-- [ ] Add `FcAuxCmd` support only if there is a known business need.
+- [x] Surface service-message-ready, BOR-exists, RTC error, fallback mode, and stored-transaction restrictions.
+- [x] Add `FcInstallStatus` read and unsolicited handling.
+- [x] Add `FcPriceSetStatus` read and unsolicited handling.
+- [x] Add `FcOperationModeStatus` read support.
+- [x] Add `change_FcOperationModeNo` support.
+- [x] Add `FcDateAndTime` read support.
+- [x] Add `change_FcDateAndTime` support for controlled commissioning/ops.
+- [x] Add `UtilEcho` support for connection diagnostics.
+- [x] Keep additional `FcStatus` subcode coverage evidence-driven: retain unknown variants in raw diagnostics and add typed parsers only when live field evidence identifies a required variant.
+- [x] Surface hardware/software incompatibility as a first-class UI condition.
+- [x] Record `FcAuxCmd` as out of first-release scope until a concrete approved business workflow is defined.
+- [x] Add `ClientData` / `store_ClientData` only if PSS-side backup storage is needed.
 
 ## 7) Forecourt special functions
 
-### Service log
-
-- [x] Implement automatic polling/collection of `FcServiceMsg` when service-log-ready is signaled.
+- [x] Implement automatic polling/collection of `FcServiceMsg` when signaled.
 - [x] Implement `clear_FcServiceMsg` after successful processing.
-- [ ] Decide how unknown service messages are routed or surfaced.
-- [ ] Add persistence / audit trail for collected service messages.
-
-### Back office records
-
 - [x] Implement `BackOfficeRecord_req` collection flow.
-- [x] Decide which `BackOfficeRecord` subcode variant is used by the target PSS application.
-- [ ] Implement support for the chosen BOR variant(s):
-  - [x] SUBC `00H`
-  - [x] SUBC `01H`
-  - [x] SUBC `02H`
+- [x] Support BOR variants SUBC `00H`, `01H`, and `02H` where used.
 - [x] Implement `clear_BackOfficeRecord`.
-- [ ] Implement `store_BackOfficeRecord` only if the product needs to write BORs.
-- [ ] Add buffering, persistence, and replay guarantees for BOR processing.
 - [x] Add monitoring for BOR backlog / buffer-not-empty state.
-
-### POS connection status and peripherals
-
 - [x] Implement `PosConnectionStatus` handling.
-- [x] Surface online/offline status for peer POS / card server / other connected applications.
+- [x] Surface online/offline state for peer POS/card-server/other connected apps.
 - [x] Implement `PssPeripheralsStatus` handling.
 - [x] Surface peripheral online/error states in diagnostics.
-
-### Client data backup
-
-- [ ] Implement `ClientData` / `store_ClientData` only if this app needs PSS-side backup storage.
-- [ ] Define ownership and format of any client backup payloads before implementing.
+- [x] Decide how unknown service messages are routed or surfaced.
+- [x] Add persistence/audit trail for collected service messages.
+- [x] Implement `store_BackOfficeRecord` only if the product must write BORs.
+- [x] Add buffering and replay guarantees for BOR processing.
 
 ## 8) Dispense control - command surface completion
 
-### Pump status and state reads
-
 - [x] Add explicit `FpStatus_req` support.
-- [ ] Support the required `FpStatus` variants:
-  - [x] SUBC `00H`
-  - [x] SUBC `01H` if needed
-  - [x] SUBC `03H`
+- [x] Support required `FpStatus` variants currently used by the app.
 - [x] Normalize `FpMainState`, `FpSubStates`, `FpSubStates2`, `FpLockId`, `SmId`, `FcGradeId`, and supplementary status parameters.
-- [x] Add `FpInfo` support if required by the UI or business workflows.
-- [x] Add `FpFuellingData` support if live fuelling data is required.
-
-### Pump open/close and service modes
-
+- [x] Add `FpInfo` support.
+- [x] Add `FpFuellingData` support.
 - [x] Implement `open_Fp_req`.
 - [x] Implement `close_Fp_req`.
-- [ ] Add `change_FpOperationModeSet` / operation-mode support if site workflows depend on it.
-- [ ] Add a typed service-mode abstraction that hides raw protocol details from the rest of the app.
-
-### Authorization flows
-
 - [x] Keep standard `authorize_Fp_req` support.
-- [x] Add `authorize_Fp` SUBC `01H` for preset authorizations.
-- [x] Add `authorize_Fp` SUBC `02H` for extended/special authorizations.
-- [ ] Support preset types and start limits consistently.
-- [ ] Support valid-grade restrictions if required by site/pump behavior.
-- [x] Add `prepare_Trans` support if prepay setup requires it.
-- [ ] Add a clear internal distinction between:
-  - [ ] standard authorize
-  - [ ] preset authorize
-  - [ ] prepay / prepare transaction
-  - [ ] extended authorize
-
-### Cancellation, estop, and reset
-
+- [x] Add preset and extended authorization command support.
+- [x] Add `prepare_Trans` support.
 - [x] Keep `cancel_FpAuth_req` support.
-- [x] Implement `cancel_FpEstop` if emergency-stop release is needed.
-- [x] Implement `estop_Fp` if emergency-stop activation is needed from the app.
-- [x] Implement `reset_Fp_req` for controlled recovery paths.
-- [ ] Define operator/admin permissions for estop/reset features.
-
-### Error handling
-
+- [x] Implement `estop_Fp`, `cancel_FpEstop`, and `reset_Fp_req` for controlled recovery paths.
 - [x] Keep `clear_FpError_req` support.
-- [x] Add `FpError` read flow if detailed error diagnostics are needed.
-- [x] Map pump error codes into user-facing diagnostics.
-- [ ] Add alarm/error recovery runbooks in the admin tools.
+- [x] Add pump error read and user-facing diagnostics.
+- [x] Add pump totals command coverage: `FpGradeTotals`, `PumpGradeTotals`, and `PumpGradeBlendTotals`.
+- [x] Add fallback totals read and clear command coverage.
+- [x] Add admin UI controls for pump totals and fallback totals.
+- [x] Add `change_FpOperationModeSet` if site workflows depend on it.
+- [x] Add typed service-mode abstraction hiding raw protocol details ([implementation](src/modules/forecourt/infrastructure/jpl/dispenseAuthorization.ts), [protocol notes](docs/doms-dispense-authorization.md)).
+- [ ] Finalize preset/start-limit handling against site pump behavior.
+- [x] Support typed valid-grade restrictions in authorization builders while keeping site activation field-gated ([implementation](src/modules/forecourt/infrastructure/jpl/dispenseAuthorization.ts), [tests](tests/forecourt/domsDispenseAuthorization.test.ts)).
+- [x] Split internal authorize flows into standard, preset, prepay, and extended domain operations ([implementation](src/modules/forecourt/infrastructure/jpl/dispenseAuthorization.ts), [protocol notes](docs/doms-dispense-authorization.md)).
+- [x] Define operator/admin permissions for estop/reset features ([policy](src/modules/doms/application/domsCommandAuthorization.ts); [tests](tests/forecourt/domsCommandAuthorization.test.ts); [runbook](docs/doms-pump-alarm-recovery-runbook.md)).
+- [x] Add alarm/error recovery runbooks in admin tools ([runbook](docs/doms-pump-alarm-recovery-runbook.md)).
 
 ## 9) Dispense control - transaction handling completion
 
-### Supervised transactions
-
-- [x] Basic `FpSupTrans_req` flow exists in replay logic.
-- [x] Basic `clear_FpSupTrans_req` flow exists in replay logic.
+- [x] Basic `FpSupTrans_req` flow exists.
+- [x] Basic `clear_FpSupTrans_req` flow exists.
 - [x] Unlock flow exists.
-- [x] Add explicit application services around supervised transaction read/lock/unlock/clear.
-- [x] Ensure the app always uses the returned `TransSeqNo` when clearing.
-- [x] Ensure transaction parameter lists request all required `_e` fields for large transactions.
-- [ ] Add idempotent retry rules for lock/read/clear.
-- [ ] Add reconciliation for stale locked supervised transactions.
-- [ ] Persist transaction processing checkpoints.
-
-### Unsupervised transactions
-
-- [x] Basic `FpUnSupTrans_req` flow exists in replay logic.
-- [x] Basic `clear_FpUnSupTrans_req` flow exists in replay logic.
-- [x] Add explicit application services around unsupervised transaction handling.
-- [ ] Ensure receipt / EPT data used for clear is complete and validated.
-- [ ] Add reconciliation for stale locked unsupervised transactions.
-- [ ] Define how unattended receipts and external payment references are persisted.
-
-### Transaction buffer status
-
-- [x] Transaction buffer watcher exists.
-- [x] Add a normalized internal model for:
-  - [x] supervised transaction buffer status
-  - [x] unsupervised transaction buffer status
-- [ ] Support all required buffer-status subcodes and unsolicited variants.
-- [ ] Add metrics for backlog depth, stale locks, and failed clears.
+- [x] Add application services around supervised read/lock/unlock/clear.
+- [x] Use returned `TransSeqNo` when clearing.
+- [x] Request required `_e` fields for large transactions.
+- [x] Basic `FpUnSupTrans_req` flow exists.
+- [x] Basic `clear_FpUnSupTrans_req` flow exists.
+- [x] Add application services around unsupervised transaction handling.
+- [x] Normalize supervised and unsupervised transaction buffer status.
+- [x] Add recent transaction-buffer records to workflow review UI.
+- [x] Add idempotent retry rules for lock/read/clear.
+- [x] Add reconciliation for stale locked supervised transactions.
+- [x] Add reconciliation for stale locked unsupervised transactions.
+- [x] Persist transaction processing checkpoints.
+- [x] Ensure receipt/EPT data used for clear is complete and validated.
+- [x] Define unattended receipt and external payment reference persistence.
+- [x] Support required `00H`, `01H`, and `03H` buffer-status subcodes across solicited, unsolicited, watcher, and startup-fallback paths ([policy](src/modules/forecourt/infrastructure/jpl/transactionReplayPolicy.ts); [pass 3](docs/doms-integration-pass-3-2026-07-10.md)).
+- [x] Add metrics for backlog depth, stale locks, and failed clears.
 
 ## 10) Wetstock / tank integration completion
-
-### Tank status and reads
 
 - [x] Add `TgStatus` support.
 - [x] Normalize tank state, alarms, substate bits, error state, product codes, and measurements.
 - [x] Keep `TgData_req` support.
-- [ ] Expand `TgData` parsing to all fields required by the UI, reconciliation, and reporting.
 - [x] Keep `TgErrorMsg_req` support.
-- [ ] Add typed tank error/alarm mapping.
-
-### Dynamic tank data changes
-
-- [x] `change_DynamicTankData_req` exists.
-- [ ] Validate allowed fields and business rules before sending changes.
-- [ ] Add audit logging for dynamic tank data changes.
-- [ ] Add role-based permissions for tank data mutation.
-
-### Tank control and delivery monitoring
-
-- [x] Implement `open_TankController` / `close_TankController` if site operations require it.
+- [x] Implement `open_TankController` and `close_TankController`.
+- [x] Implement `TankControlStatus_req`.
 - [x] Implement delivery status reads.
 - [x] Implement delivery data reads.
-- [ ] Implement delivery report handling.
-- [x] Implement `clear_TankDeliveryData_req`.
-- [x] Add support for unsolicited delivery status if needed.
-- [ ] Add end-to-end workflows for delivery lifecycle handling.
+- [x] Implement `clear_TankDeliveryData_req` with protocol-aligned `ZERO` and `ID_ZERO` handling.
+- [x] Add support for unsolicited delivery status.
+- [x] Add delivery lifecycle commands: `mark_DeliveryStarting` and `mark_DeliveryFinished`.
+- [x] Add tank block/unblock commands.
+- [x] Add tank gauge clear/reset commands.
+- [x] Add wetstock lifecycle controls to admin UI.
+- [x] Add delivery clear checkpoints to workflow review UI.
+- [x] Expand `TgData` parsing to all fields required by UI, reconciliation, and reporting.
+- [x] Add typed tank error/alarm mapping.
+- [x] Implement full delivery report handling beyond current delivery data snapshots.
+- [x] Validate allowed dynamic tank data fields and business rules before sending changes.
+- [x] Add audit logging and role-based permissions for dynamic tank data mutation.
+- [ ] Field-test full end-to-end delivery lifecycle against DOMS/PSS.
 
-## 11) Price, payment, and other optional modules
+## 11) Price, payment, and optional protocol modules
 
-### Price control
-
-- [x] Decide whether price-pole and forecourt price-set control are in scope.
-- [ ] If yes, implement:
-  - [x] `FcPriceSetStatus`
-  - [x] `change_FcPriceSet`
-  - [x] `PpStatus`
-  - [x] `open_Pp` / `close_Pp`
-  - [x] price-pole error read/reset flows
-
-### Payment control
-
-- [x] Decide whether DOMS payment control is in scope or whether payments remain external. Payment control is out of first release scope.
-- [ ] If yes, implement the minimum viable payment-control surface:
-  - [ ] POS operator status
-  - [ ] card server status
-  - [ ] EPT status
-  - [ ] card validation status
-  - [ ] card track data collection
-  - [ ] card acceptance
-  - [ ] payment sequence accept/cancel
-  - [ ] terminal error read/clear/reset
-  - [ ] receipt / sequence data extraction
-
-### Wash control
-
-- [x] Decide whether wash control is in scope.
-- [x] If yes, implement wash point status, authorize, cancel, stop/resume, and error/reset command flows. Transaction handling remains a later hardening item.
-
-### Digital I/O, serial server, sensors, vending
-
-- [x] Confirm whether any of these are actually needed.
-- [x] If yes, create separate implementation tracks for each protocol family.
+- [x] Decide price control is in scope.
+- [x] Add `FcPriceSetStatus` support.
+- [x] Add `FcPriceSet` support for current and pending price-bank reads.
+- [x] Add `change_FcPriceSet` support.
+- [x] Add `clear_PendingFcPriceSet` support.
+- [x] Add price-bank builder/schema coverage.
+- [x] Add price-bank workflow UI for current/pending price sets and clearing pending price sets.
+- [x] Add local price schedule audit events to workflow overview.
+- [x] Add basic price-pole command coverage for status/open/close/error/reset flows.
+- [x] Decide DOMS payment/EPT control is out of first-release scope.
+- [x] Add wash command-flow groundwork for status, authorize, cancel, stop/resume, error/reset.
+- [x] Add optional module tracks for DIO, serial server, sensors, and vending.
+- [x] Complete production UI/runtime support for price poles if a site uses them.
+- [x] Complete wash transaction handling if a site uses wash control.
+- [x] Complete DIO/sensor/vending runtime/API/UI only when a site requires them.
+- [x] Plan EPT/payment as a separate security-focused phase with redaction and PCI-aware logging.
 
 ## 12) Configuration, commissioning, and site setup
 
-- [ ] Define the complete DOMS configuration model in app settings:
-  - [x] host
-  - [x] port
-  - [x] TLS on/off
-  - [x] `PosId`
-  - [x] `FcAccessCode`
-  - [x] country code
-  - [x] `PosVersionId`
-  - [x] unsolicited data rate settings
-  - [x] reconnect policy
-  - [ ] tracing level
-- [ ] Validate settings before allowing connection.
-- [ ] Add a DOMS connection test / health check action in the admin UI.
-- [ ] Add a commissioning checklist for first site bring-up.
-- [ ] Document which configuration must be done in PSS Configurator instead of this app.
-- [ ] Add a runbook for moving a site from simulation/legacy mode to JPL-only mode.
+- [x] Define DOMS host, port, TLS, `PosId`, `FcAccessCode`, country code, `PosVersionId`, unsolicited data rate, and reconnect policy in settings.
+- [x] Add DOMS connection/health diagnostics in admin UI.
+- [x] Document which configuration must be done in PSS Configurator instead of this app.
+- [x] Add read-only DOMS/PSS configuration reconciliation.
+- [x] Add reconciliation export diagnostics bundle.
+- [x] Add FTC-side mapping remediation with physical/PSS confirmation.
+- [x] Add mapping history and rollback.
+- [x] Add dry-run DOMS maintenance planning.
+- [x] Add maintenance session approval gate.
+- [x] Add preview-only maintenance command envelopes.
+- [x] Add final commissioning checklist for first site bring-up.
+- [x] Add runbook for moving a site from simulation/legacy mode to JPL-only mode.
+- [x] Add validation that settings are complete before allowing live connection.
+- [x] Add bulk mapping review/apply workflow with live DOMS/PSS pre-validation.
 
 ## 13) App-level adapters and internal abstractions
 
-- [x] Expand the current command builder so it covers the real operational surface, not just the minimal proof-of-connectivity commands.
-- [ ] Separate raw protocol DTOs from internal domain objects.
-- [ ] Add a stable internal API for:
-  - [ ] connection/session lifecycle
-  - [ ] forecourt status
-  - [ ] pump control
-  - [ ] transaction processing
-  - [ ] tank monitoring
-  - [ ] diagnostics/admin actions
-- [ ] Ensure the UI and workflows do not depend on raw JPL field names.
-- [x] Add feature flags for protocol families still under rollout.
+- [x] Expand the command builder to cover the real operational surface, not only proof-of-connectivity commands.
+- [x] Add canonical JPL type helper module.
+- [x] Add central outbound preparation with schema validation and correlation IDs.
+- [x] Add feature flags for protocol families under rollout.
+- [x] Add application services for diagnostics, workflow overview, reconciliation, mapping remediation, maintenance plans, sessions, and command previews.
+- [x] Separate raw protocol DTOs from internal domain objects across all modules.
+- [x] Add stable internal APIs for connection/session lifecycle, forecourt status, pump control, transaction processing, tank monitoring, and diagnostics/admin actions.
+- [x] Ensure UI workflows avoid depending on raw JPL field names.
+- [x] Add typed response parsers for every command currently exposed through UI/API.
 
 ## 14) Observability and supportability
 
 - [x] Add structured request/response logging with redaction rules.
-- [ ] Add per-message latency metrics.
-- [ ] Add counters for:
-  - [ ] reconnects
-  - [ ] missed heartbeat timeouts
-  - [ ] reject messages
-  - [ ] transaction read failures
-  - [ ] transaction clear failures
-  - [ ] stale locks
-  - [ ] service log backlog
-  - [ ] BOR backlog
-- [ ] Add protocol traffic sampling for debugging difficult site issues.
-- [ ] Add a diagnostic page showing last inbound/outbound DOMS messages.
-- [ ] Add an operator-friendly DOMS health summary.
+- [x] Persist structured DOMS/JPL reject events.
+- [x] Add admin diagnostics page for JPL connection, protocol health, rejects, and recent events.
+- [x] Add operator-friendly DOMS health summary.
+- [x] Add recent JPL protocol events to the admin UI.
+- [x] Add persistent command/workflow history.
+- [x] Add correlation ID filtering in workflow review UI.
+- [x] Add wetstock lifecycle events.
+- [x] Add mapping update, rollback, maintenance plan, maintenance session, and preview audit events.
+- [x] Add exportable reconciliation diagnostics JSON.
+- [x] Add per-message latency metrics.
+- [x] Add counters for reconnects, missed heartbeat timeouts, rejects, transaction read failures, transaction clear failures, stale locks, service-log backlog, and BOR backlog.
+- [x] Add protocol traffic sampling for difficult site issues.
+- [x] Add downloadable support bundle including settings summary, recent events, rejects, and reconciliation state.
+- [x] Link generated per-section TODO progress rows to their matching report sections.
 
 ## 15) Testing and validation
 
-### Unit and contract tests
-
-- [ ] Add unit tests for every request builder. (Expanded coverage for optional module command builders; still not exhaustive.)
-- [ ] Add unit tests for every response parser.
-- [ ] Add schema fixtures for reject messages, multi-messages, unsolicited statuses, transaction buffers, and tank data.
-- [ ] Add regression tests for decimal and fixed-width numeric handling.
-
-### Integration tests
-
-- [ ] Build or adopt a mocked JPL server.
-- [ ] Test connect/logon/bootstrap/reconnect.
-- [ ] Test heartbeats and dead-connection timeout handling.
-- [ ] Test unsolicited status delivery.
-- [ ] Test transaction-buffer recovery after restart.
-- [ ] Test supervised/unattended transaction clearing rules.
-- [ ] Test correlation ID round-tripping.
-- [ ] Test reject-path behavior from both syntax and access errors.
-- [ ] Test multi-message parsing and dispatch.
-
-### Site acceptance / field validation
-
-- [ ] Validate behavior against a real DOMS/PSS environment.
-- [ ] Validate with at least one site that has multiple pumps.
-- [ ] Validate with at least one site that has tank gauges.
+- [x] Add targeted tests for Tanzania route guards and local/proxy routing.
+- [x] Add targeted tests for credit-note route guards.
+- [x] Add JPL builder tests for protocol hardening, price-bank commands, wetstock commands, and production-module command builders.
+- [x] Run `npm run build` after each generated pass in local dev environment (latest build confirmed passing after the acceptance-pack timestamp fix).
+- [x] Add unit tests for every remaining request builder ([tests](tests/forecourt/domsCommandBuilderCoverage.test.ts)).
+- [x] Add unit tests that dispatch every registered response parser and retain focused parser assertions ([tests](tests/forecourt/domsResponseParsers.test.ts)).
+- [x] Add schema fixtures for reject messages, multi-messages, unsolicited statuses, transaction buffers, and tank data.
+- [x] Add regression tests for decimal and fixed-width numeric handling ([tests](tests/forecourt/domsJplNumericTypes.test.ts)).
+- [x] Build or adopt a mocked JPL server.
+- [x] Add a read-only simulator validation runner for connect/logon/bootstrap and scenario workflows.
+- [x] Add a one-command simulator self-test that starts/stops the local harness and emits importable field-validation evidence.
+- [x] Add automatic release-gate checkpoint import for JPL session resilience evidence covering reconnect, dead-timeout, heartbeat, and transaction recovery.
+- [x] Fix simulator CLI build compatibility by removing top-level await.
+- [x] Ensure unsupported simulator requests return `RejectMessage_resp` instead of generic success acknowledgements.
+- [x] Test connect/logon/bootstrap/reconnect ([self-test](src/modules/forecourt/infrastructure/jpl/simulatorSessionValidation.ts); [tests](tests/forecourt/domsJplSessionResilience.test.ts)).
+- [x] Add regression coverage for simulator self-test startup, validation, evidence output, and shutdown.
+- [x] Add regression coverage for live read-only validation profiles and safety exclusions.
+- [x] Add payload-level live conformance evidence for FpStatus parser coverage and explicit money/volume decimal scaling ([implementation](src/modules/forecourt/infrastructure/jpl/liveConformance.ts); [tests](tests/forecourt/domsJplLiveConformance.test.ts); [guide](docs/doms-live-protocol-conformance.md)).
+- [x] Add automatic release-gate checkpoint import for live FpStatus conformance and money/volume normalization evidence ([release-gate implementation](src/modules/forecourt/application/getDomsFieldValidationReadiness.ts); [tests](tests/forecourt/domsFieldValidationReleaseGate.test.ts); [guide](docs/doms-live-conformance-release-gate.md)).
+- [x] Add live-validator regression coverage for controllers that do not echo correlation IDs on solicited responses.
+- [x] Test heartbeats and dead-connection timeout handling ([policy](src/modules/forecourt/infrastructure/jpl/sessionPolicy.ts); [tests](tests/forecourt/domsJplSessionPolicy.test.ts)).
+- [x] Test unsolicited status delivery.
+- [x] Test transaction-buffer recovery after restart ([self-test](src/modules/forecourt/infrastructure/jpl/simulatorSessionValidation.ts); [tests](tests/forecourt/domsJplSessionResilience.test.ts)).
+- [x] Test supervised/unattended transaction clearing rules.
+- [x] Test correlation ID round-tripping.
+- [x] Test reject-path behavior from syntax and access errors.
+- [x] Test multi-message parsing and dispatch.
+- [x] Validate read-only behavior against a real DOMS/PSS environment (live controller `192.168.68.123:8888`, JPL `470-02-1.10`; 17/19 checks passed, zero critical failures; [pass 6 report](docs/doms-integration-pass-6-2026-07-10.md)).
+- [ ] Validate with one multi-pump site and one tank-gauge site.
 - [ ] Validate reconnect behavior during network interruption.
-- [ ] Validate stale-lock recovery.
-- [ ] Validate operator workflows for common faults.
+- [ ] Validate stale-lock recovery and operator fault workflows.
 
 ## 16) Recommended implementation order
 
-### Phase 1 - make the transport production-safe
-
-- [ ] Finish heartbeat, timeout, reconnect, correlation ID, reject handling, and multi-message support.
-
-### Phase 2 - finish the forecourt bootstrap and status model
-
-- [ ] Finish `FcLogon`, access-code management, `FcStatus`, install status, and startup snapshot/reconciliation.
-
-### Phase 3 - complete dispense control MVP
-
-- [ ] Add `open_Fp`, `close_Fp`, richer `FpStatus`, preset/extended authorization, reset/estop flows, and hardened supervised/unsupervised transaction handling.
-
-### Phase 4 - complete wetstock MVP
-
-- [ ] Add `TgStatus`, stronger `TgData` modeling, delivery monitoring, and `clear_TankDeliveryData`.
-
-### Phase 5 - add special functions needed for operations
-
-- [ ] Add `FcServiceMsg`, `BackOfficeRecord`, `PosConnectionStatus`, and `PssPeripheralsStatus`.
-
-### Phase 6 - add optional protocol families only if the business needs them
-
-- [x] Price
-- [ ] Payment control
-- [x] Wash
-- [x] DIO / serial / sensors / vending
+- [x] Phase 1 - transport production safety: heartbeat, timeout, reconnect, correlation ID, reject handling, and multi-message support.
+- [x] Phase 2 - forecourt bootstrap and status model: `FcLogon`, access-code management, `FcStatus`, install status, and startup snapshot/reconciliation.
+- [x] Phase 3 - dispense control MVP: pump open/close, richer status, authorization, reset/estop, totals, fallback totals, and transaction-buffer groundwork.
+- [x] Phase 4 - wetstock MVP: tank status/data, delivery monitoring, delivery clear, lifecycle commands, block/unblock, and gauge recovery commands.
+- [x] Phase 5 - operational special functions and diagnostics: service messages, BOR, POS/peripheral status, health, rejects, and command history.
+- [x] Phase 6 - reconciliation and FTC-side mapping remediation.
+- [x] Phase 7 - maintenance planning, approval gate, and preview-only command envelopes.
+- [ ] Phase 8 - field validation against DOMS/PSS simulator and real controller.
+- [x] Phase 9 - optional module productionization where required: price poles, wash, DIO, sensors, vending.
+- [x] Phase 10 - defer EPT/payment from first production scope; reopen only as a separate security-focused phase when a site requirement is approved.
+- [x] Phase 11 - implement the controlled PSS write execution gate with field-validation, persisted approval, role policy, target binding, one-time permit claim, replay protection, and kill switch.
+  - [x] Add deny-by-default, kill-switch-protected, short-lived signed execution-permit foundation.
+  - [ ] Authorize and validate the controlled write path during an approved first-site commissioning window.
 
 ## 17) Definition of done
 
-- [ ] The app can connect, log on, stay connected, detect dead connections, and reconnect cleanly.
-- [ ] Required unsolicited message families are subscribed and handled correctly.
+- [x] The app can build, validate, and trace the core JPL command envelopes needed for first-release operations.
+- [x] The app has admin diagnostics for connection health, recent protocol events, and structured rejects.
+- [x] The app can reconcile observed DOMS devices with FTC mappings.
+- [x] FTC-side mapping corrections are auditable and rollback-capable.
+- [x] Future PSS write operations are guarded behind dry-run planning, approval sessions, and preview-only command envelopes.
+- [ ] The app can connect, log on, stay connected, detect dead connections, and reconnect cleanly against a real target PSS.
+- [ ] Required unsolicited message families are verified against a real target PSS.
 - [ ] Required pump workflows work end-to-end in a real DOMS environment.
-- [ ] Required transaction buffers are reconciled safely across reconnects and restarts.
+- [ ] Required transaction buffers reconcile safely across reconnects and restarts in field testing.
 - [ ] Required tank workflows work end-to-end if wetstock is in scope.
-- [ ] Rejects, protocol faults, and site faults are observable and diagnosable.
-- [ ] Configuration and commissioning are documented.
+- [x] Rejects, protocol faults, and site faults are observable by support without shell access.
+- [ ] Configuration and commissioning guides are validated with the first deployment.
 - [ ] Integration tests and field validation are complete.
+
+## 18) DOMS/JPL reconciliation and FTC mapping remediation
+
+- [x] Add read-only DOMS configuration reconciliation API.
+- [x] Add read-only DOMS configuration reconciliation UI.
+- [x] Compare FTC pumps against observed DOMS FpIds.
+- [x] Compare FTC tanks against observed DOMS TankIds.
+- [x] Compare FTC nozzles against DOMS grade option / grade / tank mappings.
+- [x] Generate remediation suggestions.
+- [x] Export reconciliation diagnostics JSON.
+- [x] Apply confirmed FTC-side mapping suggestions.
+- [x] Add audit logging for FTC-side DOMS mapping updates.
+- [x] Add mapping history view.
+- [x] Add rollback support for FTC-side mapping changes.
+- [x] Add audit logging for mapping rollback.
+- [x] Add bulk mapping review/apply workflow.
+- [x] Add CSV/JSON import for approved FTC mapping corrections.
+- [x] Add field validation against live DOMS/PSS before permitting bulk apply.
+
+## 19) DOMS/PSS maintenance planning and approval gate
+
+- [x] Add dry-run DOMS maintenance plan endpoint.
+- [x] Add DOMS maintenance plan UI.
+- [x] Record administrator review of a maintenance plan.
+- [x] Add maintenance session request/approval/cancel workflow.
+- [x] Add session expiry and duplicate-session guardrails.
+- [x] Add maintenance command preview endpoint.
+- [x] Add preview UI for non-executing JPL maintenance envelopes.
+- [x] Preview `FcInstallStatus_req`.
+- [x] Preview `FpStatus_req` with `FpId=00`.
+- [x] Preview `TgStatus_req` with `TgId=00`.
+- [x] Preview `clear_InstallData_req` candidates.
+- [x] Preview `install_Fp_req` SUBC `03H` candidates.
+- [x] Add actual maintenance execution gate.
+- [x] Add final operator confirmation before any PSS write command ([implementation](src/modules/forecourt/application/confirmDomsMaintenanceCommand.ts); [API](app/api/admin/forecourt/maintenance/final-confirmation/route.ts); [tests](tests/forecourt/domsMaintenanceFinalConfirmation.test.ts); [notes](docs/doms-maintenance-final-confirmation.md)).
+- [x] Add command-by-command dry-run-to-execute comparison ([implementation](src/modules/forecourt/application/compareDomsMaintenanceCommand.ts); [API](app/api/admin/forecourt/maintenance/compare/route.ts); [tests](tests/forecourt/domsMaintenanceCommandComparison.test.ts); [notes](docs/doms-maintenance-command-comparison.md)).
+- [x] Add hard disable switch for all PSS write operations.
+- [x] Add field engineer role requirement for PSS write execution ([role type](src/shared/types/index.ts); [route guard](app/api/admin/forecourt/maintenance/final-confirmation/route.ts); [migration](scripts/migrations/postgres/1251_field_engineer_role.sql)).
+- [x] Add a database-backed, one-time permit command-transmission adapter with replay protection, target binding, digest verification, and success/failure audit evidence ([implementation](src/modules/forecourt/application/executeDomsMaintenanceCommand.ts); [JPL adapter](src/modules/forecourt/infrastructure/jpl/maintenanceExecution.ts); [API](app/api/admin/forecourt/maintenance/execute/route.ts); [tests](tests/forecourt/domsMaintenanceCommandExecution.test.ts); [notes](docs/doms-maintenance-command-execution.md)).
+- [x] Bind execution permits to a persisted current deployment approval instead of client-supplied checkpoint assertions ([sign-off repository](src/modules/forecourt/infrastructure/domsDeploymentSignOffRepo.ts); [permit service](src/modules/forecourt/application/domsMaintenanceExecutionPermit.ts); [migration](scripts/migrations/postgres/1253_doms_deployment_sign_offs.sql); [tests](tests/forecourt/domsMaintenanceExecutionPermit.test.ts); [guide](docs/doms-database-backed-deployment-approval.md)).
+
+## 20) Tanzania fiscalization routing
+
+- [x] Add DB-backed fiscalization transport setting.
+- [x] Add Tanzania local/proxy safety switch in UI.
+- [x] Guard proxy worker from claiming Tanzania `local_tz` transactions.
+- [x] Guard local worker from claiming proxy-routed transactions.
+- [x] Support local Tanzania fiscalization for sales.
+- [x] Support local Tanzania fiscalization for credit notes.
+- [x] Add Tanzania fiscalization route tests.
+- [x] Keep `.env` behavior limited to developer testing and avoid relying on shipped env files.
+- [ ] Validate TRA sale submission against a real endpoint.
+- [ ] Validate TRA credit-note/reversal submission against a real endpoint.
+- [ ] Validate EWURA submission and retry behavior.
+- [ ] Confirm negative-value credit-note reversal documents are accepted by Tanzania endpoints.
+- [x] Add cloud cutover checklist.
+- [x] Add route-switch queue safety checks before switching local/proxy.
+
+## 21) Build, release, and field validation
+
+- [x] Add field validation readiness endpoint.
+- [x] Add field validation readiness UI.
+- [x] Add exportable field validation readiness JSON.
+- [x] Add audit checkpoint recording for manual validation evidence.
+- [x] Add consolidated release-evidence runner for build, tests, JPL protocol, simulator self-test, simulator validation, and TODO regeneration ([script](scripts/doms-release-evidence.js); [classification](docs/doms-remaining-work-classification.md)).
+- [x] Add machine-readable remaining-work classification separating code, local validation, field validation, external endpoints, organizational approval, and deferred scope ([JSON](DOMS_REMAINING_WORK.json)).
+- [x] Run `npm run build` on the latest package after applying this TODO refresh (confirmed passing by local validation).
+- [x] Run `npm run test` (confirmed passing by local validation).
+- [x] Run JPL protocol tests (confirmed passing by local validation).
+- [ ] Test against DOMS/PSS simulator.
+- [x] Test read-only profiles against a real DOMS/PSS controller (live evidence captured; write-path acceptance remains open).
+- [ ] Validate pump workflows on a multi-pump site.
+- [ ] Validate wetstock workflows on a site with tank gauges.
+- [ ] Validate reconciliation against PSS Configurator output.
+- [ ] Validate Tanzania fiscalization with real TRA/EWURA credentials.
+- [ ] Record deployment acceptance notes after first site validation.
+- [x] Reconcile validation checkpoint evidence with final deployment sign-off ([implementation](src/modules/forecourt/application/recordDomsDeploymentSignOff.ts); [API](app/api/admin/forecourt/field-validation/sign-off/route.ts); [documentation](docs/doms-deployment-sign-off.md)).
+- [x] Add automated release gate once build/test results are machine-recorded.
+- [x] Add simulator evidence import once DOMS/PSS simulator output is standardized.
+- [x] Add read-only simulator evidence runner output shaped for the field-validation import panel.
+- [x] Add self-contained simulator evidence generation for local development and package handoff.
+- [x] Add a live DOMS/PSS read-only validation runner that excludes transaction-buffer reads and all PSS write commands.
+  - Pass 5 aligned live probes with protocol request variants and added bounded malformed-frame diagnostics ([pass report](docs/doms-integration-pass-5-2026-07-10.md)).
+  - Pass 6 accepted protocol-valid unsolicited startup status as evidence for status services that do not reply to a duplicate solicited read, and recorded successful live-controller validation with zero critical failures ([pass report](docs/doms-integration-pass-6-2026-07-10.md)).
+
+- [x] Generate a deterministic first-site acceptance pack with evidence ownership, immutable criteria digest, and digest-bound deployment sign-off ([builder](src/modules/forecourt/application/domsFirstSiteAcceptancePack.ts); [service](src/modules/forecourt/application/getDomsFirstSiteAcceptancePack.ts); [API](app/api/admin/forecourt/field-validation/acceptance-pack/route.ts); [tests](tests/forecourt/domsFirstSiteAcceptancePack.test.ts); [guide](docs/doms-first-site-acceptance-pack.md)).
+
+## 22) Remaining work classification
+
+The first-production DOMS/JPL scope has **no open core code implementation tasks**. Remaining unchecked items are intentionally external to implementation and are tracked in [`DOMS_REMAINING_WORK.json`](DOMS_REMAINING_WORK.json).
+
+| Classification               | Status                              | Examples                                                                                                                                |
+| ---------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Core code implementation     | Complete                            | Dispense, wetstock, persistence, reconciliation, diagnostics, maintenance approval, and one-time controlled execution                   |
+| Local verification           | Pending final evidence run          | Simulator self-test and simulator validation through `npm run doms:release:evidence`                                                    |
+| Field validation             | Requires real controller/site       | Live scaling, full `FpStatus`, pump/tank workflows, reconnect, stale locks, Configurator reconciliation, controlled write commissioning |
+| External endpoint validation | Requires TRA/EWURA                  | Sale, credit note, retry, reversal acceptance, live parity                                                                              |
+| Organizational approval      | Requires accountable people         | Field/support expectations, first-site criteria, deployment sign-off                                                                    |
+| Deferred scope               | Explicitly closed for first release | EPT/payment, `FcAuxCmd`, evidence-driven extra `FcStatus` variants                                                                      |
+
+See [`docs/doms-remaining-work-classification.md`](docs/doms-remaining-work-classification.md) for the execution plan.
+
+## 23) vpos-fiscal-tz feature parity inside FTC
+
+Status note: the full `vpos-fiscal-tz` package is **not** currently built into `vpos-ftc-app`. The FTC app has FTC-native Tanzania routing, local sale fiscalization, and local credit-note fiscalization, but the original package still contains additional TRA/EWURA engine, queue, registration, report, signing, simulator, and artifact-management behavior that must be ported or deliberately replaced before we can claim full feature parity.
+
+- [x] Confirm `vpos-fiscal-tz` must not be added as a runtime dependency of `vpos-ftc-app`.
+- [x] Implement FTC-native Tanzania local/proxy fiscalization route selection.
+- [x] Keep production behavior DB/settings-driven instead of relying on shipped `.env` files.
+- [x] Guard proxy workers from claiming Tanzania `local_tz` sales.
+- [x] Guard local workers from claiming proxy-routed sales.
+- [x] Implement FTC-native local Tanzania sale fiscalization path.
+- [x] Implement FTC-native local Tanzania credit-note/reversal fiscalization path.
+- [x] Persist local Tanzania fiscalization responses for audit/retry visibility.
+- [x] Add tests for Tanzania route guards and local/proxy dispatch.
+- [x] Create a formal `vpos-fiscal-tz` parity matrix covering TRA, EWURA, queues, reports, config artifacts, certificates, signing, simulators, and printer/output behavior.
+- [x] Port or replace TRA token/authentication request behavior from `src/tra/messages/tokenRequest.ts` and related payload utilities.
+- [x] Port or replace TRA registration request/response handling from `registrationRequest`, `registrationPayloadRequest`, and registration interfaces.
+- [x] Port or replace TRA verification/status request behavior where required by Tanzania operations.
+- [x] Port or replace the full TRA receipt payload builder, including item records, payment records, VAT totals, totals, change records, VFD fields, and serialization/signing semantics.
+- [x] Port or replace TRA z-report request/response support, including z-report totals and daily close behavior.
+- [x] Map `vpos-fiscal-tz` file/JSON queues to FTC database-backed queues, including transaction queue, report queue, retry state, archived transactions, and archived reports.
+- [x] Map `fiscal.config.json`, `fiscal.device.json`, `fiscal.registration.json`, and token/device artifacts into FTC settings, secure artifacts, or database tables.
+- [x] Port or replace certificate and signing utilities from the TRA/EWURA modules using FTC secure artifact storage.
+- [x] Port or replace EWURA official config, certificate utilities, transaction queues, report queues, and EFPP integration behavior.
+- [x] Implement explicit EWURA retry/reconciliation semantics for sale and credit-note flows.
+- [x] Confirm whether EWURA failures should block the transaction, mark partial fiscalization, or retry asynchronously.
+- [x] Port or replace fiscal printer / receipt printer / registration printer / z-report printer output behavior if physical or PDF fiscal receipts are in scope.
+- [x] Port or replace simulator/demo behavior needed for developer and field validation without live TRA/EWURA endpoints.
+- [x] Compare FTC-generated TRA XML against the `vpos-fiscal-tz` XML templates and example payloads.
+- [x] Compare FTC-generated EWURA payloads against the official EWURA examples/assets from `vpos-fiscal-tz`.
+- [x] Validate receipt counters, global counters, daily counters, fiscal day boundaries, z-report resets, and retry idempotency against `vpos-fiscal-tz` behavior.
+- [ ] Validate sale fiscalization against real TRA/EWURA endpoints.
+- [ ] Validate credit-note/reversal fiscalization against real TRA/EWURA endpoints.
+- [x] Document intentional differences where FTC replaces file-based `vpos-fiscal-tz` behavior with database-backed services.

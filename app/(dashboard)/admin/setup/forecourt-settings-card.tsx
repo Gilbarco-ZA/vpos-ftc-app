@@ -515,9 +515,10 @@ export default function ForecourtSettingsCard() {
         >
           Connected to {testResult.host}:{testResult.port} and accepted access
           code {testResult.acceptedAccessCode}. Status updates:{' '}
-          {testResult.statusUpdateOk ? 'OK' : 'check failed'}; pump snapshot:{' '}
-          {testResult.fpStatusOk ? 'OK' : 'check failed'}.
+          {testResult.statusUpdateOk ? 'OK' : 'check failed'}; optional all-pump
+          snapshot: {testResult.fpStatusOk ? 'OK' : 'no response'}.
           {testResult.warning ? ` ${testResult.warning}` : ''}
+          {testResult.advisory ? ` ${testResult.advisory}` : ''}
         </Alert>
       ) : null}
 

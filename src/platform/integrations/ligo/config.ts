@@ -12,5 +12,5 @@ export async function getLigoConfig(
     baseUrl: String(node.baseUrl).replace(/\/+$/, ''),
     timeoutMs: node.timeoutMs ?? 10_000,
     apiKey: node.apiKey,
-  };
+  }
 }

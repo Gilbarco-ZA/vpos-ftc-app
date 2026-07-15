@@ -1,8 +1,10 @@
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
+import { forbidden } from '@/src/platform/web/api/response'
 import { ensureDomsBackendAllowed } from '@/src/shared/doms/backend'
 
+import { authorizeDomsCommand } from './domsCommandAuthorization'
 import { normalizeDomsCommand } from './normalizeDomsCommand'
 
 export async function runDomsCommand(
@@ -15,6 +17,23 @@ export async function runDomsCommand(
   const normalized = normalizeDomsCommand(params.command)
   if (!normalized.ok) {
     return normalized.response
+  }
+
+  const authorization = authorizeDomsCommand({
+    role: user.role,
+    commandName: normalized.cmdName,
+    payload,
+  })
+  if (!authorization.allowed) {
+    return forbidden(
+      authorization.reason ?? 'DOMS command is not permitted',
+      undefined,
+      {
+        code: 'DOMS_COMMAND_FORBIDDEN',
+        commandType: authorization.commandType,
+        requiredRoles: authorization.requiredRoles,
+      },
+    )
   }
 
   const data = await normalized.cmd(

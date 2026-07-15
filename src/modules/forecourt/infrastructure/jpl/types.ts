@@ -19,6 +19,38 @@ export type AdapterState = {
     correlationId?: string
     at: number
   }
+  lastFrameDiagnostic?: {
+    valid: boolean
+    code: string
+    message: string
+    byteLength: number
+    hasStx: boolean
+    hasEtx: boolean
+    stxIndex: number
+    etxIndex: number
+    preview: string
+    name?: string
+    subCode?: string
+    solicited?: boolean
+    correlationId?: unknown
+    at: number
+  }
+  frameDiagnostics?: Array<{
+    valid: boolean
+    code: string
+    message: string
+    byteLength: number
+    hasStx: boolean
+    hasEtx: boolean
+    stxIndex: number
+    etxIndex: number
+    preview: string
+    name?: string
+    subCode?: string
+    solicited?: boolean
+    correlationId?: unknown
+    at: number
+  }>
   lastError?: string
   posId?: string
   nextReconnectAt?: number
@@ -29,6 +61,15 @@ export type AdapterState = {
   lastPssPeripheralsStatus?: any
   lastInstallStatus?: any
   lastServiceMessages?: Array<{ seqNo?: string; message?: string; at: number }>
+  lastWashTransactions?: Array<{
+    wpId?: string
+    transSeqNo?: string
+    sourceHash?: string
+    source?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
 }
 
 export type BufferMode = 'supervised' | 'unsupervised'

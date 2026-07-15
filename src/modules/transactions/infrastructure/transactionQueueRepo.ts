@@ -25,6 +25,20 @@ export const transactionQueueRepo = {
     )
   },
 
+  async claimNextCreditNoteBatch(limit = 5) {
+    return await queryAll<TransactionQueueRow>(
+      transactionQueueSql.claimNextCreditNoteBatch,
+      [limit],
+    )
+  },
+
+  async claimPendingCreditNotesForStation(stationId: string, limit: number) {
+    return await queryAll<TransactionQueueRow>(
+      transactionQueueSql.claimPendingCreditNotesForStation,
+      [stationId, limit],
+    )
+  },
+
   async markDone(id: string) {
     await query(transactionQueueSql.markDone, [id])
   },

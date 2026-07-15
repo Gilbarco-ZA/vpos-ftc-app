@@ -3,6 +3,7 @@ import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import { shouldUseLocalTanzaniaFiscalization } from '@/src/modules/tanzania-fiscal/infrastructure/route'
 import { claimTransactionsForFiscalizationQueue } from '@/src/modules/transactions/application/commands/claim-transactions-for-fiscalization-queue'
 import { getStationLinkingWindowSeconds } from '@/src/modules/transactions/infrastructure/linkingWindow'
 import { transactionQueueRepo } from '@/src/modules/transactions/infrastructure/transactionQueueRepo'
@@ -41,6 +42,26 @@ export function startTransactionFiscalizationSchedulerWorker(opts?: {
     if (stopped || tickInFlight) return
     tickInFlight = true
     try {
+      const useLocalTanzania =
+        await shouldUseLocalTanzaniaFiscalization(stationId)
+      if (!useLocalTanzania) {
+        await upsertProcessHeartbeat({
+          stationId,
+          processName: WORKER_NAME,
+          pid: process.pid,
+          status: 'idle',
+          connected: true,
+          metrics: {
+            pollMs,
+            batchSize,
+            route: 'proxy',
+            lastClaimed: 0,
+          },
+          lastError: null,
+        })
+        return
+      }
+
       const linkingWindowSeconds =
         await getStationLinkingWindowSeconds(stationId)
 
@@ -67,6 +88,7 @@ export function startTransactionFiscalizationSchedulerWorker(opts?: {
           pollMs,
           batchSize,
           linkingWindowSeconds: linkingWindowSeconds ?? null,
+          route: 'local_tz',
           lastClaimed: claimed.length,
         },
         lastError: null,

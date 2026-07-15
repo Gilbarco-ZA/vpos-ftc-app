@@ -6,6 +6,7 @@ import { startPrintJobsWorker as startLegacyPrintJobsWorker } from '@/src/module
 import { startReportQueueWorker as startLegacyReportQueueWorker } from '@/src/modules/reports/infrastructure/reportQueueWorker'
 import { startInProcessRuntime as startCanonicalInProcessRuntime } from '@/src/modules/runtime/infrastructure/inProcessRuntime'
 import { startSupervisorMonitorWorker as startCanonicalSupervisorMonitorWorker } from '@/src/modules/runtime/infrastructure/supervisorMonitorWorker'
+import { startEwuraRetryWorker as startCanonicalEwuraRetryWorker } from '@/src/modules/tanzania-fiscal/infrastructure/ewuraRetryWorker'
 import { startProxyFiscalSenderWorker as startLegacyProxyFiscalSenderWorker } from '@/src/modules/transactions/infrastructure/fiscalization/proxySenderWorker'
 import { startTransactionFiscalizationSchedulerWorker as startCanonicalTransactionFiscalizationSchedulerWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionFiscalizationSchedulerWorker'
 import { startTransactionQueueWorker as startCanonicalTransactionQueueWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionQueueWorker'
@@ -74,6 +75,13 @@ export function startProxyFiscalSenderRuntimeWorker(opts?: {
   pollMs?: number
 }) {
   return startLegacyProxyFiscalSenderWorker(opts)
+}
+
+export function startEwuraRetryRuntimeWorker(opts?: {
+  pollMs?: number
+  batchSize?: number
+}) {
+  return startCanonicalEwuraRetryWorker(opts)
 }
 
 export function startInProcessRuntimeServices(

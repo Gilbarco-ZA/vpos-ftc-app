@@ -1,12 +1,10 @@
-import {
-  buildFcLogonEnvelope,
-  JplClient,
-} from '@gilbarcoafs/doms-pos-jpl'
-import { NextResponse } from "next/server";
+import { buildFcLogonEnvelope, JplClient } from '@gilbarcoafs/doms-pos-jpl'
+import { NextResponse } from 'next/server'
 
 import { parseCsvStringList } from '@/src/shared/forecourt/runtimeConfigShared'
 import { defineMutationRoute } from '@/src/shared/http/defineRoute'
 
+import { validateDomsLiveConnectionSettings } from '@/src/modules/forecourt/application/domsCommissioningReadiness.helpers'
 import {
   buildJplAccessCodeFallbacks,
   normalizeJplPosId,
@@ -101,12 +99,58 @@ export const POST = defineMutationRoute<TestJplSettingsBody>({
       String(body?.jplPosVersionId ?? '').trim() || '470-02-1.08'
     const posId = normalizeJplPosId(body?.jplPosId ?? '01', '01')
     const statusUpdateCode = Math.max(0, toInt(body?.jplStatusUpdateCode, 3))
+    const unsolicitedFlags = parseCsvStringList(body?.jplUnsolicitedFlags)
+    const mfdrFlags = parseCsvStringList(body?.jplUnsolicitedMfdrFlags)
     const accessCodes = buildJplAccessCodeFallbacks({
       baseAccessCode: String(body?.jplAccessCode ?? 'POS'),
       drSeconds: toInt(body?.jplUnsolicitedDrSeconds, 5),
-      requiredFlags: parseCsvStringList(body?.jplUnsolicitedFlags),
-      mfdrFlags: parseCsvStringList(body?.jplUnsolicitedMfdrFlags),
+      requiredFlags: unsolicitedFlags,
+      mfdrFlags,
     })
+
+    const settingsValidation = validateDomsLiveConnectionSettings({
+      jplHost: host,
+      jplPort: port,
+      jplPosId: posId,
+      jplAccessCode: accessCodes[0] ?? String(body?.jplAccessCode ?? 'POS'),
+      jplCountryCode: countryCode,
+      jplPosVersionId: posVersionId,
+      jplExpectedMinVersion: String(
+        body?.jplExpectedMinVersion ?? '470-02-1.07',
+      ),
+      jplHeartbeatIntervalMs: heartbeatIdleMs,
+      jplDeadConnectionTimeoutMs: inboundSilenceMs,
+      jplUnsolicitedDrSeconds: toInt(body?.jplUnsolicitedDrSeconds, 5),
+      jplUnsolicitedFlags: unsolicitedFlags,
+      jplUnsolicitedMfdrFlags: mfdrFlags,
+      jplStatusUpdateCode: statusUpdateCode,
+      jplBootstrapSnapshotEnabled: body?.jplBootstrapSnapshotEnabled !== false,
+      bufferWarnDepthSup: toInt(body?.bufferWarnDepthSup, 2),
+      bufferCritDepthSup: toInt(body?.bufferCritDepthSup, 5),
+      bufferWarnAgeMinSup: toInt(body?.bufferWarnAgeMinSup, 5),
+      bufferCritAgeMinSup: toInt(body?.bufferCritAgeMinSup, 15),
+      bufferWarnDepthUnsup: toInt(body?.bufferWarnDepthUnsup, 1),
+      bufferCritDepthUnsup: toInt(body?.bufferCritDepthUnsup, 3),
+      bufferWarnAgeMinUnsup: toInt(body?.bufferWarnAgeMinUnsup, 2),
+      bufferCritAgeMinUnsup: toInt(body?.bufferCritAgeMinUnsup, 10),
+      jplTlsRequired: tlsEnabled,
+    })
+
+    if (settingsValidation.blockers.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          success: false,
+          error: {
+            message:
+              'JPL settings are incomplete or unsafe for live connection.',
+            details: settingsValidation.blockers,
+          },
+          data: { host, port, tlsEnabled, settingsValidation },
+        },
+        { status: 400 },
+      )
+    }
 
     const attempts: Array<{ accessCode: string; ok: boolean; error?: any }> = []
     let acceptedAccessCode: string | null = null
@@ -196,10 +240,12 @@ export const POST = defineMutationRoute<TestJplSettingsBody>({
           inboundSilenceMs,
           logonResponse,
           attempts,
-          warning:
-            statusUpdateOk && fpStatusOk
-              ? null
-              : 'Logon succeeded, but one or more post-logon checks failed. Inspect details before going live.',
+          warning: statusUpdateOk
+            ? null
+            : 'Logon succeeded, but the status-update mode could not be confirmed.',
+          advisory: !fpStatusOk
+            ? 'The controller accepted logon and status updates, but did not answer the optional all-pump snapshot request within 8 seconds. This does not invalidate the JPL connection; verify individual pump state after the runtime starts.'
+            : null,
           lastError: lastError ? serializeError(lastError) : null,
         },
       })

@@ -10,6 +10,7 @@ import {
   enqueueFiscalInboxReviewFailure,
 } from '@/src/shared/runtime/fiscalInbox'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
+import { listSetupCountryOptions } from '@/src/shared/server/config/countryDatasets'
 import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
@@ -19,6 +20,7 @@ import { fuelStationsRepo } from '@/src/modules/forecourt/infrastructure/reposit
 import { completeTransactionFiscalization } from '@/src/modules/transactions/application/commands/complete-transaction-fiscalization'
 import { failTransactionFiscalization } from '@/src/modules/transactions/application/commands/fail-transaction-fiscalization'
 import { markTransactionFiscalizing } from '@/src/modules/transactions/application/commands/mark-transaction-fiscalizing'
+import { runCreditNoteFiscalization } from '@/src/modules/transactions/infrastructure/fiscalization/runCreditNoteFiscalization'
 import { runFiscalization } from '@/src/modules/transactions/infrastructure/fiscalization/runFiscalization'
 import { getStationLinkingWindowSeconds } from '@/src/modules/transactions/infrastructure/linkingWindow'
 import { transactionQueueRepo } from '@/src/modules/transactions/infrastructure/transactionQueueRepo'
@@ -90,6 +92,72 @@ async function markFailed(opts: {
   )
 }
 
+function parseQueuePayload(payload: any) {
+  return typeof payload === 'string' ? JSON.parse(payload) : payload
+}
+
+function isCreditNotePayload(payload: any) {
+  return String(payload?.kind ?? '').toUpperCase() === 'CREDIT_NOTE'
+}
+
+async function loadCreditNoteForQueueItem(args: {
+  stationId: string
+  creditNoteId: string
+  transactionId: string
+}) {
+  return await queryOne<any>(
+    `SELECT *
+       FROM credit_notes
+      WHERE station_id = $1
+        AND id = $2::uuid
+        AND transaction_id = $3::uuid
+      LIMIT 1`,
+    [args.stationId, args.creditNoteId, args.transactionId],
+  )
+}
+
+async function updateLocalCreditNoteStatus(args: {
+  stationId: string
+  creditNoteId: string
+  status: 'PENDING' | 'SENT' | 'FAILED'
+  response?: unknown
+  lastError?: string | null
+}) {
+  await queryOne(
+    `UPDATE credit_notes
+        SET status = $3,
+            proxy_response = CASE
+              WHEN $4::jsonb IS NULL THEN proxy_response
+              ELSE COALESCE(proxy_response, '{}'::jsonb) || $4::jsonb
+            END,
+            last_error = $5,
+            updated_at = NOW()
+      WHERE station_id = $1 AND id = $2::uuid`,
+    [
+      args.stationId,
+      args.creditNoteId,
+      args.status,
+      args.response == null ? null : JSON.stringify(args.response),
+      args.lastError ?? null,
+    ],
+  )
+}
+
+async function resolveDefaultCountryCode() {
+  const envCountry = String(process.env.COUNTRY_CODE || '')
+    .trim()
+    .toUpperCase()
+  const countries = await listSetupCountryOptions()
+  return (
+    countries.find(
+      (item) => item.value === envCountry || item.countryCode === envCountry,
+    )?.value ||
+    countries[0]?.value ||
+    envCountry ||
+    'UN'
+  )
+}
+
 async function ensureCustomer(
   stationId: string,
   payload: any,
@@ -110,7 +178,9 @@ async function ensureCustomer(
     .trim()
   if (!tin) return null
 
-  const country = (await fuelStationsRepo.getCountryById(stationId)) || 'TZ'
+  const country =
+    (await fuelStationsRepo.getCountryById(stationId)) ||
+    (await resolveDefaultCountryCode())
   const existingId = await customersRepo.findActiveIdByCountryTin(country, tin)
   if (existingId) return existingId
   if (!buyerName) return null
@@ -211,12 +281,167 @@ async function ensureTransactionFromQueue(
   return inserted
 }
 
+async function processCreditNote(row: TransactionQueueRow) {
+  const maxRetries = Number(process.env.VPOS_TX_MAX_RETRIES ?? '5')
+  const payload = parseQueuePayload(row.payload ?? {})
+  const creditNoteId = String(payload?.creditNoteId ?? '')
+  const transactionId = String(
+    payload?.transactionId ?? row.transaction_id ?? '',
+  )
+
+  try {
+    if (!isCreditNotePayload(payload)) {
+      throw new Error('Queue item is not a credit note payload')
+    }
+    if (!creditNoteId || !transactionId) {
+      throw new Error(
+        'Credit note queue item is missing creditNoteId or transactionId',
+      )
+    }
+
+    const [creditNote, txn] = await Promise.all([
+      loadCreditNoteForQueueItem({
+        stationId: row.station_id,
+        creditNoteId,
+        transactionId,
+      }),
+      transactionQueueRepo.findTransactionByTransactionId(
+        transactionId,
+        row.station_id,
+      ),
+    ])
+
+    if (!creditNote) {
+      throw new Error(`Credit note ${creditNoteId} not found`)
+    }
+    if (!txn) {
+      throw new Error(`Transaction ${transactionId} not found`)
+    }
+
+    await updateLocalCreditNoteStatus({
+      stationId: row.station_id,
+      creditNoteId,
+      status: 'PENDING',
+      lastError: null,
+    })
+
+    const customer = txn?.customer_id
+      ? await customersRepo.findById(txn.customer_id)
+      : null
+
+    const fiscalResult = await runCreditNoteFiscalization({
+      stationId: row.station_id,
+      transaction: txn,
+      customer,
+      creditNote,
+    })
+
+    const responsePayload = {
+      localTanzania: {
+        engine: fiscalResult.engine,
+        route: 'local_tz',
+        reference: fiscalResult.reference ?? null,
+        requestPayload: fiscalResult.requestPayload ?? null,
+        responsePayload: fiscalResult.responsePayload ?? null,
+        rawResponse: fiscalResult.rawResponse ?? null,
+        status: fiscalResult.status,
+      },
+    }
+
+    if (fiscalResult.status === 'SUCCESS') {
+      await updateLocalCreditNoteStatus({
+        stationId: row.station_id,
+        creditNoteId,
+        status: 'SENT',
+        response: responsePayload,
+        lastError: null,
+      })
+      await enqueueFiscalInboxMessage({
+        stationId: row.station_id,
+        topic: 'fiscal',
+        requestId: `credit-note-fiscalized:${creditNoteId}`,
+        message: {
+          type: 'creditNoteFiscalized',
+          stationId: row.station_id,
+          transactionId,
+          creditNoteId,
+          reference: fiscalResult.reference ?? null,
+          at: Date.now(),
+        },
+      }).catch((err) => {
+        logger.error('[vpos-transactions]', {
+          msg: 'Failed to enqueue credit note fiscalized notification',
+          error: err,
+        })
+      })
+      await markDone(row.id, row.station_id, { transactionId, creditNoteId })
+      return
+    }
+
+    const errorMessage =
+      fiscalResult.errorMessage ?? 'Credit note fiscalization failed'
+    await updateLocalCreditNoteStatus({
+      stationId: row.station_id,
+      creditNoteId,
+      status: 'FAILED',
+      response: responsePayload,
+      lastError: errorMessage,
+    })
+    throw new Error(errorMessage)
+  } catch (e: any) {
+    const msg = String(e?.message || e)
+    await enqueueFiscalInboxReviewFailure({
+      stationId: row.station_id,
+      topic: 'external_fiscalization',
+      requestId: creditNoteId
+        ? `credit-note-fiscalization-review:${creditNoteId}`
+        : `credit-note-queue-review:${row.id}`,
+      error: e,
+      message: {
+        type: 'creditNoteFiscalizationReviewRequired',
+        stationId: row.station_id,
+        transactionId: transactionId || null,
+        creditNoteId: creditNoteId || null,
+        queueId: row.id,
+        payload,
+        error: msg,
+        at: Date.now(),
+      },
+    }).catch((err) => {
+      logger.error('[vpos-transactions]', {
+        msg: 'Failed to enqueue credit note fiscal inbox review item',
+        error: err,
+        queueId: row.id,
+      })
+    })
+    if (creditNoteId) {
+      await updateLocalCreditNoteStatus({
+        stationId: row.station_id,
+        creditNoteId,
+        status: 'FAILED',
+        lastError: msg,
+      }).catch(() => {})
+    }
+    await markFailed({
+      id: row.id,
+      retryCount: row.retry_count ?? 0,
+      maxRetries,
+      errorMessage: msg,
+    })
+  }
+}
+
 async function processOne(row: TransactionQueueRow) {
   const maxRetries = Number(process.env.VPOS_TX_MAX_RETRIES ?? '5')
   let txnForReview: any = null
   try {
     if (!row.payload || typeof row.payload !== 'object') {
       throw new Error('Invalid transaction payload (expected object)')
+    }
+
+    if (isCreditNotePayload(row.payload)) {
+      await processCreditNote(row)
+      return
     }
 
     // Idempotency anchor: transactions.source_queue_id is unique.
@@ -400,6 +625,11 @@ async function workerLoop() {
     const claimed = await claimNextBatch(5)
     for (const row of claimed) {
       await processOne(row)
+    }
+
+    const creditNotes = await transactionQueueRepo.claimNextCreditNoteBatch(5)
+    for (const row of creditNotes) {
+      await processCreditNote(row)
     }
   } finally {
     await advisoryUnlock(`worker:${WORKER_NAME}`)

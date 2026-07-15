@@ -25,7 +25,7 @@ export function resolveAdminLogLines(
 export function sanitizeAdminLogFilename(value: string | null) {
   return String(value || '')
     .trim()
-    .replace(/^\/+/, '');
+    .replace(/^\/+/, '')
 }
 
 export function assertSafeAdminLogFilename(filename: string) {

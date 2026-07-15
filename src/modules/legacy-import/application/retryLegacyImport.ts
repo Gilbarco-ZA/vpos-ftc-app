@@ -1,4 +1,8 @@
 import { importLegacyIfPresent } from '@/src/platform/bootstrap/legacy-importer'
+import {
+  getLegacyArchiveDir,
+  getLegacyPermDir,
+} from '@/src/platform/config/app-config'
 import { queryOne } from '@/src/platform/db/postgres'
 
 import { recomputeDailyTotalsRange } from '@/src/modules/transactions/application/recomputeDailyTotalsRange'
@@ -18,9 +22,8 @@ export async function retryLegacyImport(args: {
 
   const result = await importLegacyIfPresent({
     stationId: args.stationId,
-    legacyPermDir:
-      process.env.LEGACY_PERM_DIR || '/opt/fccapps/vpos-perm/vposfiscal',
-    moveAsideRoot: process.env.LEGACY_IMPORT_DIR,
+    legacyPermDir: getLegacyPermDir(),
+    moveAsideRoot: getLegacyArchiveDir(),
   })
 
   if (result) {

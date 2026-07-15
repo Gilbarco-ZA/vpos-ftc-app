@@ -2,12 +2,38 @@ type CounterKey = string
 
 type Counter = { help: string; value: number }
 type Gauge = { help: string; value: number }
+type NodeProcessLike = {
+  uptime?: () => number
+  memoryUsage?: () => {
+    rss?: number
+    heapUsed?: number
+    heapTotal?: number
+  }
+}
 
 const counters = new Map<CounterKey, Counter>()
 const gauges = new Map<string, Gauge>()
 
 function sanitizeName(name: string) {
-  return name.replace(/[^a-zA-Z0-9_]/g, '_');
+  return name.replace(/[^a-zA-Z0-9_]/g, '_')
+}
+
+function getNodeProcess(): NodeProcessLike | undefined {
+  return (globalThis as typeof globalThis & { process?: NodeProcessLike })[
+    'process'
+  ]
+}
+
+function getProcessUptimeSeconds() {
+  const proc = getNodeProcess()
+  const uptime = proc?.['uptime']
+  return typeof uptime === 'function' ? Number(uptime.call(proc) || 0) : 0
+}
+
+function getProcessMemoryUsage() {
+  const proc = getNodeProcess()
+  const memoryUsage = proc?.['memoryUsage']
+  return typeof memoryUsage === 'function' ? memoryUsage.call(proc) : {}
 }
 
 export function incCounter(name: string, help: string, by = 1) {
@@ -49,8 +75,8 @@ export function recordSlowQuery(adapter: string, durationMs: number) {
 }
 
 export function snapshotPrometheusText() {
-  const uptime = process.uptime()
-  const mem = process.memoryUsage()
+  const uptime = getProcessUptimeSeconds()
+  const mem = getProcessMemoryUsage()
 
   setGauge('process_uptime_seconds', 'Process uptime in seconds', uptime)
   setGauge(

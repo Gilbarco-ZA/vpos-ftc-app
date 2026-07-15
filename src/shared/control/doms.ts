@@ -147,6 +147,13 @@ const changeGradePrices: CommandHandler = async (ctx) => {
   })
 }
 
+const clearPendingPriceSet: CommandHandler = async (ctx) => {
+  return await enqueueAndMaybeWait(ctx, {
+    type: 'CLEAR_PENDING_PRICE_SET',
+    payload: (ctx.args as any) ?? {},
+  })
+}
+
 const getAllTankDeliveryData: CommandHandler = async () => {
   // no payload
   return await enqueueAndMaybeWait(
@@ -261,6 +268,8 @@ export const domsCommands: Record<string, CommandHandler> = {
 
   changeGradePrices,
   change_grade_prices: changeGradePrices,
+  clearPendingPriceSet,
+  clear_pending_price_set: clearPendingPriceSet,
 
   getAllTankDeliveryData,
   get_all_tank_delivery_data: getAllTankDeliveryData,
@@ -316,6 +325,8 @@ export const domsCommandAliases: Record<string, string> = {
   get_grade_prices: 'getGradePrices',
   changeGradePrices: 'changeGradePrices',
   change_grade_prices: 'changeGradePrices',
+  clearPendingPriceSet: 'clearPendingPriceSet',
+  clear_pending_price_set: 'clearPendingPriceSet',
   getAllTankDeliveryData: 'getAllTankDeliveryData',
   get_all_tank_delivery_data: 'getAllTankDeliveryData',
   getAllTgData: 'getAllTgData',

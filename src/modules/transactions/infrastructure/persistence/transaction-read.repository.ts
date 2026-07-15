@@ -170,7 +170,8 @@ export async function getLatestTransactionReceiptRepo(
 ) {
   return await queryOne<any>(
     `SELECT * FROM receipts
-     WHERE station_id = $1 AND transaction_id = $2::uuid
+     WHERE station_id = $1
+       AND transaction_id = NULLIF(BTRIM(CAST($2 AS text)), '')::uuid
      ORDER BY generated_at DESC
      LIMIT 1`,
     [stationId, transactionId],
@@ -226,13 +227,13 @@ export async function getCreditNoteDetailsRepo(
     `SELECT cn.*, t.station_id, t.pos_reference, t.total_amount, t.volume,
             t.fuel_type, t.pump_number, t.transaction_date_time,
             t.fiscalization_reference, t.fiscalization_response,
-            t.customer_id, t.currency,
+            t.customer_id, NULL::text AS currency,
             c.buyer_name, c.tin, c.pin
      FROM credit_notes cn
      JOIN transactions t ON t.id = cn.transaction_id AND t.station_id = cn.station_id
      LEFT JOIN customers c ON c.id = t.customer_id
      WHERE cn.station_id = $1
-       AND cn.transaction_id = $2::uuid
+       AND cn.transaction_id = NULLIF(BTRIM(CAST($2 AS text)), '')::uuid
      ORDER BY cn.created_at DESC
      LIMIT 1`,
     [stationId, transactionId],
@@ -246,6 +247,7 @@ export async function getCreditNoteDetailsRepo(
     station,
     taxPinKv,
     siteProfile,
+    fallbackProduct,
     transactionLines,
     stationSettings,
     branding,
@@ -253,19 +255,60 @@ export async function getCreditNoteDetailsRepo(
     queryOne<any>(`SELECT * FROM fuel_stations WHERE id = $1`, [stationId]),
     kvGet<any>(stationId, 'tax_pin'),
     kvGet<any>(stationId, KV_KEYS.SITE_PROFILE),
+    queryOne<any>(
+      `SELECT COALESCE(ext_product_code, product_code) AS product_code,
+              sku,
+              COALESCE(ext_tax_code, tax_code) AS tax_code,
+              tax_rate
+         FROM products
+        WHERE station_id = $1
+          AND (
+            product_id = NULLIF(BTRIM(CAST($2 AS text)), '')
+            OR product_code = NULLIF(BTRIM(CAST($2 AS text)), '')
+            OR ext_product_code = NULLIF(BTRIM(CAST($2 AS text)), '')
+            OR LOWER(COALESCE(product_name, '')) = LOWER(NULLIF(BTRIM(CAST($3 AS text)), ''))
+            OR LOWER(COALESCE(product_name, '')) = LOWER(NULLIF(BTRIM(CAST($4 AS text)), ''))
+          )
+        ORDER BY CASE WHEN product_id = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+                 CASE WHEN product_code = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+                 CASE WHEN ext_product_code = NULLIF(BTRIM(CAST($2 AS text)), '') THEN 0 ELSE 1 END,
+                 product_name ASC
+        LIMIT 1`,
+      [
+        stationId,
+        creditNote.grade_id,
+        creditNote.grade_name,
+        creditNote.fuel_type,
+      ],
+    ),
     queryAll<any>(
       `SELECT
              tl.quantity,
              COALESCE(p.ext_unit_price, tl.unit_price, p.unit_price) AS unit_price,
              (tl.quantity * COALESCE(p.ext_unit_price, tl.unit_price, p.unit_price)) AS line_total,
+              COALESCE(p.ext_currency, p.currency) AS currency,
              p.product_name,
-             p.tax_code,
-             p.ext_tax_code
+             COALESCE(p.ext_product_code, p.product_code, t.grade_id) AS product_code,
+             p.sku,
+             COALESCE(tl.tax_code, p.tax_code) AS tax_code,
+             p.ext_tax_code,
+             COALESCE(tl.tax_rate, p.tax_rate) AS tax_rate
            FROM transaction_lines tl
+           JOIN transactions t
+             ON t.id = tl.transaction_id
+            AND t.station_id = $1
            LEFT JOIN products p
-             ON p.id = tl.product_id
-             AND p.station_id = $1
-           WHERE tl.transaction_id = $2::uuid
+             ON p.station_id = $1
+            AND (
+              p.id = tl.product_id
+              OR p.product_id = tl.product_id::text
+              OR p.product_code = tl.product_id::text
+              OR p.ext_product_code = tl.product_id::text
+              OR p.product_id = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+              OR p.product_code = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+              OR p.ext_product_code = NULLIF(BTRIM(CAST(t.grade_id AS text)), '')
+            )
+           WHERE tl.transaction_id = NULLIF(BTRIM(CAST($2 AS text)), '')::uuid
            ORDER BY tl.created_at ASC`,
       [stationId, transactionId],
     ),
@@ -294,7 +337,13 @@ export async function getCreditNoteDetailsRepo(
   )
 
   const receipt = normalizeReceipt({
-    transaction: creditNote,
+    transaction: {
+      ...creditNote,
+      product_code: fallbackProduct?.product_code ?? creditNote.product_code,
+      sku: fallbackProduct?.sku ?? creditNote.sku,
+      tax_code: fallbackProduct?.tax_code ?? creditNote.tax_code,
+      tax_rate: fallbackProduct?.tax_rate ?? creditNote.tax_rate,
+    },
     stationName: station?.name,
     station,
     stationTaxNumber,

@@ -9,7 +9,9 @@ let envLoaded = false
 
 export function bootstrapRuntimeEnvironment() {
   if (envLoaded) return
+  // Load local overrides first for developer runs, then package/runtime env files.
   loadEnv({ path: path.join(process.cwd(), '.env.local') })
+  loadEnv({ path: path.join(process.cwd(), '.env.production') })
   loadEnv({ path: path.join(process.cwd(), '.env') })
   envLoaded = true
 }

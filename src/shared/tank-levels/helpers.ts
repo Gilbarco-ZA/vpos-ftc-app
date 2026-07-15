@@ -34,15 +34,23 @@ export function normalizeDeliveryDocumentId(
   value?: string | number | null,
 ): string {
   const trimmed = String(value ?? '').trim()
-  if (/^\d+$/.test(trimmed)) {
-    const parsed = Number(trimmed)
-    if (
-      Number.isSafeInteger(parsed) &&
-      parsed > 0 &&
-      parsed <= KENYA_DELIVERY_DOCUMENT_ID_MAX
-    ) {
-      return String(parsed)
-    }
+  if (!trimmed) {
+    return String(
+      Math.min(Math.floor(Date.now() / 1000), KENYA_DELIVERY_DOCUMENT_ID_MAX),
+    )
+  }
+
+  if (!/^\d+$/.test(trimmed)) {
+    return trimmed
+  }
+
+  const parsed = Number(trimmed)
+  if (
+    Number.isSafeInteger(parsed) &&
+    parsed > 0 &&
+    parsed <= KENYA_DELIVERY_DOCUMENT_ID_MAX
+  ) {
+    return String(parsed)
   }
 
   return String(

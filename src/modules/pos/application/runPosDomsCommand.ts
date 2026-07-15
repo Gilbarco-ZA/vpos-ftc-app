@@ -6,7 +6,10 @@ import {
   legacyDomsSuccess,
 } from '@/src/shared/vpos/legacyPosApi'
 
-import { upsertPendingForecourtPriceSet } from '@/src/modules/forecourt/infrastructure/pendingPriceSetsRepo'
+import {
+  deletePendingForecourtPriceSet,
+  upsertPendingForecourtPriceSet,
+} from '@/src/modules/forecourt/infrastructure/pendingPriceSetsRepo'
 import { appendForecourtPriceScheduleEvent } from '@/src/modules/forecourt/infrastructure/priceScheduleEventsRepo'
 import {
   appendWetstockEvent,
@@ -45,7 +48,17 @@ function normalizePayload(
     command === 'openTankController' ||
     command === 'closeTankController' ||
     command === 'startDeliveryProcess' ||
-    command === 'stopDeliveryProcess'
+    command === 'stopDeliveryProcess' ||
+    command === 'clearFallbackTotals' ||
+    command === 'markDeliveryStarting' ||
+    command === 'markDeliveryFinished' ||
+    command === 'blockTank' ||
+    command === 'unblockTank' ||
+    command === 'clearTgError' ||
+    command === 'resetTg' ||
+    command === 'changeFcDateTime' ||
+    command === 'changeFcOperationMode' ||
+    command === 'utilEcho'
       ? ((body?.data as unknown) ?? body)
       : body
 
@@ -166,6 +179,40 @@ export async function runPosDomsCommand(
     }
   }
 
+  if (command === 'clearPendingPriceSet') {
+    const activationAtRaw =
+      normalizedBody?.activationAt ??
+      normalizedBody?.priceSetActivationDateAndTime ??
+      normalizedBody?.PriceSetActivationDateAndTime
+    const activationAtIso = fcDateTimeToIso(activationAtRaw)
+    const priceSetId = Number(
+      normalizedBody?.priceSetId ??
+        normalizedBody?.fcPriceSetId ??
+        normalizedBody?.FcPriceSetId,
+    )
+
+    if (activationAtIso && Number.isFinite(priceSetId)) {
+      await deletePendingForecourtPriceSet({
+        stationId,
+        priceSetId,
+        activationAt: activationAtIso,
+      })
+      await appendForecourtPriceScheduleEvent({
+        stationId,
+        priceSetId,
+        activationAt: activationAtIso,
+        eventType: 'removed_from_pending_queue',
+        source: 'doms',
+        submittedBy: options.userId ?? null,
+        domsConfirmationStatus: 'removed_from_pending_queue',
+        payload: normalizedBody ?? {},
+        data: {
+          response: data ?? null,
+        },
+      })
+    }
+  }
+
   if (command === 'clearTankDeliveryData') {
     const deliveryReportSeqNo = String(
       normalizedBody?.deliveryReportSeqNo ??
@@ -249,5 +296,37 @@ export async function runPosDomsCommand(
     })
   }
 
+  if (
+    command === 'markDeliveryStarting' ||
+    command === 'markDeliveryFinished' ||
+    command === 'blockTank' ||
+    command === 'unblockTank' ||
+    command === 'clearTgError' ||
+    command === 'resetTg'
+  ) {
+    await appendWetstockEvent({
+      stationId,
+      tankId:
+        String(normalizedBody?.tankId ?? normalizedBody?.TankId ?? '').trim() ||
+        null,
+      tgId:
+        String(
+          normalizedBody?.tgId ??
+            normalizedBody?.TgId ??
+            normalizedBody?.tankId ??
+            normalizedBody?.TankId ??
+            '',
+        ).trim() || null,
+      deliveryReportSeqNo:
+        String(data?.response?.data?.DeliveryReportSeqNo ?? '').trim() || null,
+      tankDeliverySeqNo: null,
+      eventType: command,
+      source: 'doms',
+      payload: data,
+      data: {
+        commandPayload: normalizedBody,
+      },
+    })
+  }
   return legacyDomsSuccess(data)
 }

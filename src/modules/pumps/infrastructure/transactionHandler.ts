@@ -155,6 +155,7 @@ const createTransactionForSession = async (session: FuelingSession) => {
       unit_price: number | null
       currency: string | null
       tax_rate: number | null
+      tax_code: string | null
       created_by_name: string | null
     }>(
       client,
@@ -167,8 +168,9 @@ const createTransactionForSession = async (session: FuelingSession) => {
               pr.product_name,
               pr.product_code,
               pr.unit_price,
-              COALESCE(pr.currency, 'TZS') as currency,
+              COALESCE(pr.currency, NULLIF($4, '')) as currency,
               COALESCE(pr.tax_rate, 0.16) as tax_rate,
+              COALESCE(pr.ext_tax_code, pr.tax_code) as tax_code,
               COALESCE(pr.created_by_name, 'system') as created_by_name
          FROM pumps p
          JOIN nozzles n ON n.pump_id = p.id AND n.station_id = p.station_id
@@ -178,7 +180,12 @@ const createTransactionForSession = async (session: FuelingSession) => {
           AND p.pump_number = $2
           AND n.nozzle_number = $3
         LIMIT 1`,
-      [session.stationId, session.pumpNumber, session.nozzleNumber],
+      [
+        session.stationId,
+        session.pumpNumber,
+        session.nozzleNumber,
+        process.env.DEFAULT_CURRENCY?.trim() || 'USD',
+      ],
     )
 
     if (!nozzleRow?.rows?.[0]) return null
@@ -203,7 +210,8 @@ const createTransactionForSession = async (session: FuelingSession) => {
     if (!slice) {
       const baseUnitPrice = Number(nozzle.unit_price ?? NaN)
       if (!Number.isFinite(baseUnitPrice)) return null
-      const currency = nozzle.currency || 'TZS'
+      const currency =
+        nozzle.currency || process.env.DEFAULT_CURRENCY?.trim() || 'USD'
       const taxRate = Number.isFinite(Number(nozzle.tax_rate))
         ? Number(nozzle.tax_rate)
         : 16
@@ -334,15 +342,19 @@ const createTransactionForSession = async (session: FuelingSession) => {
         product_id,
         quantity,
         unit_price,
+        tax_code,
+        tax_rate,
         price_slice_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6)`,
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         uuidv4(),
         transactionId,
         nozzle.product_row_id,
         totals.volume,
         unitPrice,
+        nozzle.tax_code,
+        nozzle.tax_rate,
         slice.id,
       ],
     )

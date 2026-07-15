@@ -1,5 +1,5 @@
 import { spawn } from 'child_process'
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { badRequest, forbidden } from '@/src/platform/web/api/response'
 import { getTerminalAllowlistCommand } from '@/src/shared/terminal/commands'

@@ -1,3 +1,5 @@
+import os from 'node:os'
+
 export type ForecourtRuntimeMode = 'jpl_tcp'
 
 export const FORECOURT_RUNTIME_KV_KEYS = {
@@ -18,6 +20,12 @@ export const FORECOURT_RUNTIME_KV_KEYS = {
   JPL_BOOTSTRAP_SNAPSHOT_ENABLED: 'env:JPL_BOOTSTRAP_SNAPSHOT_ENABLED',
   JPL_INTEGRATION_SCOPE: 'env:JPL_INTEGRATION_SCOPE',
   JPL_TLS_REQUIRED: 'env:JPL_TLS_REQUIRED',
+  JPL_TLS_REJECT_UNAUTHORIZED: 'env:JPL_TLS_REJECT_UNAUTHORIZED',
+  JPL_TLS_SERVERNAME: 'env:JPL_TLS_SERVERNAME',
+  JPL_TLS_CA_PATH: 'env:JPL_TLS_CA_PATH',
+  JPL_TLS_CLIENT_CERT_PATH: 'env:JPL_TLS_CLIENT_CERT_PATH',
+  JPL_TLS_CLIENT_KEY_PATH: 'env:JPL_TLS_CLIENT_KEY_PATH',
+  JPL_TLS_MIN_VERSION: 'env:JPL_TLS_MIN_VERSION',
   JPL_OPTIONAL_PROTOCOL_FAMILIES: 'env:JPL_OPTIONAL_PROTOCOL_FAMILIES',
 
   // Buffer health thresholds (DB override)
@@ -120,6 +128,49 @@ export const normalizeForecourtMode = (_value: unknown): ForecourtRuntimeMode =>
 export const normalizeForecourtHost = (value: unknown, fallback: string) => {
   const host = String(value ?? '').trim()
   return host.length ? host : fallback
+}
+
+export const getPreferredNetworkHost = (
+  interfaces: NodeJS.Dict<os.NetworkInterfaceInfo[]> = os.networkInterfaces(),
+) => {
+  for (const entries of Object.values(interfaces)) {
+    for (const entry of entries ?? []) {
+      if (
+        entry.family === 'IPv4' &&
+        !entry.internal &&
+        entry.address &&
+        entry.address !== '0.0.0.0'
+      ) {
+        return entry.address
+      }
+    }
+  }
+
+  return '127.0.0.1'
+}
+
+const isLoopbackHost = (value: string) => {
+  const host = value.trim().toLowerCase()
+  return (
+    host === '127.0.0.1' ||
+    host === 'localhost' ||
+    host === '::1' ||
+    host === '0.0.0.0' ||
+    host === '::'
+  )
+}
+
+export const resolveProductionHost = (
+  value: unknown,
+  fallback: string,
+  isProduction = process.env.NODE_ENV === 'production',
+) => {
+  const host = String(value ?? '').trim()
+  if (!host) return fallback
+  if (isProduction && isLoopbackHost(host)) {
+    return fallback
+  }
+  return host
 }
 
 export const normalizeForecourtPort = (value: unknown, fallback: number) => {

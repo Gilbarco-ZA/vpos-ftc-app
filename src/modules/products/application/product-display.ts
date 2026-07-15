@@ -5,29 +5,40 @@ import type {
 import type { ProductListItemRecord } from '@/src/modules/products/infrastructure/persistence/product.repository'
 
 import { getConfiguredCurrencyOptions } from '@/src/platform/config/products'
-import { KE_DATASET } from '@/src/shared/config/datasets/KE'
-import { TZ_DATASET } from '@/src/shared/config/datasets/TZ'
+import {
+  getCountryDatasetSummary,
+  isSupportedCountryCode,
+  listCountryDatasetRows,
+} from '@/src/shared/server/config/countryDatasets'
 
-export const getCurrencyOptions = (country?: string | null) => {
+export const getCurrencyOptions = async (country?: string | null) => {
   const configuredOptions = getConfiguredCurrencyOptions()
 
   if (configuredOptions.length > 0) return configuredOptions
 
-  if (country === 'TZ') return ['TZS']
-  if (country === 'KE') return ['KES']
-  return ['KES']
+  const summary = country ? await getCountryDatasetSummary(country) : null
+  const currency = String(summary?.currencyCode || '').trim()
+  return currency ? [currency] : [process.env.DEFAULT_CURRENCY?.trim() || 'USD']
 }
 
-export const getDefaultCurrency = (country?: string | null) => {
-  const options = getCurrencyOptions(country)
-  return options[0] ?? 'KES'
+export const getDefaultCurrency = async (country?: string | null) => {
+  const options = await getCurrencyOptions(country)
+  return options[0] ?? process.env.DEFAULT_CURRENCY?.trim() ?? 'USD'
 }
 
-export const getTaxTypeOptions = (country?: string | null): ConfigOption[] => {
+export const getTaxTypeOptions = async (
+  country?: string | null,
+): Promise<ConfigOption[]> => {
   const normalized = String(country || '')
     .trim()
     .toUpperCase()
-  const rows = normalized === 'TZ' ? TZ_DATASET.taxTypes : KE_DATASET.taxTypes
+  if (!(await isSupportedCountryCode(normalized))) return []
+
+  const rows = await listCountryDatasetRows({
+    countryCode: normalized,
+    datasetType: 'taxTypes',
+    activeOnly: true,
+  })
 
   return rows.map((row) => ({
     code: row.code,
@@ -46,7 +57,9 @@ export const normalizeProductsForDisplay = (
     code: String(item.productCode ?? 'N/A'),
     sku: item.sku ?? undefined,
     unitPrice: Number(item.unitPrice ?? 0),
-    currency: String(item.currency ?? 'KES'),
+    currency: String(
+      item.currency ?? process.env.DEFAULT_CURRENCY?.trim() ?? 'USD',
+    ),
     lastSyncStatus: (String(item.lastSyncStatus ?? 'UNKNOWN').toUpperCase() ||
       'UNKNOWN') as ProductListItem['lastSyncStatus'],
     lastSynced: item.lastSyncAt ? String(item.lastSyncAt) : null,

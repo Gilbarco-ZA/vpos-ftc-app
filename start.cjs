@@ -90,18 +90,22 @@ function parseEnvFile(filePath) {
   }
 }
 
-function loadEnvOptional() {
-  const envPath = path.join(__dirname, '.env');
-  let loaded = false;
-  try {
-    // prefer dotenv if available
-    // (standalone bundle may include it; but don't hard fail if not)
-    require('dotenv').config({ path: envPath });
-    loaded = true;
-  } catch (_) {
-    loaded = parseEnvFile(envPath);
+function loadDevelopmentEnvOptional() {
+  if (process.env.NODE_ENV === 'production') {
+    return { loaded: false, envPath: null, skipped: true };
   }
-  return { loaded, envPath };
+
+  const envPaths = ['.env.local', '.env.development', '.env'].map((name) => path.join(__dirname, name));
+  let loaded = false;
+  for (const envPath of envPaths) {
+    try {
+      const res = require('dotenv').config({ path: envPath });
+      loaded = loaded || !res.error;
+    } catch (_) {
+      loaded = parseEnvFile(envPath) || loaded;
+    }
+  }
+  return { loaded, envPath: envPaths.join(','), skipped: false };
 }
 
 async function writeHeartbeat(filePath, extra = {}) {
@@ -166,12 +170,12 @@ function installProcessDiagnostics() {
 // ---- main ----
 installProcessDiagnostics();
 
-const { loaded, envPath } = loadEnvOptional();
+const { loaded, envPath, skipped } = loadDevelopmentEnvOptional();
 log('[start] ts=', nowIso());
 log('[start] node=', process.version, 'platform=', process.platform, 'arch=', process.arch);
 log('[start] pid=', process.pid, 'ppid=', process.ppid);
 log('[start] cwd=', process.cwd());
-log('[start] .env loaded:', loaded, 'path=', envPath);
+log('[start] development .env loaded:', loaded, 'path=', envPath, 'skipped=', skipped);
 
 if (String(process.env.VPOS_DUMP_ENV || '') === '1') {
   log('[start] env:', dumpEnv([

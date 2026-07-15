@@ -88,7 +88,7 @@ export const getCurrentUser = async (): Promise<SessionUser | null> => {
       id: result.fs_id as string,
       code: result.fs_code as string,
       name: result.fs_name as string,
-      country: result.fs_country as 'TZ' | 'KE',
+      country: String(result.fs_country || ''),
     },
   }
 }

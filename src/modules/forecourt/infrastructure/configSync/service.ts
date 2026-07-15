@@ -14,13 +14,6 @@ import type {
   ForecourtTank,
 } from './types'
 import {
-  readSnapshotFromDomsJson,
-  readSnapshotFromDomsXml,
-  readSnapshotFromFile,
-  readTankStatusFromDoms,
-  resolveSnapshotFormat,
-} from './io'
-import {
   buildXmlRecord,
   collectArraysByKeys,
   firstArrayAtPaths,
@@ -28,7 +21,7 @@ import {
 } from './utils'
 
 const DEFAULT_TAX_RATE = 16
-const DEFAULT_CURRENCY = 'KES'
+const DEFAULT_CURRENCY = process.env.DEFAULT_CURRENCY?.trim() || 'USD'
 const PRODUCT_CLASS_CODE = '9901300102'
 const PRODUCT_TYPE_CODE = '2'
 
@@ -917,6 +910,14 @@ export async function runForecourtConfigSync(params: {
     if (cfg.source === 'file' && !cfg.snapshotFile) {
       throw new Error('Forecourt snapshotFile is required for file source')
     }
+
+    const {
+      readSnapshotFromDomsJson,
+      readSnapshotFromDomsXml,
+      readSnapshotFromFile,
+      readTankStatusFromDoms,
+      resolveSnapshotFormat,
+    } = await import('./io')
 
     const snapshotFormat = resolveSnapshotFormat(
       cfg,

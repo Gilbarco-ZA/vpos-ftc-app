@@ -1,7 +1,7 @@
 import { AppError } from '@/src/shared/errors/AppError'
 
 const normalizeSegment = (value: string | number): string => {
-  return String(value).trim().replace(/\s+/g, '-');
+  return String(value).trim().replace(/\s+/g, '-')
 }
 
 export const buildIdempotencyKey = (

@@ -8,6 +8,8 @@ import {
   getNonFiscalizedTransactionCount,
   getTransactionsCreatedLastHour,
   listForecourtEventCounts,
+  listForecourtEvents,
+  listRecentForecourtEventsByPatterns,
   listTransactionStatusCounts,
 } from '../infrastructure/adminRepo'
 import { getForecourtConnectionStatus } from './getForecourtConnectionStatus'
@@ -26,6 +28,8 @@ export async function getAdminForecourtDiagnostics(stationId: string) {
     txStatusCounts,
     nonFiscalized,
     replayStatus,
+    recentRejects,
+    recentProtocolEvents,
   ] = await Promise.all([
     getForecourtConnectionStatus(stationId),
     listForecourtEventCounts(stationId),
@@ -43,6 +47,20 @@ export async function getAdminForecourtDiagnostics(stationId: string) {
     listTransactionStatusCounts(stationId),
     getNonFiscalizedTransactionCount(stationId),
     getReplayStatusSummary(stationId),
+    listRecentForecourtEventsByPatterns({
+      stationId,
+      source: 'jpl_tcp',
+      patterns: ['RejectMessage%'],
+      limit: 20,
+    }),
+    listForecourtEvents({
+      stationId,
+      source: 'jpl_tcp',
+      limit: 20,
+      eventType: null,
+      pumpId: null,
+      action: null,
+    }),
   ])
 
   return {
@@ -61,5 +79,9 @@ export async function getAdminForecourtDiagnostics(stationId: string) {
       nonFiscalizedCount: nonFiscalized?.cnt ?? 0,
     },
     replay: replayStatus,
+    recent: {
+      rejects: recentRejects,
+      protocolEvents: recentProtocolEvents,
+    },
   }
 }

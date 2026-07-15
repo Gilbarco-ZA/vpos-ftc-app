@@ -34,6 +34,8 @@ type ValidatedProductRow = {
   unit_price: number | string | null
   product_name?: string | null
   product_code?: string | null
+  tax_code?: string | null
+  tax_rate?: number | string | null
   category?: string | null
   category_name?: string | null
 }
@@ -42,6 +44,8 @@ type NormalizedTransactionLine = {
   productId: string
   quantity: number
   unitPrice: number
+  taxCode: string | null
+  taxRate: number | null
   product: ValidatedProductRow
 }
 
@@ -75,6 +79,8 @@ type SyntheticFuelLine = {
   productId: string
   quantity: number
   unitPrice: number
+  taxCode: string | null
+  taxRate: number | null
   tankId: string | null
   nozzleId: string | null
   nozzleNumber: number | null
@@ -194,6 +200,8 @@ const resolveSyntheticFuelLine = async (
             pr.product_name,
             pr.product_code,
             COALESCE(pr.ext_unit_price, pr.unit_price, 0) AS unit_price,
+            COALESCE(pr.ext_tax_code, pr.tax_code) AS tax_code,
+            pr.tax_rate,
             t.id AS tank_id,
             n.id AS nozzle_id,
             n.nozzle_number
@@ -236,6 +244,8 @@ const resolveSyntheticFuelLine = async (
               pr.product_name,
               pr.product_code,
               COALESCE(pr.ext_unit_price, pr.unit_price, 0) AS unit_price,
+              COALESCE(pr.ext_tax_code, pr.tax_code) AS tax_code,
+              pr.tax_rate,
               t.id AS tank_id,
               n.id AS nozzle_id,
               n.nozzle_number
@@ -289,6 +299,8 @@ const resolveSyntheticFuelLine = async (
     productId: String(product.id),
     quantity: Number(quantity),
     unitPrice: roundUnitPrice(computedUnitPrice),
+    taxCode: cleanText(product.tax_code),
+    taxRate: parseNullableNumber(product.tax_rate),
     tankId: cleanUuidLike(product.tank_id) ?? tankIdHint,
     nozzleId: cleanUuidLike(product.nozzle_id) ?? nozzleIdHint,
     nozzleNumber:
@@ -316,6 +328,8 @@ const seedMissingFuelLine = async (
     syntheticFuelLine.productId,
     syntheticFuelLine.quantity,
     syntheticFuelLine.unitPrice,
+    syntheticFuelLine.taxCode,
+    syntheticFuelLine.taxRate,
   ])
 
   await txQuery(client, updateTransactionSummarySql, [
@@ -542,6 +556,8 @@ export async function replaceTransactionLinesRepo(
           productId,
           quantity,
           unitPrice: requestedUnitPrice,
+          taxCode: cleanText(product.tax_code),
+          taxRate: parseNullableNumber(product.tax_rate),
           product,
         } satisfies NormalizedTransactionLine
       },
@@ -561,6 +577,8 @@ export async function replaceTransactionLinesRepo(
           productId: syntheticFuelLine.productId,
           quantity: syntheticFuelLine.quantity,
           unitPrice: syntheticFuelLine.unitPrice,
+          taxCode: cleanText(product.tax_code),
+          taxRate: parseNullableNumber(product.tax_rate),
           product,
         })
       }
@@ -615,6 +633,8 @@ export async function replaceTransactionLinesRepo(
           transactionId,
           line.quantity,
           line.unitPrice,
+          line.taxCode,
+          line.taxRate,
         ])
       } else {
         await txQuery(client, insertTransactionLineSql, [
@@ -623,6 +643,8 @@ export async function replaceTransactionLinesRepo(
           line.productId,
           line.quantity,
           line.unitPrice,
+          line.taxCode,
+          line.taxRate,
         ])
       }
     }
@@ -724,6 +746,8 @@ export async function createManualTransactionRepo(
         productId: String(line.productId),
         quantity,
         unitPrice,
+        taxCode: cleanText(product.tax_code),
+        taxRate: parseNullableNumber(product.tax_rate),
         product,
       } satisfies NormalizedTransactionLine
     })
@@ -770,6 +794,8 @@ export async function createManualTransactionRepo(
         line.productId,
         line.quantity,
         line.unitPrice,
+        line.taxCode,
+        line.taxRate,
       ])
     }
 

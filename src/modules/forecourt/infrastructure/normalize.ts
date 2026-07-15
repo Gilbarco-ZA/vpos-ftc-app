@@ -29,6 +29,7 @@ export type NormalizedTransaction = {
   smId?: number | null
   transLockId?: number | null
   transInfoMask?: number | null
+  fcGradeId?: number | null
   moneyDue?: number | null
   volume?: number | null
   sourceMode?: 'supervised' | 'unsupervised'
@@ -44,6 +45,9 @@ export type ForecourtNormalization = {
 }
 
 const num = (v: any): number | null => {
+  if (v == null) return null
+  if (typeof v === 'string' && !v.trim()) return null
+
   // doms-pos-jpl uses BIT objects like { value: 3, bits: {...} }
   if (v && typeof v === 'object' && 'value' in v) {
     v = (v as any).value
@@ -298,10 +302,24 @@ function normalizeTransactions(
 
   // Individual transaction response shape at root
   const rootSeq = num(getAny(payload, ['TransSeqNo', 'transSeqNo']))
+  const rootTransPars = payload?.TransPars ?? payload?.transPars ?? {}
   const rootMoney = num(
-    getAny(payload, ['MoneyDue', 'Money', 'moneyDue', 'amount']) ?? null,
+    getAny(payload, [
+      'MoneyDue_e',
+      'Money_e',
+      'MoneyDue',
+      'Money',
+      'moneyDue',
+      'amount',
+    ]) ??
+      getAny(rootTransPars, ['MoneyDue_e', 'Money_e', 'MoneyDue', 'Money']) ??
+      null,
   )
-  const rootVol = num(getAny(payload, ['Vol', 'Volume', 'volume']) ?? null)
+  const rootVol = num(
+    getAny(payload, ['Vol_e', 'Vol', 'Volume', 'volume']) ??
+      getAny(rootTransPars, ['Vol_e', 'Vol', 'Volume']) ??
+      null,
+  )
 
   if (rootSeq != null || rootMoney != null || rootVol != null) {
     return [
@@ -313,7 +331,15 @@ function normalizeTransactions(
         transLockId:
           num(getAny(payload, ['TransLockId', 'transLockId'])) ?? null,
         transInfoMask:
-          num(getAny(payload, ['TransInfoMask', 'transInfoMask'])) ?? null,
+          num(
+            getAny(payload, [
+              'TransInfoMask',
+              'TransInfoFlags',
+              'transInfoMask',
+              'transInfoFlags',
+            ]),
+          ) ?? null,
+        fcGradeId: num(getAny(payload, ['FcGradeId', 'fcGradeId'])) ?? null,
         moneyDue: rootMoney ?? null,
         volume: rootVol ?? null,
 
@@ -326,11 +352,11 @@ function normalizeTransactions(
   }
 
   const list = getAny(payload, [
+    'TransInSupBuffer',
+    'TransInUnSupBuffer',
     'Trans',
     'transactions',
     'FpTrans',
-    'NoTransInSupBuffer',
-    'NoTransInUnSupBuffer',
   ])
 
   // Common doms-pos-jpl decode: arrays are placed on their element names, not on count name.
@@ -338,21 +364,36 @@ function normalizeTransactions(
   // TransSeqNo, SmId, TransLockId, TransInfoMask, MoneyDue, Vol
   let txArr: any[] = []
 
-  // Heuristic: take the first array found in payload
-  for (const v of Object.values(payload ?? {})) {
-    if (Array.isArray(v) && v.length && typeof v[0] === 'object') {
-      txArr = v as any[]
-      break
+  if (Array.isArray(list)) txArr = list
+
+  // Fallback for decoder-specific shapes: take the first object array.
+  if (!txArr.length) {
+    for (const value of Object.values(payload ?? {})) {
+      if (
+        Array.isArray(value) &&
+        value.length &&
+        typeof value[0] === 'object'
+      ) {
+        txArr = value as any[]
+        break
+      }
     }
   }
-
-  if (!txArr.length && Array.isArray(list) && list.length) txArr = list
 
   if (!txArr.length) return []
 
   return txArr.map((t) => {
-    const moneyDue = num(getAny(t, ['MoneyDue', 'moneyDue', 'amount']) ?? null)
-    const volume = num(getAny(t, ['Vol', 'Volume', 'volume']) ?? null)
+    const moneyDue = num(
+      getAny(t, [
+        'MoneyDue_e',
+        'Money_e',
+        'MoneyDue',
+        'Money',
+        'moneyDue',
+        'amount',
+      ]) ?? null,
+    )
+    const volume = num(getAny(t, ['Vol_e', 'Vol', 'Volume', 'volume']) ?? null)
 
     const entrySourceMode =
       t?.sourceMode === 'supervised' || t?.sourceMode === 'unsupervised'
@@ -368,7 +409,16 @@ function normalizeTransactions(
       transSeqNo: num(getAny(t, ['TransSeqNo', 'transSeqNo'])) ?? null,
       smId: num(getAny(t, ['SmId', 'smId'])) ?? null,
       transLockId: num(getAny(t, ['TransLockId', 'transLockId'])) ?? null,
-      transInfoMask: num(getAny(t, ['TransInfoMask', 'transInfoMask'])) ?? null,
+      transInfoMask:
+        num(
+          getAny(t, [
+            'TransInfoMask',
+            'TransInfoFlags',
+            'transInfoMask',
+            'transInfoFlags',
+          ]),
+        ) ?? null,
+      fcGradeId: num(getAny(t, ['FcGradeId', 'fcGradeId'])) ?? null,
       moneyDue,
       volume,
       sourceMode: entrySourceMode,

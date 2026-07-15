@@ -5,7 +5,7 @@ export const createUserSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['administrator', 'manager', 'tenant']),
+  role: z.enum(['administrator', 'manager', 'tenant', 'field_engineer']),
   fullName: z.string().optional(),
 })
 
@@ -17,7 +17,9 @@ export const updateUserSchema = z
       .min(3, 'Username must be at least 3 characters')
       .optional(),
     email: z.string().email('Invalid email address').optional(),
-    role: z.enum(['administrator', 'manager', 'tenant']).optional(),
+    role: z
+      .enum(['administrator', 'manager', 'tenant', 'field_engineer'])
+      .optional(),
     fullName: z.string().optional(),
   })
   .refine(

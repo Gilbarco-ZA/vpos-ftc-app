@@ -2,6 +2,7 @@ import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 
+import { getRuntimeUptimeSeconds } from '@/src/platform/runtime/nodeProcess'
 import { ok } from '@/src/platform/web/api/response'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 
@@ -49,8 +50,10 @@ export async function getAdminDiagnosticsOverview(stationId: string) {
     version,
     node: process.version,
     pid: process.pid,
-    startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
-    uptimeSeconds: Math.floor(process.uptime()),
+    startedAt: new Date(
+      Date.now() - getRuntimeUptimeSeconds() * 1000,
+    ).toISOString(),
+    uptimeSeconds: Math.floor(getRuntimeUptimeSeconds()),
   }
 
   const machineBlock = {

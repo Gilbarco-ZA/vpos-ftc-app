@@ -1,12 +1,15 @@
 export const transactionQueueSql = {
   claimNextBatch: `WITH claimed AS (
-      SELECT id
-        FROM transaction_queue
-       WHERE status = 'PENDING'
-         AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-       ORDER BY created_at ASC
-       FOR UPDATE SKIP LOCKED
+      SELECT tq.id
+        FROM transaction_queue tq
+        JOIN station_settings ss ON ss.station_id = tq.station_id
+       WHERE tq.status = 'PENDING'
+         AND ss.fiscalization_transport = 'local_tz'
+         AND COALESCE(tq.payload->>'kind', '') <> 'CREDIT_NOTE'
+         AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
+       ORDER BY tq.created_at ASC
        LIMIT $1
+       FOR UPDATE OF tq SKIP LOCKED
     )
     UPDATE transaction_queue tq
        SET status = 'PROCESSING',
@@ -16,14 +19,56 @@ export const transactionQueueSql = {
      WHERE tq.id = claimed.id
     RETURNING tq.id, tq.station_id, tq.payload, tq.retry_count, tq.transaction_id`,
   claimPendingForStation: `WITH picked AS (
-      SELECT id
-      FROM transaction_queue
-      WHERE station_id = $1
-        AND status = 'PENDING'
-        AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-      ORDER BY created_at ASC
+      SELECT tq.id
+      FROM transaction_queue tq
+      JOIN station_settings ss ON ss.station_id = tq.station_id
+      WHERE tq.station_id = $1
+        AND tq.status = 'PENDING'
+        AND ss.fiscalization_transport = 'local_tz'
+        AND COALESCE(tq.payload->>'kind', '') <> 'CREDIT_NOTE'
+        AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
+      ORDER BY tq.created_at ASC
       LIMIT $2
-      FOR UPDATE SKIP LOCKED
+      FOR UPDATE OF tq SKIP LOCKED
+    )
+    UPDATE transaction_queue q
+       SET status = 'PROCESSING',
+           processing_started_at = NOW(),
+           updated_at = NOW()
+      FROM picked
+     WHERE q.id = picked.id
+    RETURNING q.id, q.station_id, q.payload, q.retry_count, q.transaction_id`,
+  claimNextCreditNoteBatch: `WITH claimed AS (
+      SELECT tq.id
+        FROM transaction_queue tq
+        JOIN station_settings ss ON ss.station_id = tq.station_id
+       WHERE tq.status = 'PENDING'
+         AND ss.fiscalization_transport = 'local_tz'
+         AND tq.payload->>'kind' = 'CREDIT_NOTE'
+         AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
+       ORDER BY tq.created_at ASC
+       LIMIT $1
+       FOR UPDATE OF tq SKIP LOCKED
+    )
+    UPDATE transaction_queue tq
+       SET status = 'PROCESSING',
+           processing_started_at = NOW(),
+           updated_at = NOW()
+      FROM claimed
+     WHERE tq.id = claimed.id
+    RETURNING tq.id, tq.station_id, tq.payload, tq.retry_count, tq.transaction_id`,
+  claimPendingCreditNotesForStation: `WITH picked AS (
+      SELECT tq.id
+      FROM transaction_queue tq
+      JOIN station_settings ss ON ss.station_id = tq.station_id
+      WHERE tq.station_id = $1
+        AND tq.status = 'PENDING'
+        AND ss.fiscalization_transport = 'local_tz'
+        AND tq.payload->>'kind' = 'CREDIT_NOTE'
+        AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
+      ORDER BY tq.created_at ASC
+      LIMIT $2
+      FOR UPDATE OF tq SKIP LOCKED
     )
     UPDATE transaction_queue q
        SET status = 'PROCESSING',

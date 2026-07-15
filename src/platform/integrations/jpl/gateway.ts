@@ -24,6 +24,7 @@ import { enumLabel } from '@/src/modules/forecourt/infrastructure/jpl/protocol/n
 import { buildProtocolHealth } from '@/src/modules/forecourt/infrastructure/jpl/protocolHealth'
 import { getReplayCapabilities } from '@/src/modules/forecourt/infrastructure/jpl/replayState'
 import { resolveStationId } from '@/src/modules/forecourt/infrastructure/jpl/station'
+import { summarizeJplTlsConfig } from '@/src/modules/forecourt/infrastructure/jpl/tlsConfig'
 
 let cachedStationId: string | null = null
 
@@ -113,12 +114,14 @@ const buildProtocolState = (
     lastReject: state.lastReject ?? undefined,
     defaultSubscriptions,
     rawFrameDiagnosticsEnabled,
+    lastFrameDiagnostic: state.lastFrameDiagnostic ?? undefined,
   })
 
   return {
     version,
     secureMode,
     tlsRequired: Boolean(cfg.jplTlsRequired),
+    tls: summarizeJplTlsConfig(cfg),
     integrationScope: cfg.jplIntegrationScope,
     optionalProtocolFamilies: [...(cfg.jplOptionalProtocolFamilies ?? [])],
     paymentControlEnabled: false,
@@ -133,6 +136,8 @@ const buildProtocolState = (
     requestDispatchMode,
     requestMode,
     lastReject: state.lastReject ?? undefined,
+    lastFrameDiagnostic: state.lastFrameDiagnostic ?? undefined,
+    recentFrameDiagnostics: state.frameDiagnostics ?? [],
     defaultSubscriptions,
     rawFrameDiagnosticsEnabled,
     protocolHealth,
@@ -447,6 +452,7 @@ export function getJplGatewayState() {
     pricePoleErrors: state.lastPpErrors,
     washStatuses: state.lastWashStatuses,
     washErrors: state.lastWashErrors,
+    washTransactions: state.lastWashTransactions,
     digitalIoStatuses: state.lastDigitalIoStatuses,
     sensorStatuses: state.lastSensorStatuses,
     vendingStatuses: state.lastVendingStatuses,
@@ -465,6 +471,10 @@ export function getJplGatewayState() {
     tankAlerts: deriveTankStatusSummary(state.lastTgStatuses),
     pricePoleSummary: deriveOptionalDeviceSummary(state.lastPpStatuses, 'ppId'),
     washSummary: deriveOptionalDeviceSummary(state.lastWashStatuses, 'wpId'),
+    washTransactionSummary: deriveOptionalDeviceSummary(
+      state.lastWashTransactions,
+      'wpId',
+    ),
     digitalIoSummary: deriveOptionalDeviceSummary(
       state.lastDigitalIoStatuses,
       'diopId',

@@ -2,6 +2,7 @@ import type { SessionUser, UserRole } from '@/src/shared/types'
 
 import { query, queryOne } from '@/src/platform/db/postgres'
 import { AuthError, requireAuth } from '@/src/shared/auth'
+import { listSetupCountryOptions } from '@/src/shared/server/config/countryDatasets'
 import { getSetupFlags } from '@/src/shared/setup/storage'
 import { normalizeStringArray } from '@/src/shared/utils/inputs'
 import { uuidv4 } from '@/src/shared/utils/uuid'
@@ -24,11 +25,22 @@ export async function getOrCreateDefaultStationId(): Promise<string> {
 
   const id = uuidv4()
   const code = `STATION-${Date.now()}`
-  const allowedCountries = new Set(['TZ', 'KE'])
-  const rawCountry = String(process.env.COUNTRY_CODE || 'TZ')
+  const countries = await listSetupCountryOptions()
+  const rawCountry = String(
+    process.env.COUNTRY_CODE ||
+      countries[0]?.countryCode ||
+      countries[0]?.value ||
+      '',
+  )
     .trim()
     .toUpperCase()
-  const country = allowedCountries.has(rawCountry) ? rawCountry : 'TZ'
+  const country =
+    countries.find(
+      (item) => item.value === rawCountry || item.countryCode === rawCountry,
+    )?.value ||
+    countries[0]?.value ||
+    rawCountry ||
+    'UN'
 
   await query(
     `INSERT INTO fuel_stations (id, code, name, country, is_active)

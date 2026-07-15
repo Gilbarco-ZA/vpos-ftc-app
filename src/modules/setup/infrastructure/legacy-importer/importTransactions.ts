@@ -47,8 +47,14 @@ export async function importMonolithicTransactionsAndReportsIfPresent(opts: {
     onWarn,
   } = opts
 
-  const txFolder = path.join(legacyPermDir, LEGACY.FOLDERS.TRANSACTIONS)
-  const reportsFolder = path.join(legacyPermDir, LEGACY.FOLDERS.REPORTS)
+  const txFolder = path.join(
+    /*turbopackIgnore: true*/ legacyPermDir,
+    LEGACY.FOLDERS.TRANSACTIONS,
+  )
+  const reportsFolder = path.join(
+    /*turbopackIgnore: true*/ legacyPermDir,
+    LEGACY.FOLDERS.REPORTS,
+  )
 
   const hasTxFolderLayout = await folderHasJsonFiles(txFolder)
   const hasReportsFolderLayout = await folderHasJsonFiles(reportsFolder)
@@ -103,7 +109,7 @@ async function importMonolithicTransactionsFile(opts: {
     onMoved,
     onWarn,
   } = opts
-  const filePath = path.join(legacyPermDir, fileName)
+  const filePath = path.join(/*turbopackIgnore: true*/ legacyPermDir, fileName)
   if (!(await pathExists(filePath))) return
 
   try {
@@ -281,7 +287,7 @@ async function importMonolithicReportsFile(opts: {
     onMoved,
     onWarn,
   } = opts
-  const filePath = path.join(legacyPermDir, fileName)
+  const filePath = path.join(/*turbopackIgnore: true*/ legacyPermDir, fileName)
   if (!(await pathExists(filePath))) return
 
   try {
@@ -426,21 +432,23 @@ export async function importTxnFolder(opts: {
     onMoved,
     onWarn,
   } = opts
-  const dir = path.join(legacyPermDir, srcFolder)
+  const dir = path.join(/*turbopackIgnore: true*/ legacyPermDir, srcFolder)
   if (!(await pathExists(dir))) return
 
-  const files = (await fs.readdir(dir, { withFileTypes: true }))
+  const files = (
+    await fs.readdir(/*turbopackIgnore: true*/ dir, { withFileTypes: true })
+  )
     .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.json'))
     .map((e) => e.name)
     .sort()
 
   for (const filename of files) {
-    const filePath = path.join(dir, filename)
+    const filePath = path.join(/*turbopackIgnore: true*/ dir, filename)
     const meta = await getFileMeta(filePath)
     const sha = await sha256File(filePath)
     const rel =
       relativeToPermDir(legacyPermDir, filePath) ??
-      path.join(srcFolder, filename)
+      path.join(/*turbopackIgnore: true*/ srcFolder, filename)
 
     const prior = await ledgerFind(stationId, sha, meta.size)
     if (prior && (prior.status === 'imported' || prior.status === 'skipped')) {
@@ -495,7 +503,7 @@ export async function importTxnFolder(opts: {
     const details = tx.details || {}
     const totals = tx.totals || {}
     const items = Array.isArray(tx.items) ? tx.items : []
-    const stat = await fs.stat(filePath)
+    const stat = await fs.stat(/*turbopackIgnore: true*/ filePath)
 
     const transactionDateTime = toDateTime(tx.date, tx.time, stat.mtime)
     const pumpNumber =

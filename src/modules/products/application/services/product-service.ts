@@ -10,8 +10,10 @@ import {
   checkProxyDeviceStatus,
   uploadProductsViaProxy,
 } from '@/src/shared/proxy/client'
-import { getProductClassCodes } from '@/src/shared/server/config/getConfig'
-import { seedCountryConfigOnce } from '@/src/shared/server/config/seedCountryConfig'
+import {
+  isSupportedCountryCode,
+  listCountryDatasetRows,
+} from '@/src/shared/server/config/countryDatasets'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import { resolveProductCategoriesByIdsRepo } from '@/src/modules/products/infrastructure/persistence/product-category.repository'
@@ -347,9 +349,11 @@ export async function listProductClassCodesService(args: {
   country?: string | null
 }) {
   const country = String(args.country || '').toUpperCase()
-  if (country === 'KE' || country === 'TZ') {
-    await seedCountryConfigOnce(country as 'KE' | 'TZ')
-  }
+  if (!(await isSupportedCountryCode(country))) return []
 
-  return await getProductClassCodes()
+  return await listCountryDatasetRows({
+    countryCode: country,
+    datasetType: 'productClassCodes',
+    activeOnly: true,
+  })
 }

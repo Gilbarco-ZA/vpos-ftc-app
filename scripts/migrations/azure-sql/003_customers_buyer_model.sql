@@ -11,7 +11,7 @@ ALTER TABLE customers
       address_state NVARCHAR(100) NULL,
       address_province NVARCHAR(100) NULL,
       address_postal_code NVARCHAR(20) NULL,
-      address_country_code NVARCHAR(2) NULL,
+      address_country_code NVARCHAR(3) NULL,
       contact_phone NVARCHAR(50) NULL,
       contact_mobile NVARCHAR(50) NULL,
       contact_fax NVARCHAR(50) NULL,

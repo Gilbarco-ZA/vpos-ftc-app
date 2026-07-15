@@ -1,9 +1,9 @@
 trigger:
-  branches: { include: ['master'] }
+  branches: { include: ['*'] }
   tags: { include: [v*] }
 
 pr:
-  branches: { include: [master] }
+  branches: { include: [master, main] }
 
 resources:
   repositories:
@@ -16,3 +16,20 @@ extends:
   template: azure/templates/node-nextjs.yml@ci
   parameters:
     consumerPath: 'vpos-ftc-app'
+    artifactsPackageName: 'vpos-ftc-app'
+    nodeVersion: '22.15.0'
+    esbuildTarget: 'node22'
+    startScriptTemplate: 'node-web'
+    packageTargets:
+      - id: cpb539_node22
+        name: 'cpb-539-node22'
+        nodeVersion: '22.15.0'
+        nodeVersionDir: 'node-v22.15.0-linux-armv7l'
+        packageSuffix: ''
+        runtimeArchitecture: 'armv7l'
+      - id: cpb579_node22
+        name: 'cpb-579-node22'
+        nodeVersion: '22.15.0'
+        nodeVersionDir: 'node-v22.15.0-linux-arm64'
+        packageSuffix: ''
+        runtimeArchitecture: 'arm64'

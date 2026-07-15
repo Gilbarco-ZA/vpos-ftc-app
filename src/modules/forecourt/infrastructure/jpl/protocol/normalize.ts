@@ -1,4 +1,10 @@
 import {
+  normalizeJplSiteDeliveryStatus,
+  normalizeJplTankAlarmStatus,
+  normalizeJplTankDeliveryData,
+  normalizeJplTankGaugeData,
+} from '@/src/shared/doms/tankGaugeProtocol'
+import {
   extractNozzleNumber,
   mapJplMainState,
 } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
@@ -145,7 +151,7 @@ export const normalizeFpFuellingDataPayload = (
 export const normalizeTgStatusPayload = (payload: any, subCode?: string) => {
   const data = asObject(payload)
   const subStates = asObject(data?.TgSubStates)
-  const alarmStatus = asObject(data?.TgAlarmStatus)
+  const alarmStatus = normalizeJplTankAlarmStatus(data)
   return {
     tgId: stringOrUndefined(data?.TgId),
     subCode: stringOrUndefined(subCode),
@@ -175,23 +181,29 @@ export const normalizeTgStatusPayload = (payload: any, subCode?: string) => {
         'AllAvailableInventoryDataReady',
       ),
     },
-    alarms: {
-      highLevel: bitValue(alarmStatus, 'HighLevelAlarm'),
-      highHighLevel: bitValue(alarmStatus, 'HighHighLevelAlarm'),
-      lowLevel: bitValue(alarmStatus, 'LowLevelAlarm'),
-      lowLowLevel: bitValue(alarmStatus, 'LowLowLevelAlarm'),
-      highWater: bitValue(alarmStatus, 'HighWaterAlarm'),
-      tankLeak: bitValue(alarmStatus, 'TankLeakAlarm'),
-      tankDataMissing: bitValue(alarmStatus, 'TankDataMissingAlarm'),
-      highHighWater: bitValue(alarmStatus, 'HighHighWaterAlarm'),
-      ticketedDeliveryDataLost: bitValue(
-        alarmStatus,
-        'TicketedDeliveryDataLost',
-      ),
-      deliveryDataLost: bitValue(alarmStatus, 'DeliveryDataLost'),
-      otherAlarm: bitValue(alarmStatus, 'OtherAlarm'),
-    },
+    alarms: Object.fromEntries(
+      alarmStatus.all.map((alarm) => [alarm.key, alarm.active]),
+    ),
+    activeAlarms: alarmStatus.active,
+    alarmTexts: alarmStatus.texts,
+    alarmStatus,
     raw: data,
+  }
+}
+
+export const normalizeTgDataPayload = (payload: any, subCode?: string) => {
+  const normalized = normalizeJplTankGaugeData(payload)
+  if (!normalized) {
+    return {
+      tgId: undefined,
+      subCode: stringOrUndefined(subCode),
+      raw: asObject(payload),
+    }
+  }
+
+  return {
+    ...normalized,
+    subCode: stringOrUndefined(subCode),
   }
 }
 
@@ -199,33 +211,18 @@ export const normalizeSiteDeliveryStatusPayload = (
   payload: any,
   subCode?: string,
 ) => {
-  const data = asObject(payload)
-  const flags = asObject(data?.DeliveryStatusFlags)
+  const normalized = normalizeJplSiteDeliveryStatus(payload)
   return {
     subCode: stringOrUndefined(subCode),
-    deliveryReportSeqNo: stringOrUndefined(data?.DeliveryReportSeqNo),
-    flags: {
-      siteDeliveryStartingMarked:
-        bitValue(flags, 'SiteDeliveryStartingMarked') ||
-        bitValue(flags, 'SiteDeliveryStartMarked'),
-      siteDeliveryInProgress: bitValue(flags, 'SiteDeliveryInProgress'),
-      siteDeliveryFinishingMarked:
-        bitValue(flags, 'SiteDeliveryFinishingMarked') ||
-        bitValue(flags, 'SiteDeliveryFinishedMarked'),
-      siteDeliveryDataReady: bitValue(flags, 'SiteDeliveryDataIsReady'),
-      siteTicketedDeliveryDataReady: bitValue(
-        flags,
-        'SiteTicketedDeliveryDataIsReady',
-      ),
-      siteTicketedDeliveryInProgress: bitValue(
-        flags,
-        'SiteTicketedDeliveryInProgress',
-      ),
-    },
-    tgIds: arrayOfStrings(data?.TgId),
-    tankDeliveries: arrayOfStrings(data?.TankDeliveries),
-    tankTicketedDeliveries: arrayOfStrings(data?.TankTicketedDeliveries),
-    raw: data,
+    deliveryReportSeqNo: normalized.deliveryReportSeqNo,
+    status: normalized.status,
+    flags: normalized.flags,
+    tgIds: normalized.tgIds,
+    tankDeliveries: normalized.tankDeliveries,
+    tankTicketedDeliveries: normalized.tankTicketedDeliveries,
+    readyTgIds: normalized.readyTgIds,
+    clearCandidates: normalized.clearCandidates,
+    raw: normalized.raw,
   }
 }
 
@@ -233,23 +230,53 @@ export const normalizeTankDeliveryDataPayload = (
   payload: any,
   subCode?: string,
 ) => {
-  const data = asObject(payload)
-  const items = asObject(data?.TankDeliveryDataItems)
+  const normalized = normalizeJplTankDeliveryData(payload)
   return {
-    tgId: stringOrUndefined(data?.TgId),
-    posId: stringOrUndefined(data?.PosId),
+    tgId: normalized.tgId,
+    posId: normalized.posId,
     subCode: stringOrUndefined(subCode),
-    deliveryReportSeqNo:
-      stringOrUndefined(data?.DeliveryReportSeqNo) ??
-      stringOrUndefined(items?.DeliveryReportSeqNo),
-    tankDeliverySeqNo: stringOrUndefined(items?.TankDeliverySeqNo),
-    productCode: stringOrUndefined(items?.TgProductCode),
-    deliveredVol: stringOrUndefined(items?.TankDeliveredVol),
-    deliveredTcVol: stringOrUndefined(items?.TankDeliveredTcVol),
-    deliveredMass: stringOrUndefined(items?.TankDeliveredMass),
-    startDateAndTime: stringOrUndefined(items?.TankDeliveryStartDateAndTime),
-    stopDateAndTime: stringOrUndefined(items?.TankDeliveryStopDateAndTime),
-    raw: data,
+    deliveryReportSeqNo: normalized.deliveryReportSeqNo,
+    tankDeliverySeqNo: normalized.tankDeliverySeqNo,
+    productCode: normalized.productCode,
+    deliveredVol:
+      stringOrUndefined(normalized.rawItems.TankDeliveredVol) ??
+      (normalized.deliveredVolume == null
+        ? undefined
+        : String(normalized.deliveredVolume)),
+    deliveredTcVol:
+      stringOrUndefined(normalized.rawItems.TankDeliveredTcVol) ??
+      (normalized.deliveredTcVolume == null
+        ? undefined
+        : String(normalized.deliveredTcVolume)),
+    deliveredMass:
+      stringOrUndefined(normalized.rawItems.TankDeliveredMass) ??
+      (normalized.deliveredMass == null
+        ? undefined
+        : String(normalized.deliveredMass)),
+    deliveredQuantity: normalized.deliveredQuantity,
+    adjustedVolumeSigned: normalized.adjustedVolumeSigned,
+    adjustedTcVolumeSigned: normalized.adjustedTcVolumeSigned,
+    saleVolumeDuringDelivery: normalized.saleVolumeDuringDelivery,
+    deliveryTemperatureC: normalized.deliveryTemperatureC,
+    startDateAndTime: normalized.startDateAndTime,
+    stopDateAndTime: normalized.stopDateAndTime,
+    startProductVolume: normalized.startProductVolume,
+    startProductTcVolume: normalized.startProductTcVolume,
+    startWaterVolume: normalized.startWaterVolume,
+    startTemperatureC: normalized.startTemperatureC,
+    startProductMass: normalized.startProductMass,
+    startProductDensity: normalized.startProductDensity,
+    startProductTcDensity: normalized.startProductTcDensity,
+    stopProductVolume: normalized.stopProductVolume,
+    stopProductTcVolume: normalized.stopProductTcVolume,
+    stopWaterVolume: normalized.stopWaterVolume,
+    stopTemperatureC: normalized.stopTemperatureC,
+    stopProductMass: normalized.stopProductMass,
+    stopProductDensity: normalized.stopProductDensity,
+    stopProductTcDensity: normalized.stopProductTcDensity,
+    clearTarget: normalized.clearTarget,
+    rawItems: normalized.rawItems,
+    raw: normalized.raw,
   }
 }
 

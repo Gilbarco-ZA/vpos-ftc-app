@@ -1,11 +1,6 @@
 import { txQuery, withTransaction } from '@/src/platform/db/postgres'
-import { KE_DATASET } from '@/src/shared/config/datasets/KE'
-import {
-  BaseRow,
-  CountryDataset,
-  TaxRow,
-} from '@/src/shared/config/datasets/types'
-import { TZ_DATASET } from '@/src/shared/config/datasets/TZ'
+import { BaseRow, TaxRow } from '@/src/shared/config/datasets/types'
+import { loadCountryDataset } from '@/src/shared/server/config/countryDatasets'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
@@ -16,13 +11,6 @@ const normalizeCountry = (country: string) =>
   String(country || '')
     .trim()
     .toUpperCase()
-
-const pickDataset = (country: string): CountryDataset => {
-  const normalized = normalizeCountry(country)
-  if (normalized === 'KE') return KE_DATASET
-  if (normalized === 'TZ') return TZ_DATASET
-  throw new Error(`Unsupported country code: ${country}`)
-}
 
 const assertBaseRow = (row: BaseRow, table: string) => {
   if (!row.code || !String(row.code).trim()) {
@@ -161,11 +149,13 @@ const coerceTaxRates = (rows: TaxRow[]) => {
 }
 
 export const seedCountryConfig = async (
-  countryCode: 'KE' | 'TZ',
+  countryCode: string,
+  opts?: { force?: boolean },
 ): Promise<void> => {
   const normalized = normalizeCountry(countryCode)
-  const dataset = pickDataset(normalized)
+  const dataset = await loadCountryDataset(normalized)
   const forced =
+    Boolean(opts?.force) ||
     String(process.env.FORCE_SEED_CONFIG || '').toLowerCase() === 'true'
 
   await withTransaction(async (client) => {
@@ -203,15 +193,13 @@ export const seedCountryConfig = async (
 let seedPromise: Promise<void> | null = null
 let seedCountry: string | null = null
 
-export const seedCountryConfigOnce = async (
-  country: 'KE' | 'TZ',
-): Promise<void> => {
+export const seedCountryConfigOnce = async (country: string): Promise<void> => {
   const normalized = normalizeCountry(country)
   if (!normalized) return
   if (seedPromise && seedCountry === normalized) {
     return seedPromise
   }
   seedCountry = normalized
-  seedPromise = seedCountryConfig(normalized as 'KE' | 'TZ')
+  seedPromise = seedCountryConfig(normalized)
   return seedPromise
 }

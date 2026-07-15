@@ -5,6 +5,7 @@ import { fail, ok } from '@/src/platform/web/api/response'
 import { defineGetRoute } from '@/src/shared/http/defineRoute'
 
 import { listFiscalInboxQuery } from '@/src/modules/fiscal-inbox/application/queries/list-fiscal-inbox'
+import { presentFiscalInboxListRows } from '@/src/modules/fiscal-inbox/presentation/presenters/fiscal-inbox.presenter'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -62,6 +63,9 @@ export const GET = defineGetRoute({
       offset: asNonNegativeInt(searchParams.get('offset'), 0),
     })
 
-    return ok(result)
+    return ok({
+      ...result,
+      items: presentFiscalInboxListRows(result),
+    })
   },
 })

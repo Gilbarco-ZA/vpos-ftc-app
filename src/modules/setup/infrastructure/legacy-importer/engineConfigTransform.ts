@@ -1,6 +1,10 @@
 import type { SystemConfiguration } from '@/src/shared/config/schema'
 
 import { systemConfigSchema } from '@/src/shared/config/schema'
+import {
+  getPreferredNetworkHost,
+  resolveProductionHost,
+} from '@/src/shared/forecourt/runtimeConfigShared'
 
 /**
  * vpos-app historically supported an "engine.config.json" format.
@@ -14,7 +18,10 @@ export function transformEngineConfigToSystemConfig(
   oldConfig: any,
 ): SystemConfiguration {
   const level = String(oldConfig?.logger?.level ?? 'warn')
-  const domsHost = String(oldConfig?.doms?.host ?? '127.0.0.1')
+  const domsHost = resolveProductionHost(
+    oldConfig?.doms?.host,
+    getPreferredNetworkHost(),
+  )
   const posIdRaw =
     oldConfig?.doms?.options?.PosId ?? oldConfig?.doms?.posId ?? '12'
   const eptIdRaw = oldConfig?.doms?.options?.EptId ?? oldConfig?.doms?.eptId
@@ -132,7 +139,10 @@ export function transformEngineConfigToSystemConfig(
           debugPort: 9229,
           config: {
             port: port,
-            host: process.env.VPOS_API_HOST || '127.0.0.1',
+            host: resolveProductionHost(
+              process.env.VPOS_API_HOST,
+              getPreferredNetworkHost(),
+            ),
           },
           plugins: [
             { name: 'supervisor', enabled: true, config: {} },

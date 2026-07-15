@@ -12,28 +12,22 @@ export const withReplayLock = async (
   fn: () => Promise<void>,
 ): Promise<void> => {
   const locks = ensureReplayLocks()
-  const prev = locks.get(key) ?? Promise.resolve()
+  const previousTail = locks.get(key) ?? Promise.resolve()
 
   let release!: () => void
-  const current = new Promise<void>((resolve) => {
+  const gate = new Promise<void>((resolve) => {
     release = resolve
   })
+  const currentTail = previousTail.catch(() => undefined).then(() => gate)
 
-  locks.set(
-    key,
-    prev
-      .catch(() => {
-        // keep queue progressing
-      })
-      .then(() => current),
-  )
+  locks.set(key, currentTail)
 
-  await prev
+  await previousTail.catch(() => undefined)
   try {
     await fn()
   } finally {
     release()
-    if (locks.get(key) === current) {
+    if (locks.get(key) === currentTail) {
       locks.delete(key)
     }
   }
@@ -47,14 +41,24 @@ const getInFlightReplayKeys = () => {
 }
 
 export const beginReplayKey = (key: string) => {
-  const s = getInFlightReplayKeys()
-  if (s.has(key)) return false
-  s.add(key)
+  const keys = getInFlightReplayKeys()
+  if (keys.has(key)) return false
+  keys.add(key)
   return true
 }
 
 export const endReplayKey = (key: string) => {
   getInFlightReplayKeys().delete(key)
+}
+
+export const getReplayConcurrencySnapshot = () => ({
+  queuedLockCount: ensureReplayLocks().size,
+  inFlightKeyCount: getInFlightReplayKeys().size,
+})
+
+export const resetReplayConcurrencyState = () => {
+  ensureReplayLocks().clear()
+  getInFlightReplayKeys().clear()
 }
 
 export const getReplayCapabilities = () => {
@@ -71,11 +75,11 @@ export const markReplayCapability = (
   mode: BufferMode,
   value: 'unknown' | 'allowed' | 'denied',
 ) => {
-  const caps = getReplayCapabilities()
-  caps[mode] = value
+  const capabilities = getReplayCapabilities()
+  capabilities[mode] = value
 }
 
 export const canAttemptReplay = (mode: BufferMode) => {
-  const caps = getReplayCapabilities()
-  return caps[mode] !== 'denied'
+  const capabilities = getReplayCapabilities()
+  return capabilities[mode] !== 'denied'
 }

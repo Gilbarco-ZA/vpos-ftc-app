@@ -123,7 +123,8 @@ const ensureFuelCategory = async (client: any, stationId: string) => {
 
 const resolveCurrency = async (stationId: string) => {
   const sp = await kvGet<any>(stationId, KV_KEYS.SITE_PROFILE)
-  const currency = safeTrim(sp?.currency) || 'KES'
+  const currency =
+    safeTrim(sp?.currency) || process.env.DEFAULT_CURRENCY?.trim() || 'USD'
   return currency
 }
 
@@ -697,7 +698,7 @@ function mapToProxyProducts(
       packSize: null,
       unitPrice: p.price ?? 0,
       unitCost: 0, // or your internal cost if available
-      currency: p.currency ?? 'KES', // or whatever you use
+      currency: p.currency ?? process.env.DEFAULT_CURRENCY?.trim() ?? 'USD',
       commodityCode: null,
       barcode: null,
       taxCode: p.taxCode ?? null,

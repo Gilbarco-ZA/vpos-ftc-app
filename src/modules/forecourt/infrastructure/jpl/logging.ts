@@ -3,6 +3,8 @@ import '@/src/modules/forecourt/infrastructure/jpl/globals'
 import { serializeForLog } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
 import { appendLogLine } from '@/src/shared/logs/service'
 
+import { redactJplSensitivePaymentData } from '@/src/modules/forecourt/infrastructure/jpl/unattendedTransactions'
+
 export const JPL_TRAFFIC_LOG = 'doms-jpl.log'
 
 const shouldSkipTrafficLog = (
@@ -49,7 +51,7 @@ export const writeJplTrafficLog = (
   if (shouldSkipTrafficLog(direction, event, payload)) return
 
   const stamp = new Date().toISOString()
-  const body = serializeForLog(payload)
+  const body = serializeForLog(redactJplSensitivePaymentData(payload))
   void appendLogLine(
     stationId,
     'live',

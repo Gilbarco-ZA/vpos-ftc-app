@@ -32,7 +32,10 @@ const ensureTank = async (stationId: string, tankId: string) => {
   return row?.id ?? null
 }
 
-export const GET = async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
+export const GET = async (
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
@@ -80,7 +83,10 @@ export const GET = async (_req: Request, ctx: { params: Promise<{ id: string }> 
   }
 }
 
-export const POST = async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
+export const POST = async (
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
@@ -140,7 +146,10 @@ export const POST = async (req: Request, ctx: { params: Promise<{ id: string }> 
   }
 }
 
-export const PUT = async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
+export const PUT = async (
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
@@ -204,7 +213,10 @@ export const PUT = async (req: Request, ctx: { params: Promise<{ id: string }> }
   }
 }
 
-export const DELETE = async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
+export const DELETE = async (
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])

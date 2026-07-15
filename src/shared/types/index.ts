@@ -1,10 +1,10 @@
-export type UserRole = 'administrator' | 'manager' | 'tenant'
+export type UserRole = 'administrator' | 'manager' | 'tenant' | 'field_engineer'
 
 export type StationSummary = {
   id: string
   code: string
   name: string
-  country: 'TZ' | 'KE'
+  country: string
 }
 
 export type SessionUser = {
@@ -64,6 +64,20 @@ export type AuditAction =
   | 'SETTINGS_UPDATED'
   | 'DEVICE_CONFIG_UPDATED'
   | 'DEVICE_CONFIG_UPSERTED'
+  | 'DOMS_MAPPING_UPDATED'
+  | 'DOMS_MAPPING_ROLLED_BACK'
+  | 'DOMS_MAPPING_BULK_APPLIED'
+  | 'DOMS_MAINTENANCE_PLAN_REVIEWED'
+  | 'DOMS_MAINTENANCE_SESSION_REQUESTED'
+  | 'DOMS_MAINTENANCE_SESSION_APPROVED'
+  | 'DOMS_MAINTENANCE_SESSION_CANCELLED'
+  | 'DOMS_MAINTENANCE_COMMANDS_PREVIEWED'
+  | 'DOMS_MAINTENANCE_EXECUTION_BLOCKED'
+  | 'DOMS_MAINTENANCE_FINAL_CONFIRMATION_RECORDED'
+  | 'DOMS_MAINTENANCE_COMMAND_EXECUTED'
+  | 'DOMS_MAINTENANCE_COMMAND_FAILED'
+  | 'DOMS_FIELD_VALIDATION_CHECKPOINT_RECORDED'
+  | 'DOMS_DEPLOYMENT_SIGN_OFF_RECORDED'
   | 'PLUGIN_CONFIG_UPDATED'
   | 'PLUGIN_CONFIG_UPSERTED'
   | 'BRANDING_UPDATED'

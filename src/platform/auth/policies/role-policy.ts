@@ -1,6 +1,7 @@
 import type { UserRole } from '@/src/shared/types'
 
 const ROLE_HIERARCHY: Record<UserRole, number> = {
+  field_engineer: 4,
   administrator: 3,
   manager: 2,
   tenant: 1,

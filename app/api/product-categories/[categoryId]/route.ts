@@ -51,8 +51,11 @@ const toUpdateInput = (categoryId: string, body: Record<string, unknown>) => {
   }
 }
 
-export const GET = async (req: Request, props: { params: Promise<{ categoryId: string }> }) => {
-  const params = await props.params;
+export const GET = async (
+  req: Request,
+  props: { params: Promise<{ categoryId: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager', 'tenant'])
@@ -67,8 +70,11 @@ export const GET = async (req: Request, props: { params: Promise<{ categoryId: s
   }
 }
 
-export const PATCH = async (req: Request, props: { params: Promise<{ categoryId: string }> }) => {
-  const params = await props.params;
+export const PATCH = async (
+  req: Request,
+  props: { params: Promise<{ categoryId: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])
@@ -100,8 +106,11 @@ export const PATCH = async (req: Request, props: { params: Promise<{ categoryId:
   }
 }
 
-export const DELETE = async (req: Request, props: { params: Promise<{ categoryId: string }> }) => {
-  const params = await props.params;
+export const DELETE = async (
+  req: Request,
+  props: { params: Promise<{ categoryId: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])

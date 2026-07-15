@@ -18,7 +18,39 @@ export type JplTcpAdapterState = {
     info?: string
     correlationId?: string
     at: number
+  } | null
+  lastFrameDiagnostic?: {
+    valid: boolean
+    code: string
+    message: string
+    byteLength: number
+    hasStx: boolean
+    hasEtx: boolean
+    stxIndex: number
+    etxIndex: number
+    preview: string
+    name?: string
+    subCode?: string
+    solicited?: boolean
+    correlationId?: unknown
+    at: number
   }
+  frameDiagnostics?: Array<{
+    valid: boolean
+    code: string
+    message: string
+    byteLength: number
+    hasStx: boolean
+    hasEtx: boolean
+    stxIndex: number
+    etxIndex: number
+    preview: string
+    name?: string
+    subCode?: string
+    solicited?: boolean
+    correlationId?: unknown
+    at: number
+  }>
   lastError?: string
   posId?: string
   nextReconnectAt?: number
@@ -57,6 +89,13 @@ export type JplTcpAdapterState = {
     at: number
   }>
   lastTgStatuses?: Array<{
+    tgId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastTgData?: Array<{
     tgId?: string
     subCode?: string
     normalized?: any
@@ -107,6 +146,15 @@ export type JplTcpAdapterState = {
     payload?: any
     at: number
   }>
+  lastWashTransactions?: Array<{
+    wpId?: string
+    transSeqNo?: string
+    sourceHash?: string
+    source?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
   lastDigitalIoStatuses?: Array<{
     diopId?: string
     subCode?: string
@@ -130,6 +178,16 @@ export type JplTcpAdapterState = {
   }>
   lastVendingErrors?: Array<{
     vmId?: string
+    subCode?: string
+    normalized?: any
+    payload?: any
+    at: number
+  }>
+  lastVendingTotals?: Array<{
+    vmId?: string
+    vmTotalType?: string
+    vmTotalTypeLabel?: string
+    sourceHash?: string
     subCode?: string
     normalized?: any
     payload?: any

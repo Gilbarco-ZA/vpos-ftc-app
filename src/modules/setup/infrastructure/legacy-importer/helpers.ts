@@ -15,7 +15,7 @@ import { moveAside } from '@/src/modules/setup/infrastructure/legacy-importer/mo
 
 export async function fileHasContent(filePath: string): Promise<boolean> {
   try {
-    const st = await fs.stat(filePath)
+    const st = await fs.stat(/*turbopackIgnore: true*/ filePath)
     return st.isFile() && st.size > 5
   } catch {
     return false
@@ -24,7 +24,9 @@ export async function fileHasContent(filePath: string): Promise<boolean> {
 
 export async function folderHasJsonFiles(dir: string): Promise<boolean> {
   try {
-    const entries = await fs.readdir(dir, { withFileTypes: true })
+    const entries = await fs.readdir(/*turbopackIgnore: true*/ dir, {
+      withFileTypes: true,
+    })
     return entries.some(
       (e) => e.isFile() && e.name.toLowerCase().endsWith('.json'),
     )
@@ -35,7 +37,7 @@ export async function folderHasJsonFiles(dir: string): Promise<boolean> {
 
 export async function safeReadJson(filePath: string): Promise<any | null> {
   try {
-    const raw = await fs.readFile(filePath, 'utf8')
+    const raw = await fs.readFile(/*turbopackIgnore: true*/ filePath, 'utf8')
     return JSON.parse(raw)
   } catch {
     return null
@@ -44,7 +46,7 @@ export async function safeReadJson(filePath: string): Promise<any | null> {
 
 export async function pathExists(p: string): Promise<boolean> {
   try {
-    await fs.access(p)
+    await fs.access(/*turbopackIgnore: true*/ p)
     return true
   } catch {
     return false
@@ -133,7 +135,7 @@ export async function importSingleJsonFile(opts: {
   handler: (json: any) => Promise<void>
 }) {
   const { ctx, stationId, legacyPermDir } = opts
-  const fp = path.join(legacyPermDir, opts.fileName)
+  const fp = path.join(/*turbopackIgnore: true*/ legacyPermDir, opts.fileName)
   if (!(await fileHasContent(fp))) return
 
   try {
@@ -150,7 +152,7 @@ export async function importSingleJsonFile(opts: {
     })
     if (existing) return
 
-    const raw = await fs.readFile(fp, 'utf8')
+    const raw = await fs.readFile(/*turbopackIgnore: true*/ fp, 'utf8')
     const json = JSON.parse(raw)
     await opts.handler(json)
 
@@ -183,5 +185,11 @@ export async function importSingleJsonFile(opts: {
 }
 
 export async function ensureArchiveDirs(permDir: string) {
-  await fs.mkdir(path.join(permDir, 'legacy-archive'), { recursive: true })
+  await fs.mkdir(
+    /*turbopackIgnore: true*/ path.join(
+      /*turbopackIgnore: true*/ permDir,
+      'legacy-archive',
+    ),
+    { recursive: true },
+  )
 }

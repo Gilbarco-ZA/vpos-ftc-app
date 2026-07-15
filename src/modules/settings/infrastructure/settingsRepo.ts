@@ -91,6 +91,20 @@ export async function listPumpsRepo(
   )
 }
 
+export async function findPumpByIdRepo(stationId: string, pumpId: string) {
+  return await queryOne<PumpSettingsRow>(
+    `SELECT id,
+            code,
+            name,
+            status,
+            has_nozzle_selector,
+            pump_number
+       FROM pumps
+      WHERE id = $1 AND station_id = $2`,
+    [pumpId, stationId],
+  )
+}
+
 export async function findPumpByCodeRepo(stationId: string, code: string) {
   return await queryOne<{ id: string }>(
     `SELECT id FROM pumps WHERE station_id = $1 AND code = $2`,

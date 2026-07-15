@@ -14,8 +14,11 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const POST = async (req: Request, props: { params: Promise<{ productId: string }> }) => {
-  const params = await props.params;
+export const POST = async (
+  req: Request,
+  props: { params: Promise<{ productId: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
@@ -51,7 +54,7 @@ export const POST = async (req: Request, props: { params: Promise<{ productId: s
 
     await updateProductStatus({
       stationId: user.stationId,
-      productId: product.extProductId ?? product.productId,
+      productId: product.productId,
       status: syncOk ? 'synced' : 'failed',
       message: syncOk ? null : syncMessage,
     })

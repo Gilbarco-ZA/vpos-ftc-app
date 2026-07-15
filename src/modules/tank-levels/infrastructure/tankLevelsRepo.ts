@@ -29,7 +29,7 @@ const resolveExistingTable = async (tables: string[]) => {
     `SELECT CASE ${checks} ELSE NULL END AS table_name`,
     tables.map((table) => `public.${table}`),
   )
-  return row?.table_name ? row.table_name.replace(/^public\./, '') : null;
+  return row?.table_name ? row.table_name.replace(/^public\./, '') : null
 }
 
 const getTankInventoryTable = async () => {
@@ -94,11 +94,14 @@ const resolveStockInTaxes = (input: {
   const safeTaxCode = rawTaxCode ?? 'VAT'
   const rateDecimal = (taxRatePercent ?? 0) / 100
   const divisor = 1 + rateDecimal
+  const productNetTotal =
+    divisor > 0 ? roundMoney(grossTotal / divisor) : grossTotal
   const productUnitPrice =
-    divisor > 0
-      ? roundMoney(unitPriceGross / divisor)
-      : roundMoney(unitPriceGross)
-  const productNetTotal = roundMoney(productUnitPrice * quantityLitres)
+    quantityLitres > 0
+      ? roundMoney(productNetTotal / quantityLitres)
+      : divisor > 0
+        ? roundMoney(unitPriceGross / divisor)
+        : roundMoney(unitPriceGross)
   const taxAmount = roundMoney(grossTotal - productNetTotal)
 
   return {

@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-13",
+  "scope": "first-production DOMS/JPL release",
+  "summary": {
+    "coreCodeImplementationOpen": 0,
+    "localValidationOpen": 1,
+    "fieldValidationOpen": 18,
+    "externalEndpointValidationOpen": 6,
+    "organizationalApprovalOpen": 3,
+    "deferredOpen": 0
+  },
+  "code": [],
+  "localValidation": [
+    {
+      "id": "doms-simulator-acceptance",
+      "title": "Run the combined simulator self-test and validation evidence command on the final package",
+      "command": "npm run doms:release:evidence",
+      "blocking": true
+    }
+  ],
+  "fieldValidation": [
+    {
+      "id": "live-decimal-normalization",
+      "title": "Confirm money and volume scaling against live PSS values"
+    },
+    {
+      "id": "live-fp-status",
+      "title": "Confirm all FpStatus fields consumed by UI and workflows"
+    },
+    {
+      "id": "preset-start-limit",
+      "title": "Finalize preset and start-limit behavior against site pumps"
+    },
+    {
+      "id": "delivery-lifecycle",
+      "title": "Field-test the complete delivery lifecycle"
+    },
+    {
+      "id": "multi-pump-site",
+      "title": "Validate pump workflows on a multi-pump site"
+    },
+    {
+      "id": "tank-gauge-site",
+      "title": "Validate wetstock workflows on a tank-gauge site"
+    },
+    {
+      "id": "network-interruption",
+      "title": "Validate reconnect behavior during a controlled network interruption"
+    },
+    {
+      "id": "stale-lock-recovery",
+      "title": "Validate stale-lock recovery and operator fault workflows"
+    },
+    {
+      "id": "pss-configurator-reconciliation",
+      "title": "Validate reconciliation against PSS Configurator output"
+    },
+    {
+      "id": "real-controller-session",
+      "title": "Confirm connect, logon, heartbeat, dead-timeout, and reconnect behavior against the target PSS"
+    },
+    {
+      "id": "real-controller-unsolicited",
+      "title": "Verify required unsolicited message families against the target PSS"
+    },
+    {
+      "id": "real-controller-pumps",
+      "title": "Validate required pump workflows end-to-end"
+    },
+    {
+      "id": "real-controller-transactions",
+      "title": "Validate transaction reconciliation across reconnects and restarts"
+    },
+    {
+      "id": "real-controller-tanks",
+      "title": "Validate required tank workflows end-to-end"
+    },
+    {
+      "id": "commissioning-guides",
+      "title": "Validate configuration and commissioning guides at the first deployment"
+    },
+    {
+      "id": "field-integration-complete",
+      "title": "Record completion of integration and field validation"
+    },
+    {
+      "id": "first-site-acceptance-notes",
+      "title": "Record deployment acceptance notes after first-site validation"
+    },
+    {
+      "id": "controlled-write-commissioning",
+      "title": "Authorize and validate the controlled PSS write path during an approved commissioning window"
+    }
+  ],
+  "externalEndpointValidation": [
+    {
+      "id": "tra-sale",
+      "title": "Validate TRA sale submission against a real endpoint"
+    },
+    {
+      "id": "tra-credit-note",
+      "title": "Validate TRA credit-note and reversal submission against a real endpoint"
+    },
+    {
+      "id": "ewura-retry",
+      "title": "Validate EWURA submission and retry behavior"
+    },
+    {
+      "id": "negative-reversal",
+      "title": "Confirm negative-value credit-note reversal acceptance"
+    },
+    {
+      "id": "tanzania-live-credentials",
+      "title": "Validate Tanzania fiscalization with real TRA/EWURA credentials"
+    },
+    {
+      "id": "tanzania-parity-live",
+      "title": "Complete live sale and credit-note parity evidence"
+    }
+  ],
+  "organizationalApproval": [
+    {
+      "id": "commissioning-expectations",
+      "title": "Confirm commissioning expectations with field engineering and support"
+    },
+    {
+      "id": "first-site-criteria",
+      "title": "Confirm exact first-site acceptance criteria"
+    },
+    {
+      "id": "deployment-signoff",
+      "title": "Complete digest-bound first-site deployment sign-off"
+    }
+  ],
+  "deferred": [
+    {
+      "id": "ept-payment",
+      "title": "DOMS EPT/payment control",
+      "decision": "Deferred from first production scope; implement as a separate security-focused phase only when a site requirement is approved"
+    },
+    {
+      "id": "fc-aux-command",
+      "title": "FcAuxCmd",
+      "decision": "Out of scope until an approved business workflow exists"
+    },
+    {
+      "id": "additional-fc-status-subcodes",
+      "title": "Additional FcStatus subcodes",
+      "decision": "Typed coverage is deferred until live field evidence identifies a required variant; unknown variants remain observable and non-fatal"
+    }
+  ]
+}

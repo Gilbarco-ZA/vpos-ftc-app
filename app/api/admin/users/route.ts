@@ -31,11 +31,13 @@ export const POST = defineMutationRoute<Record<string, any>>({
     try {
       const parsed = createUserSchema.safeParse({
         stationId: user.stationId,
-        username: body.username,
-        email: body.email,
-        password: body.password,
+        username: String(body.username || '').trim(),
+        email: String(body.email || '')
+          .trim()
+          .toLowerCase(),
+        password: String(body.password || '').trim(),
         role: body.role,
-        fullName: body.fullName,
+        fullName: body.fullName ? String(body.fullName).trim() : undefined,
       })
 
       if (!parsed.success) {
@@ -59,6 +61,17 @@ export const POST = defineMutationRoute<Record<string, any>>({
 
       return ok(created)
     } catch (err: any) {
+      if (err?.code === '23505') {
+        const detail = String(err?.detail || '').toLowerCase()
+        if (detail.includes('username')) {
+          return fail('Username already exists for this station', 409)
+        }
+        if (detail.includes('email')) {
+          return fail('Email already exists for this station', 409)
+        }
+        return fail('User already exists for this station', 409)
+      }
+
       return await serverError(err, { req, stationId: user.stationId })
     }
   },

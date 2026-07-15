@@ -1,5 +1,5 @@
 import type { SessionUser } from '@/src/shared/types'
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { query, queryOne } from '@/src/platform/db/postgres'
 import { readBody } from '@/src/platform/web/api/request'
@@ -12,8 +12,11 @@ export const runtime = 'nodejs'
 
 const PREFIX = 'proxy.'
 
-export const GET = async (req: Request, props: { params: Promise<{ key: string }> }) => {
-  const params = await props.params;
+export const GET = async (
+  req: Request,
+  props: { params: Promise<{ key: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator', 'manager'])
@@ -30,8 +33,11 @@ export const GET = async (req: Request, props: { params: Promise<{ key: string }
   }
 }
 
-export const PATCH = async (req: Request, props: { params: Promise<{ key: string }> }) => {
-  const params = await props.params;
+export const PATCH = async (
+  req: Request,
+  props: { params: Promise<{ key: string }> },
+) => {
+  const params = await props.params
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])

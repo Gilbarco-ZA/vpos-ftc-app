@@ -34,6 +34,7 @@ export const LEGACY_EXTRA = {
   CERT_PFX: 'certificate.pfx',
   CERT_PASS: 'certificate.pass',
   FISCAL_DEVICE: 'fiscal.device.json',
+  FISCAL_TOKEN: 'fiscal.token.json',
   PRINTER_TRANSACTION_QUEUE: 'printer.transaction.queue.json',
   PRINTER_REPORT_QUEUE: 'printer.report.queue.json',
   REMOTE_UPLOAD_QUEUE: 'remote.upload.queue.json',

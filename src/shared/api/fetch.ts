@@ -8,7 +8,7 @@ type ApiResult<T = any> = {
 
 function getBaseUrl() {
   const envBase = process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL
-  if (envBase) return envBase.replace(/\/$/, '');
+  if (envBase) return envBase.replace(/\/$/, '')
 
   const port = process.env.PORT || '3080'
   return `http://localhost:${port}`

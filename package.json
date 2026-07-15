@@ -1,10 +1,10 @@
 {
   "name": "@gilbarcoafs/vpos-ftc-app",
-  "version": "0.0.8",
+  "version": "0.1.2",
   "private": true,
   "main": "start.cjs",
   "engines": {
-    "node": ">=18.12.1 <19 || >=22.15.0 <23"
+    "node": ">=22.15.0 <23"
   },
   "scripts": {
     "dev": "next dev",
@@ -12,13 +12,24 @@
     "build": "next build && npm run server:gen",
     "start": "node start.cjs -p 3080",
     "start:next": "next start",
+    "test": "node scripts/run-tests.mjs",
+    "typescript": "tsc -p tsconfig.json",
     "worker": "tsx scripts/worker.ts",
     "lint": "prettier --write .",
     "fiscal:stub": "tsx scripts/fiscal-worker-stub.ts",
-    "server:gen": "npx esbuild server.ts --bundle --platform=node --format=cjs --target=node18 --outfile=vpos-server.cjs --external:next",
+    "server:gen": "npx esbuild server.ts --bundle --platform=node --format=cjs --target=node22 --outfile=vpos-server.cjs --external:next",
     "proxy-sender-worker": "ts-node scripts/proxy-sender-worker.ts",
     "update-todo": "node scripts/update-doms-todo-progress.js",
-    "test:jpl-protocol": "tsx --test tests/runtime/jplProtocol.test.ts"
+    "test:jpl-protocol": "tsx --test tests/runtime/jplProtocol.test.ts",
+    "agent:index": "tsx scripts/generate-agent-index.ts",
+    "doms:jpl-sim": "tsx scripts/doms-jpl-simulator.ts",
+    "doms:jpl-sim:validate": "tsx scripts/doms-jpl-sim-validate.ts",
+    "doms:jpl-sim:selftest": "tsx scripts/doms-jpl-sim-selftest.ts",
+    "doms:jpl-live:validate": "tsx scripts/doms-jpl-live-validate.ts",
+    "doms:jpl-session:selftest": "tsx scripts/doms-jpl-session-selftest.ts",
+    "doms:jpl-replay:selftest": "tsx --test tests/forecourt/domsTransactionReplayPolicy.test.ts tests/forecourt/domsReplayConcurrency.test.ts tests/forecourt/domsSingleFlight.test.ts tests/forecourt/domsTransactionBufferNormalization.test.ts",
+    "doms:release:evidence": "node scripts/doms-release-evidence.js",
+    "check:architecture": "node scripts/check-page-boundaries.mjs"
   },
   "dependencies": {
     "@gilbarcoafs/doms-pos-jpl": "^1.1.12",

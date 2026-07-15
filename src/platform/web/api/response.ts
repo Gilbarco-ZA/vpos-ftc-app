@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { logServerError } from '@/src/platform/observability/errorLogger'
 import { AuthError } from '@/src/shared/auth'

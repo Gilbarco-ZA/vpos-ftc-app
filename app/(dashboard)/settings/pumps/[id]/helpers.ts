@@ -123,7 +123,7 @@ export const stateVariant = (state: string) => {
 export const formatState = (state?: string | null) => {
   if (!state) return 'Unknown'
   if (state === PUMP_NOZZLE_STATE.PREAUTHORIZED) return 'PRE-AUTHORIZED'
-  return state.replace(/_/g, ' ').toUpperCase();
+  return state.replace(/_/g, ' ').toUpperCase()
 }
 
 export const formatLastSeen = (value: number | null | undefined) => {

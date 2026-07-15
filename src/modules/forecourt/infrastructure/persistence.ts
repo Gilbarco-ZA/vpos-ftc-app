@@ -2,6 +2,7 @@ import { query, txQuery, withTransaction } from '@/src/platform/db/postgres'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import { extractJplUnattendedReceiptCapture } from '@/src/modules/forecourt/infrastructure/jpl/unattendedTransactions'
 import { normalizeForecourtEvent } from '@/src/modules/forecourt/infrastructure/normalize'
 
 type ForecourtEventInsert = {
@@ -198,11 +199,17 @@ async function materializeForecourtEventState(args: {
 
     if (norm.transactions?.length) {
       for (const t of norm.transactions) {
+        const unattendedCapture = extractJplUnattendedReceiptCapture(t.raw ?? t)
+
         await txQuery(
           client,
           `INSERT INTO forecourt_transactions
-             (id, station_id, fp_id, is_supported, trans_seq_no, sm_id, trans_lock_id, trans_info_mask, money_due, volume, occurred_at, raw)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+             (id, station_id, fp_id, is_supported, trans_seq_no, sm_id, trans_lock_id, trans_info_mask,
+              money_due, volume, occurred_at, raw,
+              doms_external_payment_reference, doms_ept_id, doms_ept_sequence_no,
+              doms_ept_receipt_format_id, doms_receipt_no, doms_card_label,
+              doms_card_pan_masked, doms_unattended_receipt_json, doms_unattended_payment_json)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
           [
             uuidv4(),
             stationId,
@@ -216,6 +223,15 @@ async function materializeForecourtEventState(args: {
             t.volume ?? null,
             occurredAt,
             t.raw ?? {},
+            unattendedCapture.externalPaymentReference ?? null,
+            unattendedCapture.eptId ?? null,
+            unattendedCapture.eptSeqNo ?? null,
+            unattendedCapture.eptReceiptFormatId ?? null,
+            unattendedCapture.receiptNo ?? null,
+            unattendedCapture.cardLabel ?? null,
+            unattendedCapture.cardPanMasked ?? null,
+            unattendedCapture.receiptJson ?? null,
+            unattendedCapture.paymentJson ?? null,
           ],
         )
       }

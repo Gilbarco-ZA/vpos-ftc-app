@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 import { bootstrapStationConfig } from '@/src/platform/config/loader'
 import { queryOne } from '@/src/platform/db/postgres'

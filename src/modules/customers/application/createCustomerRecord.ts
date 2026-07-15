@@ -44,7 +44,9 @@ export async function createCustomerRecord(params: {
   }
 
   const data = parsed.data
-  const stationCountry = String(params.stationCountry || 'TZ')
+  const stationCountry = String(
+    params.stationCountry || process.env.COUNTRY_CODE || 'UN',
+  )
     .trim()
     .toUpperCase()
   const normalizedCountry = String(data.country || stationCountry)

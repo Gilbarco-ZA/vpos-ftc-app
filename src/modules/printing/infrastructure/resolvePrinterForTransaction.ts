@@ -43,7 +43,7 @@ export const parseAssignedPumpIds = (
           .map((item) => toFiniteNumber(item))
           .filter((item): item is number => item != null && item > 0),
       ),
-    );
+    )
   }
 
   return []

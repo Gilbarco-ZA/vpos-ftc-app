@@ -12,6 +12,7 @@ export const PROCESS_NAME_ALIASES: Record<string, string> = {
   printjobsworker: 'printJobsWorker',
   reportqueueworker: 'reportQueueWorker',
   proxysenderworker: 'proxySenderWorker',
+  ewuraretryworker: 'ewuraRetryWorker',
   transactionfiscalizationscheduler: 'transactionFiscalizationScheduler',
   archiveexportworker: 'archiveExportWorker',
 
@@ -43,6 +44,11 @@ export const PROCESS_NAME_ALIASES: Record<string, string> = {
   proxysender: 'proxySenderWorker',
   proxyworker: 'proxySenderWorker',
 
+  ewura: 'ewuraRetryWorker',
+  'ewura-retry': 'ewuraRetryWorker',
+  'ewura-retry-worker': 'ewuraRetryWorker',
+  ewuraworker: 'ewuraRetryWorker',
+
   scheduler: 'transactionFiscalizationScheduler',
   fiscalizationscheduler: 'transactionFiscalizationScheduler',
   'transaction-fiscalization-scheduler': 'transactionFiscalizationScheduler',
@@ -63,6 +69,7 @@ export const CORE_PROCESS_NAMES = [
   'printJobsWorker',
   'reportQueueWorker',
   'proxySenderWorker',
+  'ewuraRetryWorker',
   'transactionFiscalizationScheduler',
   'archiveExportWorker',
 ] as const

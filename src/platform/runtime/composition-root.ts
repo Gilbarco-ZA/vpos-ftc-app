@@ -11,6 +11,7 @@ import {
 } from './env'
 import {
   RuntimeWorkerStopHandle,
+  startEwuraRetryRuntimeWorker,
   startForecourtConfigSyncRuntimeWorker,
   startInProcessRuntimeServices,
   startPosCommandsRuntimeWorker,
@@ -83,6 +84,10 @@ export function startDedicatedWorkerProcess() {
     process.env.FORECOURT_SYNC_POLL_MS,
     10 * 60_000,
   )
+  const ewuraRetryPollMs = parseRuntimeInterval(
+    process.env.VPOS_EWURA_RETRY_POLL_MS,
+    30_000,
+  )
 
   const stationId = requireRuntimeStationId('worker')
 
@@ -109,6 +114,9 @@ export function startDedicatedWorkerProcess() {
       toStopFn(
         startTransactionFiscalizationRuntimeWorker({ pollMs: txPollMs }),
       ),
+    )
+    stopFns.push(
+      toStopFn(startEwuraRetryRuntimeWorker({ pollMs: ewuraRetryPollMs })),
     )
   }
 

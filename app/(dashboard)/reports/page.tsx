@@ -6,18 +6,16 @@ import { ManagerReportsClient } from '@/components/reports/ManagerReportsClient'
 
 export const dynamic = 'force-dynamic'
 
-const ReportsPage = async (
-  props: {
-    searchParams?: Promise<{
-      preset?: any
-      startDate?: any
-      endDate?: any
-      pumpNumber?: any
-      status?: any
-    }>
-  }
-) => {
-  const searchParams = await props.searchParams;
+const ReportsPage = async (props: {
+  searchParams?: Promise<{
+    preset?: any
+    startDate?: any
+    endDate?: any
+    pumpNumber?: any
+    status?: any
+  }>
+}) => {
+  const searchParams = await props.searchParams
   const user = await requireAuth(['manager', 'administrator'])
   if (!['manager', 'administrator'].includes(user.role)) {
     redirect('/dashboard')

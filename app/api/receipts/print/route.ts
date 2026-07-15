@@ -11,7 +11,10 @@ import { parsePrinterDeviceConfig } from '@/src/modules/printing/infrastructure/
 import { printJobsRepo } from '@/src/modules/printing/infrastructure/printJobsRepo'
 import { resolvePrinterForTransaction } from '@/src/modules/printing/infrastructure/resolvePrinterForTransaction'
 import { markTransactionReceiptPrinted } from '@/src/modules/transactions/application/commands'
-import { getOrCreateLatestTransactionReceipt } from '@/src/modules/transactions/application/queries'
+import {
+  getOrCreateLatestTransactionReceipt,
+  getTransactionReceipt,
+} from '@/src/modules/transactions/application/queries'
 
 export const POST = async (req: Request) => {
   let user: SessionUser | null = null
@@ -37,6 +40,10 @@ export const POST = async (req: Request) => {
       transactionId,
     )
     if (!receipt) return fail('Receipt not found for transaction', 404)
+    const currentReceipt = await getTransactionReceipt(
+      user.stationId,
+      transactionId,
+    )
 
     const pumpNumber = await printJobsRepo.getTransactionPumpNumber(
       user.stationId,
@@ -72,10 +79,11 @@ export const POST = async (req: Request) => {
         source: 'vpos.transaction-receipt',
         transactionId,
         receiptId: String(receipt.id),
-        receiptNumber: receipt.receipt_number,
+        receiptNumber: currentReceipt?.receiptNumber ?? receipt.receipt_number,
         isReprint,
-        htmlContent: receipt.html_content,
-        plainTextContent: receipt.plain_text_content ?? '',
+        htmlContent: currentReceipt?.htmlContent ?? receipt.html_content,
+        plainTextContent:
+          currentReceipt?.plainTextContent ?? receipt.plain_text_content ?? '',
         pumpNumber: pumpNumber ?? undefined,
       },
     }
@@ -96,9 +104,10 @@ export const POST = async (req: Request) => {
 
     return ok({
       receiptId: receipt.id,
-      receiptNumber: receipt.receipt_number,
-      htmlContent: receipt.html_content,
-      plainTextContent: receipt.plain_text_content,
+      receiptNumber: currentReceipt?.receiptNumber ?? receipt.receipt_number,
+      htmlContent: currentReceipt?.htmlContent ?? receipt.html_content,
+      plainTextContent:
+        currentReceipt?.plainTextContent ?? receipt.plain_text_content,
       print: printResult,
     })
   } catch (err: any) {

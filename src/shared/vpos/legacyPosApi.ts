@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
 
 export function legacyJson<T>(payload: T, init?: ResponseInit) {
   return NextResponse.json(payload as any, init)

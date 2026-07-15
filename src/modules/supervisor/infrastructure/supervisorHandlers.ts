@@ -138,6 +138,8 @@ export const supervisorReloadConfigResponse = async (
   stationId: string,
   runtime?: SupervisorRuntime,
 ): Promise<HandlerResponse<any>> => {
-  const data = await getRuntimeManager(stationId).reloadConfig()
+  const data = runtime
+    ? await runtime.reloadConfig()
+    : await getRuntimeManager(stationId).reloadConfig()
   return { status: 200, body: { success: true, data } }
 }

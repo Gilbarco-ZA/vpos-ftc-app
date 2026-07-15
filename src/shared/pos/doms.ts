@@ -1,8 +1,26 @@
 import { sendPosCommand } from '@/src/shared/vpos/posControlClient'
 
 export type PosDomsRouteCommand =
+  | 'getFpGradeTotals'
+  | 'getPumpGradeTotals'
+  | 'getPumpGradeBlendTotals'
+  | 'getFallbackTotals'
+  | 'clearFallbackTotals'
+  | 'getTankControlStatus'
+  | 'markDeliveryStarting'
+  | 'markDeliveryFinished'
+  | 'blockTank'
+  | 'unblockTank'
+  | 'clearTgError'
+  | 'resetTg'
+  | 'getFcDateTime'
+  | 'changeFcDateTime'
+  | 'getFcOperationModeStatus'
+  | 'changeFcOperationMode'
+  | 'utilEcho'
   | 'changeDynamicTankData'
   | 'changeGradePrices'
+  | 'clearPendingPriceSet'
   | 'getAllTankDeliveryData'
   | 'getAllTgData'
   | 'getSiteDeliveryStatus'
@@ -16,8 +34,26 @@ export type PosDomsRouteCommand =
   | 'getTgErrorMsg'
 
 const POS_DOMS_COMMAND_TYPES: Record<PosDomsRouteCommand, string> = {
+  getFpGradeTotals: 'GET_FP_GRADE_TOTALS',
+  getPumpGradeTotals: 'GET_PUMP_GRADE_TOTALS',
+  getPumpGradeBlendTotals: 'GET_PUMP_GRADE_BLEND_TOTALS',
+  getFallbackTotals: 'GET_FALLBACK_TOTALS',
+  clearFallbackTotals: 'CLEAR_FALLBACK_TOTALS',
+  getTankControlStatus: 'GET_TANK_CONTROL_STATUS',
+  markDeliveryStarting: 'MARK_DELIVERY_STARTING',
+  markDeliveryFinished: 'MARK_DELIVERY_FINISHED',
+  blockTank: 'BLOCK_TANK',
+  unblockTank: 'UNBLOCK_TANK',
+  clearTgError: 'CLEAR_TG_ERROR',
+  resetTg: 'RESET_TG',
+  getFcDateTime: 'GET_FC_DATE_TIME',
+  changeFcDateTime: 'CHANGE_FC_DATE_TIME',
+  getFcOperationModeStatus: 'GET_FC_OPERATION_MODE_STATUS',
+  changeFcOperationMode: 'CHANGE_FC_OPERATION_MODE',
+  utilEcho: 'UTIL_ECHO',
   changeDynamicTankData: 'CHANGE_DYNAMIC_TANK_DATA',
   changeGradePrices: 'CHANGE_GRADE_PRICES',
+  clearPendingPriceSet: 'CLEAR_PENDING_PRICE_SET',
   getAllTankDeliveryData: 'GET_ALL_TANK_DELIVERY_DATA',
   getAllTgData: 'GET_ALL_TG_DATA',
   getSiteDeliveryStatus: 'GET_SITE_DELIVERY_STATUS',

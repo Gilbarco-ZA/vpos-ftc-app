@@ -79,6 +79,7 @@
 .light {
   --brand-primary: #ffffff;
   --brand-secondary: #f5f5f5;
+  --brand-primary-foreground: #0a0a0a;
   --brand-accent: #2563eb;
 
   --surface-page: #f5f5f5;

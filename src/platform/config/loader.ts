@@ -13,10 +13,13 @@ import { getEffectiveSystemConfiguration } from '@/src/platform/config/effective
 import { kvGet } from '@/src/platform/config/station-kv'
 import { query, queryOne, toCamelCase } from '@/src/platform/db/postgres'
 import { systemConfigSchema } from '@/src/shared/config/schema'
+import {
+  getPreferredNetworkHost,
+  resolveProductionHost,
+} from '@/src/shared/forecourt/runtimeConfigShared'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 const DEFAULT_SCHEMA_VERSION = 'vpos-app-1'
-const DEFAULT_API_HOST = '127.0.0.1'
 const DEFAULT_API_PORT = 4101
 
 type SiteProfileKv = {
@@ -176,7 +179,7 @@ export const importConfigFromJson = async (
   configPath: string,
 ): Promise<StationConfigRow | null> => {
   try {
-    const raw = await fs.readFile(configPath, 'utf-8')
+    const raw = await fs.readFile(/*turbopackIgnore: true*/ configPath, 'utf-8')
     const parsed = JSON.parse(raw) as unknown
     const configJson = normalizeConfigPayload(parsed)
     const checksum = hashString(raw)
@@ -258,7 +261,10 @@ const buildMinimalConfig = (): JsonObject => {
           debugPort: 9229,
           config: {
             port: port,
-            host: process.env.VPOS_API_HOST || DEFAULT_API_HOST,
+            host: resolveProductionHost(
+              process.env.VPOS_API_HOST,
+              getPreferredNetworkHost(),
+            ),
           },
           plugins: [
             {
@@ -295,20 +301,24 @@ const resolveCandidatePaths = (): string[] => {
 
   if (envPath) candidates.push(envPath)
   if (envDir) {
-    candidates.push(path.join(envDir, 'vpos.config.json'))
-    candidates.push(path.join(envDir, 'config.json'))
+    candidates.push(
+      path.join(/*turbopackIgnore: true*/ envDir, 'vpos.config.json'),
+    )
+    candidates.push(path.join(/*turbopackIgnore: true*/ envDir, 'config.json'))
   }
 
   const cwd = process.cwd()
-  candidates.push(path.join(cwd, 'vpos.config.json'))
-  candidates.push(path.join(cwd, 'config.json'))
-  candidates.push(path.join(cwd, 'vpos.config.example.json'))
+  candidates.push(path.join(/*turbopackIgnore: true*/ cwd, 'vpos.config.json'))
+  candidates.push(path.join(/*turbopackIgnore: true*/ cwd, 'config.json'))
+  candidates.push(
+    path.join(/*turbopackIgnore: true*/ cwd, 'vpos.config.example.json'),
+  )
   return candidates
 }
 
 const exists = async (candidate: string): Promise<boolean> => {
   try {
-    await fs.access(candidate)
+    await fs.access(/*turbopackIgnore: true*/ candidate)
     return true
   } catch {
     return false

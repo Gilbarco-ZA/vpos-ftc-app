@@ -1,5 +1,9 @@
 'use client'
 
+import type {
+  PosCatalogCategory,
+  PosCatalogProduct,
+} from '@/src/modules/pos/contracts/catalog'
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -21,29 +25,8 @@ import {
 import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
 
-type PosCategory = {
-  id: string
-  code: string
-  name: string
-  description?: string | null
-  icon?: string | null
-  imagePath?: string | null
-  productCount?: number | null
-}
-
-type PosProduct = {
-  id: string
-  externalProductId?: string | null
-  productCode?: string | null
-  productName: string
-  unitPrice: number
-  currency?: string | null
-  unitOfMeasure?: string | null
-  categoryId?: string | null
-  categoryName?: string | null
-  categoryIcon?: string | null
-  categoryImagePath?: string | null
-}
+type PosCategory = PosCatalogCategory
+type PosProduct = PosCatalogProduct
 
 type PosLine = {
   productId: string
