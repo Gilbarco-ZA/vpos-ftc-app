@@ -7,7 +7,7 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
     <div
       ref={ref}
       className={cx(
-        'rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-card transition-all duration-200 ease-out',
+        'rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-card backdrop-blur-xl transition-all duration-200 ease-out hover:border-[var(--neon-cyan)] hover:shadow-[0_0_20px_rgba(0,245,255,0.1)]',
         className,
       )}
       {...props}
@@ -35,7 +35,7 @@ export const CardTitle = forwardRef<
   <h3
     ref={ref}
     className={cx(
-      'text-[15px] font-semibold text-[var(--text-primary)]',
+      'text-[15px] font-semibold bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--text-primary)] to-[var(--text-primary)] bg-clip-text text-transparent transition-all duration-300',
       className,
     )}
     {...props}

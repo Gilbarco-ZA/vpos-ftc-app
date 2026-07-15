@@ -10,7 +10,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <input
         ref={ref}
         className={cx(
-          'h-10 w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3.5 text-sm text-[var(--text-primary)] outline-none transition-all duration-200 ease-out placeholder:text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] focus-visible:border-blue-500/50 focus-visible:bg-[var(--surface-elevated)] focus-visible:ring-2 focus-visible:ring-blue-500/20',
+          'h-10 w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3.5 text-sm text-[var(--text-primary)] outline-none transition-all duration-200 ease-out placeholder:text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] focus-visible:border-[var(--neon-cyan)] focus-visible:bg-[var(--surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--neon-cyan)]/20 focus-visible:shadow-[0_0_12px_rgba(0,245,255,0.2)]',
           className,
         )}
         {...props}
