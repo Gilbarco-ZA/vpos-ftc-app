@@ -243,11 +243,11 @@ export const SidebarContent = ({
   return (
     <div className={className}>
       {/* Header with branding */}
-      <div className="border-b border-[var(--border-default)] px-4 py-5">
+      <div className="border-b border-[var(--border-neon-cyan)] px-4 py-5 bg-gradient-to-r from-[var(--surface-page)] via-[var(--surface-page)]/95 to-[var(--surface-page)] shadow-[0_0_20px_rgba(0,245,255,0.05)]">
         <div className="flex items-start justify-between gap-3">
           <div className={collapsed ? 'sr-only' : 'animate-fade-in'}>
             <div className="flex items-center gap-3">
-              <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-muted)] transition-all duration-300 hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]">
+              <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border-2 border-[var(--neon-cyan)] bg-[var(--surface-muted)] transition-all duration-300 hover:border-[var(--neon-magenta)] hover:shadow-[0_0_16px_rgba(0,245,255,0.3)]">
                 {branding?.logoPath ? (
                   <img
                     src={branding.logoPath}
@@ -389,7 +389,7 @@ export const SidebarContent = ({
                         title={collapsed ? item.label : undefined}
                       >
                         {active ? (
-                          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-blue-500 transition-all duration-300" />
+                          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--neon-green)] transition-all duration-300 shadow-[0_0_12px_rgba(57,255,20,0.6)]" />
                         ) : null}
                         <span className={collapsed ? 'sr-only' : ''}>
                           {item.label}
@@ -458,7 +458,7 @@ export const Sidebar = ({ role, branding }: SidebarProps) => {
   return (
     <aside
       className={
-        'sticky top-0 flex h-screen flex-col border-r border-[var(--border-default)] bg-[var(--surface-page)] shadow-sm transition-all duration-300 ease-out ' +
+        'sticky top-0 flex h-screen flex-col border-r-2 border-[var(--border-neon-cyan)] bg-[var(--surface-page)] shadow-[0_0_30px_rgba(0,245,255,0.1)] transition-all duration-300 ease-out ' +
         (collapsed ? 'w-[72px]' : 'w-64')
       }
     >
