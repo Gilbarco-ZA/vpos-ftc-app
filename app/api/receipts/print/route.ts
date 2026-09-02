@@ -103,11 +103,14 @@ export const POST = async (req: Request) => {
       )
     }
 
+    const correlationId = uuidv4()
     const printPayload = {
       type: 'receipt',
       copies: 1,
-      correlationId: uuidv4(),
-      idempotencyKey: `doms-receipt:${transactionId}:${receipt.id}:${isReprint ? 'reprint' : 'initial'}`,
+      correlationId,
+      idempotencyKey: isReprint
+        ? `doms-receipt:${transactionId}:${receipt.id}:reprint:${correlationId}`
+        : `doms-receipt:${transactionId}:${receipt.id}:initial`,
       // Keep only the configured printer identity on the job. The worker resolves
       // host/port/width/timeout from device_configs, matching Admin → Printers.
       printerKey: resolvedPrinter.deviceKey || undefined,
