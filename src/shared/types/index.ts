@@ -90,6 +90,10 @@ export type AuditAction =
   | 'SYNC_STARTED'
   | 'RECEIPT_REPRINTED'
   | 'RECEIPT_PRINTED'
+  | 'STORAGE_RETENTION_POLICY_UPDATED'
+  | 'STORAGE_RETENTION_RUN_REQUESTED'
+  | 'PRINT_JOB_RETRIED'
+  | 'PRINT_JOB_CLEARED'
   | 'APPLICATION_SERVICE_RESTART_REQUESTED'
   | 'DATABASE_BACKUP_CREATED'
   | 'FULL_SYSTEM_BACKUP_CREATED'
@@ -117,37 +121,3 @@ export type ProductDevFlowOverride =
   | 'dual-write'
   | 'offline'
   | 'timeout'
-
-export type Product = {
-  id: string
-  stationId: string
-  productId: string
-  productCode: string
-  productName: string
-  productClassCode: string
-  productTypeCode: string
-  sku?: string
-  barcode?: string
-  unitPrice: number
-  unitCost: number
-  currency: string
-  taxRate: number
-  category?: string
-  categoryId?: string
-  categoryIcon?: string | null
-  categoryImagePath?: string | null
-  unitOfMeasure?: string
-  unitOfPackaging?: string
-  packSize?: string
-  taxCode?: string
-  commodityCode?: string
-  hazardousIndicator?: boolean
-  devFlowOverride?: ProductDevFlowOverride | null
-  lastSyncStatus?: ProductSyncStatus
-  lastSyncAt?: string | null
-}
-
-export type SelectOption = {
-  label: string
-  value: string
-}
