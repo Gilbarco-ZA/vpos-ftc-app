@@ -29,6 +29,8 @@ export type IngestJplTransactionArgs = {
   fuelType?: string | null
   amount?: number | null
   volume?: number | null
+  /** DOMS transaction Price_e/Price after station decimal scaling. */
+  unitPrice?: number | null
   occurredAt?: Date | string | number | null
   /** Stable identity for one physical DOMS transaction incarnation. */
   transactionIdentity: string
@@ -70,6 +72,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
   const dt = resolveTxnDateTime(args.occurredAt) ?? new Date()
   const amount = numOrNull(args.amount)
   const volume = numOrNull(args.volume)
+  const unitPrice = numOrNull(args.unitPrice)
   const totalAmount = amount != null ? Number(amount.toFixed(2)) : null
   const fuelType = strOrNull(args.fuelType)
   const nozzleId = strOrNull(args.nozzleId)
@@ -88,6 +91,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
     fuelType,
     amount: totalAmount,
     volume,
+    unitPrice,
     occurredAt: dt.toISOString(),
     transactionIdentity,
   }
@@ -382,6 +386,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
       lockId: lockId ?? 'na',
       totalAmount,
       volume,
+      unitPrice,
       fuelType,
       posReference,
       sourceMode,
@@ -399,6 +404,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
       lockId: lockId ?? 'na',
       totalAmount,
       volume,
+      unitPrice,
       fuelType,
       posReference,
       sourceMode,
