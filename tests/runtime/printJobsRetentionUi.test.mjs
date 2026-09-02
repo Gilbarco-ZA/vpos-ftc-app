@@ -24,12 +24,14 @@ test('runtime polls station retention settings without restart', () => {
   assert.match(supervisor, /startStationStorageRetentionWorker/)
 })
 
-test('printer settings exposes retention controls and manual cleanup', () => {
-  const page = read('app/(dashboard)/admin/config/printers/page.tsx')
+test('station settings exposes retention controls and manual cleanup', () => {
+  const page = read('app/(dashboard)/admin/settings/client.tsx')
+  const printerPage = read('app/(dashboard)/admin/config/printers/page.tsx')
   const card = read('components/admin/printing/RetentionSettingsCard.tsx')
   const api = read('app/api/admin/config/retention/route.ts')
   const runApi = read('app/api/admin/config/retention/run/route.ts')
   assert.match(page, /RetentionSettingsCard/)
+  assert.doesNotMatch(printerPage, /RetentionSettingsCard/)
   assert.match(card, /Enable automatic retention/)
   assert.match(card, /Dry-run only/)
   assert.match(card, /Successful printer test jobs/)
