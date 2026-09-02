@@ -9,21 +9,21 @@ import type {
 } from '@/components/products/products.types'
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 
 import { ErrorState } from '@/components/errors/ErrorState'
 import { EditProductSheet } from '@/components/products/EditProductSheet'
-import { ProductCategoriesSheet } from '@/components/products/ProductCategoriesSheet'
 import { ProductEventLogSheet } from '@/components/products/ProductEventLogSheet'
 import { normalizeStatus } from '@/components/products/products.utils'
 import { ProductsAddSheetWrapper } from '@/components/products/ProductsAddSheetWrapper'
 import { ProductsFiltersRow } from '@/components/products/ProductsFiltersRow'
+import { ProductsImportSheet } from '@/components/products/ProductsImportSheet'
 import { ProductsTable } from '@/components/products/ProductsTable'
 import { ProductStatusSheet } from '@/components/products/ProductStatusSheet'
 import {
   ProductsUIContext,
   useProductsUI,
 } from '@/components/products/useProductsUI'
+import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ToastItem, ToastVariant, ToastViewport } from '@/components/ui/toast'
@@ -31,11 +31,21 @@ import { ToastItem, ToastVariant, ToastViewport } from '@/components/ui/toast'
 type ProductsPageClientProps = {
   initialProducts: ProductListItem[]
   error?: string | null
-  currencyOptions: string[]
   defaultCurrency: string
   taxTypeOptions: import('@/components/products/products.types').ConfigOption[]
   isDevEnv: boolean
+  isRefreshing: boolean
+  onRefresh: () => Promise<void>
   children: ReactNode
+}
+
+export const ProductsImportButton = () => {
+  const { openImport } = useProductsUI()
+  return (
+    <Button variant="secondary" onClick={openImport}>
+      Import CSV
+    </Button>
+  )
 }
 
 export const ProductsAddButton = () => {
@@ -55,18 +65,18 @@ export const ProductsScheduleButton = () => {
 }
 
 export const ProductsManageCategoriesButton = () => {
-  const { openCategories } = useProductsUI()
   return (
-    <Button variant="secondary" onClick={openCategories}>
-      Manage categories
+    <Button asChild variant="secondary">
+      <Link href="/admin/products/categories">Manage categories</Link>
     </Button>
   )
 }
 
 export const ProductsPageActions = () => (
-  <div className="flex items-center gap-2">
+  <div className="flex flex-wrap items-center gap-2">
     <ProductsManageCategoriesButton />
     <ProductsScheduleButton />
+    <ProductsImportButton />
     <ProductsAddButton />
   </div>
 )
@@ -75,18 +85,18 @@ const ProductsPageClient = ({
   initialProducts,
   error,
   children,
-  currencyOptions,
   defaultCurrency,
   taxTypeOptions,
   isDevEnv,
+  isRefreshing,
+  onRefresh,
 }: ProductsPageClientProps) => {
-  const router = useRouter()
-
   const [products, setProducts] = useState<ProductListItem[]>(initialProducts)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<ProductStatus | 'ALL'>('ALL')
+  const [csrfToken, setCsrfToken] = useState('')
   const [isAddOpen, setIsAddOpen] = useState(false)
-  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const [statusProduct, setStatusProduct] = useState<ProductListItem | null>(
     null,
   )
@@ -99,7 +109,7 @@ const ProductsPageClient = ({
   >([])
 
   useEffect(() => {
-    setProducts(initialProducts)
+    queueMicrotask(() => setProducts(initialProducts))
   }, [initialProducts])
 
   const showToast = useCallback((variant: ToastVariant, message: string) => {
@@ -133,15 +143,17 @@ const ProductsPageClient = ({
   const contextValue = useMemo<ProductsUIContextValue>(
     () => ({
       openAdd: () => setIsAddOpen(true),
+      openImport: () => setIsImportOpen(true),
       closeAdd: () => setIsAddOpen(false),
-      openCategories: () => setIsCategoriesOpen(true),
       addProduct,
       showToast,
     }),
     [addProduct, showToast],
   )
 
-  const refresh = () => router.refresh()
+  const refresh = useCallback(() => {
+    void onRefresh()
+  }, [onRefresh])
 
   const handleResync = async (product: ProductListItem) => {
     try {
@@ -155,7 +167,7 @@ const ProductsPageClient = ({
         return
       }
       showToast('success', body?.data?.message ?? 'Sync triggered')
-      router.refresh()
+      await onRefresh()
     } catch (err: any) {
       showToast('error', err?.message ?? 'Sync failed')
     }
@@ -209,27 +221,47 @@ const ProductsPageClient = ({
           lastSynced: created.lastSyncAt ? String(created.lastSyncAt) : null,
         })
       }
-      router.refresh()
+      void onRefresh()
     },
-    [addProduct, router],
+    [addProduct, onRefresh],
   )
 
   return (
     <ProductsUIContext.Provider value={contextValue}>
+      <CsrfBootstrap onToken={setCsrfToken} />
       {children}
-      <ProductCategoriesSheet
-        open={isCategoriesOpen}
-        onOpenChange={setIsCategoriesOpen}
-        onSaved={() => {
-          showToast('success', 'Product categories updated')
-          router.refresh()
+      <ProductsImportSheet
+        isOpen={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        csrfToken={csrfToken}
+        onImported={(result) => {
+          const proxyWarning =
+            result.stockProxyFailureCount > 0
+              ? ` ${result.stockProxyFailureCount} stock update${result.stockProxyFailureCount === 1 ? '' : 's'} require retry from Product Stock.`
+              : ''
+          const proxyPendingWarning =
+            result.stockProxyPendingCount > 0
+              ? ` ${result.stockProxyPendingCount} stock update${result.stockProxyPendingCount === 1 ? ' remains' : 's remain'} pending until product sync succeeds.`
+              : ''
+          const productSyncWarning =
+            result.productSync && result.productSync.status !== 'synced'
+              ? ` ${result.productSync.message}`
+              : ''
+          const hasWarnings =
+            result.stockProxyFailureCount > 0 ||
+            result.stockProxyPendingCount > 0 ||
+            productSyncWarning.length > 0
+          showToast(
+            hasWarnings ? 'info' : 'success',
+            `Imported ${result.importedProductCount} product${result.importedProductCount === 1 ? '' : 's'} and created ${result.stockMovementCount} stock movement${result.stockMovementCount === 1 ? '' : 's'}.${proxyWarning}${proxyPendingWarning}${productSyncWarning}`,
+          )
+          void onRefresh()
         }}
       />
 
       <ProductsAddSheetWrapper
         isOpen={isAddOpen}
         onOpenChange={setIsAddOpen}
-        currencyOptions={currencyOptions}
         defaultCurrency={defaultCurrency}
         taxTypeOptions={taxTypeOptions}
         isDevEnv={isDevEnv}
@@ -243,14 +275,13 @@ const ProductsPageClient = ({
           if (!open) setEditProductId(null)
         }}
         productId={editProductId}
-        currencyOptions={currencyOptions}
         defaultCurrency={defaultCurrency}
         taxTypeOptions={taxTypeOptions}
         isDevEnv={isDevEnv}
         onSaved={() => {
           setEditProductId(null)
           showToast('success', 'Product updated')
-          router.refresh()
+          void onRefresh()
         }}
       />
 
@@ -283,6 +314,7 @@ const ProductsPageClient = ({
             onSearchChange={setSearch}
             onStatusChange={setStatus}
             onRefresh={refresh}
+            isRefreshing={isRefreshing}
           />
           {filteredProducts.length === 0 ? (
             <EmptyState

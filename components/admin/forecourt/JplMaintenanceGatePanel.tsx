@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
+import { CollapsibleStatusSection } from '@/components/admin/forecourt/CollapsibleStatusSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 
 const fmtTs = (value: unknown) => {
   if (value == null || value === '') return '—'
@@ -75,7 +75,7 @@ export function JplMaintenanceGatePanel() {
   const [cancelNote, setCancelNote] = useState('')
   const [cancelConfirm, setCancelConfirm] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -91,22 +91,24 @@ export function JplMaintenanceGatePanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void load()
+    queueMicrotask(() => {
+      void load()
+    })
     fetch('/api/security/csrf', { cache: 'no-store' })
       .then((response) => response.json())
       .then((data) => {
         if (typeof data?.token === 'string') setCsrfToken(data.token)
       })
       .catch(() => setCsrfToken(''))
-  }, [])
+  }, [load])
 
   const sessions = payload?.sessions ?? []
   const pendingSession = payload?.pendingSession ?? null
   const activeSession = payload?.activeSession ?? null
-  const latestSession = useMemo(() => sessions[0] ?? null, [sessions])
+  const latestSession = sessions[0] ?? null
   const currentSession = pendingSession ?? activeSession
 
   const submit = async (
@@ -201,8 +203,13 @@ export function JplMaintenanceGatePanel() {
     cancelConfirm
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
+    <CollapsibleStatusSection
+      title="DOMS maintenance approval gate"
+      status={currentSession?.status ?? 'idle'}
+      statusVariant={variantForStatus(currentSession?.status)}
+      contentClassName="p-4 pt-0"
+    >
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-base font-semibold">
@@ -273,194 +280,224 @@ export function JplMaintenanceGatePanel() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="rounded border bg-[var(--surface-card)] p-3">
-            <div className="mb-2 text-sm font-semibold">
-              Request maintenance session
+        <div className="grid grid-cols-1 gap-4">
+          <CollapsibleStatusSection
+            title="Request maintenance session"
+            status={
+              pendingSession
+                ? 'pending'
+                : activeSession
+                  ? 'approved'
+                  : 'available'
+            }
+            statusVariant={
+              pendingSession
+                ? STATUS_VARIANT.INFO
+                : activeSession
+                  ? STATUS_VARIANT.SUCCESS
+                  : STATUS_VARIANT.NEUTRAL
+            }
+            contentClassName="p-3 pt-0"
+          >
+            <div className="rounded border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 text-sm font-semibold">
+                Request maintenance session
+              </div>
+              <div className="space-y-3">
+                <textarea
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Required reason, for example: compare PSS Configurator export against FTC reconciliation before supervised maintenance."
+                  className="min-h-20 w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
+                />
+                <input
+                  value={requestedWindow}
+                  onChange={(event) => setRequestedWindow(event.target.value)}
+                  placeholder="Optional maintenance window, for example: 2026-07-09 22:00 SAST"
+                  className="w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
+                />
+                <textarea
+                  value={requestNote}
+                  onChange={(event) => setRequestNote(event.target.value)}
+                  placeholder="Optional request note"
+                  className="min-h-16 w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
+                />
+                <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={requestConfirmDryRun}
+                    onChange={(event) =>
+                      setRequestConfirmDryRun(event.target.checked)
+                    }
+                    className="mt-1"
+                  />
+                  <span>I understand this records an approval gate only.</span>
+                </label>
+                <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={requestConfirmNoCommand}
+                    onChange={(event) =>
+                      setRequestConfirmNoCommand(event.target.checked)
+                    }
+                    className="mt-1"
+                  />
+                  <span>
+                    I confirm no DOMS/PSS command will be sent by this action.
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={requestConfirmPssChecked}
+                    onChange={(event) =>
+                      setRequestConfirmPssChecked(event.target.checked)
+                    }
+                    className="mt-1"
+                  />
+                  <span>
+                    I have reviewed, or will review, PSS Configurator / physical
+                    site context before any maintenance work.
+                  </span>
+                </label>
+                <Button
+                  type="button"
+                  onClick={requestSession}
+                  disabled={!canRequest}
+                >
+                  {submitting ? 'Recording...' : 'Request session'}
+                </Button>
+              </div>
             </div>
-            <div className="space-y-3">
-              <textarea
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Required reason, for example: compare PSS Configurator export against FTC reconciliation before supervised maintenance."
-                className="min-h-20 w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
-              />
-              <input
-                value={requestedWindow}
-                onChange={(event) => setRequestedWindow(event.target.value)}
-                placeholder="Optional maintenance window, for example: 2026-07-09 22:00 SAST"
-                className="w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
-              />
-              <textarea
-                value={requestNote}
-                onChange={(event) => setRequestNote(event.target.value)}
-                placeholder="Optional request note"
-                className="min-h-16 w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
-              />
-              <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-                <input
-                  type="checkbox"
-                  checked={requestConfirmDryRun}
-                  onChange={(event) =>
-                    setRequestConfirmDryRun(event.target.checked)
-                  }
-                  className="mt-1"
-                />
-                <span>I understand this records an approval gate only.</span>
-              </label>
-              <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-                <input
-                  type="checkbox"
-                  checked={requestConfirmNoCommand}
-                  onChange={(event) =>
-                    setRequestConfirmNoCommand(event.target.checked)
-                  }
-                  className="mt-1"
-                />
-                <span>
-                  I confirm no DOMS/PSS command will be sent by this action.
-                </span>
-              </label>
-              <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-                <input
-                  type="checkbox"
-                  checked={requestConfirmPssChecked}
-                  onChange={(event) =>
-                    setRequestConfirmPssChecked(event.target.checked)
-                  }
-                  className="mt-1"
-                />
-                <span>
-                  I have reviewed, or will review, PSS Configurator / physical
-                  site context before any maintenance work.
-                </span>
-              </label>
-              <Button
-                type="button"
-                onClick={requestSession}
-                disabled={!canRequest}
-              >
-                {submitting ? 'Recording...' : 'Request session'}
-              </Button>
-            </div>
-          </div>
+          </CollapsibleStatusSection>
 
-          <div className="rounded border bg-[var(--surface-card)] p-3">
-            <div className="mb-2 text-sm font-semibold">
-              Approve or cancel current session
-            </div>
-            {currentSession ? (
-              <div className="space-y-3 text-sm">
-                <div className="rounded border p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={variantForStatus(currentSession.status)}>
-                      {currentSession.status}
-                    </Badge>
-                    <span className="font-medium">{currentSession.id}</span>
+          <CollapsibleStatusSection
+            title="Approve or cancel current session"
+            status={currentSession?.status ?? 'no session'}
+            statusVariant={variantForStatus(currentSession?.status)}
+            contentClassName="p-3 pt-0"
+          >
+            <div className="rounded border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 text-sm font-semibold">
+                Approve or cancel current session
+              </div>
+              {currentSession ? (
+                <div className="space-y-3 text-sm">
+                  <div className="rounded border p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={variantForStatus(currentSession.status)}>
+                        {currentSession.status}
+                      </Badge>
+                      <span className="font-medium">{currentSession.id}</span>
+                    </div>
+                    <div className="mt-2 text-[var(--text-secondary)]">
+                      Requested: {fmtTs(currentSession.requestedAt)} • Expires:{' '}
+                      {fmtTs(currentSession.expiresAt)}
+                    </div>
+                    <div className="mt-1 text-[var(--text-secondary)]">
+                      Reason: {valueOrDash(currentSession.reason)}
+                    </div>
                   </div>
-                  <div className="mt-2 text-[var(--text-secondary)]">
-                    Requested: {fmtTs(currentSession.requestedAt)} • Expires:{' '}
-                    {fmtTs(currentSession.expiresAt)}
-                  </div>
-                  <div className="mt-1 text-[var(--text-secondary)]">
-                    Reason: {valueOrDash(currentSession.reason)}
-                  </div>
-                </div>
 
-                {pendingSession ? (
-                  <div className="space-y-3 rounded border p-3">
-                    <div className="font-medium">Approve pending session</div>
+                  {pendingSession ? (
+                    <div className="space-y-3 rounded border p-3">
+                      <div className="font-medium">Approve pending session</div>
+                      <textarea
+                        value={approvalNote}
+                        onChange={(event) =>
+                          setApprovalNote(event.target.value)
+                        }
+                        placeholder="Required approval note"
+                        className="min-h-16 w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
+                      />
+                      <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                        <input
+                          type="checkbox"
+                          checked={approvalConfirmDryRun}
+                          onChange={(event) =>
+                            setApprovalConfirmDryRun(event.target.checked)
+                          }
+                          className="mt-1"
+                        />
+                        <span>
+                          I understand this approval still does not enable
+                          command execution.
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                        <input
+                          type="checkbox"
+                          checked={approvalConfirmNoCommand}
+                          onChange={(event) =>
+                            setApprovalConfirmNoCommand(event.target.checked)
+                          }
+                          className="mt-1"
+                        />
+                        <span>
+                          I confirm approval sends no DOMS/PSS command.
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                        <input
+                          type="checkbox"
+                          checked={approvalConfirmSiteChecked}
+                          onChange={(event) =>
+                            setApprovalConfirmSiteChecked(event.target.checked)
+                          }
+                          className="mt-1"
+                        />
+                        <span>
+                          I confirm the physical site / PSS context has been
+                          checked for this session.
+                        </span>
+                      </label>
+                      <Button
+                        type="button"
+                        onClick={() => approveSession(pendingSession.id)}
+                        disabled={!canApprove}
+                      >
+                        {submitting ? 'Approving...' : 'Approve session'}
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-3 rounded border border-red-500/20 p-3">
+                    <div className="font-medium">Cancel session</div>
                     <textarea
-                      value={approvalNote}
-                      onChange={(event) => setApprovalNote(event.target.value)}
-                      placeholder="Required approval note"
+                      value={cancelNote}
+                      onChange={(event) => setCancelNote(event.target.value)}
+                      placeholder="Required cancellation note"
                       className="min-h-16 w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
                     />
                     <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
                       <input
                         type="checkbox"
-                        checked={approvalConfirmDryRun}
+                        checked={cancelConfirm}
                         onChange={(event) =>
-                          setApprovalConfirmDryRun(event.target.checked)
+                          setCancelConfirm(event.target.checked)
                         }
                         className="mt-1"
                       />
-                      <span>
-                        I understand this approval still does not enable command
-                        execution.
-                      </span>
-                    </label>
-                    <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-                      <input
-                        type="checkbox"
-                        checked={approvalConfirmNoCommand}
-                        onChange={(event) =>
-                          setApprovalConfirmNoCommand(event.target.checked)
-                        }
-                        className="mt-1"
-                      />
-                      <span>I confirm approval sends no DOMS/PSS command.</span>
-                    </label>
-                    <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-                      <input
-                        type="checkbox"
-                        checked={approvalConfirmSiteChecked}
-                        onChange={(event) =>
-                          setApprovalConfirmSiteChecked(event.target.checked)
-                        }
-                        className="mt-1"
-                      />
-                      <span>
-                        I confirm the physical site / PSS context has been
-                        checked for this session.
-                      </span>
+                      <span>I confirm this session should be cancelled.</span>
                     </label>
                     <Button
                       type="button"
-                      onClick={() => approveSession(pendingSession.id)}
-                      disabled={!canApprove}
+                      variant="destructive"
+                      onClick={() => cancelSession(currentSession.id)}
+                      disabled={!canCancel}
                     >
-                      {submitting ? 'Approving...' : 'Approve session'}
+                      {submitting ? 'Cancelling...' : 'Cancel session'}
                     </Button>
                   </div>
-                ) : null}
-
-                <div className="space-y-3 rounded border border-red-500/20 p-3">
-                  <div className="font-medium">Cancel session</div>
-                  <textarea
-                    value={cancelNote}
-                    onChange={(event) => setCancelNote(event.target.value)}
-                    placeholder="Required cancellation note"
-                    className="min-h-16 w-full rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
-                  />
-                  <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-                    <input
-                      type="checkbox"
-                      checked={cancelConfirm}
-                      onChange={(event) =>
-                        setCancelConfirm(event.target.checked)
-                      }
-                      className="mt-1"
-                    />
-                    <span>I confirm this session should be cancelled.</span>
-                  </label>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => cancelSession(currentSession.id)}
-                    disabled={!canCancel}
-                  >
-                    {submitting ? 'Cancelling...' : 'Cancel session'}
-                  </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="text-sm text-[var(--text-secondary)]">
-                No pending or approved maintenance session is currently
-                recorded.
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="text-sm text-[var(--text-secondary)]">
+                  No pending or approved maintenance session is currently
+                  recorded.
+                </div>
+              )}
+            </div>
+          </CollapsibleStatusSection>
         </div>
 
         <div className="rounded border bg-[var(--surface-card)] p-3">
@@ -512,7 +549,7 @@ export function JplMaintenanceGatePanel() {
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleStatusSection>
   )
 }

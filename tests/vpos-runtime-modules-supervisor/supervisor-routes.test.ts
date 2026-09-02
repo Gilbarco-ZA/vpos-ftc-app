@@ -9,6 +9,14 @@ import {
 	supervisorStatusResponse
 } from '../../src/modules/supervisor/infrastructure/supervisorHandlers'
 
+const isolatedSupervisorDeps = {
+  upsertProcessHeartbeat: async () => undefined,
+  getAllProcessHeartbeats: async () => [],
+  getFiscalRecoveryMeta: async () => null,
+  getFiscalInboxMetrics: async () => null,
+  sleep: async () => undefined,
+}
+
 const createRuntime = () => {
 	const store = new Map<string, any>()
 	const kvKey = (stationId: string, key: string) => `${stationId}:${key}`
@@ -60,6 +68,7 @@ const createRuntime = () => {
 		}
 	})
 	return new SupervisorRuntime('station-1', {
+    ...isolatedSupervisorDeps,
 		query: query as any,
 		kvGet,
 		kvSet,

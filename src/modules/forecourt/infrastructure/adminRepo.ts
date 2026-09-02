@@ -35,6 +35,13 @@ export type ForecourtTransactionRow = {
   station_id: string
   fp_id: number | null
   is_supported: boolean
+  source_mode: string | null
+  normalized_transaction_id: string | null
+  normalized_at: string | null
+  reconciled_at: string | null
+  raw_payload_hash: string | null
+  raw_cleared_at: string | null
+  raw_clear_reason: string | null
   trans_seq_no: string | null
   sm_id: string | null
   trans_lock_id: string | null
@@ -202,7 +209,10 @@ export async function listForecourtEvents(params: {
   values.push(params.limit)
 
   return await queryAll<ForecourtEventRow>(
-    `SELECT id, station_id, source, apc, event_type, payload, occurred_at, received_at
+    `SELECT id, station_id, source, apc, event_type, payload,
+            retention_class, payload_hash, payload_schema_version,
+            payload_compacted_at::text AS payload_compacted_at,
+            occurred_at, received_at
        FROM forecourt_events
       WHERE ${where.join(' AND ')}
       ORDER BY occurred_at DESC
@@ -238,12 +248,156 @@ export async function listRecentForecourtEventsByPatterns(params: {
   values.push(Math.max(1, Math.min(100, Math.trunc(params.limit))))
 
   return await queryAll<ForecourtEventRow>(
-    `SELECT id, station_id, source, apc, event_type, payload, occurred_at, received_at
+    `SELECT id, station_id, source, apc, event_type, payload,
+            retention_class, payload_hash, payload_schema_version,
+            payload_compacted_at::text AS payload_compacted_at,
+            occurred_at, received_at
        FROM forecourt_events
       WHERE ${where.join(' AND ')}
       ORDER BY occurred_at DESC
       LIMIT $${i}`,
     values,
+  )
+}
+
+export type ForecourtPayloadLifecycleSummaryRow = {
+  transaction_payload_present: number
+  transaction_payload_cleared: number
+  transaction_payload_waiting_for_lines: number
+  raw_payload_present: number
+  raw_payload_cleared: number
+  raw_payload_unlinked: number
+  checkpoint_payload_present: number
+  checkpoint_payload_cleared: number
+  replay_payload_present: number
+  replay_payload_checkpoint_owned: number
+  terminal_checkpoint_rows: number
+  terminal_replay_rows: number
+  active_recovery_claims: number
+  unattended_transaction_payload_present: number
+  unattended_forecourt_payload_present: number
+  tank_raw_payload_present: number
+  tank_diagnostics_present: number
+  forecourt_event_routine: number
+  forecourt_event_error: number
+  forecourt_event_maintenance_security: number
+  forecourt_event_field_evidence: number
+}
+
+export async function getForecourtPayloadLifecycleSummary(stationId: string) {
+  return await queryOne<ForecourtPayloadLifecycleSummaryRow>(
+    `SELECT
+       (SELECT COUNT(*)::int
+          FROM transactions txn
+         WHERE txn.station_id = $1::uuid
+           AND txn.doms_source_system = 'jpl'
+           AND txn.doms_payload_json IS NOT NULL) AS transaction_payload_present,
+       (SELECT COUNT(*)::int
+          FROM transactions txn
+         WHERE txn.station_id = $1::uuid
+           AND txn.doms_source_system = 'jpl'
+           AND txn.doms_payload_cleared_at IS NOT NULL) AS transaction_payload_cleared,
+       (SELECT COUNT(*)::int
+          FROM transactions txn
+         WHERE txn.station_id = $1::uuid
+           AND txn.doms_source_system = 'jpl'
+           AND txn.doms_payload_json IS NOT NULL
+           AND txn.doms_normalized_at IS NOT NULL
+           AND txn.doms_reconciled_at IS NOT NULL
+           AND txn.doms_cleared_at IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM transaction_lines line WHERE line.transaction_id = txn.id
+           )) AS transaction_payload_waiting_for_lines,
+       (SELECT COUNT(*)::int
+          FROM forecourt_transactions raw_tx
+         WHERE raw_tx.station_id = $1::uuid
+           AND raw_tx.raw IS NOT NULL
+           AND raw_tx.raw <> '{}'::jsonb) AS raw_payload_present,
+       (SELECT COUNT(*)::int
+          FROM forecourt_transactions raw_tx
+         WHERE raw_tx.station_id = $1::uuid
+           AND raw_tx.raw_cleared_at IS NOT NULL) AS raw_payload_cleared,
+       (SELECT COUNT(*)::int
+          FROM forecourt_transactions raw_tx
+         WHERE raw_tx.station_id = $1::uuid
+           AND raw_tx.normalized_transaction_id IS NULL
+           AND raw_tx.raw IS NOT NULL
+           AND raw_tx.raw <> '{}'::jsonb) AS raw_payload_unlinked,
+       (SELECT COUNT(*)::int
+          FROM forecourt_jpl_transaction_checkpoints checkpoint
+         WHERE checkpoint.station_id = $1::uuid
+           AND (checkpoint.read_payload_json IS NOT NULL OR checkpoint.clear_payload_json IS NOT NULL)) AS checkpoint_payload_present,
+       (SELECT COUNT(*)::int
+          FROM forecourt_jpl_transaction_checkpoints checkpoint
+         WHERE checkpoint.station_id = $1::uuid
+           AND checkpoint.payload_cleared_at IS NOT NULL) AS checkpoint_payload_cleared,
+       (SELECT COUNT(*)::int
+          FROM forecourt_jpl_supervised_replay replay
+         WHERE replay.station_id = $1::uuid
+           AND (replay.read_payload_json IS NOT NULL OR replay.clear_fields_json IS NOT NULL)) AS replay_payload_present,
+       (SELECT COUNT(*)::int
+          FROM forecourt_jpl_supervised_replay replay
+         WHERE replay.station_id = $1::uuid
+           AND replay.payload_owner = 'checkpoint'
+           AND (replay.read_payload_json IS NOT NULL OR replay.clear_fields_json IS NOT NULL)) AS replay_payload_checkpoint_owned,
+       (SELECT COUNT(*)::int
+          FROM forecourt_jpl_transaction_checkpoints checkpoint
+         WHERE checkpoint.station_id = $1::uuid
+           AND checkpoint.lifecycle_stage = 'cleared'
+           AND checkpoint.terminal_at IS NOT NULL) AS terminal_checkpoint_rows,
+       (SELECT COUNT(*)::int
+          FROM forecourt_jpl_supervised_replay replay
+         WHERE replay.station_id = $1::uuid
+           AND replay.replay_stage = 'cleared'
+           AND replay.terminal_at IS NOT NULL) AS terminal_replay_rows,
+       (SELECT COUNT(*)::int
+          FROM forecourt_jpl_transaction_checkpoints checkpoint
+         WHERE checkpoint.station_id = $1::uuid
+           AND (
+             checkpoint.lifecycle_stage <> 'cleared'
+             OR checkpoint.blocked_by_foreign_pos = TRUE
+             OR checkpoint.last_error IS NOT NULL
+           )) AS active_recovery_claims,
+       (SELECT COUNT(*)::int
+          FROM transactions txn
+         WHERE txn.station_id = $1::uuid
+           AND txn.doms_source_system = 'jpl'
+           AND (
+             txn.doms_unattended_receipt_json IS NOT NULL
+             OR txn.doms_unattended_payment_json IS NOT NULL
+           )) AS unattended_transaction_payload_present,
+       (SELECT COUNT(*)::int
+          FROM forecourt_transactions raw_tx
+         WHERE raw_tx.station_id = $1::uuid
+           AND (
+             raw_tx.doms_unattended_receipt_json IS NOT NULL
+             OR raw_tx.doms_unattended_payment_json IS NOT NULL
+           )) AS unattended_forecourt_payload_present,
+       (SELECT COUNT(*)::int
+          FROM tanks tank
+         WHERE tank.station_id = $1::uuid
+           AND tank.last_tg_payload IS NOT NULL) AS tank_raw_payload_present,
+       (SELECT COUNT(*)::int
+          FROM tanks tank
+         WHERE tank.station_id = $1::uuid
+           AND tank.last_tg_diagnostics IS NOT NULL) AS tank_diagnostics_present,
+       (SELECT COUNT(*)::int
+          FROM forecourt_events event
+         WHERE event.station_id = $1::uuid
+           AND event.retention_class = 'routine') AS forecourt_event_routine,
+       (SELECT COUNT(*)::int
+          FROM forecourt_events event
+         WHERE event.station_id = $1::uuid
+           AND event.retention_class = 'error') AS forecourt_event_error,
+       (SELECT COUNT(*)::int
+          FROM forecourt_events event
+         WHERE event.station_id = $1::uuid
+           AND event.retention_class = 'maintenance_security') AS forecourt_event_maintenance_security,
+       (SELECT COUNT(*)::int
+          FROM forecourt_events event
+         WHERE event.station_id = $1::uuid
+           AND event.retention_class = 'field_evidence') AS forecourt_event_field_evidence`,
+    [stationId],
   )
 }
 
@@ -278,7 +432,10 @@ export async function listForecourtTransactions(params: {
   values.push(params.limit)
 
   return await queryAll<ForecourtTransactionRow>(
-    `SELECT id, station_id, fp_id, is_supported, trans_seq_no, sm_id, trans_lock_id, trans_info_mask,
+    `SELECT id, station_id, fp_id, is_supported, source_mode, normalized_transaction_id,
+            normalized_at::text AS normalized_at, reconciled_at::text AS reconciled_at,
+            raw_payload_hash, raw_cleared_at::text AS raw_cleared_at, raw_clear_reason,
+            trans_seq_no, sm_id, trans_lock_id, trans_info_mask,
             money_due, volume, occurred_at, raw,
             doms_external_payment_reference, doms_ept_id, doms_ept_sequence_no,
             doms_ept_receipt_format_id, doms_receipt_no, doms_card_label,

@@ -1,7 +1,7 @@
 'use client'
 
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Copy } from 'lucide-react'
@@ -65,7 +65,10 @@ export default function FiscalizedTransactionsManagerClient(props: {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const currentSearchParams = searchParams ?? new URLSearchParams()
+  const currentSearchParams = useMemo(
+    () => searchParams ?? new URLSearchParams(),
+    [searchParams],
+  )
   const [csrfToken, setCsrfToken] = useState('')
   const [creditNoteViewId, setCreditNoteViewId] = useState<string | null>(null)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
@@ -108,7 +111,7 @@ export default function FiscalizedTransactionsManagerClient(props: {
     const transactionId =
       currentSearchParams.get('transactionId')?.trim() || null
     if (view === 'credit-note' && transactionId) {
-      setCreditNoteViewId(transactionId)
+      queueMicrotask(() => setCreditNoteViewId(transactionId))
     }
   }, [currentSearchParams])
 

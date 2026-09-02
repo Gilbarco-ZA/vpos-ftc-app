@@ -1,10 +1,11 @@
+import { requireNonEmptyString } from '@/src/shared/utils/inputs'
+
 import {
   getForecourtSyncConfig as getForecourtSyncConfigShared,
   getForecourtSyncStatus as getForecourtSyncStatusShared,
   refreshTankStatus as refreshTankStatusShared,
   runForecourtConfigSync as runForecourtConfigSyncShared,
-} from '@/src/shared/forecourt/configSync'
-import { requireNonEmptyString } from '@/src/shared/utils/inputs'
+} from '@/src/modules/forecourt/application/forecourtConfigSync'
 
 export async function getForecourtSyncConfig(stationId: string) {
   return await getForecourtSyncConfigShared(

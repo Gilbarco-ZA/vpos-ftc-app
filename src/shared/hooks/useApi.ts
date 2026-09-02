@@ -36,7 +36,10 @@ export function useApi<T = unknown>(
   const [error, setError] = useState<unknown>(null)
 
   const parseRef = useRef(parse)
-  parseRef.current = parse
+
+  useEffect(() => {
+    parseRef.current = parse
+  }, [parse])
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -85,7 +88,9 @@ export function useApi<T = unknown>(
 
   useEffect(() => {
     if (!auto || !url) return
-    fetchData()
+    queueMicrotask(() => {
+      fetchData()
+    })
     return () => {
       abortRef.current?.abort()
     }

@@ -111,9 +111,7 @@ export const CustomerDrawer = ({
   const {
     form,
     setField,
-    setForm,
     fieldErrors,
-    error,
     isSubmitting,
     csrfToken,
     setCsrfToken,

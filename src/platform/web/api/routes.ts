@@ -5,6 +5,7 @@ import { requireCsrfFromParts } from '@/src/shared/security/csrf'
 
 import { readBody } from './request'
 import { badRequest, serverError } from './response'
+import { readFrameworkRouteParams } from './routeParams'
 
 export const csrfFailure = () =>
   badRequest('CSRF validation failed', { status: 403 })
@@ -29,10 +30,8 @@ type RouteMutationContext<P = Record<string, string>> = RouteContext<P> & {
   body: Record<string, any>
 }
 
-function defaultGetParams<P>(ctx: any): P {
-  return ((ctx && typeof ctx === 'object' && 'params' in ctx
-    ? ctx.params
-    : {}) || {}) as P
+function defaultGetParams<P>(ctx: any): Promise<P> {
+  return readFrameworkRouteParams<P>(ctx)
 }
 
 async function resolveParams<P>(

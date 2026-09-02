@@ -1,3 +1,5 @@
+import { EventEmitter } from 'node:events'
+
 import {
   ensurePlainObject,
   requireNonEmptyString,
@@ -34,7 +36,7 @@ export interface RuntimeBusResponseEnvelope<T = unknown> {
 }
 
 class InProcessBus implements RuntimeBus {
-  private readonly emitter = new (require('node:events').EventEmitter)()
+  private readonly emitter = new EventEmitter()
 
   async publish(topic: RuntimeBusTopic, msg: unknown): Promise<void> {
     this.emitter.emit(topic, msg)
@@ -60,7 +62,6 @@ class InProcessBus implements RuntimeBus {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __vposRuntimeBus: RuntimeBus | undefined
 }
 
@@ -113,26 +114,4 @@ export async function requestOnce<
 
     void bus.publish(normalizedTopic, req)
   })
-}
-
-/**
- * Listener wiring is intentionally deferred to legacy runtime internals until
- * MIG-025 completes the deeper event-consumer migration.
- */
-export function startPosBusListener() {
-  void import('@/src/modules/runtime/infrastructure/busListeners').then((mod) =>
-    mod.startPosBusListener(),
-  )
-}
-
-export function startFiscalBusListener() {
-  void import('@/src/modules/runtime/infrastructure/busListeners').then((mod) =>
-    mod.startFiscalBusListener(),
-  )
-}
-
-export function startArchiveBusListener() {
-  void import('@/src/modules/runtime/infrastructure/busListeners').then((mod) =>
-    mod.startArchiveBusListener(),
-  )
 }

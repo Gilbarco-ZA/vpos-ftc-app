@@ -1,8 +1,9 @@
-import { checkPrinterPageWidth } from '@/src/shared/setup/printouts'
 import {
   ensurePlainObject,
   requireNonEmptyString,
 } from '@/src/shared/utils/inputs'
+
+import { checkPrinterPageWidth } from '@/src/modules/setup/application/printouts'
 
 export async function testPrinterConnection(
   stationId: string,

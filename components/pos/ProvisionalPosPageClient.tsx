@@ -8,7 +8,7 @@ import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Minus, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react'
+import { Minus, Plus, Search, Trash2 } from 'lucide-react'
 
 import { formatNumber } from '@/src/shared/utils/format'
 
@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
+import { RuntimeImage } from '@/components/ui/runtime-image'
 
 type PosCategory = PosCatalogCategory
 type PosProduct = PosCatalogProduct
@@ -292,15 +293,12 @@ export default function ProvisionalPosPageClient({
                 />
               </div>
               <div className="flex gap-3 overflow-x-auto pb-1">
-                <button
+                <Button
                   type="button"
+                  variant="primary"
                   onClick={() => setSelectedCategory('ALL')}
-                  className={
-                    'flex min-w-[140px] shrink-0 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ' +
-                    (selectedCategory === 'ALL'
-                      ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--brand-primary)]'
-                      : 'border-border bg-[var(--surface-card)] hover:-translate-y-0.5 hover:shadow-sm')
-                  }
+                  aria-pressed={selectedCategory === 'ALL'}
+                  className="h-auto min-w-[140px] shrink-0 justify-start whitespace-normal rounded-2xl px-4 py-3 text-left"
                 >
                   <div className="border-current/20 bg-current/10 flex h-12 w-12 items-center justify-center rounded-2xl border text-lg">
                     🛍️
@@ -313,7 +311,7 @@ export default function ProvisionalPosPageClient({
                       {products.length} items
                     </div>
                   </div>
-                </button>
+                </Button>
                 {visibleCategories.map((category) => {
                   const active = selectedCategory === category.id
                   return (
@@ -330,7 +328,7 @@ export default function ProvisionalPosPageClient({
                     >
                       <div className="border-current/20 bg-current/10 flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border text-lg">
                         {category.imagePath ? (
-                          <img
+                          <RuntimeImage
                             src={category.imagePath}
                             alt={category.name}
                             className="h-full w-full object-cover"
@@ -369,7 +367,7 @@ export default function ProvisionalPosPageClient({
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted text-lg">
                     {product.categoryImagePath ? (
-                      <img
+                      <RuntimeImage
                         src={product.categoryImagePath}
                         alt={product.categoryName || product.productName}
                         className="h-full w-full object-cover"

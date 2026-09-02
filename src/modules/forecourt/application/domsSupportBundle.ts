@@ -1,5 +1,8 @@
-import { getForecourtAdapterDiagnostics } from '@/src/shared/forecourt/admin'
 import { requireNonEmptyString, toPositiveInt } from '@/src/shared/utils/inputs'
+
+import { getForecourtAdapterRuntimeDiagnostics } from '@/src/modules/forecourt/application/forecourtAdmin'
+import { getClearRejectQuarantineSnapshot } from '@/src/modules/forecourt/infrastructure/jpl/clearRejectQuarantine'
+import { getPssReferenceLengthDiagnostics } from '@/src/modules/forecourt/infrastructure/jpl/pssApplicationDiagnostics'
 
 import {
   listForecourtCommandHistory,
@@ -177,6 +180,14 @@ export function buildDomsObservabilitySummary(input: {
     /transaction.*clear.*fail/i,
     /clear_Fp.*Trans.*Reject/i,
   ])
+  const rawActiveCheckpointClearFailures = Number(
+    input.diagnostics?.replay?.metrics?.failedClearCount ?? 0,
+  )
+  const activeCheckpointClearFailures = Number.isFinite(
+    rawActiveCheckpointClearFailures,
+  )
+    ? Math.max(0, rawActiveCheckpointClearFailures)
+    : 0
   const serviceLogBacklog = asArray(adapterState.lastServiceMessages).length
   const borBacklog = asArray(adapterState.lastBackOfficeRecords).length
   const staleLocks = countStaleBufferLocks(bufferHealth)
@@ -211,8 +222,11 @@ export function buildDomsObservabilitySummary(input: {
     },
     {
       name: 'transactionClearFailures',
-      value: transactionClearFailures,
-      severity: transactionClearFailures > 0 ? 'critical' : 'ok',
+      value: Math.max(transactionClearFailures, activeCheckpointClearFailures),
+      severity:
+        Math.max(transactionClearFailures, activeCheckpointClearFailures) > 0
+          ? 'critical'
+          : 'ok',
       description: 'Recent transaction clear failure/reject signals.',
     },
     {
@@ -309,6 +323,7 @@ export async function getDomsSupportBundle(
     recentRejects,
     recentCommands,
     deliveryCheckpoints,
+    pssReferenceLengthDiagnostics,
   ] = await Promise.all([
     getAdminForecourtDiagnostics(normalizedStationId),
     getForecourtSyncConfig(normalizedStationId),
@@ -355,9 +370,10 @@ export async function getDomsSupportBundle(
       stationId: normalizedStationId,
       limit: 100,
     }),
+    getPssReferenceLengthDiagnostics(normalizedStationId),
   ])
 
-  const { adapterState, bufferHealth } = getForecourtAdapterDiagnostics()
+  const { adapterState, bufferHealth } = getForecourtAdapterRuntimeDiagnostics()
   const operationalReadiness = buildDomsOperationalReadiness({
     stationId: normalizedStationId,
     generatedAt,
@@ -396,9 +412,15 @@ export async function getDomsSupportBundle(
         (adapterState as any)?.frameDiagnostics ??
         (diagnostics as any)?.recentFrameDiagnostics ??
         [],
+      lastWireDiagnostic: (adapterState as any)?.lastWireDiagnostic ?? null,
+      wireDiagnostics: (adapterState as any)?.wireDiagnostics ?? [],
+      clearRejectQuarantine:
+        getClearRejectQuarantineSnapshot(normalizedStationId),
+      pssReferenceLengthDiagnostics,
     },
     transactions: diagnostics.transactions,
     replay: diagnostics.replay,
+    payloadLifecycle: diagnostics.payloadLifecycle ?? null,
     reconciliation: {
       summary: summarizeReconciliation(reconciliation),
       detail: reconciliation,

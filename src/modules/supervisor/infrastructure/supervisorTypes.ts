@@ -1,9 +1,15 @@
+import type { getFiscalInboxMetrics } from '@/src/modules/fiscal-inbox/application/fiscalInbox'
+import type { getFiscalRecoveryMeta } from '@/src/modules/runtime/infrastructure/fiscalRecoveryPolicy'
 import type {
   getRuntimeState,
   setRuntimeState,
 } from '@/src/modules/runtime/infrastructure/runtimeState'
 import type { query } from '@/src/platform/db/postgres'
 import type { getSystemConfiguration } from '@/src/shared/config/loader'
+import type {
+  getAllProcessHeartbeats,
+  upsertProcessHeartbeat,
+} from '@/src/shared/runtime/heartbeats'
 import type { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 
 export type SupervisorCommandType =
@@ -60,6 +66,11 @@ export type SupervisorRuntimeDeps = {
   getSystemConfiguration?: typeof getSystemConfiguration
   getRuntimeState?: typeof getRuntimeState
   setRuntimeState?: typeof setRuntimeState
+  upsertProcessHeartbeat?: typeof upsertProcessHeartbeat
+  getAllProcessHeartbeats?: typeof getAllProcessHeartbeats
+  getFiscalRecoveryMeta?: typeof getFiscalRecoveryMeta
+  getFiscalInboxMetrics?: typeof getFiscalInboxMetrics
+  sleep?: (milliseconds: number) => Promise<void>
   withLock?: <T>(key: string, fn: () => Promise<T>) => Promise<T>
 }
 

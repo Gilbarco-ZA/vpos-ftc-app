@@ -1,8 +1,9 @@
 import { requireNonEmptyString } from '@/src/shared/utils/inputs'
+
 import {
   reloadVposSupervisorRuntimeConfig,
   requestVposSupervisorRestart,
-} from '@/src/shared/vpos/supervisor'
+} from '@/src/modules/supervisor/application/vposSupervisor'
 
 export async function restartSupervisor(stationId: string) {
   return await requestVposSupervisorRestart(

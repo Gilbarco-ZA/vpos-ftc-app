@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
@@ -45,8 +45,9 @@ export default function PssXmlImportCard(props: {
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(
     null,
   )
+  const [rebooting, setRebooting] = useState(false)
 
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     setError(null)
     const res = await fetch('/api/admin/integrations/pss-xml', {
       cache: 'no-store',
@@ -58,11 +59,13 @@ export default function PssXmlImportCard(props: {
     }
     const data = j?.data ?? j
     setStatus(data as any)
-  }
+  }, [])
 
   useEffect(() => {
-    safeAsync(loadStatus(), 'pssXmlImport.loadStatus')
-  }, [])
+    queueMicrotask(() => {
+      safeAsync(loadStatus(), 'pssXmlImport.loadStatus')
+    })
+  }, [loadStatus])
 
   const canUpload = useMemo(() => {
     if (!file) return false
@@ -122,14 +125,44 @@ export default function PssXmlImportCard(props: {
     }
   }
 
-  const lastImportLabel = useMemo(() => {
+  const restartApplicationService = async () => {
+    if (rebooting) return
+    const confirmation = window.prompt(
+      'This restarts the VPOS FTC application service and briefly interrupts the POS connection. Type RESTART to continue.',
+    )
+    if (confirmation?.trim().toUpperCase() !== 'RESTART') return
+
+    setRebooting(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/system/restart-service', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'RESTART' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(
+          json?.error?.message || 'Failed to schedule service restart',
+        )
+      }
+      setNotice(
+        'VPOS FTC service restart scheduled. The application will reconnect shortly.',
+      )
+    } catch (e: any) {
+      setError(e?.message || String(e))
+      setRebooting(false)
+    }
+  }
+
+  const lastImportLabel = (() => {
     if (!status?.lastImportAt) return '—'
     try {
       return new Date(status.lastImportAt).toLocaleString()
     } catch {
       return status.lastImportAt
     }
-  }, [status?.lastImportAt])
+  })()
 
   return (
     <Card className="space-y-3 p-5">
@@ -219,6 +252,15 @@ export default function PssXmlImportCard(props: {
             >
               Refresh status
             </Button>
+            {status?.lastImportAt ? (
+              <Button
+                variant="neon-amber"
+                onClick={restartApplicationService}
+                disabled={busy || rebooting}
+              >
+                {rebooting ? 'Restart scheduled…' : 'Restart VPOS FTC service'}
+              </Button>
+            ) : null}
           </div>
 
           {notice ? (

@@ -1,6 +1,10 @@
 import { queryOne } from '@/src/platform/db/postgres'
 
-import { getStationCountryCode, isTanzaniaCountry } from './country'
+import {
+  getStationCountryCode,
+  isTanzaniaCountry,
+  normalizeFiscalCountryCode,
+} from './country'
 
 export const FISCALIZATION_TRANSPORTS = ['proxy', 'local_tz'] as const
 
@@ -17,7 +21,7 @@ export type StationFiscalizationRoute = {
   reason?: string
 }
 
-export function normalizeFiscalizationTransport(
+export function normalizeConfiguredFiscalizationTransport(
   value: unknown,
 ): FiscalizationTransport {
   const normalized = String(value ?? '')
@@ -37,8 +41,39 @@ export function normalizeFiscalizationTransport(
   return 'proxy'
 }
 
-export function isLocalTanzaniaTransport(value: unknown): boolean {
-  return normalizeFiscalizationTransport(value) === 'local_tz'
+export function normalizeFiscalizationTransport(
+  _value: unknown,
+): FiscalizationTransport {
+  // TRA/EWURA traffic is now owned by the licensed cloud middleware and must
+  // always leave the FTC app through vpos-proxy. Keep the legacy union value
+  // for database and cutover diagnostics, but never select it as an
+  // executable route.
+  return 'proxy'
+}
+
+export function resolveFiscalizationDefaults(input: {
+  country?: string | null
+  fiscalizationEngine?: string | null
+  fiscalizationTransport?: string | null
+}) {
+  const isTanzania = isTanzaniaCountry(input.country)
+  const configuredEngine = String(input.fiscalizationEngine ?? '').trim()
+  const usesGenericEngineDefault = ['mock', 'default', 'none'].includes(
+    configuredEngine.toLowerCase(),
+  )
+  const shouldApplyTanzaniaDefaults =
+    isTanzania && (!configuredEngine || usesGenericEngineDefault)
+
+  return {
+    fiscalizationEngine: shouldApplyTanzaniaDefaults
+      ? 'TZ'
+      : configuredEngine || (isTanzania ? 'TZ' : 'mock'),
+    fiscalizationTransport: 'proxy' as const,
+  }
+}
+
+export function isLocalTanzaniaTransport(_value: unknown): boolean {
+  return false
 }
 
 export function resolveStationFiscalizationRoute(input: {
@@ -47,31 +82,20 @@ export function resolveStationFiscalizationRoute(input: {
   fiscalizationEngine?: string | null
   fiscalizationTransport?: string | null
 }): StationFiscalizationRoute {
-  const country = input.country
-    ? String(input.country).trim().toUpperCase()
-    : null
-  const engine = String(input.fiscalizationEngine || 'mock').trim() || 'mock'
-  const transport = normalizeFiscalizationTransport(
-    input.fiscalizationTransport,
-  )
+  const country = normalizeFiscalCountryCode(input.country)
+  const defaults = resolveFiscalizationDefaults({
+    country,
+    fiscalizationEngine: input.fiscalizationEngine,
+    fiscalizationTransport: input.fiscalizationTransport,
+  })
+  const engine = defaults.fiscalizationEngine
+  const transport = defaults.fiscalizationTransport
   const isTanzania = isTanzaniaCountry(country)
-  const isTzEngine = engine.toUpperCase() === 'TZ'
-  const canUseLocalTanzania = isTanzania && isTzEngine
-
-  if (transport === 'local_tz' && !canUseLocalTanzania) {
-    return {
-      stationId: input.stationId,
-      country,
-      isTanzania,
-      fiscalizationEngine: engine,
-      fiscalizationTransport: transport,
-      route: 'proxy',
-      canUseLocalTanzania,
-      reason: isTanzania
-        ? `Local Tanzania fiscalization requires fiscalization_engine TZ. Current engine: ${engine}.`
-        : `Local Tanzania fiscalization is only valid for Tanzania stations. Current country: ${country || 'not configured'}.`,
-    }
-  }
+  const legacyLocalConfigured = String(input.fiscalizationTransport ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_')
+    .includes('local')
 
   return {
     stationId: input.stationId,
@@ -79,8 +103,11 @@ export function resolveStationFiscalizationRoute(input: {
     isTanzania,
     fiscalizationEngine: engine,
     fiscalizationTransport: transport,
-    route: transport,
-    canUseLocalTanzania,
+    route: 'proxy',
+    canUseLocalTanzania: false,
+    reason: legacyLocalConfigured
+      ? 'Local TRA/EWURA fiscalization is retired; requests are routed through vpos-proxy and the licensed cloud middleware.'
+      : undefined,
   }
 }
 
@@ -112,8 +139,8 @@ export async function getStationFiscalizationRoute(
     return resolveStationFiscalizationRoute({
       stationId,
       country,
-      fiscalizationEngine: 'mock',
-      fiscalizationTransport: 'proxy',
+      fiscalizationEngine: null,
+      fiscalizationTransport: null,
     })
   }
 
@@ -126,19 +153,15 @@ export async function getStationFiscalizationRoute(
 }
 
 export async function shouldUseLocalTanzaniaFiscalization(
-  stationId: string,
+  _stationId: string,
 ): Promise<boolean> {
-  const route = await getStationFiscalizationRoute(stationId)
-  return route.route === 'local_tz'
+  return false
 }
 
 export async function assertLocalTanzaniaFiscalizationRoute(stationId: string) {
   const route = await getStationFiscalizationRoute(stationId)
-  if (route.route !== 'local_tz') {
-    throw new Error(
-      route.reason ??
-        `Internal Tanzania fiscalization is disabled for this station. Current fiscalization route: ${route.route}.`,
-    )
-  }
-  return route
+  throw new Error(
+    route.reason ??
+      'Direct TRA/EWURA fiscalization is disabled. Use vpos-proxy and the licensed cloud middleware.',
+  )
 }

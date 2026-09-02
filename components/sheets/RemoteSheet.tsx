@@ -13,6 +13,8 @@ export function useRemoteResource<T>(
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<T | null>(null)
+  const parse = options?.parse
+  const auto = options?.auto ?? true
 
   const fetchData = useCallback(async () => {
     if (!openKey) return
@@ -26,20 +28,21 @@ export function useRemoteResource<T>(
         setError({ status: res.status, body })
         return
       }
-      const parsed = options?.parse ? options.parse(body) : (body?.data ?? body)
+      const parsed = parse ? parse(body) : (body?.data ?? body)
       setData(parsed as T)
     } catch (err) {
       setError(err)
     } finally {
       setLoading(false)
     }
-  }, [openKey, buildUrl, options?.parse])
+  }, [openKey, buildUrl, parse])
 
   useEffect(() => {
-    const auto = options?.auto ?? true
     if (!auto || !openKey) return
-    fetchData()
-  }, [openKey, fetchData, options?.auto])
+    queueMicrotask(() => {
+      fetchData()
+    })
+  }, [auto, fetchData, openKey])
 
   return { loading, error, data, refetch: fetchData }
 }

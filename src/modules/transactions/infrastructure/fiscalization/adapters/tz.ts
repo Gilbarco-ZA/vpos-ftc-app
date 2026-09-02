@@ -30,16 +30,29 @@ export const tzAdapter: FiscalAdapter = {
       requestPayload.tra = tra.request
 
       if (!tra.ok) {
+        const responsePayload = {
+          ...tra.response,
+          verificationUrl: tra.verificationUrl ?? null,
+        }
         return {
           status: 'FAILED',
           engine: 'TZ',
           reference: tra.reference ?? undefined,
-          rawResponse: tra.rawResponse,
+          rawResponse: JSON.stringify({
+            localTanzania: {
+              engine: 'TZ',
+              route: 'local_tz',
+              reference: tra.reference ?? null,
+              tra: {
+                request: tra.request,
+                response: responsePayload,
+                rawResponse: tra.rawResponse,
+              },
+              status: 'FAILED',
+            },
+          }),
           requestPayload,
-          responsePayload: {
-            ...tra.response,
-            verificationUrl: tra.verificationUrl ?? null,
-          },
+          responsePayload,
           errorMessage:
             tra.error || `TRA fiscalization failed (${tra.httpStatus})`,
         }
@@ -79,12 +92,30 @@ export const tzAdapter: FiscalAdapter = {
         ewuraAuditMessage: ewuraPolicy.auditMessage,
       }
 
+      const rawResponse = JSON.stringify({
+        localTanzania: {
+          engine: 'TZ',
+          route: 'local_tz',
+          reference: tra.reference ?? null,
+          tra: {
+            request: tra.request,
+            response: commonResponse.tra,
+            rawResponse: tra.rawResponse,
+          },
+          ewura,
+          tanzaniaFiscalizationState: ewuraPolicy.fiscalizationState,
+          ewuraFailureMode: ewuraPolicy.failureMode,
+          ewuraAuditMessage: ewuraPolicy.auditMessage,
+          status: ewuraPolicy.blockTransaction ? 'FAILED' : 'SUCCESS',
+        },
+      })
+
       if (ewuraPolicy.blockTransaction) {
         return {
           status: 'FAILED',
           engine: 'TZ',
           reference: tra.reference ?? undefined,
-          rawResponse: JSON.stringify(commonResponse),
+          rawResponse,
           requestPayload: {
             ...requestPayload,
             ewura: ewura?.requestPayload ?? null,
@@ -98,7 +129,7 @@ export const tzAdapter: FiscalAdapter = {
         status: ewuraPolicy.responseStatus,
         engine: 'TZ',
         reference: tra.reference ?? undefined,
-        rawResponse: JSON.stringify(commonResponse),
+        rawResponse,
         requestPayload: {
           ...requestPayload,
           ewura: ewura?.requestPayload ?? null,

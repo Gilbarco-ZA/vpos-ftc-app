@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
 import { safeAsync } from '@/src/shared/utils/safeAsync'
@@ -56,7 +56,7 @@ export const DeviceStatusPanel = () => {
   const [actionBusy, setActionBusy] = useState<string | null>(null)
   const [registrationCode, setRegistrationCode] = useState('')
 
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     setLoadingStatus(true)
     setStatusError(null)
     try {
@@ -96,9 +96,9 @@ export const DeviceStatusPanel = () => {
     } finally {
       setLoadingStatus(false)
     }
-  }
+  }, [])
 
-  const loadRegistration = async () => {
+  const loadRegistration = useCallback(async () => {
     setRegistrationLoading(true)
     setRegistrationError(null)
     try {
@@ -125,17 +125,25 @@ export const DeviceStatusPanel = () => {
 
         if (requiresRegistration) {
           setRegistration({
+            ...details,
             isRegistered: false,
             requiresRegistration: true,
             proxyStatusCode,
             errorMessage: message,
+            identity: details?.identity,
             deviceSettings: {
+              ...(details?.deviceSettings ?? {}),
               isActive:
                 typeof details?.isActive === 'boolean'
                   ? details.isActive
-                  : undefined,
+                  : details?.deviceSettings?.isActive,
             },
-            timestamps: { statusUpdatedAt: new Date().toISOString() },
+            timestamps: {
+              ...(details?.timestamps ?? {}),
+              statusUpdatedAt:
+                details?.timestamps?.statusUpdatedAt ??
+                new Date().toISOString(),
+            },
           })
         } else {
           setRegistration(null)
@@ -150,7 +158,7 @@ export const DeviceStatusPanel = () => {
     } finally {
       setRegistrationLoading(false)
     }
-  }
+  }, [])
 
   const performAction = async (
     action: 'deregister' | 'reset' | 'refreshIdentity' | 'register',
@@ -188,9 +196,13 @@ export const DeviceStatusPanel = () => {
   }
 
   useEffect(() => {
-    loadStatus()
-    loadRegistration()
-  }, [])
+    queueMicrotask(() => {
+      loadStatus()
+    })
+    queueMicrotask(() => {
+      loadRegistration()
+    })
+  }, [loadRegistration, loadStatus])
 
   const registrationCodeValid = registrationCode.trim().length >= 6
   const requiresRegistration =

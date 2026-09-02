@@ -1,8 +1,11 @@
 import { shouldRunInternalFiscalizationWorkers } from '@/src/platform/config/app-config'
 import { getProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { kvSet } from '@/src/shared/storage/stationKv'
+import { logger } from '@/src/shared/utils/logger'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
+import { serializeError } from '@/src/shared/utils/serializeError'
 
+import { startAtgPollingWorker } from '@/src/modules/forecourt/infrastructure/atgPollingWorker'
 import { startForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
 import { startPosCommandsWorker } from '@/src/modules/pos/infrastructure/posCommandsWorker'
 import { startPrintJobsWorker } from '@/src/modules/printing/infrastructure/printJobsWorker'
@@ -14,6 +17,8 @@ import {
 } from '@/src/modules/runtime/infrastructure/busListeners'
 // import { startSupervisorMonitorWorker } from '@/src/modules/runtime/infrastructure/supervisorMonitorWorker'
 import { startEwuraRetryWorker } from '@/src/modules/tanzania-fiscal/infrastructure/ewuraRetryWorker'
+import { startTanzaniaDailyTotalsWorker } from '@/src/modules/tanzania-fiscal/infrastructure/proxyDailyTotalsWorker'
+import { publishLatestTanzaniaTankInventories } from '@/src/modules/tanzania-fiscal/infrastructure/proxyTankInventories'
 import { startTransactionFiscalizationSchedulerWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionFiscalizationSchedulerWorker'
 import { startTransactionQueueWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionQueueWorker'
 
@@ -40,6 +45,14 @@ export function startInProcessRuntime(
   opts?: { monitorMs?: number },
 ) {
   const monitorMs = opts?.monitorMs ?? 10_000
+  const configuredTanzaniaDailyTotalsPollMs = Number(
+    process.env.VPOS_TANZANIA_DAILY_TOTALS_POLL_MS,
+  )
+  const tanzaniaDailyTotalsPollMs =
+    Number.isFinite(configuredTanzaniaDailyTotalsPollMs) &&
+    configuredTanzaniaDailyTotalsPollMs > 0
+      ? configuredTanzaniaDailyTotalsPollMs
+      : 60_000
 
   // Ensure migration bus listeners are active before workers start emitting.
   startPosBusListener()
@@ -50,6 +63,7 @@ export function startInProcessRuntime(
   const stopFns = new Map<string, () => void>()
   const restartCounts = new Map<string, number>()
   const nextAllowedRestartAt = new Map<string, number>()
+  const workerStartedAt = new Map<string, number>()
 
   const specs: WorkerSpec[] = [
     {
@@ -93,6 +107,26 @@ export function startInProcessRuntime(
         ]
       : []),
     {
+      name: 'tanzaniaDailyTotalsWorker',
+      start: () =>
+        startTanzaniaDailyTotalsWorker({
+          stationId,
+          pollMs: tanzaniaDailyTotalsPollMs,
+        }),
+      staleMs: Math.max(180_000, tanzaniaDailyTotalsPollMs * 3),
+      backoffMs: 10_000,
+    },
+    {
+      name: 'atgPollingWorker',
+      start: () =>
+        startAtgPollingWorker({
+          stationId,
+          publishSnapshot: publishLatestTanzaniaTankInventories,
+        }),
+      staleMs: 60_000,
+      backoffMs: 5_000,
+    },
+    {
       name: 'forecourtConfigSyncWorker',
       start: () => startForecourtConfigSyncWorker(),
       staleMs: 60_000,
@@ -103,9 +137,15 @@ export function startInProcessRuntime(
   function startOne(spec: WorkerSpec) {
     try {
       const h = spec.start()
+      workerStartedAt.set(spec.name, Date.now())
       stopFns.set(spec.name, toStopFn(h))
     } catch (e: any) {
       // Record and allow monitor loop to retry.
+      logger.error('[inProcessRuntime]', {
+        msg: 'worker start failed',
+        worker: spec.name,
+        error: serializeError(e),
+      })
       kvSet(stationId, 'vpos.runtime.lastError', {
         worker: spec.name,
         error: String(e?.message || e),
@@ -121,6 +161,7 @@ export function startInProcessRuntime(
       fn?.()
     } catch {}
     stopFns.delete(name)
+    workerStartedAt.delete(name)
   }
 
   // Start all workers immediately
@@ -138,11 +179,18 @@ export function startInProcessRuntime(
       )
       if (!hb) continue
 
+      const startedAt = workerStartedAt.get(spec.name) ?? now
+      const startupGraceMs = Math.min(30_000, spec.staleMs)
+      if (now - startedAt < startupGraceMs) continue
+
       const last = hb.lastHeartbeatAt
         ? new Date(hb.lastHeartbeatAt).getTime()
         : 0
       const stale = last && now - last > spec.staleMs
 
+      // A heartbeat row from the previous process must not trigger an immediate
+      // restart of the freshly-started worker before its first heartbeat write.
+      if (hb.pid != null && Number(hb.pid) !== process.pid && !stale) continue
       if (!stale) continue
 
       const allowAt = nextAllowedRestartAt.get(spec.name) ?? 0

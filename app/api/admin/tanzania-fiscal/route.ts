@@ -1,31 +1,33 @@
 import type { SessionUser } from '@/src/shared/types'
 import { NextRequest, NextResponse } from 'next/server'
 
-import { query, queryOne } from '@/src/platform/db/postgres'
 import { upsertSecureArtifact } from '@/src/platform/security/secure-artifacts'
 import { readBody } from '@/src/platform/web/api/request'
 import { fail, serverError } from '@/src/platform/web/api/response'
 import { createAuditLog } from '@/src/shared/audit/log'
 import { requireAuth } from '@/src/shared/auth'
-import { uuidv4 } from '@/src/shared/utils/uuid'
 
-import { isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/infrastructure/country'
-import {
-  normalizeFiscalizationTransport,
-  resolveStationFiscalizationRoute,
-} from '@/src/modules/tanzania-fiscal/infrastructure/route'
 import {
   buildTanzaniaCloudCutoverChecklist,
+  buildTraEndpointDetails,
   evaluateTanzaniaRouteSwitchSafety,
+  EWURA_DEFAULT_API_SOURCE_ID,
+  EWURA_PRODUCTION_BASE_URL,
   getTanzaniaRouteSwitchSafety,
-} from '@/src/modules/tanzania-fiscal/infrastructure/routeSwitchSafety'
+  resolveFiscalizationDefaults,
+  resolveStationFiscalizationRoute,
+  TRA_PRODUCTION_BASE_URL,
+} from '@/src/modules/tanzania-fiscal/application/adminFiscalization'
+import {
+  loadTanzaniaFiscalRows,
+  saveTanzaniaFiscalConfig,
+} from '@/src/modules/tanzania-fiscal/application/adminFiscalizationStore'
+import { isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/application/country'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type AnyRecord = Record<string, any>
-
-const nowIso = () => new Date().toISOString()
 
 function objectValue(value: unknown): AnyRecord {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -73,26 +75,9 @@ function cleanString(value: unknown): string {
   return String(value ?? '').trim()
 }
 
-function cleanNullable(value: unknown): string | null {
-  const text = cleanString(value)
-  return text || null
-}
-
-function cleanDate(value: unknown): string | null {
-  const text = cleanString(value)
-  if (!text) return null
-  const date = new Date(text)
-  if (Number.isNaN(date.getTime())) return null
-  return date.toISOString()
-}
-
 function cleanRate(value: unknown, fallback = 0.18): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
-}
-
-function cleanStatus(value: unknown, fallback = 'PENDING') {
-  return cleanString(value || fallback).toUpperCase()
 }
 
 function stringMap(input: AnyRecord, keys: string[]) {
@@ -108,7 +93,8 @@ function getTraRegistrationSources(fiscalRegistration: AnyRecord) {
   const efdms = objectValue(regData.efdms)
   const resp = objectValue(efdms.efdmsresp)
   const taxcodes = objectValue(resp.taxcodes)
-  return { data, regData, efdms, resp, taxcodes }
+  const response = objectValue(data.response)
+  return { data, regData, efdms, resp, taxcodes, response }
 }
 
 function getEwuraSources(ewuraConfig: AnyRecord, ewuraRegistration: AnyRecord) {
@@ -121,7 +107,7 @@ function getEwuraSources(ewuraConfig: AnyRecord, ewuraRegistration: AnyRecord) {
 }
 
 async function loadTanzaniaFiscalPayload(stationId: string) {
-  const [
+  const {
     station,
     settings,
     fiscalConfigRow,
@@ -129,68 +115,7 @@ async function loadTanzaniaFiscalPayload(stationId: string) {
     ewuraConfigRow,
     ewuraRegistrationRow,
     signingKey,
-  ] = await Promise.all([
-    queryOne<any>(
-      `SELECT fs.id,
-                fs.code,
-                fs.name,
-                fs.address,
-                fs.city,
-                COALESCE(
-                  NULLIF(BTRIM(fs.country), ''),
-                  NULLIF(BTRIM(sc.config_json #>> '{config,country}'), ''),
-                  NULLIF(BTRIM(sc.config_json #>> '{country}'), '')
-                ) AS country,
-                fs.phone,
-                fs.email,
-                fs.timezone
-           FROM fuel_stations fs
-           LEFT JOIN station_config sc ON sc.station_id = fs.id
-          WHERE fs.id = $1`,
-      [stationId],
-    ),
-    queryOne<any>(
-      `SELECT fiscalization_engine, fiscalization_transport, vat_rate_tz, auto_fiscalize_enabled
-           FROM station_settings
-          WHERE station_id = $1`,
-      [stationId],
-    ),
-    queryOne<any>(
-      `SELECT station_id, config_json, created_at, updated_at
-           FROM fiscal_config
-          WHERE station_id = $1`,
-      [stationId],
-    ),
-    queryOne<any>(
-      `SELECT station_id, status, registration_json, registered_at, created_at, updated_at
-           FROM fiscal_registration
-          WHERE station_id = $1`,
-      [stationId],
-    ),
-    queryOne<any>(
-      `SELECT station_id, config_json, created_at, updated_at
-           FROM ewura_config
-          WHERE station_id = $1`,
-      [stationId],
-    ),
-    queryOne<any>(
-      `SELECT station_id, status, registration_json, registered_at, created_at, updated_at
-           FROM ewura_registration
-          WHERE station_id = $1`,
-      [stationId],
-    ),
-    queryOne<any>(
-      `SELECT id, created_at
-           FROM secure_artifacts
-          WHERE station_id = $1
-            AND artifact_type = 'cert'
-            AND artifact_key = 'private-key.pem'
-            AND rotated_at IS NULL
-            AND deleted_at IS NULL
-          LIMIT 1`,
-      [stationId],
-    ).catch(() => null),
-  ])
+  } = await loadTanzaniaFiscalRows(stationId)
 
   const fiscalConfig = objectValue(fiscalConfigRow?.config_json)
   const fiscalConfigData = objectValue(fiscalConfig.data)
@@ -220,15 +145,18 @@ async function loadTanzaniaFiscalPayload(stationId: string) {
     ewura.registration,
   ]
 
+  const fiscalizationDefaults = resolveFiscalizationDefaults({
+    country: station?.country ?? null,
+    fiscalizationEngine: settings?.fiscalization_engine ?? null,
+    fiscalizationTransport: settings?.fiscalization_transport ?? null,
+  })
   const route = resolveStationFiscalizationRoute({
     stationId,
     country: station?.country ?? null,
-    fiscalizationEngine: settings?.fiscalization_engine ?? 'mock',
-    fiscalizationTransport: settings?.fiscalization_transport ?? 'proxy',
+    fiscalizationEngine: fiscalizationDefaults.fiscalizationEngine,
+    fiscalizationTransport: fiscalizationDefaults.fiscalizationTransport,
   })
-  const activeTransport = normalizeFiscalizationTransport(
-    settings?.fiscalization_transport ?? 'proxy',
-  )
+  const activeTransport = fiscalizationDefaults.fiscalizationTransport
   const [localSwitchSafetyResult, proxySwitchSafetyResult] = await Promise.all([
     getTanzaniaRouteSwitchSafety({
       stationId,
@@ -252,14 +180,17 @@ async function loadTanzaniaFiscalPayload(stationId: string) {
       : value
   const localSwitchSafety = withChecklist(localSwitchSafetyResult)
   const proxySwitchSafety = withChecklist(proxySwitchSafetyResult)
-  const selectedSwitchSafety =
-    activeTransport === 'local_tz' ? proxySwitchSafety : localSwitchSafety
+  // Proxy is now the only executable Tanzania fiscalization transport.
+  // Keep both safety payloads for backward-compatible diagnostics, but select
+  // the proxy result for the active route instead of comparing against the
+  // retired `local_tz` transport.
+  const selectedSwitchSafety = proxySwitchSafety
 
   return {
     station,
     isTanzania: isTanzaniaCountry(station?.country),
     stationSettings: {
-      fiscalizationEngine: settings?.fiscalization_engine ?? 'mock',
+      fiscalizationEngine: fiscalizationDefaults.fiscalizationEngine,
       fiscalizationTransport: activeTransport,
       fiscalizationRoute: route.route,
       fiscalizationRouteReason: route.reason ?? null,
@@ -273,13 +204,19 @@ async function loadTanzaniaFiscalPayload(stationId: string) {
       privateKeyCreatedAt: signingKey?.created_at
         ? new Date(signingKey.created_at).toISOString()
         : null,
+      skipSigningForDebug:
+        firstValue(
+          fiscalSources,
+          ['skipSigningForDebug', 'SKIP_SIGNING'],
+          'false',
+        ).toLowerCase() === 'true',
     },
     traConfig: {
-      baseUrl: firstValue(fiscalSources, [
-        'traBaseUrl',
-        'baseUrl',
-        'TRA_BASE_URL',
-      ]),
+      baseUrl: firstValue(
+        fiscalSources,
+        ['traBaseUrl', 'baseUrl', 'TRA_BASE_URL'],
+        TRA_PRODUCTION_BASE_URL,
+      ),
       taxIdNo: firstValue(fiscalSources, ['taxIdNo', 'TIN', 'tin']),
       certKey: firstValue(fiscalSources, ['certKey', 'vfdSerialNo', 'serial']),
       customerIdType: firstValue(fiscalSources, ['customerIdType'], '6'),
@@ -293,6 +230,13 @@ async function loadTanzaniaFiscalPayload(stationId: string) {
         fiscalSources,
         ['vatRate', 'VAT_RATE'],
         settings?.vat_rate_tz == null ? 0.18 : Number(settings.vat_rate_tz),
+      ),
+      endpoints: buildTraEndpointDetails(
+        firstValue(
+          fiscalSources,
+          ['traBaseUrl', 'baseUrl', 'TRA_BASE_URL'],
+          TRA_PRODUCTION_BASE_URL,
+        ),
       ),
     },
     traRegistration: {
@@ -331,21 +275,28 @@ async function loadTanzaniaFiscalPayload(stationId: string) {
       username: firstValue(fiscalSources, ['username', 'traUsername']),
       password: firstValue(fiscalSources, ['password', 'traPassword']),
       tokenpath: firstValue(fiscalSources, ['tokenpath'], 'vfdtoken'),
+      rawResponse: firstValue([tra.response], ['raw']),
+      httpStatus: firstValue([tra.response], ['httpStatus']),
       taxcodes: {
         codea: firstValue([tra.taxcodes], ['codea'], '18'),
         codeb: firstValue([tra.taxcodes], ['codeb'], '0'),
         codec: firstValue([tra.taxcodes], ['codec'], '0'),
         coded: firstValue([tra.taxcodes], ['coded'], '0'),
+        codee: firstValue([tra.taxcodes], ['codee'], '0'),
       },
     },
     ewuraConfig: {
-      baseUrl: firstValue(ewuraSources, [
-        'baseUrl',
-        'ewuraBaseUrl',
-        'EWURA_BASE_URL',
-      ]),
+      baseUrl: firstValue(
+        ewuraSources,
+        ['baseUrl', 'ewuraBaseUrl', 'EWURA_BASE_URL'],
+        EWURA_PRODUCTION_BASE_URL,
+      ),
       TranId: firstValue(ewuraSources, ['TranId'], '1'),
-      APISourceId: firstValue(ewuraSources, ['APISourceId', 'apiSourceId']),
+      APISourceId: firstValue(
+        ewuraSources,
+        ['APISourceId', 'apiSourceId'],
+        EWURA_DEFAULT_API_SOURCE_ID,
+      ),
       RetailStationName: firstValue(
         ewuraSources,
         ['RetailStationName'],
@@ -405,6 +356,7 @@ async function loadTanzaniaFiscalPayload(stationId: string) {
         ),
         code: firstValue([ewura.response], ['code', 'Code']),
         message: firstValue([ewura.response], ['message', 'Message']),
+        raw: firstValue([ewura.response], ['raw']),
       },
     },
     routeSwitchSafety: {
@@ -453,15 +405,13 @@ export const POST = async (req: NextRequest) => {
     const ewuraConfig = objectValue(body?.ewuraConfig)
     const ewuraRegistration = objectValue(body?.ewuraRegistration)
     const signing = objectValue(body?.signing)
-    const requestedTransport = normalizeFiscalizationTransport(
-      body?.fiscalizationTransport ??
-        existing.stationSettings?.fiscalizationTransport ??
-        (body?.enableTanzaniaFiscalization === false ? 'proxy' : 'local_tz'),
-    )
+    // Direct TRA/EWURA transport is retired. Persist proxy regardless of any
+    // stale client payload while preserving the stored transport in the safety
+    // snapshot so pre-cutover queues can still be inspected.
+    const requestedTransport = 'proxy' as const
 
-    const existingTransport = normalizeFiscalizationTransport(
-      existing.stationSettings?.fiscalizationTransport ?? 'proxy',
-    )
+    const existingTransport =
+      existing.routeSwitchSafety?.proxy?.snapshot?.currentTransport ?? 'proxy'
     const proposedPrivateKeyPem = cleanString(signing.privateKeyPem)
     const currentRouteSwitchSafety = await getTanzaniaRouteSwitchSafety({
       stationId: user.stationId,
@@ -516,57 +466,18 @@ export const POST = async (req: NextRequest) => {
       )
     }
 
-    const taxcodes = objectValue(traRegistration.taxcodes)
     const fiscalConfigJson = {
       data: {
         certKey: cleanString(traConfig.certKey || traRegistration.serial),
         taxIdNo: cleanString(traConfig.taxIdNo || traRegistration.tin),
-        traBaseUrl: cleanString(traConfig.baseUrl),
+        traBaseUrl: cleanString(traConfig.baseUrl || TRA_PRODUCTION_BASE_URL),
         customerIdType: cleanString(traConfig.customerIdType || '6'),
         routingKey: cleanString(
           traConfig.routingKey || traRegistration.routingkey || 'vfdrct',
         ),
         certSerial: cleanString(traConfig.certSerial),
         vatRate: cleanRate(traConfig.vatRate),
-      },
-    }
-
-    const efdmsresp = {
-      ...stringMap(traRegistration, [
-        'ackcode',
-        'ackmsg',
-        'regid',
-        'serial',
-        'uin',
-        'tin',
-        'vrn',
-        'mobile',
-        'address',
-        'street',
-        'city',
-        'country',
-        'name',
-        'receiptcode',
-        'region',
-        'routingkey',
-        'gc',
-        'taxoffice',
-        'username',
-        'password',
-        'tokenpath',
-      ]),
-      taxcodes: stringMap(taxcodes, ['codea', 'codeb', 'codec', 'coded']),
-    }
-
-    const fiscalRegistrationJson = {
-      data: {
-        regData: {
-          efdms: {
-            efdmsresp,
-            efdmssignature: cleanString(traRegistration.efdmssignature),
-          },
-        },
-        timestamp: cleanDate(traRegistration.registeredAt) || nowIso(),
+        skipSigningForDebug: signing.skipSigningForDebug === true,
       },
     }
 
@@ -591,96 +502,18 @@ export const POST = async (req: NextRequest) => {
 
     const ewuraConfigJson = {
       data: {
-        baseUrl: cleanString(ewuraConfig.baseUrl),
+        baseUrl: cleanString(ewuraConfig.baseUrl || EWURA_PRODUCTION_BASE_URL),
         ...ewuraRegistrationDetails,
       },
     }
 
-    const ewuraResponse = objectValue(ewuraRegistration.response)
-    const ewuraRegistrationJson = {
-      version: 1,
-      data: {
-        registration: ewuraRegistrationDetails,
-        response: {
-          transactionId: cleanString(ewuraResponse.transactionId),
-          requestName: cleanString(ewuraResponse.requestName),
-          code: cleanString(ewuraResponse.code),
-          message: cleanString(ewuraResponse.message),
-        },
-      },
-      lastModified: Date.now(),
-    }
-
-    await query(
-      `INSERT INTO station_settings (
-          id, station_id, key, fiscalization_engine, fiscalization_transport, vat_rate_tz
-        )
-        VALUES ($1, $2, $3, 'TZ', $4, $5)
-       ON CONFLICT (station_id)
-       DO UPDATE SET fiscalization_engine = 'TZ',
-                     fiscalization_transport = EXCLUDED.fiscalization_transport,
-                     vat_rate_tz = EXCLUDED.vat_rate_tz,
-                     updated_at = NOW()`,
-      [
-        uuidv4(),
-        user.stationId,
-        `settings:${user.stationId}`,
-        requestedTransport,
-        cleanRate(traConfig.vatRate),
-      ],
-    )
-
-    await query(
-      `INSERT INTO fiscal_config (station_id, config_json)
-            VALUES ($1, $2::jsonb)
-       ON CONFLICT (station_id)
-       DO UPDATE SET config_json = EXCLUDED.config_json,
-                     updated_at = NOW()`,
-      [user.stationId, fiscalConfigJson],
-    )
-
-    await query(
-      `INSERT INTO fiscal_registration (id, station_id, status, registration_json, registered_at)
-            VALUES ($1, $2, $3, $4::jsonb, $5)
-       ON CONFLICT (station_id)
-       DO UPDATE SET status = EXCLUDED.status,
-                     registration_json = EXCLUDED.registration_json,
-                     registered_at = EXCLUDED.registered_at,
-                     updated_at = NOW()`,
-      [
-        uuidv4(),
-        user.stationId,
-        cleanStatus(traRegistration.status),
-        fiscalRegistrationJson,
-        cleanDate(traRegistration.registeredAt),
-      ],
-    )
-
-    await query(
-      `INSERT INTO ewura_config (station_id, config_json)
-            VALUES ($1, $2::jsonb)
-       ON CONFLICT (station_id)
-       DO UPDATE SET config_json = EXCLUDED.config_json,
-                     updated_at = NOW()`,
-      [user.stationId, ewuraConfigJson],
-    )
-
-    await query(
-      `INSERT INTO ewura_registration (id, station_id, status, registration_json, registered_at)
-            VALUES ($1, $2, $3, $4::jsonb, $5)
-       ON CONFLICT (station_id)
-       DO UPDATE SET status = EXCLUDED.status,
-                     registration_json = EXCLUDED.registration_json,
-                     registered_at = EXCLUDED.registered_at,
-                     updated_at = NOW()`,
-      [
-        uuidv4(),
-        user.stationId,
-        cleanStatus(ewuraRegistration.status),
-        ewuraRegistrationJson,
-        cleanDate(ewuraRegistration.registeredAt),
-      ],
-    )
+    await saveTanzaniaFiscalConfig({
+      stationId: user.stationId,
+      transport: requestedTransport,
+      vatRate: cleanRate(traConfig.vatRate),
+      fiscalConfigJson,
+      ewuraConfigJson,
+    })
 
     const privateKeyPem = proposedPrivateKeyPem
     if (privateKeyPem) {
@@ -708,7 +541,7 @@ export const POST = async (req: NextRequest) => {
         fiscalizationEngine:
           existing.stationSettings?.fiscalizationEngine ?? null,
         fiscalizationTransport:
-          existing.stationSettings?.fiscalizationTransport ?? 'proxy',
+          existing.stationSettings?.fiscalizationTransport ?? 'local_tz',
       },
       newValues: {
         fiscalizationEngine: 'TZ',
@@ -724,6 +557,7 @@ export const POST = async (req: NextRequest) => {
         traTin: fiscalConfigJson.data.taxIdNo || null,
         ewuraLicenseNo: ewuraRegistrationDetails.EWURALicenseNo || null,
         signingKeyUpdated: !!privateKeyPem,
+        skipSigningForDebug: signing.skipSigningForDebug === true,
       },
     }).catch(() => {})
 

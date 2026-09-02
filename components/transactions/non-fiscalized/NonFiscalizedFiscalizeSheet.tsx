@@ -62,21 +62,48 @@ const NonFiscalizedFiscalizeSheet = ({
 
   useEffect(() => {
     if (!transaction) return
-    setTin('')
-    setBuyerName('')
-    setBuyerType(buyerTypeOptions[0]?.value ?? '')
-    setContactPhone('')
-    setContactEmail('')
-    setLocalReceiptFields({
-      odometer: '',
-      paymentType: 'CASH',
-      vehicleRegNr: '',
+
+    queueMicrotask(() => {
+      const linkedCustomerId = String(transaction.customerId || '').trim()
+      const linkedTin = String(transaction.customerTin || '').trim()
+      const linkedBuyerName = String(transaction.customerName || '').trim()
+
+      setTin(linkedTin)
+      setBuyerName(linkedBuyerName)
+      setBuyerType(buyerTypeOptions[0]?.value ?? '')
+      const transactionPaymentType = String(transaction.paymentType || '')
+        .trim()
+        .toUpperCase()
+
+      setContactPhone('')
+      setContactEmail('')
+      setLocalReceiptFields({
+        odometer: String(transaction.odometer ?? ''),
+        paymentType: transactionPaymentType === 'CARD' ? 'CARD' : 'CASH',
+        vehicleRegNr: String(transaction.vehicleRegNr ?? ''),
+      })
+      setCustomerState(linkedCustomerId ? 'found' : 'idle')
+      setResolvedCustomer(
+        linkedCustomerId
+          ? {
+              id: linkedCustomerId,
+              tin: linkedTin,
+              buyerName: linkedBuyerName,
+              buyerType: null,
+              pin: null,
+              contactPhone: null,
+              contactEmail: null,
+              country: null,
+              odometer: transaction.odometer ?? null,
+              paymentType: transaction.paymentType ?? null,
+              vehicleRegNr: transaction.vehicleRegNr ?? null,
+            }
+          : null,
+      )
+      setErrors({})
+      setError(null)
+      setIsSubmitting(false)
     })
-    setCustomerState('idle')
-    setResolvedCustomer(null)
-    setErrors({})
-    setError(null)
-    setIsSubmitting(false)
   }, [transaction, buyerTypeOptions])
 
   const validateTin = (value: string) => {
@@ -87,22 +114,22 @@ const NonFiscalizedFiscalizeSheet = ({
     return null
   }
 
-  const mapCustomer = (
-    customer: Record<string, any>,
-    fallbackTin: string,
-  ): ResolvedCustomer => ({
-    id: String(customer?.id ?? ''),
-    tin: String(customer?.tin ?? fallbackTin),
-    buyerName: String(customer?.buyer_name ?? customer?.buyerName ?? ''),
-    buyerType: customer?.buyer_type ?? customer?.buyerType ?? null,
-    pin: customer?.pin ?? null,
-    contactPhone: customer?.contact_phone ?? customer?.contactPhone ?? null,
-    contactEmail: customer?.contact_email ?? customer?.contactEmail ?? null,
-    country: customer?.country ?? null,
-    odometer: customer?.odometer ?? null,
-    paymentType: customer?.payment_type ?? customer?.paymentType ?? null,
-    vehicleRegNr: customer?.vehicle_reg_nr ?? customer?.vehicleRegNr ?? null,
-  })
+  const mapCustomer = useCallback(
+    (customer: Record<string, any>, fallbackTin: string): ResolvedCustomer => ({
+      id: String(customer?.id ?? ''),
+      tin: String(customer?.tin ?? fallbackTin),
+      buyerName: String(customer?.buyer_name ?? customer?.buyerName ?? ''),
+      buyerType: customer?.buyer_type ?? customer?.buyerType ?? null,
+      pin: customer?.pin ?? null,
+      contactPhone: customer?.contact_phone ?? customer?.contactPhone ?? null,
+      contactEmail: customer?.contact_email ?? customer?.contactEmail ?? null,
+      country: customer?.country ?? null,
+      odometer: customer?.odometer ?? null,
+      paymentType: customer?.payment_type ?? customer?.paymentType ?? null,
+      vehicleRegNr: customer?.vehicle_reg_nr ?? customer?.vehicleRegNr ?? null,
+    }),
+    [],
+  )
 
   const lookupCustomer = useCallback(
     async (
@@ -133,16 +160,17 @@ const NonFiscalizedFiscalizeSheet = ({
           setCustomerState(options?.foundState ?? 'found')
           setBuyerName(mapped.buyerName)
           setBuyerType(mapped.buyerType || 'B2C')
-          setLocalReceiptFields({
-            odometer: String(mapped.odometer ?? ''),
+          setLocalReceiptFields((current) => ({
+            odometer: current.odometer.trim() || String(mapped.odometer ?? ''),
             paymentType:
-              String(mapped.paymentType ?? '')
+              String(current.paymentType || mapped.paymentType || '')
                 .trim()
                 .toUpperCase() === 'CARD'
                 ? 'CARD'
                 : 'CASH',
-            vehicleRegNr: String(mapped.vehicleRegNr ?? ''),
-          })
+            vehicleRegNr:
+              current.vehicleRegNr.trim() || String(mapped.vehicleRegNr ?? ''),
+          }))
           return
         }
         const notFoundState = options?.notFoundState ?? 'not_found'
@@ -159,7 +187,7 @@ const NonFiscalizedFiscalizeSheet = ({
         setError(err)
       }
     },
-    [],
+    [mapCustomer],
   )
 
   const handleTinBlur = async () => {

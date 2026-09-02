@@ -1,8 +1,9 @@
 import { bootstrapRuntimeEnvironment } from '@/src/platform/runtime'
-import { enqueueFiscalInboxMessage } from '@/src/shared/runtime/fiscalInbox'
 import { kvGet } from '@/src/shared/storage/stationKv'
 import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
+
+import { enqueueFiscalInboxMessage } from '@/src/modules/fiscal-inbox/application/fiscalInbox'
 
 type PendingAuth = { id: string; createdAt: number }
 

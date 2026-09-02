@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
+import { CollapsibleStatusSection } from '@/components/admin/forecourt/CollapsibleStatusSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 
 const fmtTs = (value: unknown) => {
   if (value == null || value === '') return '—'
@@ -34,6 +34,9 @@ const valueOrDash = (value: unknown) => {
   const text = String(value ?? '').trim()
   return text || '—'
 }
+
+const firstDefined = (...values: unknown[]) =>
+  values.find((value) => value !== undefined && value !== null && value !== '')
 
 function SummaryMetric({ label, value }: { label: string; value: unknown }) {
   return (
@@ -122,6 +125,28 @@ const buildApplyMappingPayload = (
   return null
 }
 
+const BULK_CSV_HEADERS = [
+  'entityType',
+  'entityId',
+  'domsFpId',
+  'domsTankId',
+  'domsGradeOptionId',
+  'domsGradeId',
+  'sourceSuggestionCode',
+  'note',
+]
+
+const escapeCsvValue = (value: unknown) => {
+  const text = String(value ?? '')
+  if (!/[",\n\r]/.test(text)) return text
+  return `"${text.replaceAll('"', '""')}"`
+}
+
+const rowsToCsv = (rows: unknown[][]) =>
+  [BULK_CSV_HEADERS, ...rows]
+    .map((row) => row.map(escapeCsvValue).join(','))
+    .join('\n') + '\n'
+
 function JsonPreview({ value }: { value: unknown }) {
   return (
     <pre className="max-h-28 overflow-auto rounded bg-[var(--surface-muted)] p-2 text-[11px]">
@@ -151,7 +176,7 @@ export function JplReconciliationPanel() {
   const [confirmedBulkLive, setConfirmedBulkLive] = useState(false)
   const [confirmedBulkApply, setConfirmedBulkApply] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -165,9 +190,9 @@ export function JplReconciliationPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setHistoryLoading(true)
     try {
       const response = await api<any>(
@@ -182,18 +207,22 @@ export function JplReconciliationPanel() {
     } finally {
       setHistoryLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void load()
-    void loadHistory()
+    queueMicrotask(() => {
+      void load()
+    })
+    queueMicrotask(() => {
+      void loadHistory()
+    })
     fetch('/api/security/csrf', { cache: 'no-store' })
       .then((response) => response.json())
       .then((data) => {
         if (typeof data?.token === 'string') setCsrfToken(data.token)
       })
       .catch(() => setCsrfToken(''))
-  }, [])
+  }, [load, loadHistory])
 
   const issues = payload?.issues ?? []
   const pumps = payload?.ftc?.pumps ?? []
@@ -206,8 +235,8 @@ export function JplReconciliationPanel() {
   const suggestions = payload?.remediation?.suggestions ?? []
   const safetyNotice = payload?.remediation?.safetyNotice ?? ''
 
-  const topIssues = useMemo(() => issues.slice(0, 12), [issues])
-  const topSuggestions = useMemo(() => suggestions.slice(0, 12), [suggestions])
+  const topIssues = issues.slice(0, 12)
+  const topSuggestions = suggestions.slice(0, 12)
 
   const exportReconciliation = () => {
     window.open(
@@ -264,6 +293,85 @@ export function JplReconciliationPanel() {
       '_blank',
       'noopener,noreferrer',
     )
+  }
+
+  const loadCurrentSiteTemplate = () => {
+    const rows: unknown[][] = []
+    for (const pump of pumps) {
+      rows.push([
+        'pump',
+        pump.id,
+        firstDefined(pump.domsFpId, pump.doms_fp_id) ?? '',
+        '',
+        '',
+        '',
+        'site-template',
+        `Pump ${firstDefined(pump.pump_number, pump.pumpNumber, pump.code, pump.id)} - verify against PSS Configurator`,
+      ])
+    }
+    for (const tank of tanks) {
+      rows.push([
+        'tank',
+        tank.id,
+        '',
+        firstDefined(tank.domsTankId, tank.doms_tank_id) ?? '',
+        '',
+        '',
+        'site-template',
+        `Tank ${firstDefined(tank.code, tank.name, tank.id)} - verify against tank gauge assignment`,
+      ])
+    }
+    for (const nozzle of nozzles) {
+      rows.push([
+        'nozzle',
+        nozzle.id,
+        '',
+        firstDefined(nozzle.domsTankId, nozzle.doms_tank_id) ?? '',
+        firstDefined(nozzle.domsGradeOptionId, nozzle.doms_grade_option_id) ??
+          '',
+        firstDefined(nozzle.domsGradeId, nozzle.doms_grade_id) ?? '',
+        'site-template',
+        `Pump ${firstDefined(nozzle.pump_number, nozzle.pumpNumber, nozzle.pump_code, '—')} nozzle ${firstDefined(nozzle.nozzle_number, nozzle.nozzleNumber, '—')}`,
+      ])
+    }
+    setBulkCsvText(rowsToCsv(rows))
+    setBulkJsonText('')
+    setBulkResult(null)
+  }
+
+  const loadSuggestedMappingsTemplate = () => {
+    const rows = suggestions
+      .map((suggestion: any) => {
+        const apply = buildApplyMappingPayload(suggestion)
+        if (!apply) return null
+        return [
+          apply.entityType,
+          apply.entityId,
+          apply.mapping.domsFpId ?? '',
+          apply.mapping.domsTankId ?? '',
+          apply.mapping.domsGradeOptionId ?? '',
+          apply.mapping.domsGradeId ?? '',
+          apply.sourceSuggestionCode ??
+            suggestion.code ??
+            'reconciliation-suggestion',
+          suggestion.title ??
+            suggestion.description ??
+            'Review against physical site',
+        ]
+      })
+      .filter(Boolean) as unknown[][]
+
+    setBulkCsvText(rowsToCsv(rows))
+    setBulkJsonText('')
+    setBulkResult(null)
+  }
+
+  const importBulkCsvFile = async (file: File | null) => {
+    if (!file) return
+    const text = await file.text()
+    setBulkCsvText(text)
+    setBulkJsonText('')
+    setBulkResult(null)
   }
 
   const submitBulkMapping = async (mode: 'dry-run' | 'apply') => {
@@ -349,8 +457,13 @@ export function JplReconciliationPanel() {
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
+    <CollapsibleStatusSection
+      title="DOMS configuration reconciliation"
+      status={String(payload?.severity ?? 'unknown').toUpperCase()}
+      statusVariant={severityVariant(payload?.severity)}
+      contentClassName="p-4 pt-0"
+    >
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-base font-semibold">
@@ -506,441 +619,548 @@ export function JplReconciliationPanel() {
           </div>
         </div>
 
-        <div className="rounded border bg-[var(--surface-card)] p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-sm font-semibold">
-                FTC-side remediation suggestions
-              </div>
-              <div className="text-xs text-[var(--text-secondary)]">
-                Suggestions may update FTC mappings after confirmation, but no
-                DOMS install command is sent.
-              </div>
-            </div>
-            <Badge variant={STATUS_VARIANT.INFO}>
-              {suggestions.length} suggestions
-            </Badge>
-          </div>
-          {safetyNotice ? (
-            <div className="mb-3 rounded border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-800">
-              {safetyNotice}
-            </div>
-          ) : null}
-
-          <div className="mb-3 grid grid-cols-1 gap-2 rounded border bg-[var(--surface-muted)] p-3 text-xs md:grid-cols-[1fr_2fr]">
-            <label className="flex items-start gap-2 text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={confirmedPhysicalMapping}
-                onChange={(event) =>
-                  setConfirmedPhysicalMapping(event.target.checked)
-                }
-                className="mt-0.5"
-              />
-              <span>
-                I have checked the selected mapping against the physical site
-                and PSS Configurator.
-              </span>
-            </label>
-            <textarea
-              value={confirmationNote}
-              onChange={(event) => setConfirmationNote(event.target.value)}
-              placeholder="Optional confirmation note, for example: checked against dispenser labels and PSS Configurator export."
-              className="min-h-16 rounded border bg-[var(--surface-card)] p-2 text-xs text-[var(--text-primary)]"
-            />
-          </div>
-          {topSuggestions.length ? (
-            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-              {topSuggestions.map((suggestion: any, index: number) => {
-                const applyPayload = buildApplyMappingPayload(suggestion)
-                const applyKey = applyPayload
-                  ? `${applyPayload.entityType}:${applyPayload.entityId}:${suggestion.code}`
-                  : ''
-                return (
-                  <div
-                    key={`${suggestion.code}-${index}`}
-                    className="rounded border p-3 text-sm"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={severityVariant(suggestion.severity)}>
-                        {suggestion.severity}
-                      </Badge>
-                      <Badge variant={STATUS_VARIANT.NEUTRAL}>
-                        {suggestion.confidence} confidence
-                      </Badge>
-                      <span className="font-medium">{suggestion.title}</span>
-                    </div>
-                    <div className="mt-2 text-[var(--text-secondary)]">
-                      {suggestion.description}
-                    </div>
-                    <div className="mt-2 text-xs text-[var(--text-muted)]">
-                      {suggestion.suggestedAction}
-                    </div>
-                    {suggestion.suggestedValue ? (
-                      <JsonPreview value={suggestion.suggestedValue} />
-                    ) : null}
-                    {applyPayload ? (
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded border bg-[var(--surface-muted)] p-2">
-                        <div className="text-xs text-[var(--text-secondary)]">
-                          Applies to FTC {applyPayload.entityType} mapping only.
-                          No DOMS command will be sent.
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={
-                            !csrfToken ||
-                            !confirmedPhysicalMapping ||
-                            applyingKey === applyKey
-                          }
-                          onClick={() => applyMapping(suggestion)}
-                        >
-                          {applyingKey === applyKey
-                            ? 'Applying...'
-                            : 'Apply FTC mapping'}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-sm text-[var(--text-secondary)]">
-              No remediation suggestions are available for the current snapshot.
-            </div>
-          )}
-        </div>
-
-        <div className="rounded border bg-[var(--surface-card)] p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-sm font-semibold">
-                Bulk FTC-side mapping review/apply
-              </div>
-              <div className="text-xs text-[var(--text-secondary)]">
-                Paste approved CSV or JSON corrections, dry-run them against the
-                latest DOMS/PSS reconciliation snapshot, then apply the reviewed
-                batch to FTC mappings only.
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={downloadBulkTemplate}
-              >
-                CSV template
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                disabled={!csrfToken || bulkLoading}
-                onClick={() => submitBulkMapping('dry-run')}
-              >
-                {bulkLoading ? 'Reviewing...' : 'Dry-run batch'}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={
-                  !csrfToken ||
-                  bulkLoading ||
-                  !confirmedPhysicalMapping ||
-                  !confirmedBulkLive ||
-                  !confirmedBulkApply ||
-                  bulkResult?.ok !== true
-                }
-                onClick={() => submitBulkMapping('apply')}
-              >
-                {bulkLoading ? 'Applying...' : 'Apply reviewed batch'}
-              </Button>
-            </div>
-          </div>
-
-          <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                CSV rows
-              </label>
-              <textarea
-                value={bulkCsvText}
-                onChange={(event) => {
-                  setBulkCsvText(event.target.value)
-                  setBulkResult(null)
-                }}
-                placeholder="entityType,entityId,domsFpId,domsTankId,domsGradeOptionId,domsGradeId,sourceSuggestionCode,note"
-                className="min-h-32 w-full rounded border bg-[var(--surface-muted)] p-2 font-mono text-xs text-[var(--text-primary)]"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-                JSON rows
-              </label>
-              <textarea
-                value={bulkJsonText}
-                onChange={(event) => {
-                  setBulkJsonText(event.target.value)
-                  setBulkResult(null)
-                }}
-                placeholder='[{"entityType":"pump","entityId":"...","domsFpId":1}]'
-                className="min-h-32 w-full rounded border bg-[var(--surface-muted)] p-2 font-mono text-xs text-[var(--text-primary)]"
-              />
-            </div>
-          </div>
-
-          <div className="mb-3 grid grid-cols-1 gap-2 rounded border bg-[var(--surface-muted)] p-3 text-xs md:grid-cols-2">
-            <label className="flex items-start gap-2 text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={confirmedBulkLive}
-                onChange={(event) => setConfirmedBulkLive(event.target.checked)}
-                className="mt-0.5"
-              />
-              <span>
-                I refreshed reconciliation against live DOMS/PSS data and
-                checked that the batch matches the latest observed controller
-                IDs.
-              </span>
-            </label>
-            <label className="flex items-start gap-2 text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={confirmedBulkApply}
-                onChange={(event) =>
-                  setConfirmedBulkApply(event.target.checked)
-                }
-                className="mt-0.5"
-              />
-              <span>
-                I understand this applies all reviewed rows as FTC-side mapping
-                changes only and sends no DOMS/PSS write command.
-              </span>
-            </label>
-          </div>
-
-          {bulkResult ? (
-            <div className="space-y-3 rounded border bg-[var(--surface-muted)] p-3 text-xs">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  variant={
-                    bulkResult.ok
-                      ? STATUS_VARIANT.SUCCESS
-                      : STATUS_VARIANT.ERROR
-                  }
-                >
-                  {bulkResult.ok ? 'READY' : 'BLOCKED'}
-                </Badge>
-                <span>
-                  {bulkResult.summary?.itemCount ?? 0} rows,{' '}
-                  {bulkResult.summary?.blockerCount ?? 0} blockers,{' '}
-                  {bulkResult.summary?.warningCount ?? 0} warnings
-                </span>
-                <span className="text-[var(--text-muted)]">
-                  Reconciliation:{' '}
-                  {valueOrDash(bulkResult.reconciliation?.severity)}
-                </span>
-              </div>
-
-              {bulkResult.blockers?.length ? (
-                <div>
-                  <div className="mb-1 font-semibold text-red-700">
-                    Blockers
-                  </div>
-                  <div className="space-y-1">
-                    {bulkResult.blockers.map((blocker: any, index: number) => (
-                      <div
-                        key={`${blocker.code}-${index}`}
-                        className="rounded border border-red-500/30 bg-red-500/5 p-2 text-red-800"
-                      >
-                        {blocker.sourceLine
-                          ? `Line ${blocker.sourceLine}: `
-                          : ''}
-                        {blocker.message}
-                      </div>
-                    ))}
-                  </div>
+        <CollapsibleStatusSection
+          title="FTC-side remediation suggestions"
+          status={`${suggestions.length} suggestions`}
+          statusVariant={
+            suggestions.length ? STATUS_VARIANT.NEUTRAL : STATUS_VARIANT.SUCCESS
+          }
+          contentClassName="p-3 pt-0"
+        >
+          <div className="rounded border bg-[var(--surface-card)] p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold">
+                  FTC-side remediation suggestions
                 </div>
-              ) : null}
-
-              {bulkResult.warnings?.length ? (
-                <div>
-                  <div className="mb-1 font-semibold text-amber-800">
-                    Warnings
-                  </div>
-                  <div className="space-y-1">
-                    {bulkResult.warnings.map((warning: any, index: number) => (
-                      <div
-                        key={`${warning.code}-${index}`}
-                        className="rounded border border-amber-500/30 bg-amber-500/5 p-2 text-amber-900"
-                      >
-                        {warning.sourceLine
-                          ? `Line ${warning.sourceLine}: `
-                          : ''}
-                        {warning.message}
-                      </div>
-                    ))}
-                  </div>
+                <div className="text-xs text-[var(--text-secondary)]">
+                  Suggestions may update FTC mappings after confirmation, but no
+                  DOMS install command is sent.
                 </div>
-              ) : null}
-
-              {bulkResult.items?.length ? (
-                <div className="overflow-auto">
-                  <table className="min-w-full text-left text-xs">
-                    <thead className="text-[var(--text-muted)]">
-                      <tr>
-                        <th className="px-2 py-1">Source</th>
-                        <th className="px-2 py-1">Entity</th>
-                        <th className="px-2 py-1">Mapping</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bulkResult.items.slice(0, 50).map((item: any) => (
-                        <tr
-                          key={`${item.source}-${item.index}`}
-                          className="border-t align-top"
-                        >
-                          <td className="px-2 py-1">
-                            {item.source}
-                            {item.sourceLine ? `:${item.sourceLine}` : ''}
-                          </td>
-                          <td className="px-2 py-1">
-                            {item.entityType}:{item.entityId}
-                          </td>
-                          <td className="px-2 py-1">
-                            <JsonPreview value={item.mapping} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="text-sm text-[var(--text-secondary)]">
-              Dry-run a CSV or JSON batch to see blockers, warnings, and the
-              exact FTC-side mapping rows that would be applied.
-            </div>
-          )}
-        </div>
-
-        <div className="rounded border bg-[var(--surface-card)] p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-sm font-semibold">
-                FTC mapping change history
               </div>
-              <div className="text-xs text-[var(--text-secondary)]">
-                Rollback is blocked if the mapping changed after the selected
-                audit entry.
-              </div>
+              <Badge variant={STATUS_VARIANT.INFO}>
+                {suggestions.length} suggestions
+              </Badge>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+            {safetyNotice ? (
+              <div className="mb-3 rounded border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-800">
+                {safetyNotice}
+              </div>
+            ) : null}
+
+            <div className="mb-3 grid grid-cols-1 gap-2 rounded border bg-[var(--surface-muted)] p-3 text-xs md:grid-cols-[1fr_2fr]">
+              <label className="flex items-start gap-2 text-[var(--text-secondary)]">
                 <input
                   type="checkbox"
-                  checked={confirmedRollback}
+                  checked={confirmedPhysicalMapping}
                   onChange={(event) =>
-                    setConfirmedRollback(event.target.checked)
+                    setConfirmedPhysicalMapping(event.target.checked)
                   }
+                  className="mt-0.5"
                 />
-                Confirm rollback against physical site and PSS Configurator
+                <span>
+                  I have checked the selected mapping against the physical site
+                  and PSS Configurator.
+                </span>
               </label>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={loadHistory}
-                disabled={historyLoading}
-              >
-                {historyLoading ? 'Loading...' : 'Refresh history'}
-              </Button>
+              <textarea
+                value={confirmationNote}
+                onChange={(event) => setConfirmationNote(event.target.value)}
+                placeholder="Optional confirmation note, for example: checked against dispenser labels and PSS Configurator export."
+                className="min-h-16 rounded border bg-[var(--surface-card)] p-2 text-xs text-[var(--text-primary)]"
+              />
             </div>
-          </div>
-          {mappingHistory.length ? (
-            <div className="overflow-auto">
-              <table className="min-w-full text-left text-xs">
-                <thead className="text-[var(--text-muted)]">
-                  <tr>
-                    <th className="px-2 py-1">When</th>
-                    <th className="px-2 py-1">Action</th>
-                    <th className="px-2 py-1">Entity</th>
-                    <th className="px-2 py-1">Old values</th>
-                    <th className="px-2 py-1">New values</th>
-                    <th className="px-2 py-1">User</th>
-                    <th className="px-2 py-1">Rollback</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mappingHistory.map((entry: any) => (
-                    <tr key={entry.id} className="border-t align-top">
-                      <td className="whitespace-nowrap px-2 py-1">
-                        {fmtTs(entry.createdAt)}
-                      </td>
-                      <td className="px-2 py-1">
-                        <Badge
-                          variant={
-                            entry.action === 'DOMS_MAPPING_ROLLED_BACK'
-                              ? STATUS_VARIANT.NEUTRAL
-                              : STATUS_VARIANT.INFO
-                          }
-                        >
-                          {String(entry.action ?? '')
-                            .replace('DOMS_MAPPING_', '')
-                            .toLowerCase()}
+            {topSuggestions.length ? (
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                {topSuggestions.map((suggestion: any, index: number) => {
+                  const applyPayload = buildApplyMappingPayload(suggestion)
+                  const applyKey = applyPayload
+                    ? `${applyPayload.entityType}:${applyPayload.entityId}:${suggestion.code}`
+                    : ''
+                  return (
+                    <div
+                      key={`${suggestion.code}-${index}`}
+                      className="rounded border p-3 text-sm"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={severityVariant(suggestion.severity)}>
+                          {suggestion.severity}
                         </Badge>
-                      </td>
-                      <td className="px-2 py-1">
-                        <div>{valueOrDash(entry.entityType)}</div>
-                        <div className="text-[10px] text-[var(--text-muted)]">
-                          {valueOrDash(entry.entityId)}
-                        </div>
-                      </td>
-                      <td className="px-2 py-1">
-                        <JsonPreview value={entry.oldValues} />
-                      </td>
-                      <td className="px-2 py-1">
-                        <JsonPreview value={entry.newValues} />
-                      </td>
-                      <td className="px-2 py-1">
-                        {valueOrDash(entry.userFullName ?? entry.username)}
-                      </td>
-                      <td className="px-2 py-1">
-                        {entry.canRollback ? (
+                        <Badge variant={STATUS_VARIANT.NEUTRAL}>
+                          {suggestion.confidence} confidence
+                        </Badge>
+                        <span className="font-medium">{suggestion.title}</span>
+                      </div>
+                      <div className="mt-2 text-[var(--text-secondary)]">
+                        {suggestion.description}
+                      </div>
+                      <div className="mt-2 text-xs text-[var(--text-muted)]">
+                        {suggestion.suggestedAction}
+                      </div>
+                      {suggestion.suggestedValue ? (
+                        <JsonPreview value={suggestion.suggestedValue} />
+                      ) : null}
+                      {applyPayload ? (
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded border bg-[var(--surface-muted)] p-2">
+                          <div className="text-xs text-[var(--text-secondary)]">
+                            Applies to FTC {applyPayload.entityType} mapping
+                            only. No DOMS command will be sent.
+                          </div>
                           <Button
                             type="button"
                             size="sm"
                             variant="secondary"
                             disabled={
                               !csrfToken ||
-                              !confirmedRollback ||
-                              rollingBackId === entry.id
+                              !confirmedPhysicalMapping ||
+                              applyingKey === applyKey
                             }
-                            onClick={() => rollbackMapping(entry)}
+                            onClick={() => applyMapping(suggestion)}
                           >
-                            {rollingBackId === entry.id
-                              ? 'Rolling back...'
-                              : 'Rollback'}
+                            {applyingKey === applyKey
+                              ? 'Applying...'
+                              : 'Apply FTC mapping'}
                           </Button>
-                        ) : (
-                          <span className="text-[var(--text-muted)]">—</span>
-                        )}
-                      </td>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-[var(--text-secondary)]">
+                No remediation suggestions are available for the current
+                snapshot.
+              </div>
+            )}
+          </div>
+        </CollapsibleStatusSection>
+
+        <CollapsibleStatusSection
+          title="Bulk FTC-side mapping review/apply"
+          status={bulkResult ? 'reviewed' : 'not reviewed'}
+          statusVariant={
+            bulkResult ? STATUS_VARIANT.SUCCESS : STATUS_VARIANT.INFO
+          }
+          contentClassName="p-3 pt-0"
+        >
+          <div className="rounded border bg-[var(--surface-card)] p-3">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">
+                  Bulk FTC-side mapping review/apply
+                </div>
+                <div className="text-xs text-[var(--text-secondary)]">
+                  Start from the current site entities or the reconciliation
+                  suggestions, complete the DOMS IDs, then run a safe dry-run
+                  before applying FTC-side mappings.
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={loadCurrentSiteTemplate}
+                >
+                  Load current site template
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={suggestions.length === 0}
+                  onClick={loadSuggestedMappingsTemplate}
+                >
+                  Load suggested corrections
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={downloadBulkTemplate}
+                >
+                  Download blank CSV
+                </Button>
+              </div>
+            </div>
+
+            <div className="mb-3 grid grid-cols-1 gap-2 rounded border bg-[var(--surface-muted)] p-3 text-xs md:grid-cols-3">
+              <div>
+                <div className="font-semibold">1. Prepare</div>
+                <div className="mt-1 text-[var(--text-secondary)]">
+                  Load site rows, use suggested corrections, or upload a
+                  completed CSV from the technician.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold">2. Dry-run</div>
+                <div className="mt-1 text-[var(--text-secondary)]">
+                  Validate UUIDs, duplicates, conflicts, and observed DOMS IDs
+                  without changing the database.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold">3. Apply</div>
+                <div className="mt-1 text-[var(--text-secondary)]">
+                  Confirm the physical mapping and apply only after the dry-run
+                  is ready. No PSS command is sent.
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border p-3">
+              <label className="text-xs font-medium">
+                Upload completed CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="ml-3 text-xs"
+                  onChange={(event) =>
+                    void importBulkCsvFile(event.target.files?.[0] ?? null)
+                  }
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={
+                    !csrfToken ||
+                    bulkLoading ||
+                    (!bulkCsvText.trim() && !bulkJsonText.trim())
+                  }
+                  onClick={() => submitBulkMapping('dry-run')}
+                >
+                  {bulkLoading ? 'Reviewing...' : 'Dry-run batch'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={
+                    !csrfToken ||
+                    bulkLoading ||
+                    !confirmedPhysicalMapping ||
+                    !confirmedBulkLive ||
+                    !confirmedBulkApply ||
+                    bulkResult?.ok !== true
+                  }
+                  onClick={() => submitBulkMapping('apply')}
+                >
+                  {bulkLoading ? 'Applying...' : 'Apply reviewed batch'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setBulkCsvText('')
+                    setBulkJsonText('')
+                    setBulkResult(null)
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+
+            <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
+                  CSV rows
+                </label>
+                <textarea
+                  value={bulkCsvText}
+                  onChange={(event) => {
+                    setBulkCsvText(event.target.value)
+                    setBulkResult(null)
+                  }}
+                  placeholder="entityType,entityId,domsFpId,domsTankId,domsGradeOptionId,domsGradeId,sourceSuggestionCode,note"
+                  className="min-h-32 w-full rounded border bg-[var(--surface-muted)] p-2 font-mono text-xs text-[var(--text-primary)]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
+                  JSON rows
+                </label>
+                <textarea
+                  value={bulkJsonText}
+                  onChange={(event) => {
+                    setBulkJsonText(event.target.value)
+                    setBulkResult(null)
+                  }}
+                  placeholder='[{"entityType":"pump","entityId":"...","domsFpId":1}]'
+                  className="min-h-32 w-full rounded border bg-[var(--surface-muted)] p-2 font-mono text-xs text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+
+            <div className="mb-3 grid grid-cols-1 gap-2 rounded border bg-[var(--surface-muted)] p-3 text-xs md:grid-cols-2">
+              <label className="flex items-start gap-2 text-[var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={confirmedBulkLive}
+                  onChange={(event) =>
+                    setConfirmedBulkLive(event.target.checked)
+                  }
+                  className="mt-0.5"
+                />
+                <span>
+                  I refreshed reconciliation against live DOMS/PSS data and
+                  checked that the batch matches the latest observed controller
+                  IDs.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-[var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={confirmedBulkApply}
+                  onChange={(event) =>
+                    setConfirmedBulkApply(event.target.checked)
+                  }
+                  className="mt-0.5"
+                />
+                <span>
+                  I understand this applies all reviewed rows as FTC-side
+                  mapping changes only and sends no DOMS/PSS write command.
+                </span>
+              </label>
+            </div>
+
+            {bulkResult ? (
+              <div className="space-y-3 rounded border bg-[var(--surface-muted)] p-3 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={
+                      bulkResult.ok
+                        ? STATUS_VARIANT.SUCCESS
+                        : STATUS_VARIANT.ERROR
+                    }
+                  >
+                    {bulkResult.ok ? 'READY' : 'BLOCKED'}
+                  </Badge>
+                  <span>
+                    {bulkResult.summary?.itemCount ?? 0} rows,{' '}
+                    {bulkResult.summary?.blockerCount ?? 0} blockers,{' '}
+                    {bulkResult.summary?.warningCount ?? 0} warnings
+                  </span>
+                  <span className="text-[var(--text-muted)]">
+                    Reconciliation:{' '}
+                    {valueOrDash(bulkResult.reconciliation?.severity)}
+                  </span>
+                </div>
+
+                {bulkResult.blockers?.length ? (
+                  <div>
+                    <div className="mb-1 font-semibold text-red-700">
+                      Blockers
+                    </div>
+                    <div className="space-y-1">
+                      {bulkResult.blockers.map(
+                        (blocker: any, index: number) => (
+                          <div
+                            key={`${blocker.code}-${index}`}
+                            className="rounded border border-red-500/30 bg-red-500/5 p-2 text-red-800"
+                          >
+                            {blocker.sourceLine
+                              ? `Line ${blocker.sourceLine}: `
+                              : ''}
+                            {blocker.message}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {bulkResult.warnings?.length ? (
+                  <div>
+                    <div className="mb-1 font-semibold text-amber-800">
+                      Warnings
+                    </div>
+                    <div className="space-y-1">
+                      {bulkResult.warnings.map(
+                        (warning: any, index: number) => (
+                          <div
+                            key={`${warning.code}-${index}`}
+                            className="rounded border border-amber-500/30 bg-amber-500/5 p-2 text-amber-900"
+                          >
+                            {warning.sourceLine
+                              ? `Line ${warning.sourceLine}: `
+                              : ''}
+                            {warning.message}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {bulkResult.items?.length ? (
+                  <div className="overflow-auto">
+                    <table className="min-w-full text-left text-xs">
+                      <thead className="text-[var(--text-muted)]">
+                        <tr>
+                          <th className="px-2 py-1">Source</th>
+                          <th className="px-2 py-1">Entity</th>
+                          <th className="px-2 py-1">Mapping</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bulkResult.items.slice(0, 50).map((item: any) => (
+                          <tr
+                            key={`${item.source}-${item.index}`}
+                            className="border-t align-top"
+                          >
+                            <td className="px-2 py-1">
+                              {item.source}
+                              {item.sourceLine ? `:${item.sourceLine}` : ''}
+                            </td>
+                            <td className="px-2 py-1">
+                              {item.entityType}:{item.entityId}
+                            </td>
+                            <td className="px-2 py-1">
+                              <JsonPreview value={item.mapping} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="text-sm text-[var(--text-secondary)]">
+                Dry-run a CSV or JSON batch to see blockers, warnings, and the
+                exact FTC-side mapping rows that would be applied.
+              </div>
+            )}
+          </div>
+        </CollapsibleStatusSection>
+
+        <CollapsibleStatusSection
+          title="FTC mapping change history"
+          status={`${mappingHistory.length} changes`}
+          statusVariant={
+            mappingHistory.length ? STATUS_VARIANT.INFO : STATUS_VARIANT.SUCCESS
+          }
+          contentClassName="p-3 pt-0"
+        >
+          <div className="rounded border bg-[var(--surface-card)] p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold">
+                  FTC mapping change history
+                </div>
+                <div className="text-xs text-[var(--text-secondary)]">
+                  Rollback is blocked if the mapping changed after the selected
+                  audit entry.
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={confirmedRollback}
+                    onChange={(event) =>
+                      setConfirmedRollback(event.target.checked)
+                    }
+                  />
+                  Confirm rollback against physical site and PSS Configurator
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={loadHistory}
+                  disabled={historyLoading}
+                >
+                  {historyLoading ? 'Loading...' : 'Refresh history'}
+                </Button>
+              </div>
+            </div>
+            {mappingHistory.length ? (
+              <div className="overflow-auto">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="text-[var(--text-muted)]">
+                    <tr>
+                      <th className="px-2 py-1">When</th>
+                      <th className="px-2 py-1">Action</th>
+                      <th className="px-2 py-1">Entity</th>
+                      <th className="px-2 py-1">Old values</th>
+                      <th className="px-2 py-1">New values</th>
+                      <th className="px-2 py-1">User</th>
+                      <th className="px-2 py-1">Rollback</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-sm text-[var(--text-secondary)]">
-              No DOMS mapping changes have been audited yet.
-            </div>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {mappingHistory.map((entry: any) => (
+                      <tr key={entry.id} className="border-t align-top">
+                        <td className="whitespace-nowrap px-2 py-1">
+                          {fmtTs(entry.createdAt)}
+                        </td>
+                        <td className="px-2 py-1">
+                          <Badge
+                            variant={
+                              entry.action === 'DOMS_MAPPING_ROLLED_BACK'
+                                ? STATUS_VARIANT.NEUTRAL
+                                : STATUS_VARIANT.INFO
+                            }
+                          >
+                            {String(entry.action ?? '')
+                              .replace('DOMS_MAPPING_', '')
+                              .toLowerCase()}
+                          </Badge>
+                        </td>
+                        <td className="px-2 py-1">
+                          <div>{valueOrDash(entry.entityType)}</div>
+                          <div className="text-[10px] text-[var(--text-muted)]">
+                            {valueOrDash(entry.entityId)}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1">
+                          <JsonPreview value={entry.oldValues} />
+                        </td>
+                        <td className="px-2 py-1">
+                          <JsonPreview value={entry.newValues} />
+                        </td>
+                        <td className="px-2 py-1">
+                          {valueOrDash(entry.userFullName ?? entry.username)}
+                        </td>
+                        <td className="px-2 py-1">
+                          {entry.canRollback ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              disabled={
+                                !csrfToken ||
+                                !confirmedRollback ||
+                                rollingBackId === entry.id
+                              }
+                              onClick={() => rollbackMapping(entry)}
+                            >
+                              {rollingBackId === entry.id
+                                ? 'Rolling back...'
+                                : 'Rollback'}
+                            </Button>
+                          ) : (
+                            <span className="text-[var(--text-muted)]">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-sm text-[var(--text-secondary)]">
+                No DOMS mapping changes have been audited yet.
+              </div>
+            )}
+          </div>
+        </CollapsibleStatusSection>
 
         <div className="space-y-2">
           <div className="text-sm font-semibold">Pump to DOMS FpId mapping</div>
@@ -1106,7 +1326,7 @@ export function JplReconciliationPanel() {
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleStatusSection>
   )
 }

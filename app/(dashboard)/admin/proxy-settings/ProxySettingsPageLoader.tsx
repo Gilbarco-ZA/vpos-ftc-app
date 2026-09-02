@@ -43,7 +43,7 @@ export function ProxySettingsPageLoader() {
     <div className="space-y-4">
       <PageHeader
         title="Proxy settings"
-        description="Manage vpos-proxy cloud API, timeout, rate limit, and IUD configuration."
+        description="Read and update the live vpos-proxy configuration on the DOMS host."
       />
       {error ? (
         <ErrorDetails
@@ -56,6 +56,7 @@ export function ProxySettingsPageLoader() {
         <ProxySettingsForm
           initialSettings={data.settings}
           runtimeLastUpdated={data.runtimeLastUpdated ?? null}
+          endpointUrl={data.endpointUrl ?? null}
         />
       ) : null}
     </div>

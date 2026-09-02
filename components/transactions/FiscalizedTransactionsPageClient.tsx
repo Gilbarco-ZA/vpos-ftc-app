@@ -60,6 +60,9 @@ type FiscalizedTransactionsPageClientProps = {
   initialTransactions: FiscalizedTransactionListItem[]
   error?: string | null
   decimals: DecimalSettings
+  initialStartDate?: string
+  initialEndDate?: string
+  businessDate?: string
 }
 
 const formatNumber = (value: number | null, digits = 2) => {
@@ -241,11 +244,17 @@ const FiscalizedTransactionsPageClient = ({
   initialTransactions,
   error,
   decimals,
+  initialStartDate = '',
+  initialEndDate = '',
+  businessDate = '',
 }: FiscalizedTransactionsPageClientProps) => {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const currentSearchParams = searchParams ?? new URLSearchParams()
+  const currentSearchParams = useMemo(
+    () => searchParams ?? new URLSearchParams(),
+    [searchParams],
+  )
   const [transactions, setTransactions] = useState(initialTransactions)
   const [loadError, setLoadError] = useState<unknown>(error ?? null)
   const [loading, setLoading] = useState(false)
@@ -253,8 +262,8 @@ const FiscalizedTransactionsPageClient = ({
   const [search, setSearch] = useState('')
   const [customer, setCustomer] = useState('')
   const [fuelType, setFuelType] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(initialStartDate)
+  const [endDate, setEndDate] = useState(initialEndDate)
   const [detailsTransaction, setDetailsTransaction] =
     useState<FiscalizedTransactionListItem | null>(null)
   const [statusTransaction, setStatusTransaction] =
@@ -310,8 +319,8 @@ const FiscalizedTransactionsPageClient = ({
       if (search.trim()) params.set('search', search.trim())
       if (customer.trim()) params.set('customer', customer.trim())
       if (fuelType) params.set('fuel', fuelType)
-      if (startDate) params.set('from', `${startDate}T00:00:00`)
-      if (endDate) params.set('to', `${endDate}T23:59:59`)
+      if (startDate) params.set('startDate', startDate)
+      if (endDate) params.set('endDate', endDate)
 
       const res = await fetch(`/api/transactions?${params.toString()}`, {
         cache: 'no-store',
@@ -424,7 +433,7 @@ const FiscalizedTransactionsPageClient = ({
     const transactionId =
       currentSearchParams.get('transactionId')?.trim() || null
     if (view === 'credit-note' && transactionId) {
-      setCreditNoteViewId(transactionId)
+      queueMicrotask(() => setCreditNoteViewId(transactionId))
     }
   }, [currentSearchParams])
 
@@ -526,6 +535,15 @@ const FiscalizedTransactionsPageClient = ({
         onFuelTypeChange={setFuelType}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
+        onToday={() => {
+          setStartDate(businessDate)
+          setEndDate(businessDate)
+        }}
+        onAllDates={() => {
+          setStartDate('')
+          setEndDate('')
+        }}
+        todayDisabled={!businessDate}
         onRefresh={refresh}
         loading={loading}
       />

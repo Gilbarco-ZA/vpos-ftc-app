@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { requireAuth } from '@/src/shared/auth'
 
 import { ControlPanelClient } from '@/components/admin/ControlPanelClient'
+import { SystemDataManagementPanel } from '@/components/admin/SystemDataManagementPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,17 @@ const AdminControlPage = async () => {
       </p>
 
       <ControlPanelClient />
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-xl font-semibold">Data maintenance</h2>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Create portable backups or reset this installation before assigning
+            the machine to a new client.
+          </p>
+        </div>
+        <SystemDataManagementPanel />
+      </section>
     </div>
   )
 }

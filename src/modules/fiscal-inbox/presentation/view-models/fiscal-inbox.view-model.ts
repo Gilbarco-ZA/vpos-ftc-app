@@ -11,6 +11,7 @@ export type FiscalInboxListRowViewModel = {
   createdAt: string | null
   processedAt: string | null
   deadAt: string | null
+  resolvedAt: string | null
   errorText: string | null
   relatedTransactionId: string | null
   relatedTransactionStatus: string | null
@@ -27,6 +28,7 @@ export type FiscalInboxItemViewModel = {
   receivedAt: string | null
   processedAt: string | null
   deadAt: string | null
+  resolvedAt: string | null
   errorText: string | null
   relatedTransactionId: string | null
   relatedTransactionStatus: string | null

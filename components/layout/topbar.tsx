@@ -30,13 +30,13 @@ export const Topbar = ({
   return (
     <header
       className={cx(
-        'relative bg-[var(--surface-page)]/80 border-b border-[var(--border-neon-cyan)] backdrop-blur-xl transition-all duration-300',
+        'bg-[var(--surface-page)]/80 relative min-h-20 border-b border-[var(--border-default)] backdrop-blur-xl transition-all duration-300',
         'shadow-sm hover:shadow-[0_0_20px_rgba(0,245,255,0.1)]',
         className,
       )}
     >
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--neon-cyan)] to-transparent opacity-30"></div>
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 xl:px-8">
+      <div className="mx-auto flex min-h-20 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 xl:px-8">
         {/* Leading slot (hamburger on mobile) */}
         {leading ? (
           <div className="flex shrink-0 items-center">{leading}</div>
@@ -46,7 +46,7 @@ export const Topbar = ({
         <div className="min-w-0 flex-1">
           {breadcrumbs ??
             (title && (
-              <div className="truncate text-sm font-medium text-[var(--neon-cyan)] animate-glow-pulse">
+              <div className="animate-glow-pulse truncate text-sm font-medium text-[var(--neon-cyan)]">
                 {title}
               </div>
             ))}

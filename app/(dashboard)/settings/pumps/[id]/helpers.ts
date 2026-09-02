@@ -1,17 +1,12 @@
 import type { PumpNozzle, PumpStateSnapshot } from '@/src/shared/pumps/types'
 
 import {
-  FORECOURT_CONNECTION_STATUS,
   PUMP_NOZZLE_STATE,
   SIM_PUMP_STATE,
   STATUS_VARIANT,
 } from '@/src/shared/status/ui'
 
-import type {
-  ForecourtConnectionPayload,
-  NozzleFormState,
-  SimPump,
-} from './types'
+import type { NozzleFormState, SimPump } from './types'
 
 export const emptyForm = (): NozzleFormState => ({
   nozzleNumber: '',

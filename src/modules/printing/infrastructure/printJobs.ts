@@ -1,7 +1,23 @@
 import { renderEscpos } from '@/src/shared/printers/escposRenderer'
+import { normalizeReceiptBrandingSnapshot } from '@/src/shared/receipts/receiptSnapshots'
 
+import {
+  CANONICAL_PRINT_JOB_TYPES,
+  extractEmbeddedPrintable,
+  extractPrintPayloadSource,
+  formatReportPrintText,
+  htmlToPlainText,
+  isSpecializedEmbeddedReceiptPayload,
+  normalizePrintJobType,
+} from '@/src/modules/printing/domain/printJobPayload'
+import {
+  buildReceiptEscposLines,
+  extractReceiptPrintMetadata,
+  extractReceiptQrData,
+} from '@/src/modules/printing/domain/receiptPrintDocument'
 import { escposTcpPrintText } from '@/src/modules/printing/infrastructure/escposTcp'
 import { parsePrinterDeviceConfig } from '@/src/modules/printing/infrastructure/printerConfig'
+import { resolveReceiptEscposImages } from '@/src/modules/printing/infrastructure/receiptImages'
 import { sendEscposRaw } from '@/src/modules/printing/infrastructure/receiptPrinter'
 import { resolvePrinterForTransaction } from '@/src/modules/printing/infrastructure/resolvePrinterForTransaction'
 import {
@@ -141,11 +157,7 @@ async function resolveAssignedPrinterConfig(job: PrintJobRow) {
   return toConnectionPrinter(resolved.config)
 }
 
-async function printText(
-  stationId: string,
-  printer: PrinterConfig,
-  text: string,
-) {
+async function printText(printer: PrinterConfig, text: string) {
   const width = printer.width || 48
   const wrapped = wrapTextToWidth(text, width)
   await escposTcpPrintText(wrapped, {
@@ -155,11 +167,7 @@ async function printText(
   })
 }
 
-async function printEscpos(
-  stationId: string,
-  printer: PrinterConfig,
-  payload: Buffer,
-) {
+async function printEscpos(printer: PrinterConfig, payload: Buffer) {
   await sendEscposRaw(payload, {
     host: printer.ip,
     port: printer.port ?? 9100,
@@ -173,7 +181,8 @@ async function printEscpos(
  * status transitions + retries.
  */
 export async function handlePrintJob(job: PrintJobRow) {
-  const { job_type, payload } = job
+  const { payload } = job
+  const jobType = normalizePrintJobType(job.job_type)
 
   // Per-job overrides
   const payloadIp = String(
@@ -199,17 +208,13 @@ export async function handlePrintJob(job: PrintJobRow) {
     )
   }
 
-  if (job_type === 'setup.check_printer_page_width') {
+  if (jobType === 'setup.check_printer_page_width') {
     const width = payloadWidth || printer.width || 48
-    await printText(
-      job.station_id,
-      { ...printer, width },
-      makeWidthRuler(width),
-    )
+    await printText({ ...printer, width }, makeWidthRuler(width))
     return
   }
 
-  if (job_type === 'setup.test_transaction_printout') {
+  if (jobType === 'setup.test_transaction_printout') {
     const width = payloadWidth || printer.width || 48
     const sample = [
       'TEST TRANSACTION RECEIPT',
@@ -223,11 +228,11 @@ export async function handlePrintJob(job: PrintJobRow) {
       '--------------------------------',
       'Thank you',
     ].join('\n')
-    await printText(job.station_id, { ...printer, width }, sample)
+    await printText({ ...printer, width }, sample)
     return
   }
 
-  if (job_type === 'setup.test_report_printout') {
+  if (jobType === 'setup.test_report_printout') {
     const width = payloadWidth || printer.width || 48
     const sample = [
       'TEST REPORT',
@@ -240,51 +245,137 @@ export async function handlePrintJob(job: PrintJobRow) {
       '--------------------------------',
       'End',
     ].join('\n')
-    await printText(job.station_id, { ...printer, width }, sample)
+    await printText({ ...printer, width }, sample)
     return
   }
 
-  if (job_type === 'print.receipt') {
+  if (jobType === CANONICAL_PRINT_JOB_TYPES.receipt) {
     const width = payloadWidth || printer.width || 42
-    const data = payload?.data || payload?.receipt || payload
-    const escposBase64 = data?.escposBase64 || data?.escpos_base64
-    if (escposBase64) {
-      const buffer = Buffer.from(String(escposBase64), 'base64')
-      await printEscpos(job.station_id, { ...printer, width }, buffer)
-      return
+    const transactionId = String(job.source_transaction_id ?? '').trim()
+    const receiptId = String(payload?.receiptId ?? '').trim()
+    const embedded = extractEmbeddedPrintable(payload)
+    const sourceKind = extractPrintPayloadSource(payload)
+    const specializedEmbeddedSource =
+      isSpecializedEmbeddedReceiptPayload(payload)
+
+    const printEmbedded = async () => {
+      if (embedded?.kind === 'escposBase64') {
+        await printEscpos(
+          { ...printer, width },
+          Buffer.from(embedded.value, 'base64'),
+        )
+        return true
+      }
+      if (embedded?.kind === 'receiptLines') {
+        const buffer = renderEscpos(embedded.value as any[], { width })
+        await printEscpos({ ...printer, width }, buffer)
+        return true
+      }
+      if (embedded?.kind === 'text') {
+        await printText({ ...printer, width }, embedded.value)
+        return true
+      }
+      return false
     }
 
-    if (Array.isArray(data?.receiptLines)) {
-      const buffer = renderEscpos(data.receiptLines, { width })
-      await printEscpos(job.station_id, { ...printer, width }, buffer)
-      return
+    // Credit notes and other specialized receipt formats still own embedded
+    // printable content. Never replace those with the ordinary transaction
+    // receipt merely because they carry a transaction reference for routing.
+    if (specializedEmbeddedSource && (await printEmbedded())) return
+
+    if (transactionId) {
+      const receipt = await printJobsRepo.getReceiptPrintSource(
+        job.station_id,
+        transactionId,
+        receiptId || null,
+      )
+      const canonicalText =
+        String(receipt?.plain_text_content ?? '').trim() ||
+        htmlToPlainText(receipt?.html_content)
+      if (canonicalText) {
+        const metadata = extractReceiptPrintMetadata(receipt?.fiscal_data)
+        const branding = normalizeReceiptBrandingSnapshot(
+          receipt?.branding_snapshot,
+        )
+        const lines = buildReceiptEscposLines({
+          plainText: canonicalText,
+          qrData: extractReceiptQrData(receipt?.fiscal_data),
+          country: metadata.country ?? receipt?.station_country,
+          width,
+          siteNames: [
+            branding?.stationDisplayName,
+            metadata.siteName,
+            receipt?.station_name,
+          ],
+          siteTin: metadata.siteTin ?? receipt?.station_tin ?? '',
+          includeBrandLogo: Boolean(branding?.logoPath),
+        })
+        const printableLines = await resolveReceiptEscposImages(lines, {
+          widthCharacters: width,
+          logoPath: branding?.logoPath,
+        })
+        await printEscpos(
+          { ...printer, width },
+          renderEscpos(printableLines, { width }),
+        )
+        return
+      }
     }
-    const text =
-      data?.plainTextContent ||
-      data?.plain_text_content ||
-      data?.text ||
-      data?.content ||
-      ''
-    if (!text) throw new Error('Receipt payload has no printable content')
-    await printText(job.station_id, { ...printer, width }, String(text))
-    return
+
+    if (await printEmbedded()) return
+
+    if (specializedEmbeddedSource) {
+      throw new Error(
+        `Specialized receipt print job ${sourceKind} has no printable content`,
+      )
+    }
+    if (transactionId) {
+      throw new Error(
+        `Receipt source not found for referenced transaction ${transactionId}`,
+      )
+    }
+    throw new Error(
+      'Receipt print job has no source reference or printable content',
+    )
   }
 
-  if (job_type === 'print.report') {
+  if (jobType === CANONICAL_PRINT_JOB_TYPES.report) {
     const width = payloadWidth || printer.width || 48
-    const data = payload?.data || payload?.report || payload
-    const text =
-      data?.plainTextContent ||
-      data?.plain_text_content ||
-      data?.text ||
-      data?.content ||
-      ''
-    if (!text) throw new Error('Report payload has no printable content')
-    await printText(job.station_id, { ...printer, width }, String(text))
-    return
+    const reportId = String(job.source_report_id ?? '').trim()
+
+    if (reportId) {
+      const report = await printJobsRepo.getReportPrintSource(
+        job.station_id,
+        reportId,
+      )
+      if (report) {
+        const text = formatReportPrintText({
+          reportType: report.report_type,
+          reportDateTime: report.report_date_time,
+          payload: report.payload,
+        })
+        await printText({ ...printer, width }, text)
+        return
+      }
+    }
+
+    const embedded = extractEmbeddedPrintable(payload)
+    if (embedded?.kind === 'text') {
+      await printText({ ...printer, width }, embedded.value)
+      return
+    }
+
+    if (reportId) {
+      throw new Error(
+        `Report source not found for referenced report ${reportId}`,
+      )
+    }
+    throw new Error(
+      'Report print job has no source reference or printable content',
+    )
   }
 
-  throw new Error(`Unknown print job type: ${job_type}`)
+  throw new Error(`Unknown print job type: ${job.job_type}`)
 }
 
 /**

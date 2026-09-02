@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 
 import { applyDateRangeParams } from '@/src/shared/crud/filters'
@@ -123,16 +123,15 @@ export function ManagerReportsClient({
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (preset !== 'custom') {
-      const r = presetToRange(preset)
-      setStartDate(r.startDate)
-      setEndDate(r.endDate)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset])
+  const handlePresetChange = (nextPreset: PresetKey) => {
+    setPreset(nextPreset)
+    if (nextPreset === 'custom') return
+    const range = presetToRange(nextPreset)
+    setStartDate(range.startDate)
+    setEndDate(range.endDate)
+  }
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true)
     setErr(null)
     try {
@@ -188,12 +187,13 @@ export function ManagerReportsClient({
     } finally {
       setLoading(false)
     }
-  }
+  }, [endDate, pumpNumber, startDate, status])
 
   useEffect(() => {
-    refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate])
+    queueMicrotask(() => {
+      void refresh()
+    })
+  }, [refresh])
 
   const showInitialLoading = loading && !summary && rows.length === 0
 
@@ -222,7 +222,9 @@ export function ManagerReportsClient({
             <FormField label="Preset" className="md:col-span-3">
               <Select
                 value={preset}
-                onChange={(e) => setPreset(e.target.value as PresetKey)}
+                onChange={(e) =>
+                  handlePresetChange(e.target.value as PresetKey)
+                }
               >
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>

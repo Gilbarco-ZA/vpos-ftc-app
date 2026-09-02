@@ -9,7 +9,7 @@ const main = async () => {
     msg: `Deleted ${result.deletedAuditLogs} audit log rows older than 30 days`,
   })
   logger.info('[cleanup-audit]', {
-    msg: `Deleted ${result.deletedSessions} session rows older than 30 days`,
+    msg: `Deleted ${result.deletedSessions} expired session rows`,
   })
 }
 

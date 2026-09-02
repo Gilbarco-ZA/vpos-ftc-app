@@ -93,7 +93,7 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
             metrics: { lastError: msg },
           })
         }
-      } catch (e) {
+      } catch {
         await new Promise((r) => setTimeout(r, Math.max(1000, pollMs)))
       }
     }

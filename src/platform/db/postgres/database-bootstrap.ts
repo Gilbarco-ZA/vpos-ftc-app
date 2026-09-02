@@ -7,7 +7,11 @@ import {
 } from '@/src/platform/config/app-config'
 import { logger } from '@/src/shared/utils/logger'
 
-let databaseBootstrapPromise: Promise<void> | null = null
+type DatabaseBootstrapGlobals = typeof globalThis & {
+  __vposDatabaseBootstrapPromise?: Promise<void>
+}
+
+const databaseBootstrapGlobals = () => globalThis as DatabaseBootstrapGlobals
 
 const quoteIdentifier = (value: string): string => {
   return `"${value.replace(/"/g, '""')}"`
@@ -71,11 +75,16 @@ const createDatabaseIfMissing = async (): Promise<void> => {
 }
 
 export const ensurePostgresDatabase = async (): Promise<void> => {
-  if (!databaseBootstrapPromise) {
-    databaseBootstrapPromise = createDatabaseIfMissing().catch((error) => {
-      databaseBootstrapPromise = null
+  const globals = databaseBootstrapGlobals()
+  if (!globals.__vposDatabaseBootstrapPromise) {
+    let promise: Promise<void>
+    promise = createDatabaseIfMissing().catch((error) => {
+      if (globals.__vposDatabaseBootstrapPromise === promise) {
+        globals.__vposDatabaseBootstrapPromise = undefined
+      }
       throw error
     })
+    globals.__vposDatabaseBootstrapPromise = promise
   }
-  return databaseBootstrapPromise
+  return globals.__vposDatabaseBootstrapPromise
 }

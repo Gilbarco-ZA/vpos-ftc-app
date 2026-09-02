@@ -1,8 +1,9 @@
 import { queryOne } from '@/src/platform/db/postgres'
 
 import type { FiscalizationTransport } from './route'
+import { isTanzaniaCountry } from './country'
 import {
-  normalizeFiscalizationTransport,
+  normalizeConfiguredFiscalizationTransport,
   resolveStationFiscalizationRoute,
 } from './route'
 
@@ -197,8 +198,13 @@ export function evaluateTanzaniaRouteSwitchSafety(args: {
   now?: Date
 }): TanzaniaRouteSwitchSafetyResult {
   const snapshot = args.snapshot
-  const targetTransport = normalizeFiscalizationTransport(args.targetTransport)
-  const currentTransport = normalizeFiscalizationTransport(
+  // Route-switch safety retains the stored legacy transport so operators can
+  // inspect and drain pre-cutover queues. Executable runtime routing remains
+  // proxy-only through normalizeFiscalizationTransport/resolveStationFiscalizationRoute.
+  const targetTransport = normalizeConfiguredFiscalizationTransport(
+    args.targetTransport,
+  )
+  const currentTransport = normalizeConfiguredFiscalizationTransport(
     snapshot.currentTransport,
   )
   const direction =
@@ -212,19 +218,24 @@ export function evaluateTanzaniaRouteSwitchSafety(args: {
   const warnings: TanzaniaRouteSwitchIssue[] = []
   const checklist: TanzaniaRouteSwitchChecklistItem[] = []
 
-  const resolvedTarget = resolveStationFiscalizationRoute({
-    stationId: snapshot.stationId,
-    country: snapshot.country,
-    fiscalizationEngine: snapshot.fiscalizationEngine,
-    fiscalizationTransport: targetTransport,
-  })
+  const countryIsTanzania = isTanzaniaCountry(snapshot.country)
+  const engineIsTanzania =
+    String(snapshot.fiscalizationEngine ?? '')
+      .trim()
+      .toUpperCase() === 'TZ'
+  const legacyLocalTargetValid = countryIsTanzania && engineIsTanzania
+  const targetValidationReason = !countryIsTanzania
+    ? `Local Tanzania fiscalization is only valid for Tanzania stations. Current country: ${snapshot.country || 'not configured'}.`
+    : !engineIsTanzania
+      ? `Local Tanzania fiscalization requires fiscalization_engine TZ. Current engine: ${snapshot.fiscalizationEngine || 'not configured'}.`
+      : null
 
-  if (targetTransport === 'local_tz' && resolvedTarget.route !== 'local_tz') {
+  if (targetTransport === 'local_tz' && !legacyLocalTargetValid) {
     blockers.push(
       makeIssue(
         'blocker',
         'target-route-not-local-tanzania',
-        resolvedTarget.reason ??
+        targetValidationReason ??
           'Local Tanzania fiscalization is not available for this station.',
       ),
     )
@@ -402,10 +413,10 @@ export function evaluateTanzaniaRouteSwitchSafety(args: {
     checklistItem(
       'route-valid',
       'Target route is valid for station country and fiscal engine',
-      targetTransport === 'local_tz' && resolvedTarget.route !== 'local_tz'
+      targetTransport === 'local_tz' && !legacyLocalTargetValid
         ? 'block'
         : 'pass',
-      resolvedTarget.reason ?? `target=${targetTransport}`,
+      targetValidationReason ?? `target=${targetTransport}`,
     ),
     checklistItem(
       'local-queues-drained',
@@ -779,7 +790,7 @@ export async function loadTanzaniaRouteSwitchSnapshot(
     }
   }
 
-  const currentTransport = normalizeFiscalizationTransport(
+  const currentTransport = normalizeConfiguredFiscalizationTransport(
     row.fiscalization_transport,
   )
   const route = resolveStationFiscalizationRoute({

@@ -1,4 +1,9 @@
-import { query, queryAll } from '@/src/platform/db/postgres'
+import {
+  snapshotDeviceConfigVersion,
+  snapshotPluginConfigVersion,
+} from '@/src/platform/config/config-version-history'
+import { configJsonEquals } from '@/src/platform/config/config-version-policy'
+import { query, queryAll, queryOne } from '@/src/platform/db/postgres'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 export type PluginConfig = {
@@ -37,6 +42,20 @@ export async function upsertPluginConfig(args: {
   createdBy?: string | null
 }) {
   const schemaVersion = args.schemaVersion ?? 1
+  const nextConfig = args.configJson ?? {}
+  const current = await queryOne<{ enabled: boolean; config_json: unknown }>(
+    `SELECT enabled, config_json
+       FROM plugin_configs
+      WHERE station_id = $1 AND process_type = $2 AND plugin_name = $3`,
+    [args.stationId, args.processType, args.pluginName],
+  )
+  if (
+    current?.enabled === args.enabled &&
+    configJsonEquals(current.config_json, nextConfig)
+  ) {
+    return
+  }
+
   await query(
     `INSERT INTO plugin_configs (id, station_id, process_type, plugin_name, enabled, config_json)
      VALUES ($1, $2, $3, $4, $5, $6)
@@ -50,22 +69,20 @@ export async function upsertPluginConfig(args: {
       args.processType,
       args.pluginName,
       args.enabled,
-      args.configJson ?? {},
+      nextConfig,
     ],
   )
 
-  await query(
-    `INSERT INTO plugin_config_versions (station_id, process_type, plugin_name, schema_version, config_json, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [
-      args.stationId,
-      args.processType,
-      args.pluginName,
+  if (!current || !configJsonEquals(current.config_json, nextConfig)) {
+    await snapshotPluginConfigVersion({
+      stationId: args.stationId,
+      processType: args.processType,
+      pluginName: args.pluginName,
       schemaVersion,
-      args.configJson ?? {},
-      args.createdBy ?? null,
-    ],
-  )
+      configJson: nextConfig,
+      createdBy: args.createdBy ?? null,
+    })
+  }
 }
 
 export async function listDeviceConfigs(stationId: string) {
@@ -88,6 +105,20 @@ export async function upsertDeviceConfig(args: {
   createdBy?: string | null
 }) {
   const schemaVersion = args.schemaVersion ?? 1
+  const nextConfig = args.configJson ?? {}
+  const current = await queryOne<{ enabled: boolean; config_json: unknown }>(
+    `SELECT enabled, config_json
+       FROM device_configs
+      WHERE station_id = $1 AND device_type = $2 AND device_key = $3`,
+    [args.stationId, args.deviceType, args.deviceKey],
+  )
+  if (
+    current?.enabled === args.enabled &&
+    configJsonEquals(current.config_json, nextConfig)
+  ) {
+    return
+  }
+
   await query(
     `INSERT INTO device_configs (id, station_id, device_type, device_key, enabled, config_json)
      VALUES ($1, $2, $3, $4, $5, $6)
@@ -101,20 +132,18 @@ export async function upsertDeviceConfig(args: {
       args.deviceType,
       args.deviceKey,
       args.enabled,
-      args.configJson ?? {},
+      nextConfig,
     ],
   )
 
-  await query(
-    `INSERT INTO device_config_versions (station_id, device_type, device_key, schema_version, config_json, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [
-      args.stationId,
-      args.deviceType,
-      args.deviceKey,
+  if (!current || !configJsonEquals(current.config_json, nextConfig)) {
+    await snapshotDeviceConfigVersion({
+      stationId: args.stationId,
+      deviceType: args.deviceType,
+      deviceKey: args.deviceKey,
       schemaVersion,
-      args.configJson ?? {},
-      args.createdBy ?? null,
-    ],
-  )
+      configJson: nextConfig,
+      createdBy: args.createdBy ?? null,
+    })
+  }
 }

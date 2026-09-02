@@ -1,5 +1,9 @@
+import {
+  configJsonEquals,
+  hashConfigJson,
+} from '@/src/platform/config/config-version-policy'
 import { getStationConfig } from '@/src/platform/config/loader'
-import { query } from '@/src/platform/db/postgres'
+import { query, queryOne } from '@/src/platform/db/postgres'
 import {
   getBrandingSettings,
   updateBrandingSettings,
@@ -39,24 +43,54 @@ export async function saveStationConfigRepo(args: {
     `station_config_update:${args.stationId}`,
   ])
   try {
-    const id = uuidv4()
-    await query(
-      `
-        INSERT INTO station_config_versions (id, station_id, schema_version, config_json, created_by)
-        SELECT $1, station_id, schema_version, config_json, $3
-        FROM station_config
-        WHERE station_id = $2
-      `,
-      [id, args.stationId, args.updatedBy],
+    const current = await queryOne<{
+      schema_version: string
+      config_json: Record<string, unknown>
+    }>(
+      `SELECT schema_version, config_json
+         FROM station_config
+        WHERE station_id = $1`,
+      [args.stationId],
     )
+    if (current && configJsonEquals(current.config_json, args.configJson)) {
+      return
+    }
+
+    if (current) {
+      const id = uuidv4()
+      const configHash = hashConfigJson(current.config_json)
+      await query(
+        `INSERT INTO station_config_versions
+           (id, station_id, schema_version, config_json, config_hash, created_by)
+         SELECT $1, $2, $3, $4, $5, $6
+          WHERE NOT EXISTS (
+            SELECT 1
+              FROM (
+                SELECT config_hash, config_json
+                  FROM station_config_versions
+                 WHERE station_id = $2
+                 ORDER BY created_at DESC, id DESC
+                 LIMIT 1
+              ) latest
+             WHERE latest.config_hash = $5
+                OR (latest.config_hash IS NULL AND latest.config_json = $4::jsonb)
+          )`,
+        [
+          id,
+          args.stationId,
+          current.schema_version,
+          current.config_json,
+          configHash,
+          args.updatedBy,
+        ],
+      )
+    }
 
     await query(
-      `
-        UPDATE station_config
-           SET config_json = $2,
-               updated_at = NOW()
-         WHERE station_id = $1
-      `,
+      `UPDATE station_config
+          SET config_json = $2,
+              updated_at = NOW()
+        WHERE station_id = $1`,
       [args.stationId, args.configJson],
     )
   } finally {

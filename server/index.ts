@@ -7,13 +7,14 @@ import {
   updateConsoleCaptureStation,
 } from '@/src/platform/logs/consoleCapture'
 import { bootstrapRuntimeEnvironment } from '@/src/platform/runtime'
-import { getJplTcpAdapterState } from '@/src/shared/forecourt/adapters'
+import { getStationId } from '@/src/shared/utils/getStationId'
+import { logger } from '@/src/shared/utils/logger'
+
+import { getJplTcpAdapterState } from '@/src/modules/forecourt/application/forecourtAdapters'
 import {
   loadForecourtRuntimeConfigFromDb,
   startForecourtRuntimeConfigWatcher,
-} from '@/src/shared/forecourt/runtime'
-import { getStationId } from '@/src/shared/utils/getStationId'
-import { logger } from '@/src/shared/utils/logger'
+} from '@/src/modules/forecourt/application/forecourtRuntime'
 
 import { attachForecourtWs } from './forecourtWs'
 

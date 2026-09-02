@@ -1,8 +1,9 @@
 import type { SessionUser } from '@/src/shared/types'
 
-import { query } from '@/src/platform/db/postgres'
 import { ok, serverError } from '@/src/platform/web/api/response'
 import { requireAuth } from '@/src/shared/auth'
+
+import { listTransactionNotifications } from '@/src/modules/transactions/application/queries/list-transaction-notifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,35 +26,10 @@ export const GET = async (req: Request) => {
     )
     const limit = Math.max(1, Math.min(MAX_LIMIT, Number(limitRaw) || 20))
 
-    const rows = await query(
-      `
-      SELECT id, received_at, message_json
-      FROM fiscal_inbox
-      WHERE station_id = $1
-        AND id > $2
-        AND (message_json->>'type') IN (
-          'transactionCreated',
-          'transactionFailed',
-          'transactionFiscalized'
-        )
-      ORDER BY id ASC
-      LIMIT $3
-      `,
-      [user.stationId, sinceId, limit],
-    )
-
-    const items = (rows?.rows ?? []).map((row: any) => {
-      const message = row.message_json ?? {}
-      return {
-        id: Number(row.id),
-        receivedAt: row.received_at ? String(row.received_at) : null,
-        type: String(message.type || ''),
-        transactionId: message.transactionId ?? null,
-        pumpNumber: message.pumpNumber ?? null,
-        amount: message.amount ?? null,
-        error: message.error ?? null,
-        reference: message.reference ?? null,
-      }
+    const items = await listTransactionNotifications({
+      stationId: user.stationId,
+      sinceId,
+      limit,
     })
 
     return ok({ items })

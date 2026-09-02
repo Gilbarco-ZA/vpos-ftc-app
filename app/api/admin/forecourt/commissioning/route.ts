@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export const GET = defineGetRoute({
-  roles: ['administrator', 'manager'],
+  roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user }) => {
     return NextResponse.json({
       success: true,

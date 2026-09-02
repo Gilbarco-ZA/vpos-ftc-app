@@ -6,6 +6,7 @@ import type {
   PssXmlPriceGroup,
   PssXmlProduct,
   PssXmlTank,
+  PssXmlTankGauge,
 } from '@/src/shared/integrations/pssXml/types'
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 
@@ -136,7 +137,32 @@ export const parsePssConfigXml = (xml: string): PssXmlConfig => {
       const id = getAttr(t, 'ID').trim()
       if (!id) continue
       const productId = getAttr(t, 'ProductID').trim()
-      tanks.push({ id, productId: productId || null })
+      const tankGroupId = getAttr(t, 'TankGroupID').trim()
+      tanks.push({
+        id,
+        productId: productId || null,
+        tankGroupId: tankGroupId || null,
+      })
+    }
+  }
+
+  // TankGauges (under Devices). TgId is the identifier used by TgData_req.
+  const tankGauges: PssXmlTankGauge[] = []
+  const tankGaugesNode = devices ? getDirectChild(devices, 'TankGauges') : null
+  if (tankGaugesNode) {
+    for (const tg of getDirectChildren(tankGaugesNode, 'TankGauge')) {
+      const id = getAttr(tg, 'ID').trim()
+      if (!id) continue
+      const tankNode = getDirectChild(tg, 'Tank')
+      const subAddressNode = getDirectChild(tg, 'PhysicalSubAddress')
+      tankGauges.push({
+        id,
+        tankId: tankNode ? getAttr(tankNode, 'ID').trim() || null : null,
+        pssPortNo: toIntOrNull(getText(getDirectChild(tg, 'PSSPortNo'))),
+        physicalSubAddress: subAddressNode
+          ? toIntOrNull(getAttr(subAddressNode, 'Value'))
+          : null,
+      })
     }
   }
 
@@ -150,6 +176,9 @@ export const parsePssConfigXml = (xml: string): PssXmlConfig => {
       if (!id) continue
 
       const pssPortNo = toIntOrNull(getText(getDirectChild(fp, 'PSSPortNo')))
+      const physicalAddress = toIntOrNull(
+        getText(getDirectChild(fp, 'PhysicalAddress')),
+      )
       const deviceSubAddress = toIntOrNull(
         getText(getDirectChild(fp, 'DeviceSubAddress')),
       )
@@ -171,15 +200,26 @@ export const parsePssConfigXml = (xml: string): PssXmlConfig => {
 
           const gradeIdNode = getDirectChild(go, 'GradeID')
           const gradeId = gradeIdNode ? getText(gradeIdNode) : ''
+          const nozzleId = getText(getDirectChild(go, 'NozzleId'))
 
-          const partNode = getDirectChild(go, 'Part')
-          const tankId = partNode ? getAttr(partNode, 'TankID').trim() : ''
-          const parts = partNode ? getAttr(partNode, 'Parts').trim() : ''
+          const partNodes = getDirectChildren(go, 'Part')
+          const tankIds = Array.from(
+            new Set(
+              partNodes
+                .map((part) => getAttr(part, 'TankID').trim())
+                .filter(Boolean),
+            ),
+          )
+          const firstPart = partNodes[0] ?? null
+          const tankId = tankIds[0] ?? ''
+          const parts = firstPart ? getAttr(firstPart, 'Parts').trim() : ''
 
           gradeOptions.push({
             id: goId,
+            nozzleId: nozzleId || null,
             gradeId: gradeId || null,
             tankId: tankId || null,
+            tankIds,
             parts: parts || null,
           })
         }
@@ -188,6 +228,7 @@ export const parsePssConfigXml = (xml: string): PssXmlConfig => {
       fuellingPoints.push({
         id,
         pssPortNo,
+        physicalAddress,
         ipAddress: ipAddress || null,
         tcpUdpPortNo,
         deviceSubAddress,
@@ -196,17 +237,27 @@ export const parsePssConfigXml = (xml: string): PssXmlConfig => {
     }
   }
 
-  return { grades, priceGroups, products, tanks, fuellingPoints }
+  return {
+    grades,
+    priceGroups,
+    products,
+    tanks,
+    tankGauges,
+    fuellingPoints,
+  }
 }
 
 export type PssXmlPumpMapping = {
   pumpId: string
   nozzles: Array<{
+    /** DOMS GradeOption ID. */
+    gradeOptionId: string
+    /** Physical nozzle/hose ID. */
     nozzleId: string
     /** PSS GradeID (string) */
     gradeId: string
-    /** PSS TankID (string) */
-    tankId: string
+    /** Complete PSS tank-part mapping for this grade option. */
+    tankIds: string[]
   }>
 }
 
@@ -273,17 +324,23 @@ export const patchPssXmlFuellingPoints = (args: {
 
     for (const nozzle of pump.nozzles) {
       const go = doc.createElement('GradeOption')
-      go.setAttribute('ID', String(nozzle.nozzleId))
+      go.setAttribute('ID', String(nozzle.gradeOptionId))
 
       const gradeIdNode = doc.createElement('GradeID')
       gradeIdNode.appendChild(doc.createTextNode(String(nozzle.gradeId)))
       go.appendChild(gradeIdNode)
 
-      const partNode = doc.createElement('Part')
-      partNode.setAttribute('TankID', String(nozzle.tankId))
-      // PSS examples include Parts="1"; keep that default.
-      partNode.setAttribute('Parts', '1')
-      go.appendChild(partNode)
+      for (const tankId of nozzle.tankIds) {
+        const partNode = doc.createElement('Part')
+        partNode.setAttribute('TankID', String(tankId))
+        // PSS examples include Parts="1"; keep that default.
+        partNode.setAttribute('Parts', '1')
+        go.appendChild(partNode)
+      }
+
+      const nozzleIdNode = doc.createElement('NozzleId')
+      nozzleIdNode.appendChild(doc.createTextNode(String(nozzle.nozzleId)))
+      go.appendChild(nozzleIdNode)
 
       gradeOptionsNode.appendChild(go)
     }

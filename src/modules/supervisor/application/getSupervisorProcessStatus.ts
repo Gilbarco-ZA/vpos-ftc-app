@@ -1,5 +1,6 @@
-import { getRuntimeManager } from '@/src/shared/runtime/manager'
 import { requireNonEmptyString } from '@/src/shared/utils/inputs'
+
+import { getRuntimeManager } from '@/src/modules/runtime/application/runtimeManager'
 
 export async function getSupervisorProcessStatus(
   stationId: string,

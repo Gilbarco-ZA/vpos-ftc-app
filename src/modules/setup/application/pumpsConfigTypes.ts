@@ -3,6 +3,7 @@ export type PumpsConfig = {
     pumpId: string
     pumpNumber?: string | number | null
     domsFpId?: string | number | null
+    physicalAddress?: string | number | null
     deviceSubAddress?: string | number | null
     pssPortNo?: string | number | null
     endpointHost?: string | null
@@ -13,6 +14,7 @@ export type PumpsConfig = {
       domsGradeOptionId?: string | number | null
       domsGradeId?: string | number | null
       domsTankId?: string | number | null
+      domsTankIds?: Array<string | number> | null
     }>
   }>
 }

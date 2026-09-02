@@ -2,14 +2,15 @@ import crypto from 'node:crypto'
 import type {
   PssXmlConfig,
   PssXmlIdMap,
+  PssXmlImportSummary,
 } from '@/src/shared/integrations/pssXml/types'
 
 import { txQuery, withTransaction } from '@/src/platform/db/postgres'
-import { submitProductToProxy } from '@/src/shared/fiscalization/proxy/client'
 import {
   ImportedProduct,
   ProxyProductDto,
-} from '@/src/shared/fiscalization/proxy/types'
+} from '@/src/shared/fiscalization/proxy/contracts'
+import { buildPssXmlImportSummary } from '@/src/shared/integrations/pssXml/importSummary'
 import { PSS_XML_KEYS } from '@/src/shared/integrations/pssXml/keys'
 import { parsePssConfigXml } from '@/src/shared/integrations/pssXml/xml'
 import { normalizeTankConfig } from '@/src/shared/settings/tanksConfig'
@@ -19,7 +20,12 @@ import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import {
+  getStationConfigJsonRepo,
+  updateStationConfigJsonRepo,
+} from '@/src/modules/admin-integrations/infrastructure/adminIntegrationsRepo'
 import { syncForecourtFromPumpsConfig } from '@/src/modules/setup/infrastructure/setupRepo'
+import { submitProductToProxy } from '@/src/modules/transactions/infrastructure/fiscalization/proxyClient'
 
 const sha256Hex = (input: string) =>
   crypto.createHash('sha256').update(input, 'utf8').digest('hex')
@@ -33,6 +39,142 @@ const toPrice = (raw: number | null | undefined) => {
 }
 
 const safeTrim = (v: unknown) => String(v ?? '').trim()
+
+export class PssXmlImportValidationError extends Error {
+  readonly issues: string[]
+
+  constructor(issues: string[]) {
+    super(issues.join('; '))
+    this.name = 'PssXmlImportValidationError'
+    this.issues = issues
+  }
+}
+
+const getGradeOptionTankIds = (gradeOption: {
+  tankId?: string | null
+  tankIds?: string[]
+}) => {
+  const candidates = Array.isArray(gradeOption.tankIds)
+    ? gradeOption.tankIds
+    : gradeOption.tankId
+      ? [gradeOption.tankId]
+      : []
+  return Array.from(new Set(candidates.map(safeTrim).filter(Boolean)))
+}
+
+export const validateParsedPssTopology = (parsed: PssXmlConfig) => {
+  const issues: string[] = []
+  const tankIds = new Set(
+    parsed.tanks.map((tank) => safeTrim(tank.id)).filter(Boolean),
+  )
+  const seenFpIds = new Set<string>()
+  const seenPhysicalTuples = new Map<string, string>()
+
+  for (const fp of parsed.fuellingPoints) {
+    const fpId = safeTrim(fp.id)
+    if (!fpId) continue
+    if (seenFpIds.has(fpId)) issues.push(`Duplicate FuellingPoint ID '${fpId}'`)
+    seenFpIds.add(fpId)
+
+    if (
+      fp.pssPortNo != null &&
+      fp.physicalAddress != null &&
+      fp.deviceSubAddress != null
+    ) {
+      const tuple = `${fp.pssPortNo}:${fp.physicalAddress}:${fp.deviceSubAddress}`
+      const owner = seenPhysicalTuples.get(tuple)
+      if (owner && owner !== fpId) {
+        issues.push(
+          `FuellingPoints '${owner}' and '${fpId}' share PSSPortNo/PhysicalAddress/DeviceSubAddress '${tuple}'`,
+        )
+      } else {
+        seenPhysicalTuples.set(tuple, fpId)
+      }
+    }
+
+    const gradeOptionIds = new Set<string>()
+    const nozzleIds = new Set<string>()
+    for (const gradeOption of fp.gradeOptions) {
+      const gradeOptionId = safeTrim(gradeOption.id)
+      const nozzleId = safeTrim(gradeOption.nozzleId) || gradeOptionId
+      if (gradeOptionIds.has(gradeOptionId)) {
+        issues.push(
+          `Pump ${fpId} has duplicate GradeOption ID '${gradeOptionId}'`,
+        )
+      }
+      gradeOptionIds.add(gradeOptionId)
+      if (nozzleIds.has(nozzleId)) {
+        issues.push(`Pump ${fpId} has duplicate NozzleId '${nozzleId}'`)
+      }
+      nozzleIds.add(nozzleId)
+
+      for (const tankId of getGradeOptionTankIds(gradeOption)) {
+        if (!tankIds.has(tankId)) {
+          issues.push(
+            `Pump ${fpId} GradeOption ${gradeOptionId} references unknown TankID '${tankId}'`,
+          )
+        }
+      }
+    }
+  }
+
+  if (issues.length) throw new PssXmlImportValidationError(issues)
+}
+
+export const buildPumpsPayloadFromPss = (
+  parsed: PssXmlConfig,
+  idMap: Pick<PssXmlIdMap, 'tankDbIdByTankId'>,
+) => ({
+  pumps: parsed.fuellingPoints
+    .map((fp) => {
+      const pumpId = safeTrim(fp.id)
+      if (!pumpId) return null
+
+      const nozzles = fp.gradeOptions
+        .map((go) => {
+          const gradeOptionId = safeTrim(go.id)
+          const nozzleId = safeTrim(go.nozzleId) || gradeOptionId
+          const pssTankIds = getGradeOptionTankIds(go)
+          const primaryPssTankId = pssTankIds[0] ?? ''
+          if (!gradeOptionId || !nozzleId || !primaryPssTankId) return null
+
+          const tankDbId = idMap.tankDbIdByTankId[primaryPssTankId]
+          if (!tankDbId) return null
+
+          return {
+            nozzleId,
+            tankId: tankDbId,
+            domsGradeOptionId: gradeOptionId,
+            domsGradeId: safeTrim(go.gradeId) || null,
+            domsTankId: primaryPssTankId,
+            domsTankIds: pssTankIds,
+          }
+        })
+        .filter(Boolean) as Array<{
+        nozzleId: string
+        tankId: string
+        domsGradeOptionId: string
+        domsGradeId: string | null
+        domsTankId: string
+        domsTankIds: string[]
+      }>
+
+      return nozzles.length
+        ? {
+            pumpId,
+            pumpNumber: pumpId,
+            domsFpId: pumpId,
+            physicalAddress: fp.physicalAddress ?? null,
+            deviceSubAddress: fp.deviceSubAddress ?? null,
+            pssPortNo: fp.pssPortNo ?? null,
+            endpointHost: safeTrim(fp.ipAddress) || null,
+            endpointPort: fp.tcpUdpPortNo ?? null,
+            nozzles,
+          }
+        : null
+    })
+    .filter(Boolean),
+})
 
 const FUEL_CATEGORY_CODE = 'FUEL'
 const FUEL_CATEGORY_NAME = 'Fuel'
@@ -121,6 +263,72 @@ const ensureFuelCategory = async (client: any, stationId: string) => {
   }
 }
 
+const ensureImportedTankGroup = async (
+  client: any,
+  stationId: string,
+  pssGroupId: string,
+) => {
+  const raw = safeTrim(pssGroupId)
+  if (!raw) return null
+  const code = `pss-${raw}`.slice(0, 50)
+  const name = `PSS Tank Group ${raw}`
+  const row = await txQuery<{ id: string }>(
+    client,
+    `INSERT INTO tank_groups (id, station_id, code, name)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (station_id, code) DO UPDATE SET
+       name = EXCLUDED.name,
+       updated_at = NOW()
+     RETURNING id`,
+    [uuidv4(), stationId, code, name],
+  ).then((result) => result.rows[0] ?? null)
+  return row?.id ?? null
+}
+
+const applyPssJplDefaults = async (stationId: string) => {
+  const { configJson } = await getStationConfigJsonRepo(stationId)
+  if (!configJson || typeof configJson !== 'object') return
+
+  const integrations = { ...(configJson.integrations ?? {}) }
+  const existingJpl = { ...(integrations.jpl ?? {}) }
+  const nextJpl = {
+    ...existingJpl,
+    host: safeTrim(existingJpl.host) || '127.0.0.1',
+    enabledApcs: Array.from(
+      new Set([
+        ...(Array.isArray(existingJpl.enabledApcs)
+          ? existingJpl.enabledApcs
+          : []),
+        'apc1',
+        'apc2',
+      ]),
+    ),
+  }
+  const nextBackend =
+    safeTrim(integrations.posBackend).toLowerCase() === 'none' ||
+    !safeTrim(integrations.posBackend)
+      ? 'jpl'
+      : integrations.posBackend
+
+  const unchanged =
+    integrations.posBackend === nextBackend &&
+    JSON.stringify(integrations.jpl ?? {}) === JSON.stringify(nextJpl)
+  if (unchanged) return
+
+  await updateStationConfigJsonRepo({
+    stationId,
+    username: 'PSS_IMPORT',
+    nextConfigJson: {
+      ...configJson,
+      integrations: {
+        ...integrations,
+        posBackend: nextBackend,
+        jpl: nextJpl,
+      },
+    },
+  })
+}
+
 const resolveCurrency = async (stationId: string) => {
   const sp = await kvGet<any>(stationId, KV_KEYS.SITE_PROFILE)
   const currency =
@@ -150,11 +358,12 @@ const buildTankConfigFromPss = (parsed: PssXmlConfig) => {
   for (const fp of parsed.fuellingPoints) {
     for (const go of fp.gradeOptions) {
       const gradeId = safeTrim(go.gradeId)
-      const tankId = safeTrim(go.tankId)
-      if (!tankId || !gradeId) continue
+      if (!gradeId) continue
 
-      if (!tankGradeIdByTankId.has(tankId)) {
-        tankGradeIdByTankId.set(tankId, gradeId)
+      for (const tankId of getGradeOptionTankIds(go)) {
+        if (!tankGradeIdByTankId.has(tankId)) {
+          tankGradeIdByTankId.set(tankId, gradeId)
+        }
       }
       usedGradeIds.add(gradeId)
     }
@@ -210,7 +419,7 @@ const buildTankConfigFromPss = (parsed: PssXmlConfig) => {
   }
 
   const tanks = tankGradeNames.length ? tankGradeNames : grades.slice()
-  const activeTanks = new Array<boolean>(tanks.length).fill(true)
+  const activeTanks = Array<boolean>(tanks.length).fill(true)
 
   return normalizeTankConfig({
     grades,
@@ -221,8 +430,7 @@ const buildTankConfigFromPss = (parsed: PssXmlConfig) => {
 
 export type ImportPssXmlResult = {
   checksum: string
-  parsed: PssXmlConfig
-  idMap: PssXmlIdMap
+  importSummary: PssXmlImportSummary
   importedProducts: number
   importedTanks: number
   importedPumps: number
@@ -314,7 +522,7 @@ export function buildTankConfigFromParsed(parsed: any): TankConfig {
  * - tanks (from Devices/Tanks)
  * - pumps + nozzles mapping (from Devices/FuellingPoints/GradeOptions)
  *
- * Also persists the raw XML + parsed JSON + PSS<->DB ID mapping into station_kv.
+ * Also persists the raw XML, compact import summary, and PSS<->DB ID mapping into station_kv.
  */
 export const importPssConfigXml = async (args: {
   stationId: string
@@ -325,15 +533,17 @@ export const importPssConfigXml = async (args: {
   const checksum = sha256Hex(xml)
 
   const parsed = parsePssConfigXml(xml)
+  validateParsedPssTopology(parsed)
   const currency = await resolveCurrency(stationId)
 
   const primaryPriceGroup = pickPrimaryPriceGroup(parsed)
 
+  const importedAt = new Date().toISOString()
   const idMap: PssXmlIdMap = {
     version: 1,
     sourcePath: sourcePath || undefined,
     sourceChecksum: checksum,
-    importedAt: new Date().toISOString(),
+    importedAt,
     productDbIdByGradeId: {},
     tankDbIdByTankId: {},
     pumpDbIdByFpId: {},
@@ -345,7 +555,7 @@ export const importPssConfigXml = async (args: {
     await withTransaction(async (client) => {
       let productsCount = 0
       let tanksCount = 0
-      let productList = []
+      const productList = []
       const fuelCategoryId = await ensureFuelCategory(client, stationId)
 
       for (const g of parsed.grades) {
@@ -436,6 +646,16 @@ export const importPssConfigXml = async (args: {
         }
       }
 
+      const gaugesByTankId = new Map<string, string[]>()
+      for (const gauge of parsed.tankGauges ?? []) {
+        const gaugeId = safeTrim(gauge.id)
+        const referencedTankId = safeTrim(gauge.tankId)
+        if (!gaugeId || !referencedTankId) continue
+        const values = gaugesByTankId.get(referencedTankId) ?? []
+        values.push(gaugeId)
+        gaugesByTankId.set(referencedTankId, values)
+      }
+
       for (const t of parsed.tanks) {
         const tankId = safeTrim(t.id)
         if (!tankId) continue
@@ -464,12 +684,16 @@ export const importPssConfigXml = async (args: {
              product_id,
              capacity_litres,
              low_level_litres,
-             critical_level_litres
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+             critical_level_litres,
+             tank_group_id,
+             doms_tank_id
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
            ON CONFLICT (station_id, code) DO UPDATE SET
              name = EXCLUDED.name,
              status = EXCLUDED.status,
              product_id = EXCLUDED.product_id,
+             tank_group_id = COALESCE(EXCLUDED.tank_group_id, tanks.tank_group_id),
+             doms_tank_id = COALESCE(EXCLUDED.doms_tank_id, tanks.doms_tank_id),
              updated_at = NOW()
            RETURNING id`,
           [
@@ -482,6 +706,19 @@ export const importPssConfigXml = async (args: {
             0,
             null,
             null,
+            await ensureImportedTankGroup(
+              client,
+              stationId,
+              safeTrim(t.tankGroupId),
+            ),
+            (() => {
+              const candidates = gaugesByTankId.get(tankId) ?? []
+              if (candidates.length === 1) return candidates[0]
+              const sameIdGauge = (parsed.tankGauges ?? []).find(
+                (gauge) => safeTrim(gauge.id) === tankId,
+              )
+              return sameIdGauge ? tankId : null
+            })(),
           ],
         ).then((r) => r.rows[0])
 
@@ -497,56 +734,13 @@ export const importPssConfigXml = async (args: {
       }
     })
 
-  // 2) Build pumps config payload and sync to DB.
-  const pumpsPayload = {
-    pumps: parsed.fuellingPoints
-      .map((fp) => {
-        const pumpId = safeTrim(fp.id)
-        if (!pumpId) return null
-
-        const nozzles = fp.gradeOptions
-          .map((go) => {
-            const nozzleId = safeTrim(go.id)
-            const pssTankId = safeTrim(go.tankId)
-            if (!nozzleId || !pssTankId) return null
-
-            const tankDbId = idMap.tankDbIdByTankId[pssTankId]
-            if (!tankDbId) return null
-
-            return {
-              nozzleId,
-              tankId: tankDbId,
-              domsGradeOptionId: nozzleId,
-              domsGradeId: safeTrim(go.gradeId) || null,
-              domsTankId: pssTankId,
-            }
-          })
-          .filter(Boolean) as Array<{
-          nozzleId: string
-          tankId: string
-          domsGradeOptionId: string
-          domsGradeId: string | null
-          domsTankId: string
-        }>
-
-        return nozzles.length
-          ? {
-              pumpId,
-              pumpNumber: pumpId,
-              domsFpId: pumpId,
-              deviceSubAddress: fp.deviceSubAddress ?? null,
-              pssPortNo: fp.pssPortNo ?? null,
-              endpointHost: safeTrim(fp.ipAddress) || null,
-              endpointPort: fp.tcpUdpPortNo ?? null,
-              nozzles,
-            }
-          : null
-      })
-      .filter(Boolean) as Array<{ pumpId: string; nozzles: any[] }>,
-  }
+  // 2) Build pumps config payload and reconcile the authoritative DOMS topology.
+  const pumpsPayload = buildPumpsPayloadFromPss(parsed, idMap)
 
   if (pumpsPayload.pumps.length) {
-    await syncForecourtFromPumpsConfig(stationId, pumpsPayload as any)
+    await syncForecourtFromPumpsConfig(stationId, pumpsPayload as any, {
+      authoritativeDomsSnapshot: true,
+    })
 
     // Persist the DB UUIDs assigned during reconciliation so future export and support tooling
     // can compare DOMS FuellingPoint/GradeOption identities with app rows.
@@ -588,6 +782,8 @@ export const importPssConfigXml = async (args: {
            FROM nozzles n
            JOIN pumps p ON p.id = n.pump_id AND p.station_id = n.station_id
           WHERE n.station_id = $1
+            AND n.is_active = TRUE
+            AND p.status <> 'INACTIVE'
             AND COALESCE(p.doms_fp_id, p.pump_number) = ANY($2::int[])`,
         [stationId, domsFpIds],
       )
@@ -609,7 +805,9 @@ export const importPssConfigXml = async (args: {
              SELECT pu.id AS pump_id, COUNT(nz.id) AS cnt
                FROM pumps pu
                JOIN nozzles nz ON nz.pump_id = pu.id
-              WHERE pu.station_id = $1 AND nz.station_id = $1
+              WHERE pu.station_id = $1
+                AND nz.station_id = $1
+                AND nz.is_active = TRUE
               GROUP BY pu.id
            ) sub
           WHERE p.id = sub.pump_id AND p.station_id = $1`,
@@ -618,13 +816,25 @@ export const importPssConfigXml = async (args: {
     })
   }
 
-  // 3) Persist KV metadata (raw xml + parsed + mapping).
+  // 3) Persist authoritative XML, compact metadata, and the export ID map.
+  // The parsed object remains in memory for this import only; station_kv must not
+  // retain a second full representation of the same XML.
   const tankConfigFromPss = buildTankConfigFromPss(parsed)
+  const importSummary = buildPssXmlImportSummary({
+    parsed,
+    sourceChecksum: checksum,
+    sourcePath: sourcePath ?? null,
+    importedAt,
+    sourceBytes: Buffer.byteLength(xml, 'utf8'),
+    importedProducts: importedProductsCount,
+    importedTanks,
+    importedPumps: pumpsPayload.pumps.length,
+  })
   await Promise.all([
     kvSet(stationId, PSS_XML_KEYS.RAW_XML, xml),
-    kvSet(stationId, PSS_XML_KEYS.PARSED_JSON, parsed),
+    kvSet(stationId, PSS_XML_KEYS.IMPORT_SUMMARY, importSummary),
     kvSet(stationId, PSS_XML_KEYS.ID_MAP, idMap),
-    kvSet(stationId, PSS_XML_KEYS.LAST_IMPORT_AT, new Date().toISOString()),
+    kvSet(stationId, PSS_XML_KEYS.LAST_IMPORT_AT, importedAt),
     kvSet(stationId, PSS_XML_KEYS.LAST_IMPORT_CHECKSUM, checksum),
     kvSet(stationId, PSS_XML_KEYS.LAST_IMPORT_ERROR, null),
     kvSet(stationId, KV_KEYS.TANKS_CONFIG, tankConfigFromPss),
@@ -650,6 +860,8 @@ export const importPssConfigXml = async (args: {
     })
   } catch {}
 
+  await applyPssJplDefaults(stationId)
+
   const proxyProducts = mapToProxyProducts(importedProducts, {
     createdByName: 'PSS Config Import',
   })
@@ -670,8 +882,7 @@ export const importPssConfigXml = async (args: {
 
   return {
     checksum,
-    parsed,
-    idMap,
+    importSummary,
     importedProducts: importedProductsCount,
     importedTanks,
     importedPumps: pumpsPayload.pumps.length,

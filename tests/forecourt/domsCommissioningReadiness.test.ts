@@ -48,6 +48,38 @@ describe('DOMS commissioning readiness helpers', () => {
     assert.equal(result.blockers.length, 0)
   })
 
+
+  it('accepts the documented 15 second heartbeat with a 30 second dead timeout', () => {
+    const result = validateDomsLiveConnectionSettings({
+      ...validSettings,
+      jplHeartbeatIntervalMs: 15_000,
+      jplDeadConnectionTimeoutMs: 30_000,
+    })
+
+    assert.equal(
+      result.checks.find((item) => item.id === 'jpl-heartbeat-window')?.severity,
+      'pass',
+    )
+    assert.equal(
+      result.checks.find((item) => item.id === 'jpl-dead-timeout-window')?.severity,
+      'pass',
+    )
+  })
+
+  it('blocks a dead timeout equal to the heartbeat interval', () => {
+    const result = validateDomsLiveConnectionSettings({
+      ...validSettings,
+      jplHeartbeatIntervalMs: 15_000,
+      jplDeadConnectionTimeoutMs: 15_000,
+    })
+
+    assert.equal(result.status, 'blocked')
+    assert.equal(
+      result.checks.find((item) => item.id === 'jpl-dead-timeout-window')?.severity,
+      'block',
+    )
+  })
+
   it('blocks reserved POS IDs and missing subscription flags', () => {
     const result = validateDomsLiveConnectionSettings({
       ...validSettings,

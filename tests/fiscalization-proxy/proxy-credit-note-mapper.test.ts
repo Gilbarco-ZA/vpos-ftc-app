@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { mapTransactionToProxyCreditNote } from '../../src/shared/fiscalization/proxy/mapper'
+import { mapTransactionToProxyCreditNote } from '../../src/modules/transactions/infrastructure/fiscalization/transaction-proxy.mapper'
 
 test('maps credit note payload with full invoice-derived values for proxy', () => {
   const payload = mapTransactionToProxyCreditNote({

@@ -112,13 +112,11 @@ let reconnectTimer: NodeJS.Timeout | null = null
 let pumpMappingsCache: PumpMappingsCache | null = null
 let stationIdCache: string | null = null
 let stationIdPromise: Promise<string | null> | null = null
-let pendingAcks = new Map<string, PendingAck>()
+const pendingAcks = new Map<string, PendingAck>()
 const lastPumpState = new Map<number, SimPump>()
 
 declare global {
-  // eslint-disable-next-line no-var
   var __simTcpNdjsonAdapterStarted: boolean | undefined
-  // eslint-disable-next-line no-var
   var __simTcpNdjsonAdapterState: AdapterState | undefined
 }
 

@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -45,6 +46,7 @@ const DIALOG_CONTENT_SELECTOR =
   '[data-radix-dialog-content], [role="dialog"], [data-slot="sheet-content"]'
 
 const normalize = (value: string) => value.toLowerCase().trim()
+const subscribe = () => () => {}
 
 export function SearchableSelect({
   value,
@@ -67,22 +69,26 @@ export function SearchableSelect({
   const [query, setQuery] = useState('')
   const [panelPosition, setPanelPosition] = useState<PanelPosition | null>(null)
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
-  const [mounted, setMounted] = useState(false)
+  const mounted = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  )
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (!mounted) return
-
+  const openSelect = () => {
     const dialogContent =
       containerRef.current?.closest(DIALOG_CONTENT_SELECTOR) ?? null
-
     setPortalTarget(
       dialogContent instanceof HTMLElement ? dialogContent : document.body,
     )
-  }, [mounted])
+    setQuery('')
+    setIsOpen(true)
+  }
+
+  const closeSelect = () => {
+    setIsOpen(false)
+    setQuery('')
+  }
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value) ?? null,
@@ -145,11 +151,12 @@ export function SearchableSelect({
       })
     }
 
-    updatePosition()
+    const animationFrame = window.requestAnimationFrame(updatePosition)
     window.addEventListener('resize', updatePosition)
     window.addEventListener('scroll', updatePosition, true)
 
     return () => {
+      window.cancelAnimationFrame(animationFrame)
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
@@ -167,11 +174,13 @@ export function SearchableSelect({
         return
       }
       setIsOpen(false)
+      setQuery('')
     }
 
     const handleEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsOpen(false)
+        setQuery('')
         triggerRef.current?.focus()
       }
     }
@@ -186,10 +195,7 @@ export function SearchableSelect({
   }, [isOpen])
 
   useEffect(() => {
-    if (!isOpen) {
-      setQuery('')
-      return
-    }
+    if (!isOpen) return
 
     const timer = window.setTimeout(() => inputRef.current?.focus(), 0)
     return () => window.clearTimeout(timer)
@@ -205,7 +211,7 @@ export function SearchableSelect({
       event.key === ' '
     ) {
       event.preventDefault()
-      setIsOpen(true)
+      openSelect()
     }
   }
 
@@ -254,7 +260,7 @@ export function SearchableSelect({
                         )}
                         onClick={() => {
                           onChange(option.value)
-                          setIsOpen(false)
+                          closeSelect()
                           triggerRef.current?.focus()
                         }}
                       >
@@ -294,7 +300,7 @@ export function SearchableSelect({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => (isOpen ? closeSelect() : openSelect())}
         onKeyDown={handleTriggerKeyDown}
         className="flex h-11 w-full items-center justify-between gap-3 rounded-input border border-[var(--border-default)] bg-[var(--surface-card)] px-3.5 text-left text-sm text-[var(--text-primary)] shadow-sm outline-none transition-all hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] focus-visible:border-blue-500/50 focus-visible:bg-[var(--surface-elevated)] focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
       >

@@ -1,3 +1,5 @@
+import type { TransactionVehicleDetailsInput } from '@/src/modules/transactions/infrastructure/persistence/transaction.types'
+
 import { fiscalizeQueuedTransactionRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction.repository'
 
 export type FiscalizeCustomerInput = {
@@ -5,14 +7,17 @@ export type FiscalizeCustomerInput = {
   tin?: string | null
   buyerName?: string | null
 }
+
 export async function fiscalizeQueuedTransaction(input: {
   stationId: string
   transactionId: string
   customer?: FiscalizeCustomerInput | null
+  vehicleDetails?: TransactionVehicleDetailsInput | null
 }) {
   return await fiscalizeQueuedTransactionRepo(
     input.stationId,
     input.transactionId,
     input.customer ?? null,
+    input.vehicleDetails ?? null,
   )
 }

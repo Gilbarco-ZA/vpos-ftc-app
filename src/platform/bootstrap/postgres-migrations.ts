@@ -32,11 +32,25 @@ const CHECKSUM_BYPASS = new Set([
   '038_transaction_lines.sql',
 ])
 
-let migrationsPromise: Promise<void> | null = null
+type MigrationGlobals = typeof globalThis & {
+  __vposPostgresMigrationsPromise?: Promise<void>
+}
 
-export const ensurePostgresMigrations = async (): Promise<void | null> => {
-  if (!migrationsPromise) migrationsPromise = runMigrations()
-  return migrationsPromise
+const migrationGlobals = () => globalThis as MigrationGlobals
+
+export const ensurePostgresMigrations = async (): Promise<void> => {
+  const globals = migrationGlobals()
+  if (!globals.__vposPostgresMigrationsPromise) {
+    let promise: Promise<void>
+    promise = runMigrations().catch((error) => {
+      if (globals.__vposPostgresMigrationsPromise === promise) {
+        globals.__vposPostgresMigrationsPromise = undefined
+      }
+      throw error
+    })
+    globals.__vposPostgresMigrationsPromise = promise
+  }
+  return globals.__vposPostgresMigrationsPromise
 }
 
 const runMigrations = async (): Promise<void> => {

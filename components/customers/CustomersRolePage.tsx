@@ -1,21 +1,17 @@
-import type { CustomerListResult } from '@/src/shared/server/customersTypes'
+import type { CustomerListResult } from '@/src/modules/customers/application/customerTypes'
 import { redirect } from 'next/navigation'
 
 import { api } from '@/src/shared/api/fetch'
 import { requireAuth } from '@/src/shared/auth'
 import { applyDateRangeParams } from '@/src/shared/crud/filters'
-import { getCsrfToken } from '@/src/shared/security/csrf'
 
 import { ListToolbar } from '@/components/crud/ListToolbar'
 import CustomersPageClient, {
   CustomersAddButton,
 } from '@/components/customers/CustomersPageClient'
 import { PageHeader } from '@/components/layout/page-header'
-import { CsrfHiddenInput } from '@/components/security/CsrfHiddenInput'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -28,19 +24,6 @@ import {
 export type CustomersRole = 'tenant' | 'manager' | 'administrator'
 
 type SearchParams = Record<string, string | string[] | undefined>
-
-type CustomerSearchRow = {
-  id?: string
-  buyer_name?: string
-  buyerName?: string
-  tin?: string
-  contact_email?: string
-  contactEmail?: string
-  contact_phone?: string
-  contactPhone?: string
-  city?: string
-  country?: string
-}
 
 type CustomerListRow = {
   id?: string
@@ -63,28 +46,15 @@ const readParam = (params: SearchParams, key: string) => {
   return value ?? ''
 }
 
-const normalizeCustomerName = (row: CustomerSearchRow | CustomerListRow) =>
+const normalizeCustomerName = (row: CustomerListRow) =>
   row.buyer_name || row.buyerName || '(No buyer name)'
 
-const normalizeContact = (row: CustomerSearchRow | CustomerListRow) =>
+const normalizeContact = (row: CustomerListRow) =>
   row.contact_email ||
   row.contactEmail ||
   row.contact_phone ||
   row.contactPhone ||
   '-'
-
-const searchCustomers = async (q: string) => {
-  if (!q) return { local: [], cloud: [] }
-
-  const res = await api<{
-    local: CustomerSearchRow[]
-    cloud: CustomerSearchRow[]
-  }>(`/api/customers/search?query=${encodeURIComponent(q)}&includeCloud=true`)
-
-  // `api()` returns ApiResult<T>. Tenant UI expects the payload.
-  if (!res?.success) return { local: [], cloud: [] }
-  return res.data ?? { local: [], cloud: [] }
-}
 
 const loadCustomers = async (opts: {
   q?: string
@@ -109,54 +79,6 @@ const loadCustomers = async (opts: {
 const loadAdminCustomers = async (params: URLSearchParams) => {
   const res = await api(`/api/customers?${params.toString()}`)
   return res
-}
-
-const CustomerResultsCard = ({
-  title,
-  rows,
-  emptyDescription,
-}: {
-  title: string
-  rows: CustomerSearchRow[]
-  emptyDescription: string
-}) => {
-  return (
-    <Card className="overflow-hidden">
-      <div className="border-b border-border px-4 py-3 text-sm font-semibold text-[var(--text-primary)]">
-        {title}
-      </div>
-      {rows.length === 0 ? (
-        <div className="p-6">
-          <EmptyState title="No matches" description={emptyDescription} />
-        </div>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Buyer name</TableHead>
-              <TableHead>TIN</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>City</TableHead>
-              <TableHead>Country</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id ?? `${row.tin}-${row.buyer_name}`}>
-                <TableCell className="font-medium text-[var(--text-primary)]">
-                  {normalizeCustomerName(row)}
-                </TableCell>
-                <TableCell>{row.tin || '-'}</TableCell>
-                <TableCell>{normalizeContact(row)}</TableCell>
-                <TableCell>{row.city || '-'}</TableCell>
-                <TableCell>{row.country || '-'}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </Card>
-  )
 }
 
 const TenantCustomersView = async ({

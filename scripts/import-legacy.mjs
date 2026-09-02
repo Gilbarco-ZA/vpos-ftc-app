@@ -1,11 +1,9 @@
 #!/usr/bin/env node
-/* eslint-disable no-console */
-
 import fs from 'fs/promises'
 import path from 'path'
 import process from 'process'
 import { Pool } from 'pg'
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 
 /**
  * Legacy vpos-console storage constants (from vpos-console/src-server/core/common/config.ts)
@@ -64,17 +62,13 @@ const qOne = async (text, params) => {
 	const r = await pool.query(text, params)
 	return r.rows[0] || null
 }
-const qAll = async (text, params) => {
-	const r = await pool.query(text, params)
-	return r.rows
-}
 const q = async (text, params) => pool.query(text, params)
 
 const safeParseJson = async (filePath) => {
 	try {
 		const raw = await fs.readFile(filePath, 'utf8')
 		return JSON.parse(raw)
-	} catch (e) {
+	} catch {
 		return null
 	}
 }
@@ -105,6 +99,65 @@ const toNumber = (v, fallback = 0) => {
 	if (v === null || v === undefined) return fallback
 	const n = typeof v === 'number' ? v : parseFloat(String(v))
 	return Number.isFinite(n) ? n : fallback
+}
+
+const sensitiveFiscalKey =
+	/(?:authorization|access[_-]?token|refresh[_-]?token|bearer|password|passwd|secret|private[_-]?key|client[_-]?secret|certificate|cert[_-]?data|pfx|pkcs12|cvv|cvc|card[_-]?number|account[_-]?number|full[_-]?pan|^pan$)/i
+
+const sanitizeLegacyFiscalPayload = (value) => {
+	const visit = (entry, key) => {
+		if (key && sensitiveFiscalKey.test(key)) return '[REDACTED]'
+		if (entry === null || entry === undefined) return null
+		if (Array.isArray(entry)) return entry.map((item) => visit(item))
+		if (typeof entry !== 'object') {
+			return typeof entry === 'string'
+				? entry.replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, 'Bearer [REDACTED]')
+				: entry
+		}
+		return Object.fromEntries(
+			Object.entries(entry).map(([childKey, childValue]) => [
+				childKey,
+				visit(childValue, childKey)
+			])
+		)
+	}
+	return visit(value)
+}
+
+const stableFiscalJson = (value) => {
+	if (Array.isArray(value)) return value.map(stableFiscalJson)
+	if (!value || typeof value !== 'object') return value
+	return Object.keys(value)
+		.sort()
+		.reduce((out, key) => {
+			out[key] = stableFiscalJson(value[key])
+			return out
+		}, {})
+}
+
+const buildLegacyEventRecord = ({ payload, status, reference, occurredAt }) => {
+	const responsePayload = sanitizeLegacyFiscalPayload(payload)
+	const payloadHash = createHash('sha256')
+		.update(JSON.stringify(stableFiscalJson({ requestPayload: null, responsePayload })))
+		.digest('hex')
+	const eventId = randomUUID()
+	const eventStatus = status === 'FISCALIZED' ? 'SUCCESS' : 'FAILED'
+	const summary = {
+		schemaVersion: 1,
+		source: 'fiscalization_event',
+		eventId,
+		status: eventStatus,
+		engine: 'legacy',
+		transport: 'legacy',
+		reference: reference || null,
+		fiscalDocumentId: null,
+		requestId: null,
+		responseStatus: eventStatus,
+		message: null,
+		payloadHash,
+		occurredAt: new Date(occurredAt).toISOString()
+	}
+	return { eventId, eventStatus, responsePayload, payloadHash, summary }
 }
 
 const resolveStationId = async () => {
@@ -193,41 +246,83 @@ const importTransactionFile = async (
 		return { inserted: 0, skipped: 0 }
 	}
 
-	await q(
-		`
-    INSERT INTO transactions (
-      station_id,
-      customer_id,
-      pump_number,
-      transaction_date_time,
-      total_amount,
-      volume,
-      fuel_type,
-      pos_reference,
-      status,
-      fiscalization_reference,
-      fiscalization_response,
-      legacy_filename,
-      created_at,
-      updated_at
-    )
-    VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
-    `,
-		[
-			stationId,
-			pumpNumber || 0,
-			transactionDateTime,
-			totalAmount,
-			volume,
-			fuelType,
-			posReference,
-			status,
-			fiscalRef,
-			// Store entire legacy payload for traceability
-			JSON.stringify(vfd),
-			filename
-		]
-	)
+	const transactionId = randomUUID()
+	const event = buildLegacyEventRecord({
+		transactionId,
+		payload: vfd,
+		status,
+		reference: fiscalRef,
+		occurredAt: transactionDateTime
+	})
+	const client = await pool.connect()
+	try {
+		await client.query('BEGIN')
+		await client.query(
+			`INSERT INTO transactions (
+			   id, station_id, customer_id, pump_number, transaction_date_time,
+			   total_amount, volume, fuel_type, pos_reference, status,
+			   fiscalization_reference, fiscalization_response, legacy_filename,
+			   created_at, updated_at
+			 )
+			 VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, NULL, $11, NOW(), NOW())`,
+			[
+				transactionId,
+				stationId,
+				pumpNumber || 0,
+				transactionDateTime,
+				totalAmount,
+				volume,
+				fuelType,
+				posReference,
+				status,
+				fiscalRef,
+				filename
+			]
+		)
+		await client.query(
+			`INSERT INTO fiscalization_events (
+			   id, station_id, transaction_id, engine, transport, status,
+			   reference, request_payload, response_payload, error_message,
+			   schema_version, payload_hash, origin, idempotency_key,
+			   occurred_at, finalized_at
+			 )
+			 VALUES ($1, $2, $3, 'legacy', 'legacy', $4, $5, NULL, $6::jsonb, NULL,
+			         1, $7, 'legacy_import', $8, $9, $9)`,
+			[
+				event.eventId,
+				stationId,
+				transactionId,
+				event.eventStatus,
+				fiscalRef,
+				JSON.stringify(event.responsePayload),
+				event.payloadHash,
+				`legacy-fiscal-response:v1:${transactionId}:${event.payloadHash}`,
+				transactionDateTime
+			]
+		)
+		await client.query(
+			`UPDATE transactions
+			    SET latest_fiscal_event_id = $3,
+			        fiscalization_response = $4,
+			        fiscalized_at = CASE WHEN $5 = 'SUCCESS' THEN $6 ELSE fiscalized_at END,
+			        updated_at = NOW()
+			  WHERE station_id = $1 AND id = $2`,
+			[
+				stationId,
+				transactionId,
+				event.eventId,
+				JSON.stringify(event.summary),
+				event.eventStatus,
+				transactionDateTime
+			]
+		)
+		await client.query('COMMIT')
+	} catch (error) {
+		await client.query('ROLLBACK')
+		throw error
+	} finally {
+		client.release()
+	}
 
 	return { inserted: 1, skipped: 0 }
 }
@@ -351,6 +446,23 @@ const normalizeConfigPayload = (input) => {
 }
 
 const upsertStationConfig = async (stationId, configJson, schemaVersion) => {
+	const normalized = JSON.stringify(stableFiscalJson(configJson ?? {}))
+	const configHash = createHash('sha256').update(normalized).digest('hex')
+	const current = await qOne(
+		`SELECT schema_version, config_json
+		   FROM station_config
+		  WHERE station_id = $1`,
+		[stationId]
+	)
+	const unchanged = Boolean(
+		current &&
+		current.schema_version === schemaVersion &&
+		JSON.stringify(stableFiscalJson(current.config_json ?? {})) === normalized
+	)
+	if (unchanged) {
+		console.log(`Station config already matches schema=${schemaVersion}; skipping duplicate version`)
+		return
+	}
 	if (DRY_RUN) {
 		console.log(`DRY_RUN: would upsert station_config schema=${schemaVersion}`)
 		return
@@ -366,9 +478,10 @@ const upsertStationConfig = async (stationId, configJson, schemaVersion) => {
 	)
 	const id = randomUUID()
 	await q(
-		`INSERT INTO station_config_versions (id, station_id, schema_version, config_json, created_by)
-		 VALUES ($5, $1, $2, $3, $4)`,
-		[stationId, schemaVersion, configJson, 'legacy-import',id]
+		`INSERT INTO station_config_versions
+		   (id, station_id, schema_version, config_json, config_hash, created_by)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		[id, stationId, schemaVersion, configJson, configHash, 'legacy-import']
 	)
 }
 

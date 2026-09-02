@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 
@@ -62,7 +62,7 @@ export default function PosIntegrationSettings() {
   const [state, setState] = useState<State>(emptyState)
   const [backendOptions, setBackendOptions] = useState<Option[]>([])
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setError(null)
     setNotice(null)
     setLoading(true)
@@ -107,11 +107,13 @@ export default function PosIntegrationSettings() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    safeAsync(load(), 'posIntegration.load')
-  }, [])
+    queueMicrotask(() => {
+      safeAsync(load(), 'posIntegration.load')
+    })
+  }, [load])
 
   const backendHelp = useMemo(() => {
     if (state.backend === 'jpl') {

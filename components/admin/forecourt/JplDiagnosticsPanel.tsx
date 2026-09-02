@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
+import { CollapsibleStatusSection } from '@/components/admin/forecourt/CollapsibleStatusSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -80,7 +81,7 @@ export function JplDiagnosticsPanel() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -94,11 +95,13 @@ export function JplDiagnosticsPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void load()
-  }, [])
+    queueMicrotask(() => {
+      void load()
+    })
+  }, [load])
 
   const protocol = payload?.adapterState?.protocol ?? payload?.protocol ?? {}
   const protocolHealth =
@@ -125,203 +128,214 @@ export function JplDiagnosticsPanel() {
   }, [payload?.adapterState?.lastMessageAt, payload?.connection?.ageMs])
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold">JPL diagnostics</div>
-            <div className="text-xs text-[var(--text-secondary)]">
-              Protocol health, heartbeat freshness, correlation mode, and recent
-              rejects.
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={badgeVariantForHealth(protocolHealth?.status)}>
-              {protocolHealth?.status ?? 'unknown'}
-            </Badge>
-            <Button onClick={load} disabled={loading}>
-              {loading ? 'Refreshing…' : 'Refresh diagnostics'}
-            </Button>
-          </div>
-        </div>
-
-        {error ? (
-          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <Metric label="Connection" value={payload?.connection?.status} />
-          <Metric
-            label="Connected"
-            value={payload?.connection?.connected ? 'yes' : 'no'}
-          />
-          <Metric label="Last message age" value={fmtAge(messageAge)} />
-          <Metric label="Last heartbeat age" value={fmtAge(heartbeatAge)} />
-          <Metric
-            label="JPL version"
-            value={protocol?.version ?? payload?.adapterState?.protocolVersion}
-          />
-          <Metric
-            label="Secure transport"
-            value={protocol?.secureMode ? 'yes' : 'no'}
-          />
-          <Metric
-            label="Correlation"
-            value={
-              protocol?.correlationCapability ??
-              String(protocol?.correlationSupport ?? 'unknown')
-            }
-          />
-          <Metric
-            label="Request mode"
-            value={protocol?.requestMode ?? protocol?.requestDispatchMode}
-          />
-        </div>
-
-        {issues.length ? (
-          <div className="space-y-2 rounded border bg-[var(--surface-card)] p-3">
-            <div className="text-sm font-semibold">Protocol issues</div>
-            <div className="space-y-2">
-              {issues.map((issue: any, index: number) => (
-                <div
-                  key={`${issue?.code ?? 'issue'}-${index}`}
-                  className="flex flex-wrap items-start gap-2 text-sm"
-                >
-                  <Badge variant={badgeVariantForHealth(issue?.severity)}>
-                    {issue?.severity ?? 'warn'}
-                  </Badge>
-                  <div>
-                    <span className="font-medium">
-                      {issue?.code ?? 'issue'}:
-                    </span>{' '}
-                    <span className="text-[var(--text-secondary)]">
-                      {issue?.message ?? ''}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded border bg-[var(--surface-card)] p-3 text-sm text-[var(--text-secondary)]">
-            No protocol health issues currently reported.
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <div className="rounded border bg-[var(--surface-card)] p-3">
-            <div className="mb-2 text-sm font-semibold">Controller flags</div>
-            <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words text-xs text-[var(--text-secondary)]">
-              {JSON.stringify(
-                payload?.adapterState?.controllerFlags ??
-                  payload?.controllerFlags ??
-                  {},
-                null,
-                2,
-              )}
-            </pre>
-          </div>
-          <div className="rounded border bg-[var(--surface-card)] p-3">
-            <div className="mb-2 text-sm font-semibold">
-              Subscriptions and dispatch
-            </div>
-            <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words text-xs text-[var(--text-secondary)]">
-              {JSON.stringify(
-                {
-                  defaultSubscriptions: protocolHealth?.defaultSubscriptions,
-                  requestDispatchPolicy: protocol?.requestDispatchPolicy,
-                  requestDispatchMode: protocol?.requestDispatchMode,
-                  rawFrameDiagnosticsEnabled:
-                    protocolHealth?.rawFrameDiagnosticsEnabled,
-                  lastDisconnectReason:
-                    payload?.adapterState?.lastDisconnectReason,
-                  nextReconnectAt: fmtTs(
-                    payload?.adapterState?.nextReconnectAt,
-                  ),
-                },
-                null,
-                2,
-              )}
-            </pre>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <div className="rounded border bg-[var(--surface-card)] p-3">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-semibold">
-                Recent protocol rejects
+    <CollapsibleStatusSection
+      title="JPL diagnostics"
+      status={protocolHealth?.status ?? 'unknown'}
+      statusVariant={badgeVariantForHealth(protocolHealth?.status)}
+      contentClassName="p-0"
+    >
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">JPL diagnostics</div>
+              <div className="text-xs text-[var(--text-secondary)]">
+                Protocol health, heartbeat freshness, correlation mode, and
+                recent rejects.
               </div>
-              <Badge
-                variant={
-                  recentRejects.length
-                    ? STATUS_VARIANT.ERROR
-                    : STATUS_VARIANT.SUCCESS
-                }
-              >
-                {recentRejects.length}
-              </Badge>
             </div>
-            {recentRejects.length ? (
+            <div className="flex items-center gap-2">
+              <Badge variant={badgeVariantForHealth(protocolHealth?.status)}>
+                {protocolHealth?.status ?? 'unknown'}
+              </Badge>
+              <Button onClick={load} disabled={loading}>
+                {loading ? 'Refreshing…' : 'Refresh diagnostics'}
+              </Button>
+            </div>
+          </div>
+
+          {error ? (
+            <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <Metric label="Connection" value={payload?.connection?.status} />
+            <Metric
+              label="Connected"
+              value={payload?.connection?.connected ? 'yes' : 'no'}
+            />
+            <Metric label="Last message age" value={fmtAge(messageAge)} />
+            <Metric label="Last heartbeat age" value={fmtAge(heartbeatAge)} />
+            <Metric
+              label="JPL version"
+              value={
+                protocol?.version ?? payload?.adapterState?.protocolVersion
+              }
+            />
+            <Metric
+              label="Secure transport"
+              value={protocol?.secureMode ? 'yes' : 'no'}
+            />
+            <Metric
+              label="Correlation"
+              value={
+                protocol?.correlationCapability ??
+                String(protocol?.correlationSupport ?? 'unknown')
+              }
+            />
+            <Metric
+              label="Request mode"
+              value={protocol?.requestMode ?? protocol?.requestDispatchMode}
+            />
+          </div>
+
+          {issues.length ? (
+            <div className="space-y-2 rounded border bg-[var(--surface-card)] p-3">
+              <div className="text-sm font-semibold">Protocol issues</div>
               <div className="space-y-2">
-                {recentRejects.slice(0, 8).map((event: any) => (
+                {issues.map((issue: any, index: number) => (
                   <div
-                    key={event.id}
-                    className="border-b pb-2 text-xs last:border-b-0"
+                    key={`${issue?.code ?? 'issue'}-${index}`}
+                    className="flex flex-wrap items-start gap-2 text-sm"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-medium">{event.event_type}</span>
-                      <span className="text-[var(--text-muted)]">
-                        {fmtTs(event.occurred_at)}
+                    <Badge variant={badgeVariantForHealth(issue?.severity)}>
+                      {issue?.severity ?? 'warn'}
+                    </Badge>
+                    <div>
+                      <span className="font-medium">
+                        {issue?.code ?? 'issue'}:
+                      </span>{' '}
+                      <span className="text-[var(--text-secondary)]">
+                        {issue?.message ?? ''}
                       </span>
                     </div>
-                    <div className="mt-1 text-[var(--text-secondary)]">
-                      {eventSummary(event)}
-                    </div>
-                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words text-[11px] text-[var(--text-muted)]">
-                      {JSON.stringify(event.payload, null, 2)}
-                    </pre>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="text-sm text-[var(--text-secondary)]">
-                No persisted rejects found.
+            </div>
+          ) : (
+            <div className="rounded border bg-[var(--surface-card)] p-3 text-sm text-[var(--text-secondary)]">
+              No protocol health issues currently reported.
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div className="rounded border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 text-sm font-semibold">Controller flags</div>
+              <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words text-xs text-[var(--text-secondary)]">
+                {JSON.stringify(
+                  payload?.adapterState?.controllerFlags ??
+                    payload?.controllerFlags ??
+                    {},
+                  null,
+                  2,
+                )}
+              </pre>
+            </div>
+            <div className="rounded border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 text-sm font-semibold">
+                Subscriptions and dispatch
               </div>
-            )}
+              <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words text-xs text-[var(--text-secondary)]">
+                {JSON.stringify(
+                  {
+                    defaultSubscriptions: protocolHealth?.defaultSubscriptions,
+                    requestDispatchPolicy: protocol?.requestDispatchPolicy,
+                    requestDispatchMode: protocol?.requestDispatchMode,
+                    rawFrameDiagnosticsEnabled:
+                      protocolHealth?.rawFrameDiagnosticsEnabled,
+                    lastDisconnectReason:
+                      payload?.adapterState?.lastDisconnectReason,
+                    nextReconnectAt: fmtTs(
+                      payload?.adapterState?.nextReconnectAt,
+                    ),
+                  },
+                  null,
+                  2,
+                )}
+              </pre>
+            </div>
           </div>
 
-          <div className="rounded border bg-[var(--surface-card)] p-3">
-            <div className="mb-2 text-sm font-semibold">Recent JPL events</div>
-            {recentProtocolEvents.length ? (
-              <div className="space-y-2">
-                {recentProtocolEvents.slice(0, 10).map((event: any) => (
-                  <div
-                    key={event.id}
-                    className="flex flex-wrap items-start justify-between gap-2 border-b pb-2 text-xs last:border-b-0"
-                  >
-                    <div>
-                      <div className="font-medium">{event.event_type}</div>
-                      <div className="text-[var(--text-secondary)]">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div className="rounded border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-semibold">
+                  Recent protocol rejects
+                </div>
+                <Badge
+                  variant={
+                    recentRejects.length
+                      ? STATUS_VARIANT.ERROR
+                      : STATUS_VARIANT.SUCCESS
+                  }
+                >
+                  {recentRejects.length}
+                </Badge>
+              </div>
+              {recentRejects.length ? (
+                <div className="space-y-2">
+                  {recentRejects.slice(0, 8).map((event: any) => (
+                    <div
+                      key={event.id}
+                      className="border-b pb-2 text-xs last:border-b-0"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium">{event.event_type}</span>
+                        <span className="text-[var(--text-muted)]">
+                          {fmtTs(event.occurred_at)}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-[var(--text-secondary)]">
                         {eventSummary(event)}
                       </div>
+                      <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words text-[11px] text-[var(--text-muted)]">
+                        {JSON.stringify(event.payload, null, 2)}
+                      </pre>
                     </div>
-                    <div className="text-[var(--text-muted)]">
-                      {fmtTs(event.occurred_at)}
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-[var(--text-secondary)]">
+                  No persisted rejects found.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 text-sm font-semibold">
+                Recent JPL events
+              </div>
+              {recentProtocolEvents.length ? (
+                <div className="space-y-2">
+                  {recentProtocolEvents.slice(0, 10).map((event: any) => (
+                    <div
+                      key={event.id}
+                      className="flex flex-wrap items-start justify-between gap-2 border-b pb-2 text-xs last:border-b-0"
+                    >
+                      <div>
+                        <div className="font-medium">{event.event_type}</div>
+                        <div className="text-[var(--text-secondary)]">
+                          {eventSummary(event)}
+                        </div>
+                      </div>
+                      <div className="text-[var(--text-muted)]">
+                        {fmtTs(event.occurred_at)}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-[var(--text-secondary)]">
-                No persisted JPL events found.
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-[var(--text-secondary)]">
+                  No persisted JPL events found.
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </CollapsibleStatusSection>
   )
 }

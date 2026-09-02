@@ -1,13 +1,10 @@
-import { queryAll, queryOne } from '@/src/platform/db/postgres'
+import {
+  queryAll,
+  queryOne,
+  txQuery,
+  withTransaction,
+} from '@/src/platform/db/postgres'
 import { getEnvValue } from '@/src/shared/config/envDb'
-import {
-  submitCreditNotesToProxy,
-  submitInvoiceToProxy,
-} from '@/src/shared/fiscalization/proxy/client'
-import {
-  mapTransactionToProxyCreditNote,
-  mapTransactionToProxyInvoice,
-} from '@/src/shared/fiscalization/proxy/mapper'
 import {
   getFiscalizationResultsSinceViaProxy,
   getOfflineQueueItemViaProxy,
@@ -15,18 +12,38 @@ import {
 } from '@/src/shared/proxy/client'
 import { mapFiscalReceipt } from '@/src/shared/receipts/mapFiscalReceipt'
 import { getRuntimeBus } from '@/src/shared/runtime/bus'
-import { enqueueFiscalInboxReviewFailure } from '@/src/shared/runtime/fiscalInbox'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
+import { getDefaultTaxTypeForCountry } from '@/src/shared/server/config/countryCatalog'
 import { getUserDisplayName } from '@/src/shared/server/users'
 import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 import { isUuid } from '@/src/shared/utils/uuid'
 
+import { enqueueFiscalInboxReviewFailure } from '@/src/modules/fiscal-inbox/application/fiscalInbox'
 import { syncDeductionForTransaction } from '@/src/modules/tank-levels/application/legacyTransactionSync'
+import {
+  isTanzaniaCountry,
+  normalizeFiscalCountryCode,
+} from '@/src/modules/tanzania-fiscal/infrastructure/country'
+import { enrichTanzaniaProxyInvoice } from '@/src/modules/tanzania-fiscal/infrastructure/proxyInvoice'
 import { getStationFiscalizationRoute } from '@/src/modules/tanzania-fiscal/infrastructure/route'
 import { markTransactionFailed } from '@/src/modules/transactions/application/commands/mark-transaction-failed'
 import { markTransactionFiscalized } from '@/src/modules/transactions/application/commands/mark-transaction-fiscalized'
+import { enqueueAutoPrintFiscalReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/autoPrintFiscalReceipt'
+import { persistFiscalizationEventRepo } from '@/src/modules/transactions/infrastructure/fiscalization/fiscalization-event.repository'
+import {
+  getFiscalizationLegacyFallbackReadCount,
+  resolveCanonicalFiscalizationPayload,
+} from '@/src/modules/transactions/infrastructure/fiscalization/fiscalization-read-compat'
+import {
+  submitCreditNotesToProxy,
+  submitInvoiceToProxy,
+} from '@/src/modules/transactions/infrastructure/fiscalization/proxyClient'
+import {
+  mapTransactionToProxyCreditNote,
+  mapTransactionToProxyInvoice,
+} from '@/src/modules/transactions/infrastructure/fiscalization/transaction-proxy.mapper'
 import { getStationLinkingWindowSeconds } from '@/src/modules/transactions/infrastructure/linkingWindow'
 import { getTransactionDetailsRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction-read.repository'
 import { mapTransactionInvoiceLines } from '@/src/modules/transactions/infrastructure/persistence/transaction.mapper'
@@ -74,6 +91,16 @@ async function vatRateForCountry(stationId: string, country: string | null) {
   return Number(
     (await getEnvValue(stationId, 'VPOS_VAT_RATE_DEFAULT', '0')) || 0,
   )
+}
+
+async function loadFiscalizationEngine(stationId: string): Promise<string> {
+  const settings = await queryOne<{ fiscalization_engine: string | null }>(
+    `SELECT fiscalization_engine
+       FROM station_settings
+      WHERE station_id = $1`,
+    [stationId],
+  )
+  return String(settings?.fiscalization_engine || 'proxy').trim() || 'proxy'
 }
 
 async function loadTransactionForProxySend(
@@ -167,16 +194,6 @@ function extractFirstString(source: any, paths: string[]): string | null {
     if (text) return text
   }
   return null
-}
-
-function safeParseJson(value: any) {
-  if (!value) return null
-  if (typeof value === 'object') return value
-  try {
-    return JSON.parse(String(value))
-  } catch {
-    return null
-  }
 }
 
 function extractProxyDocumentId(source: any): string | null {
@@ -600,34 +617,59 @@ function mergeFiscalizationResponses(submission: any, final: any) {
 async function persistProxySubmission(input: {
   stationId: string
   transactionId: string
+  engine: string
   fiscalDocumentId?: string | null
   cloudTransactionId?: string | null
-  fiscalizationResponse: unknown
+  requestPayload?: unknown
+  responsePayload: unknown
+  existingEventId?: string | null
+  idempotencyKey?: string | null
 }) {
   const cloudTransactionId = isUuid(String(input.cloudTransactionId || ''))
     ? String(input.cloudTransactionId)
     : null
 
-  return await queryOne<any>(
-    `UPDATE transactions
-        SET status = 'FISCALIZING',
-            fiscal_document_id = COALESCE(NULLIF(BTRIM(CAST($3 AS text)), ''), fiscal_document_id),
-            cloud_transaction_id = COALESCE($4::uuid, cloud_transaction_id),
-            fiscalization_response = $5,
-            last_error = NULL,
-            updated_at = NOW()
-      WHERE station_id = $1
-        AND id = $2::uuid
-        AND deleted_at IS NULL
-    RETURNING *`,
-    [
-      input.stationId,
-      input.transactionId,
-      input.fiscalDocumentId ?? null,
-      cloudTransactionId,
-      JSON.stringify(input.fiscalizationResponse ?? null),
-    ],
-  )
+  return await withTransaction(async (client) => {
+    const recorded = await persistFiscalizationEventRepo({
+      stationId: input.stationId,
+      transactionId: input.transactionId,
+      engine: input.engine,
+      transport: 'proxy',
+      status: 'PENDING',
+      fiscalDocumentId: input.fiscalDocumentId ?? null,
+      requestPayload: input.requestPayload,
+      responsePayload: input.responsePayload,
+      existingEventId: input.existingEventId ?? null,
+      idempotencyKey: input.idempotencyKey ?? null,
+      client,
+    })
+
+    const result = await txQuery<any>(
+      client,
+      `UPDATE transactions
+          SET status = 'FISCALIZING',
+              fiscal_document_id = COALESCE(NULLIF(BTRIM(CAST($3 AS text)), ''), fiscal_document_id),
+              cloud_transaction_id = COALESCE($4::uuid, cloud_transaction_id),
+              latest_fiscal_event_id = $5::uuid,
+              fiscalization_response = $6,
+              last_error = NULL,
+              updated_at = NOW()
+        WHERE station_id = $1
+          AND id = $2::uuid
+          AND deleted_at IS NULL
+      RETURNING *`,
+      [
+        input.stationId,
+        input.transactionId,
+        input.fiscalDocumentId ?? null,
+        cloudTransactionId,
+        recorded.event.id,
+        JSON.stringify(recorded.compatibilitySummary),
+      ],
+    )
+
+    return result.rows?.[0] ?? null
+  })
 }
 
 async function listPendingProxyFiscalizationTransactions(
@@ -635,28 +677,44 @@ async function listPendingProxyFiscalizationTransactions(
   limit = 50,
 ) {
   return await queryAll<any>(
-    `SELECT id,
-            station_id,
-            pos_reference,
-            status,
-            fiscal_document_id,
-            cloud_transaction_id,
-            fiscalization_response,
-            created_at,
-            updated_at
-       FROM transactions
-      WHERE station_id = $1
-        AND deleted_at IS NULL
-        AND status = 'FISCALIZING'
-        AND (fiscalization_reference IS NULL OR btrim(fiscalization_reference) = '')
-      ORDER BY updated_at ASC
+    `SELECT t.id,
+            t.station_id,
+            t.pos_reference,
+            t.status,
+            t.fiscal_document_id,
+            t.cloud_transaction_id,
+            t.fiscalization_response,
+            t.latest_fiscal_event_id,
+            t.created_at,
+            t.updated_at,
+            event.id AS fiscal_event_id,
+            event.engine AS fiscal_event_engine,
+            event.request_payload AS fiscal_event_request_payload,
+            event.response_payload AS fiscal_event_response_payload
+       FROM transactions t
+       LEFT JOIN fiscalization_events event
+         ON event.id = t.latest_fiscal_event_id
+        AND event.station_id = t.station_id
+        AND event.transaction_id = t.id
+      WHERE t.station_id = $1
+        AND t.deleted_at IS NULL
+        AND t.status = 'FISCALIZING'
+        AND (t.fiscalization_reference IS NULL OR btrim(t.fiscalization_reference) = '')
+      ORDER BY t.updated_at ASC
       LIMIT $2`,
     [stationId, limit],
   )
 }
 
+function getStoredProxyFiscalizationPayload(txn: any) {
+  return resolveCanonicalFiscalizationPayload({
+    eventResponsePayload: txn?.fiscal_event_response_payload,
+    legacyTransactionResponse: txn?.fiscalization_response,
+  }).payload
+}
+
 function matchesFiscalizationResult(txn: any, result: any): boolean {
-  const stored = safeParseJson(txn?.fiscalization_response)
+  const stored = getStoredProxyFiscalizationPayload(txn)
   const candidateKeys = new Set(
     [
       upperTrim(txn?.fiscal_document_id),
@@ -675,11 +733,17 @@ async function reconcilePendingProxyFiscalizations(input: {
   stationId: string
   pendingLimit?: number
   resultsLimit?: number
+  excludeTransactionIds?: ReadonlySet<string>
 }) {
-  const pending = await listPendingProxyFiscalizationTransactions(
+  const pendingRows = await listPendingProxyFiscalizationTransactions(
     input.stationId,
     Math.max(1, Number(input.pendingLimit ?? 50)),
   )
+  const pending = input.excludeTransactionIds?.size
+    ? pendingRows.filter(
+        (row) => !input.excludeTransactionIds?.has(String(row.id)),
+      )
+    : pendingRows
   if (!pending.length) {
     return { checked: 0, finalized: 0, failed: 0, polledResults: 0 }
   }
@@ -756,9 +820,13 @@ async function reconcilePendingProxyFiscalizations(input: {
 
   let finalized = 0
   let failed = 0
+  const defaultProxyEngine = await loadFiscalizationEngine(input.stationId)
 
   for (const txn of pending) {
-    const stored = safeParseJson(txn?.fiscalization_response)
+    const stored = getStoredProxyFiscalizationPayload(txn)
+    const proxyEngine =
+      String(txn?.fiscal_event_engine || defaultProxyEngine).trim() ||
+      defaultProxyEngine
     let matched = results.find((result) =>
       matchesFiscalizationResult(txn, result),
     )
@@ -831,9 +899,12 @@ async function reconcilePendingProxyFiscalizations(input: {
         await persistProxySubmission({
           stationId: input.stationId,
           transactionId: String(txn.id),
+          engine: proxyEngine,
           fiscalDocumentId: matchedDocId,
           cloudTransactionId: matchedRequestId || storedRequestId,
-          fiscalizationResponse: merged,
+          requestPayload: txn?.fiscal_event_request_payload ?? null,
+          responsePayload: merged,
+          existingEventId: txn?.fiscal_event_id ?? null,
         }).catch(() => {})
       }
 
@@ -848,7 +919,15 @@ async function reconcilePendingProxyFiscalizations(input: {
           extractFailureMessage(matched) || 'Proxy fiscalization failed',
         incrementRetryCount: true,
         fiscalDocumentId: matchedDocId,
-        fiscalizationResponse: merged,
+        fiscalEvent: {
+          engine: proxyEngine,
+          transport: 'proxy',
+          existingEventId: txn?.fiscal_event_id ?? null,
+          requestPayload: txn?.fiscal_event_request_payload ?? null,
+          responsePayload: merged,
+          errorMessage:
+            extractFailureMessage(matched) || 'Proxy fiscalization failed',
+        },
       }).catch(() => {})
 
       logger.warn(`[${WORKER_NAME}] proxy fiscalization result marked failed`, {
@@ -876,7 +955,14 @@ async function reconcilePendingProxyFiscalizations(input: {
       transactionId: String(txn.id),
       fiscalizationReference: fiscalReference,
       fiscalDocumentId: matchedDocId,
-      fiscalizationResponse: merged,
+      fiscalEvent: {
+        engine: proxyEngine,
+        transport: 'proxy',
+        reference: fiscalReference,
+        existingEventId: txn?.fiscal_event_id ?? null,
+        requestPayload: txn?.fiscal_event_request_payload ?? null,
+        responsePayload: merged,
+      },
     })
 
     await syncDeductionForTransaction({
@@ -889,12 +975,27 @@ async function reconcilePendingProxyFiscalizations(input: {
       })
     })
 
+    const autoPrint = await enqueueAutoPrintFiscalReceipt({
+      stationId: input.stationId,
+      transactionId: String(txn.id),
+    }).catch((error: any) => {
+      logger.error(`[${WORKER_NAME}] proxy auto-print enqueue failed`, {
+        stationId: input.stationId,
+        transactionId: String(txn.id),
+        error: String(error?.message || error),
+      })
+      return null
+    })
+
     logger.info(`[${WORKER_NAME}] proxy fiscalization result reconciled`, {
       stationId: input.stationId,
       transactionId: String(txn.id),
       documentId: matchedDocId,
       documentNumber: fiscalReference,
       status: extractProxyStatus(matched),
+      autoPrintEnabled: autoPrint?.enabled ?? null,
+      autoPrintEnqueued: autoPrint?.enqueued ?? false,
+      printJobId: autoPrint?.printJobId ?? null,
     })
 
     finalized += 1
@@ -913,22 +1014,32 @@ export async function sendClaimedTransactionToProxy(input: {
   station: any
   txn: any
   linkingWindowSeconds: number | null
+  countryCode?: string | null
   trigger: 'worker' | 'sendNow'
 }) {
-  const { stationId, station, txn, linkingWindowSeconds, trigger } = input
+  const {
+    stationId,
+    station,
+    txn,
+    linkingWindowSeconds,
+    countryCode,
+    trigger,
+  } = input
 
   let docId: string | null = null
   let docNo: string | null = null
+  let proxyEngine = 'proxy'
+  let proxyRequestPayload: unknown = null
 
   try {
+    proxyEngine = await loadFiscalizationEngine(stationId)
     const customer =
       txn.customer_id != null
         ? await loadCustomer(stationId, txn.customer_id)
         : null
-    const country = station?.country
-      ? String(station.country).toUpperCase()
-      : null
-    const defaultTaxType = await loadDefaultTaxType()
+    const country = normalizeFiscalCountryCode(countryCode ?? station?.country)
+    const stationForPayload = country ? { ...station, country } : station
+    const defaultTaxType = await getDefaultTaxTypeForCountry(country)
     const vatRate =
       defaultTaxType?.rate != null
         ? Number(defaultTaxType.rate)
@@ -946,16 +1057,26 @@ export async function sendClaimedTransactionToProxy(input: {
       fullTxn.fuel_type ?? txn.fuel_type ?? null,
     )
 
-    const invoice = mapTransactionToProxyInvoice({
+    const mappedInvoice = mapTransactionToProxyInvoice({
       transaction: fullTxn,
       customer,
-      station,
+      station: stationForPayload,
       vatRate,
       taxType: defaultTaxType?.code ?? null,
       taxRate: defaultTaxType?.rate ?? null,
       createdByName,
       enrichment,
     })
+    const invoice = isTanzaniaCountry(country)
+      ? await enrichTanzaniaProxyInvoice({
+          stationId,
+          transaction: fullTxn,
+          customer,
+          createdByName,
+          invoice: mappedInvoice,
+        })
+      : mappedInvoice
+    proxyRequestPayload = invoice
 
     logger.info(`[${WORKER_NAME}] submitting transaction to proxy`, {
       stationId,
@@ -964,6 +1085,8 @@ export async function sendClaimedTransactionToProxy(input: {
       hasCustomer: !!txn.customer_id,
       lineCount: Array.isArray(fullTxn?.lines) ? fullTxn.lines.length : 0,
       linkingWindowExpired: isLinkingWindowExpired(txn, linkingWindowSeconds),
+      country,
+      payloadContract: isTanzaniaCountry(country) ? 'tanzania' : 'legacy',
     })
 
     getRuntimeBus().publish('proxy', {
@@ -984,7 +1107,10 @@ export async function sendClaimedTransactionToProxy(input: {
         `Proxy submit failed: ${res.status} ${JSON.stringify(res.data)}`,
       )
 
-    docId = extractProxyDocumentId(res.data)
+    // Tanzania final responses may omit documentId. The exact identifier sent
+    // to the proxy remains authoritative and is safer than leaving the local
+    // transaction without a correlation identifier.
+    docId = extractProxyDocumentId(res.data) || trimString(invoice.documentId)
     docNo = extractProxyDocumentNumber(res.data)
 
     const requestId = extractProxyRequestId(res.data, {
@@ -995,14 +1121,22 @@ export async function sendClaimedTransactionToProxy(input: {
 
     try {
       if (hasFailurePayload) {
-        await markTransactionFailed({
+        const failedTransaction = await markTransactionFailed({
           stationId,
           transactionId: String(txn.id),
           lastError:
             extractFailureMessage(res.data) || 'Proxy fiscalization failed',
           incrementRetryCount: true,
           fiscalDocumentId: docId,
-          fiscalizationResponse: res.data ?? {},
+          fiscalEvent: {
+            engine: proxyEngine,
+            transport: 'proxy',
+            requestPayload: invoice,
+            responsePayload: res.data ?? {},
+            errorMessage:
+              extractFailureMessage(res.data) || 'Proxy fiscalization failed',
+            idempotencyKey: `proxy:${txn.id}:attempt:${Number(txn.retry_count ?? 0)}`,
+          },
         })
         await enqueueFiscalInboxReviewFailure({
           stationId,
@@ -1016,7 +1150,9 @@ export async function sendClaimedTransactionToProxy(input: {
             transactionId: String(txn.id),
             documentId: docId,
             documentNumber: docNo,
-            response: res.data ?? null,
+            fiscalEventId: failedTransaction?.latest_fiscal_event_id ?? null,
+            fiscalizationSummary:
+              failedTransaction?.fiscalization_response ?? null,
             at: Date.now(),
           },
         }).catch((err) => {
@@ -1035,15 +1171,24 @@ export async function sendClaimedTransactionToProxy(input: {
           transactionId: String(txn.id),
           fiscalizationReference: docNo,
           fiscalDocumentId: docId,
-          fiscalizationResponse: res.data ?? {},
+          fiscalEvent: {
+            engine: proxyEngine,
+            transport: 'proxy',
+            reference: docNo,
+            requestPayload: invoice,
+            responsePayload: res.data ?? {},
+            idempotencyKey: `proxy:${txn.id}:attempt:${Number(txn.retry_count ?? 0)}`,
+          },
         })
       } else {
         await persistProxySubmission({
           stationId,
           transactionId: String(txn.id),
+          engine: proxyEngine,
           fiscalDocumentId: docId,
           cloudTransactionId: requestId,
-          fiscalizationResponse: {
+          requestPayload: invoice,
+          responsePayload: {
             submission: res.data ?? {},
             requestId,
             documentId: docId,
@@ -1052,6 +1197,7 @@ export async function sendClaimedTransactionToProxy(input: {
             submitStatus: res.status,
             final: null,
           },
+          idempotencyKey: `proxy:${txn.id}:attempt:${Number(txn.retry_count ?? 0)}`,
         })
       }
     } catch (error: any) {
@@ -1091,6 +1237,19 @@ export async function sendClaimedTransactionToProxy(input: {
         })
       })
 
+      const autoPrint = await enqueueAutoPrintFiscalReceipt({
+        stationId,
+        transactionId: String(txn.id),
+      }).catch((error: any) => {
+        logger.error(`[${WORKER_NAME}] proxy auto-print enqueue failed`, {
+          stationId,
+          transactionId: String(txn.id),
+          trigger,
+          error: String(error?.message || error),
+        })
+        return null
+      })
+
       logger.info(`[${WORKER_NAME}] proxy submit succeeded`, {
         stationId,
         transactionId: String(txn.id),
@@ -1098,6 +1257,9 @@ export async function sendClaimedTransactionToProxy(input: {
         documentId: docId,
         documentNumber: docNo,
         finalized: true,
+        autoPrintEnabled: autoPrint?.enabled ?? null,
+        autoPrintEnqueued: autoPrint?.enqueued ?? false,
+        printJobId: autoPrint?.printJobId ?? null,
       })
     } else {
       logger.info(
@@ -1147,13 +1309,24 @@ export async function sendClaimedTransactionToProxy(input: {
       at: Date.now(),
     })
 
-    await markTransactionFailed({
+    const failedTransaction = await markTransactionFailed({
       stationId,
       transactionId: String(txn.id),
       lastError: String(e?.message || e),
       incrementRetryCount: true,
       fiscalDocumentId: docId,
-    }).catch(() => {})
+      fiscalEvent: {
+        engine: proxyEngine,
+        transport: 'proxy',
+        requestPayload: proxyRequestPayload,
+        responsePayload: {
+          error: String(e?.message || e),
+          documentId: docId,
+        },
+        errorMessage: String(e?.message || e),
+        idempotencyKey: `proxy:${txn.id}:attempt:${Number(txn.retry_count ?? 0)}`,
+      },
+    }).catch(() => null)
     await enqueueFiscalInboxReviewFailure({
       stationId,
       topic: 'external_fiscalization',
@@ -1165,6 +1338,8 @@ export async function sendClaimedTransactionToProxy(input: {
         transactionId: String(txn.id),
         documentId: docId,
         trigger,
+        fiscalEventId: failedTransaction?.latest_fiscal_event_id ?? null,
+        fiscalizationSummary: failedTransaction?.fiscalization_response ?? null,
         error: String(e?.message || e),
         at: Date.now(),
       },
@@ -1216,6 +1391,7 @@ export async function sendTransactionToProxyNow(input: {
     station,
     txn: claimed,
     linkingWindowSeconds,
+    countryCode: route.country,
     trigger: 'sendNow',
   })
 }
@@ -1360,7 +1536,7 @@ async function sendCreditNoteQueueItemToProxy(input: {
     const country = station?.country
       ? String(station.country).toUpperCase()
       : null
-    const defaultTaxType = await loadDefaultTaxType()
+    const defaultTaxType = await getDefaultTaxTypeForCountry(country)
     const vatRate =
       defaultTaxType?.rate != null
         ? Number(defaultTaxType.rate)
@@ -1497,24 +1673,6 @@ async function sendCreditNoteQueueItemToProxy(input: {
 
 // ─── End Credit Note Queue Helpers ───────────────────────────────────────────
 
-async function loadDefaultTaxType() {
-  const row = await queryOne<{ code: string; rate: number | string | null }>(
-    `SELECT code, rate
-     FROM cfg_tax_types
-     WHERE is_active = TRUE
-     ORDER BY sort_order ASC, name ASC
-     LIMIT 1`,
-  )
-
-  if (!row?.code) return null
-  const rate =
-    row.rate === null || row.rate === undefined ? null : Number(row.rate)
-  return {
-    code: String(row.code),
-    rate: Number.isFinite(rate) ? rate : null,
-  }
-}
-
 /**
  * Resolve pump, nozzle, tank, and product details directly from
  * the relational tables (pumps → nozzles → tanks → products).
@@ -1538,7 +1696,7 @@ async function resolveEnrichmentFromTables(
     tank_id: string | null
     nozzle_number: number | null
   }>(
-    `SELECT id, tank_id, nozzle_number FROM nozzles WHERE station_id = $1 AND pump_id = $2 ORDER BY nozzle_number`,
+    `SELECT id, tank_id, nozzle_number FROM nozzles WHERE station_id = $1 AND pump_id = $2 AND is_active = TRUE ORDER BY nozzle_number`,
     [stationId, pump.id],
   )
   if (!nozzles.length) return { pumpId: String(pump.id) }
@@ -1716,6 +1874,7 @@ export function startProxyFiscalSenderWorker(opts?: {
     station: any,
     txn: any,
     linkingWindowSeconds: number | null,
+    countryCode: string | null,
   ) {
     const transactionId = String(txn.id)
     const run = sendClaimedTransactionToProxy({
@@ -1723,6 +1882,7 @@ export function startProxyFiscalSenderWorker(opts?: {
       station,
       txn,
       linkingWindowSeconds,
+      countryCode,
       trigger: 'worker',
     }).finally(() => {
       inFlight.delete(transactionId)
@@ -1753,6 +1913,8 @@ export function startProxyFiscalSenderWorker(opts?: {
             inFlight: inFlight.size,
             cnInFlight: cnInFlight.size,
             reconcilePollMs,
+            legacyFiscalizationFallbackReads:
+              getFiscalizationLegacyFallbackReadCount(),
             route: route.route,
             skipped: 'local_tz_route',
           },
@@ -1768,6 +1930,7 @@ export function startProxyFiscalSenderWorker(opts?: {
           stationId,
           pendingLimit,
           resultsLimit,
+          excludeTransactionIds: new Set(inFlight.keys()),
         })
         lastReconcileAt = Date.now()
 
@@ -1799,7 +1962,7 @@ export function startProxyFiscalSenderWorker(opts?: {
       }
 
       for (const txn of rows) {
-        dispatchSend(station, txn, linkingWindowSeconds)
+        dispatchSend(station, txn, linkingWindowSeconds, route.country)
       }
     } finally {
       tickRunning = false
@@ -1866,6 +2029,8 @@ export function startProxyFiscalSenderWorker(opts?: {
           inFlight: inFlight.size,
           cnInFlight: cnInFlight.size,
           reconcilePollMs,
+          legacyFiscalizationFallbackReads:
+            getFiscalizationLegacyFallbackReadCount(),
         },
       }).catch(() => {}),
     HEARTBEAT_MS,

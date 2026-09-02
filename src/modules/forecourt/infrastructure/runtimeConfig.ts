@@ -1,3 +1,4 @@
+import { resolveEnvValueFromSources } from '@/src/platform/config/env-db'
 import {
   getPreferredNetworkHost,
   FORECOURT_RUNTIME_KV_KEYS as KEY,
@@ -63,7 +64,8 @@ export type ForecourtRuntimeConfig = {
   bufferCritAgeMinUnsup: number
 }
 
-const EXTRA_REQUEST_POLICY_KEY = 'JPL_REQUEST_DISPATCH_POLICY'
+const EXTRA_REQUEST_POLICY_KEY = 'env:JPL_REQUEST_DISPATCH_POLICY'
+const LEGACY_REQUEST_POLICY_KEY = 'JPL_REQUEST_DISPATCH_POLICY'
 
 const normalizeRequestDispatchPolicy = (
   value: unknown,
@@ -93,15 +95,11 @@ const normalizeRequestDispatchPolicy = (
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __forecourtRuntimeConfig: ForecourtRuntimeConfig | undefined
-  // eslint-disable-next-line no-var
   var __forecourtRuntimeConfigLoadedAt: number | undefined
-  // eslint-disable-next-line no-var
   var __forecourtRuntimeConfigListeners:
     | Set<(cfg: ForecourtRuntimeConfig) => void>
     | undefined
-  // eslint-disable-next-line no-var
   var __forecourtRuntimeConfigWatchers:
     | Map<string, ReturnType<typeof setInterval>>
     | undefined
@@ -341,7 +339,19 @@ export const loadForecourtRuntimeConfigFromDb = async (stationId: string) => {
     KEY.BUFFER_WARN_AGE_MIN_UNSUP,
     KEY.BUFFER_CRIT_AGE_MIN_UNSUP,
   ] as const
-  const values = await kvGetMany<any>(stationId, [...keys])
+  const values = await kvGetMany<any>(stationId, [
+    ...keys,
+    LEGACY_REQUEST_POLICY_KEY,
+  ])
+  const effectiveValue = (key: string) => {
+    const persisted =
+      key === EXTRA_REQUEST_POLICY_KEY
+        ? (values[key] ?? values[LEGACY_REQUEST_POLICY_KEY])
+        : values[key]
+    return key.startsWith('env:')
+      ? resolveEnvValueFromSources(key.slice(4), persisted)
+      : persisted
+  }
   const [
     jplOperationMode,
     jplHost,
@@ -376,7 +386,7 @@ export const loadForecourtRuntimeConfigFromDb = async (stationId: string) => {
     bufferCritDepthUnsup,
     bufferWarnAgeMinUnsup,
     bufferCritAgeMinUnsup,
-  ] = keys.map((key) => values[key])
+  ] = keys.map((key) => effectiveValue(key))
 
   const merged: ForecourtRuntimeConfig = {
     mode: 'jpl_tcp',

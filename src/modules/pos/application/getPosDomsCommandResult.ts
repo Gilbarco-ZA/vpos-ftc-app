@@ -1,13 +1,12 @@
 import {
-  resolveTankRecordsByGaugeIds,
-  syncTankGaugeVolumes,
-} from '@/src/shared/doms/tankGauge'
-import { dispatchPosDomsCommand } from '@/src/shared/pos/doms'
-import {
   legacyDomsFailure,
   legacyDomsSuccess,
 } from '@/src/shared/vpos/legacyPosApi'
 
+import {
+  resolveTankRecordsByGaugeIds,
+  syncTankGaugeVolumes,
+} from '@/src/modules/forecourt/application/tankGauge'
 import {
   deleteActivatedPendingForecourtPriceSets,
   deletePendingForecourtPriceSet,
@@ -19,6 +18,7 @@ import {
   appendWetstockEvent,
   upsertTankDeliveryCheckpoint,
 } from '@/src/modules/forecourt/infrastructure/wetstockLifecycleRepo'
+import { dispatchPosDomsCommand } from '@/src/modules/pos/application/legacy/doms'
 
 import type { PosDomsRouteCommand } from './posDomsTypes'
 

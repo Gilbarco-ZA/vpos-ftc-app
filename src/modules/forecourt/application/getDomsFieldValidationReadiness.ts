@@ -20,7 +20,6 @@ export type DomsFieldValidationStatus =
   | 'blocked'
 
 export type DomsFieldValidationArea =
-  | 'build'
   | 'jpl-hardware'
   | 'operations'
   | 'reconciliation'
@@ -62,6 +61,26 @@ export type RecordDomsFieldValidationEvidenceImportInput = {
   confirmNoPssWrite?: unknown
   confirmManualValidation?: unknown
 }
+
+export type RecordDomsFieldValidationCommandResultInput = {
+  action?: unknown
+  checklistItemId?: unknown
+  commandId?: unknown
+  commandTitle?: unknown
+  success?: unknown
+  evidence?: unknown
+}
+
+export const DOMS_FIELD_VALIDATION_AUTOMATED_CHECK_IDS = [
+  'jpl-live-connection-observed',
+  'jpl-live-fp-status-conformance-validated',
+  'jpl-live-value-normalization-validated',
+  'production-workflows-exercised',
+  'fc-install-status-snapshot-captured',
+] as const
+
+export type DomsFieldValidationAutomatedCheckId =
+  (typeof DOMS_FIELD_VALIDATION_AUTOMATED_CHECK_IDS)[number]
 
 export type DomsFieldValidationCheckpointSummary = {
   id: string
@@ -321,22 +340,7 @@ export const deriveDomsFieldValidationEvidenceCheckpoints = (input: {
     })
   }
 
-  if (evidenceType === 'build-test-run' || evidenceType === 'local-build') {
-    add(
-      'local-build-completed',
-      statusFromBool(
-        boolResult(results, 'buildPassed', 'build', 'npmRunBuild'),
-      ),
-      { expectedCommand: 'npm run build' },
-    )
-    add(
-      'test-suite-completed',
-      statusFromBool(
-        boolResult(results, 'testsPassed', 'testPassed', 'npmRunTest'),
-      ),
-      { expectedCommand: 'npm run test && npm run test:jpl-protocol' },
-    )
-  } else if (evidenceType === 'jpl-simulator') {
+  if (evidenceType === 'jpl-simulator') {
     add(
       'jpl-live-connection-observed',
       statusFromBool(
@@ -514,7 +518,7 @@ const deriveConnectionStatus = (diagnostics: any) => {
   return { connection, adapterState, connected, statusText }
 }
 
-const buildChecklist = (params: {
+export const buildDomsFieldValidationChecklist = (params: {
   diagnostics: any
   reconciliation: any
   workflow: any
@@ -543,42 +547,6 @@ const buildChecklist = (params: {
   const workflowTransactions = asArray(
     workflow?.data?.transactions ?? workflow?.transactions,
   )
-
-  addItem(items, {
-    id: 'local-build-completed',
-    area: 'build',
-    status: 'pending',
-    title: 'Local production build has been run on the latest package',
-    description:
-      'Generated packages are parse checked in this environment, but the production Next.js build must be run on the local development machine with dependencies installed.',
-    evidence: {
-      expectedCommand: 'npm run build',
-      source: 'manual-local-validation',
-    },
-    nextAction:
-      'Run npm run build locally and record the result as a validation checkpoint.',
-    blocksProduction: true,
-    manualValidationRequired: true,
-  })
-
-  addItem(items, {
-    id: 'test-suite-completed',
-    area: 'build',
-    status: 'pending',
-    title: 'Automated tests have been run on the latest package',
-    description:
-      'Run the full test suite and the JPL protocol-focused tests after applying this pass.',
-    evidence: {
-      expectedCommands: [
-        'npm run test',
-        'npm run test -- tests/runtime/jplProtocol.test.ts',
-      ],
-    },
-    nextAction:
-      'Run the full test suite locally, fix any failures, and record the result.',
-    blocksProduction: true,
-    manualValidationRequired: true,
-  })
 
   addItem(items, {
     id: 'jpl-live-connection-observed',
@@ -867,6 +835,24 @@ const buildChecklist = (params: {
   return items
 }
 
+export const DOMS_FIELD_VALIDATION_CHECK_IDS = [
+  'jpl-live-connection-observed',
+  'jpl-network-reconnect-validated',
+  'jpl-dead-connection-detection-validated',
+  'jpl-transaction-recovery-validated',
+  'jpl-heartbeat-resilience-validated',
+  'jpl-live-fp-status-conformance-validated',
+  'jpl-live-value-normalization-validated',
+  'jpl-rejects-reviewed',
+  'production-workflows-exercised',
+  'fc-install-status-snapshot-captured',
+  'reconciliation-reviewed',
+  'maintenance-execution-disabled',
+  'tanzania-tra-sale-validated',
+  'tanzania-credit-note-validated',
+  'cloud-cutover-checklist-ready',
+] as const
+
 const checkpointFromAuditLog = (
   row: AuditLog,
 ): DomsFieldValidationCheckpointSummary | null => {
@@ -1005,7 +991,7 @@ async function writeFieldValidationCheckpointAudit(params: {
     userId: params.user.id,
     action: 'DOMS_FIELD_VALIDATION_CHECKPOINT_RECORDED',
     entityType: 'forecourt.domsFieldValidation',
-    entityId: params.checklistItemId,
+    entityId: undefined,
     newValues: {
       checklistItemId: params.checklistItemId,
       status: params.status,
@@ -1072,7 +1058,7 @@ export async function getDomsFieldValidationReadiness(stationId: string) {
     ),
   ])
 
-  const baselineChecklist = buildChecklist({
+  const baselineChecklist = buildDomsFieldValidationChecklist({
     diagnostics,
     reconciliation,
     workflow,
@@ -1152,6 +1138,63 @@ export async function getDomsFieldValidationReadiness(stationId: string) {
         pendingSession: maintenanceSessions?.data?.pendingSession ?? null,
       },
     },
+  }
+}
+
+export async function recordDomsFieldValidationCommandResult(
+  input: RecordDomsFieldValidationCommandResultInput,
+  user: SessionUser,
+) {
+  if (input.success !== true) {
+    throw new Error(
+      'Only successful command results can mark validation passed',
+    )
+  }
+
+  const checklistItemId = requireNonEmptyString(
+    input.checklistItemId,
+    'checklistItemId',
+  ) as DomsFieldValidationAutomatedCheckId
+  if (!DOMS_FIELD_VALIDATION_AUTOMATED_CHECK_IDS.includes(checklistItemId)) {
+    throw new Error('Checklist item does not allow automated command evidence')
+  }
+
+  const commandId = requireNonEmptyString(input.commandId, 'commandId')
+  const commandTitle = requireNonEmptyString(input.commandTitle, 'commandTitle')
+  const evidence = sanitizeEvidenceObject(input.evidence)
+  const readiness = await getDomsFieldValidationReadiness(user.stationId)
+  const item = readiness.checklist.find(
+    (candidate) => candidate.id === checklistItemId,
+  )
+  if (!item) throw new Error('Unknown checklist item')
+
+  const audit = await writeFieldValidationCheckpointAudit({
+    user,
+    checklistItemId,
+    status: 'passed',
+    note: `${commandTitle} completed successfully.`,
+    evidenceReference: `jpl-command://${commandId}`,
+    evidence: {
+      commandId,
+      commandTitle,
+      success: true,
+      recordedAutomatically: true,
+      ...evidence,
+    },
+    itemTitle: item.title,
+    itemArea: item.area,
+    source: 'doms-jpl-command-result',
+    readinessGeneratedAt: readiness.generatedAt,
+    overallStatus: readiness.overallStatus,
+    productionReleaseStatus: readiness.productionReleaseStatus,
+  })
+
+  return {
+    success: true,
+    auditLogId: audit.id,
+    checklistItemId,
+    status: 'passed' as const,
+    readiness: await getDomsFieldValidationReadiness(user.stationId),
   }
 }
 

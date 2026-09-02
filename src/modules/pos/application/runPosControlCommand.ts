@@ -1,4 +1,4 @@
-import { executePosControlCommand } from '@/src/shared/pos/control'
+import { executePosControlCommand } from '@/src/modules/pos/application/legacy/control'
 
 import type { PosControlRouteCommand } from './posControlTypes'
 

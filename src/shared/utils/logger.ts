@@ -32,24 +32,20 @@ function format(level: string, tag: string, data?: LogData): string {
 export const logger = {
   debug(tag: string, data?: LogData) {
     if (getMinLevel() <= LOG_LEVELS.debug) {
-      // eslint-disable-next-line no-console
       console.debug(format('debug', tag, data))
     }
   },
   info(tag: string, data?: LogData) {
     if (getMinLevel() <= LOG_LEVELS.info) {
-      // eslint-disable-next-line no-console
       console.log(format('info', tag, data))
     }
   },
   warn(tag: string, data?: LogData) {
     if (getMinLevel() <= LOG_LEVELS.warn) {
-      // eslint-disable-next-line no-console
       console.warn(format('warn', tag, data))
     }
   },
   error(tag: string, data?: LogData) {
-    // eslint-disable-next-line no-console
     console.error(format('error', tag, data))
   },
 }

@@ -1,8 +1,8 @@
 import type { JplConfig } from '@/src/platform/integrations/jpl/types'
 
 import { getSystemConfiguration } from '@/src/platform/config/loader'
-import { getForecourtSettings } from '@/src/shared/forecourt/settings'
 
+import { getForecourtSettings } from '@/src/modules/forecourt/application/forecourtSettings'
 import { getForecourtRuntimeConfig } from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 
 /**

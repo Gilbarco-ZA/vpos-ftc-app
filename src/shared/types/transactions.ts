@@ -69,6 +69,13 @@ export type NonFiscalizedTransactionRow = {
   retry_count: number
   fiscal_queue_enqueued_at: string | null
   last_error: string | null
+  customer_id?: string | null
+  customer_buyer_name?: string | null
+  customer_tin?: string | null
+  doms_source_system?: string | null
+  odometer?: string | null
+  payment_type?: string | null
+  vehicle_reg_nr?: string | null
 }
 
 export type FiscalizedTransactionRow = {
@@ -103,6 +110,13 @@ export type TransactionListItem = {
   retryCount: number
   fiscalQueueEnqueuedAt: string | null
   lastError: string | null
+  customerId?: string | null
+  customerName?: string | null
+  customerTin?: string | null
+  domsSourceSystem?: string | null
+  odometer?: string | null
+  paymentType?: string | null
+  vehicleRegNr?: string | null
 }
 
 export type FiscalizedTransactionListItem = {

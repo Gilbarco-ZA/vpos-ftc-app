@@ -2,29 +2,29 @@ import '@/src/modules/forecourt/infrastructure/jpl/globals'
 
 import type { ProtocolHealthPayload } from '@/src/modules/forecourt/infrastructure/jpl/protocolHealth'
 import type {
+  RequestDispatchMode,
+  RequestDispatchPolicy,
+} from '@/src/modules/forecourt/infrastructure/runtimeConfig'
+import type {
   JplBufferAlert,
   JplBufferEntrySummary,
   JplBufferHealthSummary,
   JplBufferSeverity,
 } from '@/src/platform/integrations/jpl/types'
-import type {
-  RequestDispatchMode,
-  RequestDispatchPolicy,
-} from '@/src/shared/forecourt/runtimeConfig'
 import type { JplClient } from '@gilbarcoafs/doms-pos-jpl'
 
-import { mapJplMainState } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
 import {
   getJplAdapterState,
   getJplBufferHealth,
 } from '@/src/shared/forecourt/jplState'
-import { getForecourtRuntimeConfig } from '@/src/shared/forecourt/runtimeConfig'
 
+import { mapJplMainState } from '@/src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers'
 import { enumLabel } from '@/src/modules/forecourt/infrastructure/jpl/protocol/normalize'
 import { buildProtocolHealth } from '@/src/modules/forecourt/infrastructure/jpl/protocolHealth'
 import { getReplayCapabilities } from '@/src/modules/forecourt/infrastructure/jpl/replayState'
 import { resolveStationId } from '@/src/modules/forecourt/infrastructure/jpl/station'
 import { summarizeJplTlsConfig } from '@/src/modules/forecourt/infrastructure/jpl/tlsConfig'
+import { getForecourtRuntimeConfig } from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 
 let cachedStationId: string | null = null
 

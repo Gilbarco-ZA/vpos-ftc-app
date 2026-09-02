@@ -14,8 +14,11 @@ import {
   refreshIdentityViaProxy,
   resetDeviceViaProxy,
 } from '@/src/shared/proxy/client'
+import { KV_KEYS } from '@/src/shared/setup/keys'
 import { validateRegistrationCode } from '@/src/shared/setup/validate'
+import { kvGetMany } from '@/src/shared/storage/stationKv'
 
+import { enrichRegistrationStatus } from '@/src/modules/setup/application/enrichRegistrationStatus'
 import { registerPublicSetupDevice } from '@/src/modules/setup/application/registerPublicSetupDevice'
 
 export const dynamic = 'force-dynamic'
@@ -25,8 +28,31 @@ export const GET = async () => {
   let user: SessionUser | null = null
   try {
     user = await requireAuth(['administrator'])
-    const result = await getRegistrationStatusViaProxy(user?.stationId)
-    return NextResponse.json(result)
+    const [result, cached] = await Promise.all([
+      getRegistrationStatusViaProxy(user.stationId),
+      kvGetMany<any>(user.stationId, [
+        KV_KEYS.VPOS_DEVICE_DATA,
+        KV_KEYS.VPOS_DEVICE_REGISTRATION,
+        KV_KEYS.PROXY_IDENTITY,
+      ]),
+    ])
+
+    const enrich = (value: unknown) =>
+      enrichRegistrationStatus(value, {
+        stationId: user!.stationId,
+        stationName: user!.station?.name,
+        deviceData: cached[KV_KEYS.VPOS_DEVICE_DATA],
+        registrationData: cached[KV_KEYS.VPOS_DEVICE_REGISTRATION],
+        proxyIdentity: cached[KV_KEYS.PROXY_IDENTITY],
+        updatedAt: new Date().toISOString(),
+      })
+
+    const data =
+      result.data && typeof result.data === 'object' && result.data.details
+        ? { ...result.data, details: enrich(result.data.details) }
+        : enrich(result.data)
+
+    return NextResponse.json({ ...result, data })
   } catch (err) {
     return await serverError(err, { stationId: user?.stationId })
   }

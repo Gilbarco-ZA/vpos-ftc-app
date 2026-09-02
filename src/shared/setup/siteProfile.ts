@@ -1,10 +1,12 @@
 import { query } from '@/src/platform/db/postgres'
-import { getSiteConfigurationPublic } from '@/src/shared/proxy/client'
+import {
+  getSiteConfigurationPublic,
+  updateRegistrationCountryViaProxy,
+} from '@/src/shared/proxy/client'
 import {
   getCountryDatasetSummary,
   isSupportedCountryCode,
 } from '@/src/shared/server/config/countryDatasets'
-import { seedCountryConfigOnce } from '@/src/shared/server/config/seedCountryConfig'
 import { KV_KEYS } from '@/src/shared/setup/keys'
 import { getRegistrationStatusViaProxy } from '@/src/shared/setup/proxy'
 import { kvGet, kvGetMany, kvSet } from '@/src/shared/storage/stationKv'
@@ -32,6 +34,36 @@ const normalizeString = (value: unknown) => String(value || '').trim()
 const pickString = (...values: unknown[]) =>
   values.map(normalizeString).find(Boolean) || ''
 const normalizeCountry = (value: string) => value.trim().toUpperCase()
+
+const proxyErrorMessage = (data: any, fallback: string) => {
+  const value = data?.error?.message || data?.message || data?.error
+  return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+const registrationCountryFrom = (payload: any) =>
+  pickString(
+    payload?.countryCode,
+    payload?.countryId,
+    payload?.country_code,
+    payload?.country_id,
+    payload?.identity?.countryCode,
+    payload?.identity?.countryId,
+    payload?.identity?.country,
+  )
+
+const syncCountryToProxy = async (stationId: string, country: string) => {
+  const result = await updateRegistrationCountryViaProxy(stationId, country)
+  if (!result.ok) {
+    throw new Error(
+      String(
+        proxyErrorMessage(
+          result.data,
+          'Failed to synchronize the country to vpos-proxy',
+        ),
+      ),
+    )
+  }
+}
 
 const extractSiteProfile = (payload: any): SiteProfile | null => {
   if (!payload) return null
@@ -94,9 +126,15 @@ const extractSiteProfile = (payload: any): SiteProfile | null => {
 }
 
 const persistSiteProfile = async (stationId: string, profile: SiteProfile) => {
+  const existingProfile = await kvGet<SiteProfile>(
+    stationId,
+    KV_KEYS.SITE_PROFILE,
+  )
   const normalizedCountry = profile.country
     ? normalizeCountry(profile.country)
-    : ''
+    : existingProfile?.country
+      ? normalizeCountry(existingProfile.country)
+      : ''
   const normalizedTimezone = profile.timezone?.trim() || ''
   const address = profile.address?.trim() || ''
   try {
@@ -123,6 +161,25 @@ const persistSiteProfile = async (stationId: string, profile: SiteProfile) => {
       [stationId, profile.siteName, address, normalizedCountry],
     )
   }
+  if (normalizedCountry === 'TZ') {
+    await query(
+      `UPDATE station_settings
+       SET auto_print_receipts = TRUE,
+           fiscalization_engine = 'TZ',
+           fiscalization_transport = 'proxy',
+           updated_at = NOW()
+       WHERE station_id = $1`,
+      [stationId],
+    )
+  } else if (normalizedCountry) {
+    await query(
+      `UPDATE station_settings
+       SET fiscalization_transport = 'proxy', updated_at = NOW()
+       WHERE station_id = $1`,
+      [stationId],
+    )
+  }
+
   const stored: SiteProfile = {
     ...profile,
     country: normalizedCountry || undefined,
@@ -205,15 +262,22 @@ export async function saveSiteProfile(
   const normalizedStationId = requireNonEmptyString(stationId, 'stationId')
   const siteName = pickString((body as any)?.siteName, (body as any)?.name)
   if (!siteName) throw new Error('siteName is required')
+  const country =
+    pickString((body as any)?.country, (body as any)?.countryCode) || undefined
+  if (country) {
+    const normalizedCountry = normalizeCountry(country)
+    if (!(await isSupportedCountryCode(normalizedCountry))) {
+      throw new Error('Unsupported country')
+    }
+    await syncCountryToProxy(normalizedStationId, normalizedCountry)
+  }
   return await persistSiteProfile(normalizedStationId, {
     siteName,
     taxNumber:
       pickString((body as any)?.taxNumber, (body as any)?.tax_number) ||
       undefined,
     address: pickString((body as any)?.address) || undefined,
-    country:
-      pickString((body as any)?.country, (body as any)?.countryCode) ||
-      undefined,
+    country,
     currency:
       pickString((body as any)?.currency, (body as any)?.currencyCode) ||
       undefined,
@@ -236,7 +300,7 @@ export const syncSiteProfileFromProxy = async (
         const deviceSettings = payload?.deviceSettings ?? {}
         const seeded = await persistMinimalSiteProfile(normalizedStationId, {
           siteName: pickString(identity?.siteName, deviceSettings?.deviceName),
-          country: pickString(identity?.countryCode, identity?.country),
+          country: registrationCountryFrom(payload),
           timezone: pickString(identity?.timezone),
           currency: pickString(identity?.currencyCode, identity?.currency),
         })
@@ -247,7 +311,6 @@ export const syncSiteProfileFromProxy = async (
           !normalizedCountry ||
           !(await isSupportedCountryCode(normalizedCountry))
         await kvSet(normalizedStationId, 'setup.needsCountry', needsCountry)
-        if (!needsCountry) await seedCountryConfigOnce(normalizedCountry)
         return {
           ok: true,
           profile: seeded,
@@ -270,7 +333,6 @@ export const syncSiteProfileFromProxy = async (
       const needsCountry =
         !normalizedCountry || !(await isSupportedCountryCode(normalizedCountry))
       await kvSet(normalizedStationId, 'setup.needsCountry', needsCountry)
-      if (!needsCountry) await seedCountryConfigOnce(normalizedCountry)
       return {
         ok: true,
         profile: existing || undefined,
@@ -296,14 +358,44 @@ export const syncSiteProfileFromProxy = async (
       status: 502,
       error: 'Site configuration is missing required fields',
     }
-  const stored = await persistSiteProfile(normalizedStationId, profile)
+  let effectiveProfile = profile
+  try {
+    const registration =
+      await getRegistrationStatusViaProxy(normalizedStationId)
+    const payload = (registration.data as any)?.data ?? registration.data
+    const proxyCountry = registration.ok ? registrationCountryFrom(payload) : ''
+    if (proxyCountry && (await isSupportedCountryCode(proxyCountry))) {
+      // The proxy country reflects the effective country selected during
+      // registration. Prefer it over stale or incomplete site configuration.
+      effectiveProfile = { ...profile, country: proxyCountry }
+    }
+  } catch {}
+
+  const profileCountry = effectiveProfile.country
+    ? normalizeCountry(effectiveProfile.country)
+    : ''
+  if (profileCountry && (await isSupportedCountryCode(profileCountry))) {
+    try {
+      await syncCountryToProxy(normalizedStationId, profileCountry)
+    } catch (error) {
+      return {
+        ok: false,
+        status: 502,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to synchronize site country to vpos-proxy',
+      }
+    }
+  }
+
+  const stored = await persistSiteProfile(normalizedStationId, effectiveProfile)
   const normalizedCountry = stored.country
     ? normalizeCountry(stored.country)
     : ''
   const needsCountry =
     !normalizedCountry || !(await isSupportedCountryCode(normalizedCountry))
   await kvSet(normalizedStationId, 'setup.needsCountry', needsCountry)
-  if (!needsCountry) await seedCountryConfigOnce(normalizedCountry)
   return {
     ok: true,
     profile: stored,
@@ -318,6 +410,8 @@ export async function setSiteCountry(stationId: string, country: string) {
   if (!(await isSupportedCountryCode(normalizedCountry))) {
     throw new Error('Unsupported country')
   }
+
+  await syncCountryToProxy(normalizedStationId, normalizedCountry)
 
   const existing =
     (await kvGet<SiteProfile>(normalizedStationId, KV_KEYS.SITE_PROFILE)) ||
@@ -338,7 +432,6 @@ export async function setSiteCountry(stationId: string, country: string) {
   })
 
   await kvSet(normalizedStationId, 'setup.needsCountry', false)
-  await seedCountryConfigOnce(normalizedCountry)
 
   return {
     ok: true,

@@ -85,11 +85,6 @@ export const customerSchema = customerCreateSchema
 
 export const customerSearchSchema = z.object({
   query: z.string().min(1, 'Search query is required'),
-  includeCloud: z.boolean().optional().default(false),
-})
-
-export const customerImportSchema = z.object({
-  cloudCustomerId: z.string().uuid('Invalid cloud customer ID'),
 })
 
 // TRANSACTION SCHEMAS

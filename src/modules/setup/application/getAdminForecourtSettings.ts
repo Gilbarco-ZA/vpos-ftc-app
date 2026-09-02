@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { getForecourtSettings } from '@/src/shared/forecourt/settings'
+import { getForecourtSettings } from '@/src/modules/forecourt/application/forecourtSettings'
 
 export async function getAdminForecourtSettings(stationId: string) {
   const settings = await getForecourtSettings(stationId)

@@ -2,7 +2,6 @@
 
 import type { ActionStatus } from '@/src/shared/status/ui'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Label } from '@radix-ui/react-dropdown-menu'
 
 import { toNumberStrict as parseNumber } from '@/src/shared/numbers'
 import { ACTION_STATUS, STATUS_VARIANT } from '@/src/shared/status/ui'
@@ -11,7 +10,14 @@ import { PageHeader } from '@/components/layout/page-header'
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorDetails } from '@/components/ui/error-details'
 import { Input } from '@/components/ui/input'
@@ -54,10 +60,22 @@ export type TankListItem = {
   tankGroupName?: string
   domsTankId?: string
   liveVolumeLitres?: number | null
+  liveTcVolumeLitres?: number | null
+  liveTemperatureC?: number | null
   liveVolumeUpdatedAt?: string | null
   manualVolumeLitres?: number | null
   manualVolumeRecordedAt?: string | null
   manualVolumeRecordedBy?: string
+  atgProductLevelMm?: number | null
+  atgWaterLevelMm?: number | null
+  atgWaterVolumeLitres?: number | null
+  atgAvailableRoomLitres?: number | null
+  atgGaugeOnline?: boolean | null
+  atgInventoryDataReady?: boolean | null
+  atgGaugeAlarmActive?: boolean | null
+  atgGaugeErrorActive?: boolean | null
+  atgControllerUpdatedAt?: string | null
+  atgCapturedAt?: string | null
 }
 
 type StatusOption = {
@@ -67,10 +85,16 @@ type StatusOption = {
 
 type TankGroupOption = { id: string; code: string; name: string }
 
+type AtgPollingSettings = {
+  enabled: boolean
+  intervalMinutes: number
+}
+
 type TankSettingsResponse = {
   tanks: TankListItem[]
   products: TankProductOption[]
   tankGroups?: TankGroupOption[]
+  atgPolling?: AtgPollingSettings
 }
 
 type TankFormState = {
@@ -110,16 +134,31 @@ const emptyForm = (): TankFormState => ({
 const formatCapacity = (value: number | null) =>
   value === null || Number.isNaN(value) ? '—' : value.toLocaleString()
 
+const formatMeasurement = (value: number | null | undefined, digits = 2) =>
+  value === null || value === undefined || Number.isNaN(value)
+    ? '—'
+    : value.toLocaleString(undefined, { maximumFractionDigits: digits })
+
+const formatAtgTime = (value: string | null | undefined) => {
+  if (!value) return '—'
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleString()
+}
+
 export default function TankSettingsClient() {
   const [csrfToken, setCsrfToken] = useState('')
   const [tanks, setTanks] = useState<TankListItem[]>([])
   const [products, setProducts] = useState<TankProductOption[]>([])
-  const [tankGroups, setTankGroups] = useState<TankGroupOption[]>([])
   const [statusOptions, setStatusOptions] = useState<StatusOption[]>([])
   const [productSearch, setProductSearch] = useState('')
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingAtg, setIsSavingAtg] = useState(false)
+  const [atgPolling, setAtgPolling] = useState<AtgPollingSettings>({
+    enabled: false,
+    intervalMinutes: 10,
+  })
   const [loadError, setLoadError] = useState<unknown>(null)
   const [status, setStatus] = useState<StatusMessage | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -139,7 +178,9 @@ export default function TankSettingsClient() {
       }
       setTanks(body?.data?.tanks ?? [])
       setProducts(body?.data?.products ?? [])
-      setTankGroups(body?.data?.tankGroups ?? [])
+      setAtgPolling(
+        body?.data?.atgPolling ?? { enabled: false, intervalMinutes: 10 },
+      )
     } catch (err) {
       setLoadError(err)
     } finally {
@@ -162,8 +203,12 @@ export default function TankSettingsClient() {
   }, [])
 
   useEffect(() => {
-    loadData()
-    loadStatusOptions()
+    queueMicrotask(() => {
+      loadData()
+    })
+    queueMicrotask(() => {
+      loadStatusOptions()
+    })
   }, [loadData, loadStatusOptions])
 
   const filteredTanks = useMemo(() => {
@@ -183,6 +228,12 @@ export default function TankSettingsClient() {
       `${product.name} ${product.code}`.toLowerCase().includes(term),
     )
   }, [productSearch, products])
+
+  const selectedTank = useMemo(
+    () =>
+      form.id ? (tanks.find((tank) => tank.id === form.id) ?? null) : null,
+    [form.id, tanks],
+  )
 
   const openCreate = () => {
     setForm(emptyForm())
@@ -257,14 +308,89 @@ export default function TankSettingsClient() {
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw body
       await loadData()
+      const synced = body?.data?.synced
+      const syncedCount = Number(
+        typeof synced === 'number' ? synced : (synced?.count ?? 0),
+      )
+      const requestedCount = Number(
+        typeof synced === 'object' && synced !== null
+          ? (synced?.requested ?? syncedCount)
+          : syncedCount,
+      )
+      const controllerErrorCount =
+        typeof synced === 'object' &&
+        synced !== null &&
+        Array.isArray(synced?.controllerErrors)
+          ? synced.controllerErrors.length
+          : 0
+      const message =
+        requestedCount > syncedCount || controllerErrorCount > 0
+          ? `Synced ${syncedCount} of ${requestedCount} tank volume(s) from DOMS${
+              controllerErrorCount > 0
+                ? `; ${controllerErrorCount} gauge request(s) failed.`
+                : '.'
+            }`
+          : `Synced ${syncedCount} tank volume(s) from DOMS.`
       setStatus({
         type: ACTION_STATUS.SUCCESS,
-        message: `Synced ${(body?.data?.synced?.count ?? 0) as number} tank volume(s) from DOMS.`,
+        message,
       })
     } catch (err: any) {
       const message =
         err?.error?.message || err?.message || 'Failed to sync tank volumes.'
       setStatus({ type: ACTION_STATUS.ERROR, message })
+    }
+  }
+
+  const saveAtgPolling = async () => {
+    setStatus(null)
+    const intervalMinutes = Number(atgPolling.intervalMinutes)
+    if (
+      !Number.isInteger(intervalMinutes) ||
+      intervalMinutes < 1 ||
+      intervalMinutes > 1440
+    ) {
+      setStatus({
+        type: ACTION_STATUS.ERROR,
+        message:
+          'ATG interval must be a whole number between 1 and 1440 minutes.',
+      })
+      return
+    }
+
+    setIsSavingAtg(true)
+    try {
+      const res = await fetch('/api/settings/tanks/atg-polling', {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
+        body: JSON.stringify({
+          data: {
+            enabled: atgPolling.enabled,
+            intervalMinutes,
+          },
+          csrf_token: csrfToken,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw body
+      setAtgPolling(body?.data ?? atgPolling)
+      setStatus({
+        type: ACTION_STATUS.SUCCESS,
+        message: atgPolling.enabled
+          ? `ATG polling worker enabled every ${intervalMinutes} minute(s).`
+          : 'ATG polling worker disabled.',
+      })
+    } catch (err: any) {
+      const message =
+        err?.error?.message ||
+        err?.message ||
+        'Failed to save ATG worker settings.'
+      setStatus({ type: ACTION_STATUS.ERROR, message })
+    } finally {
+      setIsSavingAtg(false)
     }
   }
 
@@ -340,6 +466,68 @@ export default function TankSettingsClient() {
       />
 
       <Card>
+        <CardHeader>
+          <CardTitle>ATG polling worker</CardTitle>
+          <CardDescription>
+            Periodically collect all configured tank-gauge data from DOMS using
+            GET_ALL_TG_DATA. Each run updates the current tank values and
+            replaces the locally stored latest ATG snapshot. Historical
+            retention is handled in the cloud.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
+            <label className="flex items-start gap-3 rounded-lg border border-border p-3">
+              <Checkbox
+                checked={atgPolling.enabled}
+                onChange={(event) =>
+                  setAtgPolling((prev) => ({
+                    ...prev,
+                    enabled: event.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <span className="block text-sm font-medium text-[var(--text-primary)]">
+                  Enable automatic ATG capture
+                </span>
+                <span className="block text-xs text-[var(--text-muted)]">
+                  Disabled by default until explicitly enabled for the station.
+                </span>
+              </span>
+            </label>
+
+            <div className="space-y-1">
+              <label className="text-xs text-[var(--text-secondary)]">
+                Capture interval (minutes)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                max={1440}
+                step={1}
+                value={atgPolling.intervalMinutes}
+                onChange={(event) =>
+                  setAtgPolling((prev) => ({
+                    ...prev,
+                    intervalMinutes: Number(event.target.value),
+                  }))
+                }
+              />
+            </div>
+
+            <Button
+              variant="primary"
+              onClick={saveAtgPolling}
+              disabled={isSavingAtg}
+            >
+              {isSavingAtg ? 'Saving...' : 'Save ATG settings'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <Input
@@ -384,7 +572,7 @@ export default function TankSettingsClient() {
               }
             />
           ) : (
-            <div className="overflow-hidden rounded-card border border-border bg-surface-card">
+            <div className="overflow-x-auto rounded-card border border-border bg-surface-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -393,6 +581,7 @@ export default function TankSettingsClient() {
                     <TableHead>Status</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead className="text-right">Capacity (L)</TableHead>
+                    <TableHead>Live ATG</TableHead>
                     <TableHead className="text-right">Low level (L)</TableHead>
                     <TableHead className="text-right">Critical (L)</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -424,6 +613,61 @@ export default function TankSettingsClient() {
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCapacity(tank.capacityLitres)}
+                      </TableCell>
+                      <TableCell>
+                        {tank.liveVolumeLitres === null ||
+                        tank.liveVolumeLitres === undefined ? (
+                          <div className="text-sm text-[var(--text-muted)]">
+                            No ATG reading
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="font-medium text-[var(--text-primary)]">
+                              {formatMeasurement(tank.liveVolumeLitres)} L
+                            </div>
+                            <div className="text-xs text-[var(--text-muted)]">
+                              TC {formatMeasurement(tank.liveTcVolumeLitres)} L
+                              · {formatMeasurement(tank.liveTemperatureC, 1)} °C
+                            </div>
+                            <div className="text-xs text-[var(--text-muted)]">
+                              Level{' '}
+                              {formatMeasurement(tank.atgProductLevelMm, 1)} mm
+                              · Water{' '}
+                              {formatMeasurement(tank.atgWaterVolumeLitres)} L
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1 text-xs">
+                              <Badge
+                                variant={
+                                  tank.atgGaugeOnline === false
+                                    ? STATUS_VARIANT.ERROR
+                                    : STATUS_VARIANT.SUCCESS
+                                }
+                              >
+                                {tank.atgGaugeOnline === false
+                                  ? 'Gauge offline'
+                                  : 'Gauge online'}
+                              </Badge>
+                              <Badge
+                                variant={
+                                  tank.atgInventoryDataReady === false
+                                    ? STATUS_VARIANT.WARN
+                                    : STATUS_VARIANT.INFO
+                                }
+                              >
+                                {tank.atgInventoryDataReady === false
+                                  ? 'Inventory pending'
+                                  : 'Inventory ready'}
+                              </Badge>
+                            </div>
+                            <div className="text-[11px] text-[var(--text-muted)]">
+                              Updated{' '}
+                              {formatAtgTime(
+                                tank.atgControllerUpdatedAt ??
+                                  tank.liveVolumeUpdatedAt,
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCapacity(tank.lowLevelLitres)}
@@ -643,6 +887,67 @@ export default function TankSettingsClient() {
                 }
               />
             </div>
+
+            {selectedTank && (
+              <div className="rounded-lg border border-border bg-[var(--surface-subtle)] p-3">
+                <div className="text-sm font-medium text-[var(--text-primary)]">
+                  Live DOMS / ATG inventory
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <div>
+                    <div className="text-[var(--text-muted)]">
+                      Observed volume
+                    </div>
+                    <div>
+                      {formatMeasurement(selectedTank.liveVolumeLitres)} L
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--text-muted)]">TC volume</div>
+                    <div>
+                      {formatMeasurement(selectedTank.liveTcVolumeLitres)} L
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--text-muted)]">
+                      Product level
+                    </div>
+                    <div>
+                      {formatMeasurement(selectedTank.atgProductLevelMm, 1)} mm
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--text-muted)]">Water</div>
+                    <div>
+                      {formatMeasurement(selectedTank.atgWaterVolumeLitres)} L
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--text-muted)]">Temperature</div>
+                    <div>
+                      {formatMeasurement(selectedTank.liveTemperatureC, 1)} °C
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--text-muted)]">
+                      Available room
+                    </div>
+                    <div>
+                      {formatMeasurement(selectedTank.atgAvailableRoomLitres)} L
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 text-[11px] text-[var(--text-muted)]">
+                  Controller updated{' '}
+                  {formatAtgTime(
+                    selectedTank.atgControllerUpdatedAt ??
+                      selectedTank.liveVolumeUpdatedAt,
+                  )}
+                  . These values are read-only and are refreshed by DOMS sync;
+                  configured capacity and manual volume are not overwritten.
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1">
               <label className="text-xs text-[var(--text-secondary)]">

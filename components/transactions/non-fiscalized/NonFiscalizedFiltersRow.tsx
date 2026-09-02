@@ -1,4 +1,5 @@
 import { nonFiscalizedStatusOptions } from '@/components/transactions/non-fiscalized/constants'
+import { Button } from '@/components/ui/button'
 import { FiltersRow } from '@/components/ui/filters-row'
 import { Select } from '@/components/ui/select'
 
@@ -11,6 +12,9 @@ type NonFiscalizedFiltersRowProps = {
   onStatusChange: (value: string) => void
   onStartDateChange: (value: string) => void
   onEndDateChange: (value: string) => void
+  onToday: () => void
+  onAllDates: () => void
+  todayDisabled?: boolean
   onRefresh: () => void
 }
 
@@ -23,6 +27,9 @@ const NonFiscalizedFiltersRow = ({
   onStatusChange,
   onStartDateChange,
   onEndDateChange,
+  onToday,
+  onAllDates,
+  todayDisabled,
   onRefresh,
 }: NonFiscalizedFiltersRowProps) => (
   <FiltersRow>
@@ -49,6 +56,17 @@ const NonFiscalizedFiltersRow = ({
       onFromChange={onStartDateChange}
       onToChange={onEndDateChange}
     />
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={onToday}
+      disabled={todayDisabled}
+    >
+      Today
+    </Button>
+    <Button type="button" variant="secondary" onClick={onAllDates}>
+      All dates
+    </Button>
     <FiltersRow.Action onClick={onRefresh} />
   </FiltersRow>
 )

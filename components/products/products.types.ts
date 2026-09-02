@@ -1,5 +1,5 @@
-import { ToastVariant } from '../ui/toast'
-import { ProductsUpsertSheetContentProps } from './ProductsUpsertSheetContent'
+import type { ToastVariant } from '../ui/toast'
+import type { ProductsUpsertSheetContentProps } from './ProductsUpsertSheetContent'
 
 export type ProductStatus = 'SYNCED' | 'PENDING' | 'FAILED' | 'UNKNOWN'
 
@@ -46,8 +46,8 @@ export type ProductEventLogItem = {
 
 export type ProductsUIContextValue = {
   openAdd: () => void
+  openImport: () => void
   closeAdd: () => void
-  openCategories: () => void
   addProduct: (product: ProductListItem) => void
   showToast: (type: ToastVariant, message: string) => void
 }
@@ -124,6 +124,24 @@ export const createEmptyForm = (
   extTaxCode: '',
   extHazardousIndicator: false,
   devFlowOverride: '',
+})
+
+export const withStationCurrency = (
+  form: AddProductFormState,
+  defaultCurrency: string,
+): AddProductFormState => ({
+  ...form,
+  currency: defaultCurrency,
+  extCurrency: defaultCurrency,
+})
+
+export const withPackagingSelection = (
+  form: AddProductFormState,
+  packagingCode: string,
+): AddProductFormState => ({
+  ...form,
+  unitOfPackaging: packagingCode,
+  extUnitOfPackaging: packagingCode,
 })
 
 export const buildPayload = (form: AddProductFormState) => {
@@ -203,7 +221,6 @@ export const buildPayload = (form: AddProductFormState) => {
 export type ProductsAddSheetWrapperProps = {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  currencyOptions: string[]
   defaultCurrency: string
   taxTypeOptions: ConfigOption[]
   isDevEnv: boolean

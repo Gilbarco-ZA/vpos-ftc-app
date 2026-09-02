@@ -16,26 +16,25 @@ test('proxy fiscalization claim SQL only claims proxy-routed stations', () => {
   assert.match(statement.sql, /FOR UPDATE OF t SKIP LOCKED/i)
 })
 
-test('local transaction queue worker only claims local TZ-routed station rows', () => {
+test('retired local transaction queue worker cannot claim rows', () => {
   assert.match(transactionQueueSql.claimNextBatch, /JOIN station_settings ss/i)
-  assert.match(
-    transactionQueueSql.claimNextBatch,
-    /ss\.fiscalization_transport = 'local_tz'/i,
-  )
+  assert.match(transactionQueueSql.claimNextBatch, /AND FALSE/i)
+  assert.doesNotMatch(transactionQueueSql.claimNextBatch, /local_tz/i)
   assert.match(
     transactionQueueSql.claimNextBatch,
     /COALESCE\(tq\.payload->>'kind', ''\) <> 'CREDIT_NOTE'/i,
   )
 })
 
-test('local credit note queue worker only claims local TZ-routed credit notes', () => {
+test('retired local credit note queue worker cannot claim rows', () => {
   assert.match(
     transactionQueueSql.claimNextCreditNoteBatch,
     /JOIN station_settings ss/i,
   )
-  assert.match(
+  assert.match(transactionQueueSql.claimNextCreditNoteBatch, /AND FALSE/i)
+  assert.doesNotMatch(
     transactionQueueSql.claimNextCreditNoteBatch,
-    /ss\.fiscalization_transport = 'local_tz'/i,
+    /local_tz/i,
   )
   assert.match(
     transactionQueueSql.claimNextCreditNoteBatch,

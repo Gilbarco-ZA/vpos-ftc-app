@@ -5,28 +5,33 @@
 :root {
   /* ─── Neo-Fuel Station 2077 Brand Palette ─────────────────── */
   /* Primary Neon Accents */
-  --neon-cyan: #00F5FF;
-  --neon-magenta: #C300FF;
-  --neon-green: #39FF14;
-  --neon-amber: #FF9500;
-  
+  --neon-cyan: #00f5ff;
+  --neon-magenta: #c300ff;
+  --neon-green: #39ff14;
+  --neon-amber: #ff9500;
+
   /* Secondary Neon Shades */
-  --neon-cyan-dark: #0EA5E9;
-  --neon-magenta-dark: #A855F7;
-  --neon-green-dark: #22C55E;
-  --neon-amber-dark: #F97316;
+  --neon-cyan-dark: #0ea5e9;
+  --neon-magenta-dark: #a855f7;
+  --neon-green-dark: #22c55e;
+  --neon-amber-dark: #f97316;
 
   /* Brand Colors */
   --brand-primary: #0a0a0a;
   --brand-secondary: #0f0f0f;
   --brand-primary-foreground: #fafafa;
   --brand-accent: var(--neon-cyan);
+  --color-primary: var(--neon-cyan);
+  --color-secondary: var(--neon-magenta);
+  --color-success: var(--neon-green);
+  --color-warning: var(--neon-amber);
+  --neon-primary-foreground: #031316;
 
   /* Surfaces - Deep Space Theme */
   --surface-page: #0a0a0a;
   --surface-card: rgba(23, 23, 23, 0.85);
   --surface-muted: #171717;
-  --surface-elevated: rgba(38, 38, 38, 0.90);
+  --surface-elevated: rgba(38, 38, 38, 0.9);
   --surface-hover: rgba(255, 255, 255, 0.02);
   --surface-overlay: rgba(10, 10, 10, 0.9);
   --auth-accent-top: rgba(0, 245, 255, 0.08);
@@ -50,11 +55,11 @@
   /* Status - Neon Themed */
   --status-success-bg: rgba(57, 255, 20, 0.1);
   --status-success-border: rgba(57, 255, 20, 0.4);
-  --status-success-text: #39FF14;
+  --status-success-text: #39ff14;
 
   --status-warn-bg: rgba(255, 149, 0, 0.1);
   --status-warn-border: rgba(255, 149, 0, 0.4);
-  --status-warn-text: #FF9500;
+  --status-warn-text: #ff9500;
 
   --status-error-bg: rgba(239, 68, 68, 0.1);
   --status-error-border: rgba(239, 68, 68, 0.3);
@@ -62,7 +67,7 @@
 
   --status-info-bg: rgba(0, 245, 255, 0.1);
   --status-info-border: rgba(0, 245, 255, 0.4);
-  --status-info-text: #00F5FF;
+  --status-info-text: #00f5ff;
 
   /* Radius */
   --radius-sm: 0.375rem;
@@ -73,7 +78,8 @@
 
   /* Shadow - Neon Glows */
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.5), 0 12px 48px rgba(0, 0, 0, 0.4);
+  --shadow-elevated:
+    0 4px 24px rgba(0, 0, 0, 0.5), 0 12px 48px rgba(0, 0, 0, 0.4);
   --shadow-glow: 0 0 20px rgba(0, 245, 255, 0.15);
   --shadow-glow-cyan: 0 0 24px rgba(0, 245, 255, 0.25);
   --shadow-glow-magenta: 0 0 24px rgba(195, 0, 255, 0.25);
@@ -199,7 +205,8 @@
 
 /* ─── Neon Animations & Effects ─────────────────────────────── */
 @keyframes energyPulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 currentColor;
   }
   50% {
@@ -208,7 +215,8 @@
 }
 
 @keyframes glowPulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     text-shadow: 0 0 8px currentColor;
   }
@@ -234,7 +242,8 @@
 }
 
 @keyframes neonBorderGlow {
-  0%, 100% {
+  0%,
+  100% {
     border-color: currentColor;
     box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
   }
@@ -386,13 +395,13 @@
 
   /* Glassmorphic Panels */
   .glass-panel {
-    background: var(--surface-card);
+    background: color-mix(in srgb, var(--surface-card) 82%, transparent);
     backdrop-filter: blur(20px);
     border: 1px solid var(--border-default);
   }
 
   .glass-panel-elevated {
-    background: var(--surface-elevated);
+    background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
     backdrop-filter: blur(24px);
     border: 1px solid var(--border-strong);
   }

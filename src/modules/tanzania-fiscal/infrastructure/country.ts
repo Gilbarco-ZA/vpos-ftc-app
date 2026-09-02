@@ -7,11 +7,21 @@ const TANZANIA_CODES = new Set([
   'UNITED REPUBLIC OF TANZANIA',
 ])
 
-export function isTanzaniaCountry(value: unknown): boolean {
+const KENYA_CODES = new Set(['KE', 'KEN', 'KENYA', 'REPUBLIC OF KENYA'])
+
+export function normalizeFiscalCountryCode(value: unknown): string | null {
   const normalized = String(value ?? '')
     .trim()
     .toUpperCase()
-  return TANZANIA_CODES.has(normalized)
+
+  if (!normalized) return null
+  if (TANZANIA_CODES.has(normalized)) return 'TZ'
+  if (KENYA_CODES.has(normalized)) return 'KE'
+  return normalized
+}
+
+export function isTanzaniaCountry(value: unknown): boolean {
+  return normalizeFiscalCountryCode(value) === 'TZ'
 }
 
 export async function getStationCountryCode(
@@ -30,7 +40,7 @@ export async function getStationCountryCode(
     [stationId],
   )
 
-  return row?.country ? String(row.country).trim().toUpperCase() : null
+  return normalizeFiscalCountryCode(row?.country)
 }
 
 export async function assertStationIsTanzania(stationId: string) {

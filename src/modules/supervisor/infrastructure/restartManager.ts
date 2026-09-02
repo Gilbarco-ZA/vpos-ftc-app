@@ -1,16 +1,16 @@
 import cron, { ScheduledTask } from 'node-cron'
 
 import { appendLogLine } from '@/src/shared/logs/service'
-import { getRuntimeManager } from '@/src/shared/runtime/manager'
 import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 import { logger } from '@/src/shared/utils/logger'
 
+import { getRuntimeManager } from '@/src/modules/runtime/application/runtimeManager'
 import {
   RestartConfig,
   RestartReason,
   RestartStatus,
   SafetyCheckResult,
-} from './restartTypes'
+} from '@/src/modules/supervisor/contracts/restart'
 
 const CONFIG_KEY = 'vpos.restart.config'
 const STATUS_KEY = 'vpos.restart.status'

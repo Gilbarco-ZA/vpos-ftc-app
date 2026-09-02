@@ -109,14 +109,6 @@ const pad2 = (value: unknown, fallback = '01') => {
   return String(Math.trunc(numeric)).padStart(2, '0')
 }
 
-const pad4 = (value: unknown, fallback = '0001') => {
-  const raw = String(value ?? '').trim()
-  const selected = raw || fallback
-  const numeric = Number(selected)
-  if (!Number.isFinite(numeric)) return selected.padStart(4, '0').slice(-4)
-  return String(Math.trunc(numeric)).padStart(4, '0')
-}
-
 const coerceCount = (value: unknown, fallback: number, max = 99) => {
   const parsed = Number(value ?? fallback)
   if (!Number.isFinite(parsed) || parsed < 0) return fallback

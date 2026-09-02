@@ -17,6 +17,7 @@ export function fiscalInboxListRowsSql(
           fi.received_at,
           fi.processed_at,
           fi.dead_at,
+          fi.resolved_at,
           fi.error_text,
           fi.message_json,
           tx.id AS related_transaction_id,
@@ -45,6 +46,7 @@ export const fiscalInboxSql = {
           fi.received_at,
           fi.processed_at,
           fi.dead_at,
+          fi.resolved_at,
           fi.error_text,
           fi.message_json,
           tx.id AS related_transaction_id,
@@ -85,6 +87,7 @@ export const fiscalInboxSql = {
           dead_at = NULL,
           error_text = NULL,
           processed_at = NULL,
+          resolved_at = NULL,
           updated_at = NOW()
     WHERE id = $1
       AND station_id::text = $2::text
@@ -92,6 +95,7 @@ export const fiscalInboxSql = {
   markDeadById: `UPDATE fiscal_inbox
       SET status = 'DEAD',
           dead_at = COALESCE(dead_at, NOW()),
+          resolved_at = NULL,
           error_text = $3,
           updated_at = NOW()
     WHERE id = $1
@@ -99,6 +103,7 @@ export const fiscalInboxSql = {
     RETURNING id`,
   markFailedById: `UPDATE fiscal_inbox
       SET status = 'FAILED',
+          resolved_at = NULL,
           error_text = $3,
           next_attempt_at = NOW(),
           updated_at = NOW()
@@ -108,6 +113,7 @@ export const fiscalInboxSql = {
   markProcessedById: `UPDATE fiscal_inbox
       SET status = 'PROCESSED',
           processed_at = COALESCE(processed_at, NOW()),
+          resolved_at = COALESCE(resolved_at, NOW()),
           updated_at = NOW()
     WHERE id = $1
       AND station_id::text = $2::text
@@ -126,6 +132,7 @@ export const fiscalInboxSql = {
       received_at,
       processed_at,
       dead_at,
+      resolved_at,
       error_text,
       message_json
     ) VALUES (
@@ -134,6 +141,7 @@ export const fiscalInboxSql = {
       0,
       NOW(),
       NOW(),
+      NULL,
       NULL,
       NULL,
       NULL,
@@ -149,6 +157,7 @@ export const fiscalInboxSql = {
                     attempt_count = 0,
                     next_attempt_at = NOW(),
                     dead_at = NULL,
+                    resolved_at = NULL,
                     error_text = NULL,
                     received_at = NOW(),
                     updated_at = NOW()
@@ -185,6 +194,7 @@ export const fiscalInboxSql = {
                     ELSE NOW() + (LEAST(900, POWER(2, GREATEST(0, attempt_count))) * INTERVAL '1 second')
                   END,
           processed_at = NULL,
+          resolved_at = NULL,
           updated_at = NOW()
     WHERE id = $1`,
   metricsByStation: `SELECT

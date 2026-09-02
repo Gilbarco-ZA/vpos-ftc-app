@@ -1,8 +1,6 @@
 import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
 
-import { padId2 } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
-import { getForecourtRuntimeConfig } from '@/src/shared/forecourt/runtimeConfig'
-
+import { padId2 } from '@/src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers'
 import {
   buildFpStatusSubCodePreference,
   resolveDispenseAuthorizeMode,
@@ -36,6 +34,7 @@ import {
   buildUnlockSupervisedTransactionRequest,
   DEFAULT_TRANSACTION_PAR_IDS,
 } from '@/src/modules/forecourt/infrastructure/jpl/transactionService'
+import { getForecourtRuntimeConfig } from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 
 export const JPL_COMMAND_NAMES = [
   'open_Fp_req',
@@ -229,12 +228,6 @@ export const normalizeJplCommandAction = (action: string) =>
 
 const maybeArray = <T = any>(value: unknown): T[] | undefined =>
   Array.isArray(value) ? (value as T[]) : undefined
-
-const toBoolInt = (value: unknown) => {
-  if (typeof value === 'boolean') return value ? 1 : 0
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? Math.trunc(parsed) : undefined
-}
 
 const cleanObject = (value: Record<string, any>) =>
   Object.fromEntries(
@@ -552,7 +545,7 @@ const buildResetTgRequest = (payload: any) =>
     },
   })
 
-const buildFcDateTimeRequest = (payload: any) =>
+const buildFcDateTimeRequest = () =>
   validateJplOutboundMessage({
     name: 'FcDateAndTime_req' as JplCommandName,
     subCode: '00H',
@@ -979,7 +972,7 @@ export const buildJplCommandRequest = (
   }
 
   if (normalized === 'GET_FC_DATE_TIME' || normalized === 'READ_FC_DATE_TIME') {
-    return buildFcDateTimeRequest(payload)
+    return buildFcDateTimeRequest()
   }
 
   if (

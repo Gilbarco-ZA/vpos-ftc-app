@@ -205,10 +205,22 @@ export async function listTanksRepo(
             t.tank_group_id,
             t.doms_tank_id,
             t.live_volume_litres,
+            t.live_tc_volume_litres,
+            t.live_temperature_c,
             t.live_volume_updated_at,
             t.manual_volume_litres,
             t.manual_volume_recorded_at,
             t.manual_volume_recorded_by,
+            atg.product_level AS atg_product_level,
+            atg.water_level AS atg_water_level,
+            atg.water_volume_litres AS atg_water_volume_litres,
+            atg.available_room_litres AS atg_available_room_litres,
+            atg.gauge_online AS atg_gauge_online,
+            atg.inventory_data_ready AS atg_inventory_data_ready,
+            atg.gauge_alarm_active AS atg_gauge_alarm_active,
+            atg.gauge_error_active AS atg_gauge_error_active,
+            atg.controller_updated_at AS atg_controller_updated_at,
+            atg.captured_at AS atg_captured_at,
             tg.name as tank_group_name,
             p.product_name,
             p.product_code,
@@ -216,6 +228,9 @@ export async function listTanksRepo(
        FROM tanks t
        JOIN products p ON p.id = t.product_id
   LEFT JOIN tank_groups tg ON tg.id = t.tank_group_id
+  LEFT JOIN tank_atg_snapshots atg
+         ON atg.tank_id = t.id
+        AND atg.station_id = t.station_id
       WHERE t.station_id = $1
       ORDER BY t.updated_at DESC`,
     [stationId],

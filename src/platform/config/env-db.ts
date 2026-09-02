@@ -3,18 +3,31 @@ import { query, queryAll } from '@/src/platform/db/postgres'
 
 const PREFIX = 'env:'
 
+export type EnvironmentValueSource = Readonly<
+  Record<string, string | undefined>
+>
+
+export const resolveEnvValueFromSources = (
+  name: string,
+  persistedValue: unknown,
+  defaultValue?: string,
+  env: EnvironmentValueSource = process.env,
+): string | undefined => {
+  const direct = env[name]
+  if (direct != null && String(direct).length) return String(direct)
+
+  if (persistedValue == null) return defaultValue
+  const stored = String(persistedValue)
+  return stored.length ? stored : defaultValue
+}
+
 export async function getEnvValue(
   stationId: string,
   name: string,
   defaultValue?: string,
 ): Promise<string | undefined> {
-  const direct = process.env[name]
-  if (direct != null && String(direct).length) return String(direct)
-
-  const fromDb = await kvGet<any>(stationId, PREFIX + name)
-  if (fromDb == null) return defaultValue
-  const s = String(fromDb)
-  return s.length ? s : defaultValue
+  const fromDb = await kvGet<unknown>(stationId, PREFIX + name)
+  return resolveEnvValueFromSources(name, fromDb, defaultValue)
 }
 
 export async function setEnvValue(

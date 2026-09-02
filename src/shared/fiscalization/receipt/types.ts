@@ -4,6 +4,11 @@ export type ReceiptStation = {
   name: string
   taxId?: string | null
   country?: string | null
+  mobile?: string | null
+  vrn?: string | null
+  serial?: string | null
+  uin?: string | null
+  taxOffice?: string | null
 }
 
 export type ReceiptTransaction = {
@@ -12,6 +17,10 @@ export type ReceiptTransaction = {
   fiscalReference: string
   status?: string | null
   attendant?: string | null
+  receiptDate?: string | null
+  receiptTime?: string | null
+  pumpNumber?: string | null
+  nozzleNumber?: string | null
 }
 
 export type ReceiptCustomer = {
@@ -50,6 +59,7 @@ export type ReceiptPayment = {
   amount: number
   itemsCount: number
   currency?: string | null
+  discount?: number | null
 }
 
 export type FiscalMeta = {
@@ -58,6 +68,18 @@ export type FiscalMeta = {
   receiptNumber: string
   internalData?: string | null
   signature?: string | null
+  traReceiptNumber?: string | null
+  dailyCount?: string | null
+  globalCount?: string | null
+  zNumber?: string | null
+  verificationCode?: string | null
+  verificationUrl?: string | null
+}
+
+export type ReceiptCustomization = {
+  headerLines?: string[]
+  footerLines?: string[]
+  logoPath?: string | null
 }
 
 export type ReceiptQrPayload = {
@@ -74,6 +96,7 @@ export type FiscalReceiptModel = {
   payment: ReceiptPayment
   fiscalMeta: FiscalMeta
   qrPayload?: ReceiptQrPayload | null
+  customization?: ReceiptCustomization
   /** Decimal formatting overrides for receipt values (0-3, default 2). */
   decimals: DecimalSettings
 }
@@ -87,4 +110,11 @@ export type PrintableLine =
     }
   | { type: 'separator' }
   | { type: 'qr'; value: string }
+  | {
+      type: 'image'
+      asset: 'tra-receipt-start' | 'branding-logo' | 'tra-receipt-end'
+      dataBase64?: string
+      width?: number
+      height?: number
+    }
   | { type: 'empty'; lines?: number }

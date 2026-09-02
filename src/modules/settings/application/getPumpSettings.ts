@@ -1,5 +1,4 @@
-import { resolveTankGroups } from '@/src/shared/doms/tankGauge'
-
+import { resolveTankGroups } from '@/src/modules/forecourt/application/tankGauge'
 import { listPumpsRepo } from '@/src/modules/settings/infrastructure/settingsRepo'
 
 export async function getPumpSettings(stationId: string) {

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-30T06:53:28.358Z",
+  "note": "All tracked module boundaries currently have zero violations. Any new violation fails the architecture check.",
+  "violations": {
+    "apiRouteToInfrastructure": [],
+    "sharedToFeature": [],
+    "domainToInfrastructure": []
+  }
+}

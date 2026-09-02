@@ -1,5 +1,6 @@
 import type {
   FuelSelectionInput,
+  TransactionMutationActor,
   UpsertTransactionLineInput,
 } from '@/src/modules/transactions/infrastructure/persistence/transaction.repository'
 
@@ -11,6 +12,7 @@ export async function replaceTransactionLines(
   stationId: string,
   transactionId: string,
   lines: UpsertTransactionLineInput[],
+  actor: TransactionMutationActor,
   removedProductIds: string[] = [],
   fuelSelection?: FuelSelectionInput | null,
 ) {
@@ -19,11 +21,13 @@ export async function replaceTransactionLines(
     transactionId,
     'transactionId',
   )
-  return await replaceTransactionLinesRepo(
+  const result = await replaceTransactionLinesRepo(
     scopedStationId,
     scopedTransactionId,
     lines,
+    actor,
     removedProductIds,
     fuelSelection,
   )
+  return result
 }

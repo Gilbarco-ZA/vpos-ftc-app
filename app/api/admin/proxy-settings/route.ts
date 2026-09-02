@@ -20,6 +20,7 @@ const SETTINGS_FIELDS = [
   'cloudApiBase',
   'swaggerEndpointCloud',
   'swaggerEndpointInternal',
+  'swaggerEndpointTanzania',
   'healthEndpoint',
   'swaggerCacheTimeout',
   'requestTimeout',
@@ -28,16 +29,37 @@ const SETTINGS_FIELDS = [
   'fiscalNif',
   'fiscalEmissionLogic',
   'fiscalRepositoryId',
+  'countryCode',
+  'queueModules',
 ] as const
 
-const toPatch = (body: Record<string, any>): ProxySettingsPatch => {
-  const patch: Record<string, any> = {}
+const toPatch = (body: Record<string, unknown>): ProxySettingsPatch => {
+  const patch: ProxySettingsPatch = {}
+  const scalarPatch = patch as Record<string, unknown>
+
   for (const field of SETTINGS_FIELDS) {
     const value = body[field]
-    if (value !== undefined && value !== null) {
-      patch[field] = typeof value === 'string' ? value.trim() : value
+    if (value === undefined || value === null) continue
+
+    if (field === 'queueModules') {
+      if (typeof value === 'object' && !Array.isArray(value)) {
+        patch.queueModules = Object.fromEntries(
+          Object.entries(value as Record<string, unknown>).map(
+            ([key, enabled]) => [key, enabled === true],
+          ),
+        )
+      }
+      continue
     }
+
+    if (field === 'countryCode') {
+      patch.countryCode = String(value).trim().toUpperCase() || null
+      continue
+    }
+
+    scalarPatch[field] = typeof value === 'string' ? value.trim() : value
   }
+
   return patch
 }
 
@@ -55,11 +77,11 @@ export const GET = defineGetRoute({
       )
     }
 
-    return ok(extractProxySettingsPayload(result.data))
+    return ok(extractProxySettingsPayload(result.data, result.url))
   },
 })
 
-export const PATCH = defineMutationRoute<Record<string, any>>({
+export const PATCH = defineMutationRoute<Record<string, unknown>>({
   roles: ['administrator'],
   handler: async (_req, { user, body }) => {
     const result = await updateProxySettingsViaProxy(
@@ -76,6 +98,6 @@ export const PATCH = defineMutationRoute<Record<string, any>>({
       )
     }
 
-    return ok(extractProxySettingsPayload(result.data))
+    return ok(extractProxySettingsPayload(result.data, result.url))
   },
 })

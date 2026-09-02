@@ -2,7 +2,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { getSystemConfiguration } from '@/src/shared/config/loader'
-import { jplRequest } from '@/src/shared/vpos/posProxy'
+
+import { jplRequest } from '@/src/modules/pos/application/posProxy'
 
 async function getJplForecourtConfig(stationId: string) {
   const cfg = await getSystemConfiguration(stationId)

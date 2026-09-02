@@ -2,6 +2,8 @@
 .next
 node_modules
 tests
+docs/archive
+.agent
 *.js
 *.mjs
 *.cjs

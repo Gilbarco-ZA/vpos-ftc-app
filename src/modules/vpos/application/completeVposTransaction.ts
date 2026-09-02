@@ -2,7 +2,8 @@ import {
   ensurePlainObject,
   requireNonEmptyString,
 } from '@/src/shared/utils/inputs'
-import { completeVposTransaction } from '@/src/shared/vpos/pos'
+
+import { completeVposTransaction } from '@/src/modules/vpos/application/pos'
 
 export async function finalizeVposTransaction(args: {
   stationId: string

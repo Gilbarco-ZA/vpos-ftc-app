@@ -66,13 +66,7 @@ export const AllocateTransactionModalForm = (props: {
   const [query, setQuery] = useState(props.initialQuery || '')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [results, setResults] = useState<{
-    local: Customer[]
-    cloud: Customer[]
-  }>({
-    local: [],
-    cloud: [],
-  })
+  const [results, setResults] = useState<Customer[]>([])
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null,
@@ -84,29 +78,25 @@ export const AllocateTransactionModalForm = (props: {
   const canSearch = useMemo(() => query.trim().length >= 2, [query])
 
   useEffect(() => {
-    setErr(null)
-    if (!canSearch) {
-      setResults({ local: [], cloud: [] })
-      return
-    }
-
     if (debounceRef.current) window.clearTimeout(debounceRef.current)
     debounceRef.current = window.setTimeout(async () => {
+      setErr(null)
+      if (!canSearch) {
+        setResults([])
+        return
+      }
       try {
         setLoading(true)
         const res = await fetch(
-          `/api/customers/search?query=${encodeURIComponent(query.trim())}&includeCloud=true`,
+          `/api/customers/search?query=${encodeURIComponent(query.trim())}`,
           { cache: 'no-store' },
         )
         if (!res.ok) throw new Error('Search failed')
         const data = await res.json()
-        setResults({
-          local: Array.isArray(data?.local) ? data.local : [],
-          cloud: Array.isArray(data?.cloud) ? data.cloud : [],
-        })
+        setResults(Array.isArray(data?.local) ? data.local : [])
       } catch (e: any) {
         setErr(e?.message || 'Search failed')
-        setResults({ local: [], cloud: [] })
+        setResults([])
       } finally {
         setLoading(false)
       }
@@ -127,44 +117,6 @@ export const AllocateTransactionModalForm = (props: {
     setCustomerId(String(c.id))
     setTin('')
     setErr(null)
-  }
-
-  const importCloud = async (cloudCustomerId: string) => {
-    if (!csrfToken) throw new Error('CSRF token not ready')
-    const body = new URLSearchParams()
-    body.set('csrf_token', csrfToken)
-    body.set('cloudCustomerId', cloudCustomerId)
-
-    const res = await fetch('/api/customers/import', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-        'x-csrf-token': csrfToken,
-      },
-      body,
-    })
-    if (!res.ok) {
-      const t = await res.text().catch(() => '')
-      throw new Error(t || 'Import failed')
-    }
-    return res.json()
-  }
-
-  const selectCloud = async (c: Customer) => {
-    try {
-      setErr(null)
-      setLoading(true)
-      const imported = await importCloud(String(c.id))
-      const localCustomer = imported?.data || imported
-      if (!localCustomer?.id) throw new Error('Import returned no customer id')
-      setSelectedCustomer(localCustomer)
-      setCustomerId(String(localCustomer.id))
-      setTin('')
-    } catch (e: any) {
-      setErr(e?.message || 'Import failed')
-    } finally {
-      setLoading(false)
-    }
   }
 
   const submitAllocate = async () => {
@@ -249,52 +201,18 @@ export const AllocateTransactionModalForm = (props: {
                 </div>
               ) : null}
 
-              {(results.local.length > 0 || results.cloud.length > 0) && (
+              {results.length > 0 && (
                 <div className="rounded-card border border-border bg-surface-card">
-                  {results.local.length > 0 && (
-                    <div className="border-b border-border px-3 py-2 text-xs font-semibold text-[var(--text-secondary)]">
-                      Local
-                    </div>
-                  )}
                   <div className="divide-y divide-border">
-                    {results.local.map((c) => {
+                    {results.map((c) => {
                       const d = displayCustomer(c)
                       return (
                         <Button
-                          key={`l-${c.id}`}
+                          key={c.id}
                           type="button"
                           variant="ghost"
                           className="h-auto w-full justify-start rounded-none px-3 py-2 text-left"
                           onClick={() => selectLocal(c)}
-                        >
-                          <div>
-                            <div className="font-medium">{d.title}</div>
-                            {d.meta ? (
-                              <div className="text-xs text-[var(--text-muted)]">
-                                {d.meta}
-                              </div>
-                            ) : null}
-                          </div>
-                        </Button>
-                      )
-                    })}
-                  </div>
-
-                  {results.cloud.length > 0 && (
-                    <div className="border-y border-border px-3 py-2 text-xs font-semibold text-[var(--text-secondary)]">
-                      Cloud (will import on select)
-                    </div>
-                  )}
-                  <div className="divide-y divide-border">
-                    {results.cloud.map((c) => {
-                      const d = displayCustomer(c)
-                      return (
-                        <Button
-                          key={`c-${c.id}`}
-                          type="button"
-                          variant="ghost"
-                          className="h-auto w-full justify-start rounded-none px-3 py-2 text-left"
-                          onClick={() => selectCloud(c)}
                         >
                           <div>
                             <div className="font-medium">{d.title}</div>

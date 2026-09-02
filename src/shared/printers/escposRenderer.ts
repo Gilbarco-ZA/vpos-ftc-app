@@ -29,6 +29,30 @@ const encodeQr = (data: string, moduleSize: number, ecLevel: number) => {
   ])
 }
 
+const encodeRasterImage = (line: Extract<EscposLine, { type: 'image' }>) => {
+  const width = Math.max(0, Math.floor(Number(line.width ?? 0)))
+  const height = Math.max(0, Math.floor(Number(line.height ?? 0)))
+  const widthBytes = Math.ceil(width / 8)
+  if (!line.dataBase64 || !width || !height || !widthBytes) return null
+
+  const data = Buffer.from(line.dataBase64, 'base64')
+  if (data.length !== widthBytes * height) return null
+
+  return Buffer.concat([
+    cmd(
+      GS,
+      0x76,
+      0x30,
+      0x00,
+      widthBytes & 0xff,
+      (widthBytes >> 8) & 0xff,
+      height & 0xff,
+      (height >> 8) & 0xff,
+    ),
+    data,
+  ])
+}
+
 export const renderEscpos = (
   lines: EscposLine[],
   options: EscposRenderOptions = {},
@@ -75,6 +99,15 @@ export const renderEscpos = (
       setBold(false)
       buffers.push(encodeQr(line.value, qrModuleSize, qrErrorCorrection))
       buffers.push(cmd(0x0a))
+      return
+    }
+
+    if (line.type === 'image') {
+      const image = encodeRasterImage(line)
+      if (!image) return
+      setAlign('center')
+      setBold(false)
+      buffers.push(image, cmd(0x0a))
       return
     }
 

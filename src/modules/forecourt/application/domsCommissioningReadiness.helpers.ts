@@ -24,6 +24,21 @@ export type DomsCommissioningStep = {
   required: boolean
   description: string
   evidenceRequired: string
+  completed?: boolean
+  notes?: string
+  completedAt?: string | null
+  completedByUserId?: string | null
+  completedByUsername?: string | null
+}
+
+export type DomsCommissioningChecklistSummary = {
+  total: number
+  completed: number
+  requiredTotal: number
+  requiredCompleted: number
+  percentComplete: number
+  requiredPercentComplete: number
+  updatedAt: string | null
 }
 
 export type DomsCommissioningReadiness = {
@@ -36,6 +51,7 @@ export type DomsCommissioningReadiness = {
     warnings: DomsCommissioningCheck[]
   }
   commissioningChecklist: DomsCommissioningStep[]
+  commissioningChecklistSummary: DomsCommissioningChecklistSummary
   legacyToJplRunbook: DomsCommissioningStep[]
   liveReadiness: {
     connected: boolean
@@ -476,79 +492,188 @@ export function buildDomsFirstSiteCommissioningChecklist(): DomsCommissioningSte
     {
       id: 'commissioning-field-scope',
       phase: 'pre-site',
-      title: 'Confirm first-site DOMS/PSS scope and acceptance criteria',
+      title: 'Site scope and acceptance criteria confirmed',
       owner: 'field-engineer',
       required: true,
       description:
-        'Confirm pumps, tanks, price control, optional modules, POS IDs, TLS mode, and the acceptance test sequence before connecting FTC to the live controller.',
+        'Confirm the controller address, POS ID, TLS mode, pump count, nozzle count, tank count, price control, fiscal route, and agreed acceptance sequence before live work starts.',
       evidenceRequired:
-        'Signed site scope or deployment ticket with pump/tank counts, PSS address, POS ID allocation, and accepted protocol families.',
+        'Deployment ticket or site scope containing the expected physical and logical forecourt inventory.',
+    },
+    {
+      id: 'commissioning-registration',
+      phase: 'pre-site',
+      title: 'FTC station and device registration verified',
+      owner: 'site-admin',
+      required: true,
+      description:
+        'Confirm the FTC is registered to the correct cloud site and that Site ID, Site name, and Device ID match the deployment record.',
+      evidenceRequired:
+        'Registration page screenshot or deployment record containing the matching identifiers.',
     },
     {
       id: 'commissioning-pss-configurator',
-      phase: 'pre-site',
-      title: 'Verify PSS Configurator logical installation',
+      phase: 'configuration',
+      title: 'PSS Configurator logical installation verified',
       owner: 'field-engineer',
       required: true,
       description:
-        'Confirm the PSS Configurator is the source of truth for logical devices. FTC mapping changes must remain FTC-side unless a separate PSS maintenance execution is approved.',
+        'Confirm the PSS Configurator remains the source of truth for installed pumps, fuelling points, grade options, tanks, gauges, and price equipment.',
       evidenceRequired:
-        'PSS Configurator export or screenshot set matching observed FpId, tank, grade, and nozzle assignments.',
+        'Current PSS Configurator export or screenshots matching the physical site.',
     },
     {
       id: 'commissioning-live-settings',
       phase: 'configuration',
-      title: 'Validate JPL settings before live connection',
+      title: 'JPL connection and buffer settings validated',
       owner: 'site-admin',
       required: true,
       description:
-        'Use the setup screen and commissioning panel to clear all blocker checks for host, port, POS ID, access code, heartbeat, version floor, subscriptions, and buffer thresholds.',
+        'Clear all setting blockers for host, port, POS ID, access code, heartbeat, dead-connection timeout, version floor, subscriptions, TLS, and buffer thresholds.',
       evidenceRequired:
-        'Commissioning readiness export showing no setting blockers.',
+        'Commissioning readiness result showing no setting blockers.',
     },
     {
       id: 'commissioning-connectivity-test',
       phase: 'configuration',
-      title: 'Run JPL settings test against target PSS',
+      title: 'Controller connection, logon, and status snapshot verified',
       owner: 'support',
       required: true,
       description:
-        'Use the setup test action to connect, log on, set status update mode, and request a pump status snapshot.',
+        'Connect to the target PSS, complete FcLogon, enable status updates, and confirm at least one live controller status response.',
       evidenceRequired:
-        'Saved test result showing connected=true, loggedOn=true, statusUpdateOk, and expected JPL version.',
+        'Saved connectivity result with connected and logged-on state plus the observed JPL version.',
     },
     {
-      id: 'commissioning-reconciliation',
-      phase: 'field-validation',
-      title: 'Refresh reconciliation and resolve FTC-side mapping issues',
+      id: 'commissioning-products-grades',
+      phase: 'configuration',
+      title: 'Products, grades, and prices verified',
       owner: 'field-engineer',
       required: true,
       description:
-        'Refresh reconciliation while connected to the live controller, compare physical labels, and use single-row or bulk remediation only for FTC mapping corrections.',
+        'Compare FTC products and grade prices to the controller and site price schedule. Resolve stale or missing products before a test dispense.',
       evidenceRequired:
-        'Reconciliation export and mapping-history entry for each approved correction.',
+        'Product/grade comparison and current price set reference.',
     },
     {
-      id: 'commissioning-workflows',
-      phase: 'field-validation',
-      title: 'Exercise supervised, unsupervised, tank, and price workflows',
+      id: 'commissioning-pump-mappings',
+      phase: 'mapping',
+      title: 'Pump and fuelling-point mappings verified',
       owner: 'field-engineer',
       required: true,
       description:
-        'Validate the first-release operational workflows against the real controller or approved simulator without enabling PSS maintenance writes.',
+        'Confirm every FTC pump maps to the correct DOMS FpId and that the physical pump label agrees with the PSS configuration.',
       evidenceRequired:
-        'Workflow review export, receipt/checkpoint IDs, and operator sign-off for each test scenario.',
+        'Reconciliation result or approved bulk mapping dry-run with no pump blockers.',
+    },
+    {
+      id: 'commissioning-nozzle-mappings',
+      phase: 'mapping',
+      title: 'Nozzle, grade-option, grade, and tank mappings verified',
+      owner: 'field-engineer',
+      required: true,
+      description:
+        'Verify each nozzle against the physical hose, DOMS grade option, forecourt grade, and supplying tank.',
+      evidenceRequired:
+        'Nozzle mapping sheet or reconciliation result with physical verification notes.',
+    },
+    {
+      id: 'commissioning-tank-gauges',
+      phase: 'field-validation',
+      title: 'Tank gauges respond and tank assignments are correct',
+      owner: 'field-engineer',
+      required: true,
+      description:
+        'Refresh tank gauge data, confirm every configured TgId responds, and verify tank/product assignments. Zero readings are acceptable only when confirmed as the controller state.',
+      evidenceRequired:
+        'Tank gauge response summary and technician note for any zero or unavailable reading.',
+    },
+    {
+      id: 'commissioning-price-equipment',
+      phase: 'field-validation',
+      title: 'Price profiles and price display equipment verified',
+      owner: 'field-engineer',
+      required: true,
+      description:
+        'Confirm the active price set, price groups, grade assignments, and any configured price-board mappings match the site.',
+      evidenceRequired:
+        'Active price-set reference and price-board verification result.',
+    },
+    {
+      id: 'commissioning-test-dispense',
+      phase: 'field-validation',
+      title: 'Supervised test dispense captured end to end',
+      owner: 'field-engineer',
+      required: true,
+      description:
+        'Authorize and complete an approved test dispense, then verify the transaction is durably captured, linked to the correct pump/nozzle, and cleared according to policy.',
+      evidenceRequired:
+        'Transaction ID, FpId, sequence number, amount, volume, and replay/checkpoint result.',
+    },
+    {
+      id: 'commissioning-receipt-printer',
+      phase: 'field-validation',
+      title: 'Receipt preview and physical print verified',
+      owner: 'site-admin',
+      required: true,
+      description:
+        'Confirm the receipt template, station branding, printer routing, and physical output are correct for the station country.',
+      evidenceRequired:
+        'Receipt preview reference and signed physical print sample.',
+    },
+    {
+      id: 'commissioning-fiscal-route',
+      phase: 'fiscalization',
+      title: 'Country fiscal route and registration verified',
+      owner: 'site-admin',
+      required: true,
+      description:
+        'Confirm the station uses the correct country fiscal route and that the required fiscal device registration, endpoint configuration, and signing material are valid.',
+      evidenceRequired:
+        'Fiscal route readiness result and current registration response reference.',
+    },
+    {
+      id: 'commissioning-ewura',
+      phase: 'fiscalization',
+      title: 'EWURA registration verified for Tanzania sites',
+      owner: 'site-admin',
+      required: false,
+      description:
+        'For Tanzania deployments, confirm the EWURA registration request and latest response are stored and accepted. Mark not applicable in notes for other countries.',
+      evidenceRequired:
+        'EWURA registration response or an explicit not-applicable note.',
+    },
+    {
+      id: 'commissioning-first-sale',
+      phase: 'acceptance',
+      title: 'First production-equivalent sale and receipt verified',
+      owner: 'field-engineer',
+      required: true,
+      description:
+        'Complete the agreed acceptance sale and verify transaction capture, fiscalization where applicable, receipt content, and cloud synchronization.',
+      evidenceRequired:
+        'Transaction, fiscal receipt, synchronization result, and operator sign-off references.',
+    },
+    {
+      id: 'commissioning-shift-close',
+      phase: 'acceptance',
+      title: 'Shift close or Z-report workflow verified',
+      owner: 'site-admin',
+      required: true,
+      description:
+        'Run the country-appropriate shift close or Z-report workflow and confirm counters, totals, fiscal response, and printed output.',
+      evidenceRequired: 'Z-report or shift-close reference and signed output.',
     },
     {
       id: 'commissioning-support-bundle',
       phase: 'sign-off',
-      title: 'Export support bundle and field validation readiness',
+      title: 'Support bundle and final readiness evidence exported',
       owner: 'support',
       required: true,
       description:
-        'Capture a redacted support bundle and field validation readiness export before the final go/no-go decision.',
+        'Capture the redacted support bundle, workflow review, field validation readiness, and outstanding action list before the final go/no-go decision.',
       evidenceRequired:
-        'Support bundle JSON and field validation readiness JSON attached to the deployment ticket.',
+        'Support bundle and readiness exports attached to the deployment ticket.',
     },
   ]
 }

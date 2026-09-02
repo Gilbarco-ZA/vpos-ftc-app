@@ -5,7 +5,6 @@ import { ProductsUpsertSheetContent } from './ProductsUpsertSheetContent'
 export const ProductsAddSheetWrapper = ({
   isOpen,
   onOpenChange,
-  currencyOptions,
   defaultCurrency,
   taxTypeOptions,
   isDevEnv,
@@ -19,7 +18,6 @@ export const ProductsAddSheetWrapper = ({
           title="Add product"
           submitLabel="Save product"
           onClose={() => onOpenChange(false)}
-          currencyOptions={currencyOptions}
           defaultCurrency={defaultCurrency}
           taxTypeOptions={taxTypeOptions}
           isDevEnv={isDevEnv}

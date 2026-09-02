@@ -3,21 +3,29 @@ import '@/src/modules/forecourt/infrastructure/jpl/globals'
 import type { BufferMode } from '@/src/modules/forecourt/infrastructure/jpl/types'
 import type { TransactionCheckpointRow } from '@/src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionCheckpointRepo'
 
-import { serializeError } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
-import { getForecourtRuntimeConfig } from '@/src/shared/forecourt/runtimeConfig'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import { serializeError } from '@/src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers'
 import {
   markBufferCleared,
   markBufferError,
 } from '@/src/modules/forecourt/infrastructure/jpl/bufferHealth'
+import {
+  quarantineDeterministicSupervisedClearReject,
+  resetClearRejectQuarantine,
+} from '@/src/modules/forecourt/infrastructure/jpl/clearRejectQuarantine'
 import {
   beginReplayKey,
   endReplayKey,
   withReplayLock,
 } from '@/src/modules/forecourt/infrastructure/jpl/replayState'
 import { runSingleFlight } from '@/src/modules/forecourt/infrastructure/jpl/singleFlight'
+import {
+  requestTransactionBufferStatusWithFallback,
+  transactionBufferContains,
+  verifyTransactionAbsentFromBuffer,
+} from '@/src/modules/forecourt/infrastructure/jpl/transactionBufferStatus'
 import {
   buildTransactionPumpLockKey,
   buildTransactionReplayKey,
@@ -30,6 +38,7 @@ import {
 import { forecourtJplReplayRepo } from '@/src/modules/forecourt/infrastructure/repositories/forecourtJplReplayRepo'
 import { forecourtJplTransactionCheckpointRepo } from '@/src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionCheckpointRepo'
 import { forecourtJplTransactionRecoveryRepo } from '@/src/modules/forecourt/infrastructure/repositories/forecourtJplTransactionRecoveryRepo'
+import { getForecourtRuntimeConfig } from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 
 export type JplTransactionRecoverySweepInput = {
   stationId: string
@@ -145,10 +154,7 @@ const buildClearRequestForRow = (
       posId,
       transSeqNo,
       txData: payload,
-      payload: {
-        PaymentParameters: {},
-        ...(payload && typeof payload === 'object' ? payload : {}),
-      },
+      payload: payload && typeof payload === 'object' ? payload : {},
     })
   }
 
@@ -242,6 +248,10 @@ export const runJplTransactionRecoverySweep = async (
       const dryRun = input.dryRun === true
       const runId = uuidv4()
       const actions: JplTransactionRecoveryAction[] = []
+      const resetQuarantineCount =
+        !dryRun && (input.triggerSource ?? 'manual_admin') === 'manual_admin'
+          ? resetClearRejectQuarantine(stationId)
+          : 0
 
       await forecourtJplTransactionRecoveryRepo.createRun({
         id: runId,
@@ -252,6 +262,7 @@ export const runJplTransactionRecoverySweep = async (
           dryRun,
           maxClearAttempts: input.maxClearAttempts ?? 5,
           limit: input.limit ?? 50,
+          resetQuarantineCount,
         },
       })
 
@@ -361,6 +372,38 @@ export const runJplTransactionRecoverySweep = async (
 
           try {
             await withReplayLock(lockKey, async () => {
+              const fpId2 = toId2(fpId)
+              const seq4 = toDec4(transSeqNo)
+              const beforeClear =
+                await requestTransactionBufferStatusWithFallback({
+                  client: input.client,
+                  sourceMode: row.source_mode,
+                  fpId: fpId2,
+                })
+
+              if (
+                !transactionBufferContains({
+                  sourceMode: row.source_mode,
+                  response: beforeClear.response,
+                  transSeqNo: seq4,
+                })
+              ) {
+                await completeCheckpointAsCleared({ row, posId })
+                clearSuccessCount += 1
+                globalThis.__jplSeenTransactions?.add(key)
+                actions.push({
+                  sourceMode: row.source_mode,
+                  fpId,
+                  transSeqNo,
+                  lifecycleStage: 'cleared',
+                  action: 'clear_succeeded',
+                  lockId: row.lock_id,
+                  ownerPosId: posId,
+                  error: 'DOMS buffer already confirmed transaction absent.',
+                })
+                return
+              }
+
               retriesAttempted += 1
               await forecourtJplTransactionCheckpointRepo.upsert({
                 stationId,
@@ -378,6 +421,12 @@ export const runJplTransactionRecoverySweep = async (
               })
 
               await input.client.request(request)
+              await verifyTransactionAbsentFromBuffer({
+                client: input.client,
+                sourceMode: row.source_mode,
+                fpId: fpId2,
+                transSeqNo: seq4,
+              })
               await completeCheckpointAsCleared({ row, posId })
               clearSuccessCount += 1
               globalThis.__jplSeenTransactions?.add(key)
@@ -394,6 +443,14 @@ export const runJplTransactionRecoverySweep = async (
           } catch (error) {
             failedCount += 1
             lastError = toErrorText(error)
+            if (row.source_mode === 'supervised') {
+              quarantineDeterministicSupervisedClearReject({
+                stationId,
+                fpId,
+                transSeqNo,
+                error,
+              })
+            }
             await recordClearFailure({ row, posId, error })
             actions.push({
               sourceMode: row.source_mode,

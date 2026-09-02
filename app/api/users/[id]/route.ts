@@ -1,10 +1,11 @@
 import type { SessionUser } from '@/src/shared/types'
 import { NextResponse } from 'next/server'
 
-import { query } from '@/src/platform/db/postgres'
 import { serverError } from '@/src/platform/web/api/response'
 import { deleteUserSessions, requireAuth } from '@/src/shared/auth'
 import { getUserById, userExists } from '@/src/shared/server/users'
+
+import { softDeleteUser } from '@/src/modules/users/application/manageUsers'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -69,10 +70,7 @@ export const DELETE = async (
       )
     }
 
-    await query(
-      `UPDATE users SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`,
-      [id],
-    )
+    await softDeleteUser(id)
     await deleteUserSessions(id).catch(() => {})
     return NextResponse.json({ success: true })
   } catch (err) {

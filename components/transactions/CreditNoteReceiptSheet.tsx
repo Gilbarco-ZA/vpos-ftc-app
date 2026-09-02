@@ -102,7 +102,9 @@ export const CreditNoteReceiptSheet = ({
 
   useEffect(() => {
     if (!canFetch) return
-    fetchCreditNote()
+    queueMicrotask(() => {
+      fetchCreditNote()
+    })
   }, [canFetch, fetchCreditNote])
 
   const printReceipt = useCallback(async () => {

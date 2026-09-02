@@ -7,6 +7,10 @@ import type {
   StationConfigRow,
 } from '@/src/shared/config/types'
 
+import {
+  configJsonEquals,
+  hashConfigJson,
+} from '@/src/platform/config/config-version-policy'
 import { deepMerge } from '@/src/platform/config/deep-merge'
 import { getStationConfigDefaults } from '@/src/platform/config/defaults'
 import { getEffectiveSystemConfiguration } from '@/src/platform/config/effective'
@@ -103,6 +107,14 @@ export const saveStationConfig = async (
   configJson: JsonObject,
   schemaVersion = DEFAULT_SCHEMA_VERSION,
 ): Promise<void> => {
+  const existing = await getStationConfig(stationId)
+  if (
+    existing?.schemaVersion === schemaVersion &&
+    configJsonEquals(existing.configJson, configJson)
+  ) {
+    return
+  }
+
   await query(
     `INSERT INTO station_config (station_id, schema_version, config_json)
      VALUES ($1, $2, $3)
@@ -113,10 +125,12 @@ export const saveStationConfig = async (
     [stationId, schemaVersion, configJson],
   )
   const id = uuidv4()
+  const configHash = hashConfigJson(configJson)
   await query(
-    `INSERT INTO station_config_versions (id, station_id, schema_version, config_json, created_by)
-      VALUES ($1, $2, $3, $4, $5)`,
-    [id, stationId, schemaVersion, configJson, 'bootstrap'],
+    `INSERT INTO station_config_versions
+       (id, station_id, schema_version, config_json, config_hash, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, stationId, schemaVersion, configJson, configHash, 'bootstrap'],
   )
 }
 

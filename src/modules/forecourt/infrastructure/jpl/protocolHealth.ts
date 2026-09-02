@@ -1,7 +1,7 @@
 import type {
   RequestDispatchMode,
   RequestDispatchPolicy,
-} from '@/src/shared/forecourt/runtimeConfig'
+} from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 
 type RejectSummary =
   | {

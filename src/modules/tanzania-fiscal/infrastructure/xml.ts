@@ -70,3 +70,47 @@ export function dateParts(value: unknown, timezone = 'Africa/Dar_es_Salaam') {
     time: `${parts.hour}:${parts.minute}:${parts.second}`,
   }
 }
+
+export function isoDateTimeInTimezone(
+  value: unknown,
+  timezone = 'Africa/Dar_es_Salaam',
+) {
+  const date =
+    value instanceof Date ? value : new Date(String(value || Date.now()))
+  if (!Number.isFinite(date.getTime())) {
+    throw new Error('Invalid date value')
+  }
+
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+    hourCycle: 'h23',
+  })
+  const parts = Object.fromEntries(
+    fmt.formatToParts(date).map((part) => [part.type, part.value]),
+  ) as Record<string, string>
+
+  const milliseconds = Number(parts.fractionalSecond || '0')
+  const zonedAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+    milliseconds,
+  )
+  const offsetMinutes = Math.round((zonedAsUtc - date.getTime()) / 60_000)
+  const sign = offsetMinutes < 0 ? '-' : '+'
+  const absoluteOffset = Math.abs(offsetMinutes)
+  const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0')
+  const offsetMins = String(absoluteOffset % 60).padStart(2, '0')
+
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.${String(milliseconds).padStart(3, '0')}${sign}${offsetHours}:${offsetMins}`
+}

@@ -1,9 +1,5 @@
-export {
-  requestJplTcpTankGaugeData,
-  sendJplTcpCommand,
-  startJplTcpAdapter,
-} from '@/src/modules/forecourt/infrastructure/jpl/lifecycle'
-export {
-  getJplAdapterState as getJplTcpAdapterState,
-  getJplBufferHealth as getJplTcpBufferHealth,
-} from '@/src/shared/forecourt/jplState'
+/**
+ * Compatibility export for the historical adapter path.
+ * New imports should use ../jpl/adapter.
+ */
+export * from '@/src/modules/forecourt/infrastructure/jpl/adapter'

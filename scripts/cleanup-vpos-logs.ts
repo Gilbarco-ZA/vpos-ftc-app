@@ -8,8 +8,10 @@ async function main() {
   logger.info('[cleanup-vpos-logs]', {
     msg: `Cleaning vpos_logs older than ${days} days`,
   })
-  await cleanupVposLogs(days)
-  logger.info('[cleanup-vpos-logs]', { msg: 'Done' })
+  const deleted = await cleanupVposLogs(days)
+  logger.info('[cleanup-vpos-logs]', {
+    msg: `Deleted ${deleted} vpos_logs row(s)`,
+  })
 }
 
 main().catch((err) => {

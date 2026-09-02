@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useEffect, useMemo, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { Alert } from '@/components/ui/alert'
@@ -61,7 +61,7 @@ export default function LanguagesClient({ children }: { children: ReactNode }) {
     [languages],
   )
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -80,11 +80,13 @@ export default function LanguagesClient({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void load()
-  }, [])
+    queueMicrotask(() => {
+      void load()
+    })
+  }, [load])
 
   const editLanguage = (language: Language) => {
     setForm({

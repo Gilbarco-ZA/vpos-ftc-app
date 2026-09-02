@@ -4,8 +4,41 @@ import { getPostgresPoolConfig } from '@/src/platform/config/app-config'
 import { logDbQuery } from '@/src/platform/db/observability/dbDebug'
 import { logSlowQuery } from '@/src/platform/db/observability/slow-query-logger'
 import { logger } from '@/src/shared/utils/logger'
+import { serializeError } from '@/src/shared/utils/serializeError'
 
-let pool: Pool | null = null
+type PostgresPoolGlobals = typeof globalThis & {
+  __vposPostgresPool?: Pool
+  __vposPostgresPoolCreatedAt?: number
+}
+
+export type PostgresPoolDiagnostics = {
+  pid: number
+  totalCount: number
+  idleCount: number
+  waitingCount: number
+  max: number
+  idleTimeoutMillis: number
+  connectionTimeoutMillis: number
+  createdAt: string | null
+}
+
+const poolGlobals = () => globalThis as PostgresPoolGlobals
+
+const getConfiguredPoolLimits = () => {
+  const config = getPostgresPoolConfig()
+  return {
+    max: Number(config.max ?? 20),
+    idleTimeoutMillis: Number(config.idleTimeoutMillis ?? 30_000),
+    connectionTimeoutMillis: Number(config.connectionTimeoutMillis ?? 10_000),
+  }
+}
+
+const isPoolPressureError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  return /timeout expired|connection terminated due to connection timeout|remaining connection slots|too many clients/i.test(
+    message,
+  )
+}
 
 export type TransactionCallback<T> = (client: PoolClient) => Promise<T>
 
@@ -23,17 +56,53 @@ export interface PaginatedResult<T> {
 }
 
 export const getPool = (): Pool => {
-  if (!pool) {
-    pool = new Pool(getPostgresPoolConfig())
+  const globals = poolGlobals()
+  if (!globals.__vposPostgresPool) {
+    const config = getPostgresPoolConfig()
+    const pool = new Pool(config)
+    globals.__vposPostgresPool = pool
+    globals.__vposPostgresPoolCreatedAt = Date.now()
 
     pool.on('error', (err: any) => {
       logger.error('[postgres]', {
         msg: 'Unexpected error on idle client',
-        error: err,
+        error: serializeError(err),
+        pool: getPostgresPoolDiagnostics(),
       })
     })
+
+    logger.info('[postgres] pool created', {
+      pid: process.pid,
+      max: config.max ?? null,
+      idleTimeoutMillis: config.idleTimeoutMillis ?? null,
+      connectionTimeoutMillis: config.connectionTimeoutMillis ?? null,
+    })
   }
-  return pool
+  return globals.__vposPostgresPool!
+}
+
+/**
+ * The pool is process-global rather than module-global. Next.js may load
+ * server modules through more than one compiled graph in a single Node.js
+ * process; a module-local singleton can therefore create duplicate pg pools.
+ */
+export const getPostgresPoolDiagnostics = (): PostgresPoolDiagnostics => {
+  const globals = poolGlobals()
+  const activePool = globals.__vposPostgresPool
+  const limits = getConfiguredPoolLimits()
+
+  return {
+    pid: process.pid,
+    totalCount: activePool?.totalCount ?? 0,
+    idleCount: activePool?.idleCount ?? 0,
+    waitingCount: activePool?.waitingCount ?? 0,
+    max: limits.max,
+    idleTimeoutMillis: limits.idleTimeoutMillis,
+    connectionTimeoutMillis: limits.connectionTimeoutMillis,
+    createdAt: globals.__vposPostgresPoolCreatedAt
+      ? new Date(globals.__vposPostgresPoolCreatedAt).toISOString()
+      : null,
+  }
 }
 
 export const query = async <T extends QueryResultRow = Record<string, unknown>>(
@@ -116,6 +185,13 @@ async function executeQuery<T extends QueryResultRow>(
         durationMs: duration,
         rowCount: null,
         queryError: err,
+      })
+    }
+    if (isPoolPressureError(err)) {
+      logger.error('[postgres] pool pressure query failure', {
+        durationMs: duration,
+        error: serializeError(err),
+        pool: getPostgresPoolDiagnostics(),
       })
     }
     throw err
@@ -275,10 +351,13 @@ export const queryPaginated = async <
 }
 
 export const closePool = async (): Promise<void> => {
-  if (pool) {
-    await pool.end()
-    pool = null
-  }
+  const globals = poolGlobals()
+  const activePool = globals.__vposPostgresPool
+  if (!activePool) return
+
+  globals.__vposPostgresPool = undefined
+  globals.__vposPostgresPoolCreatedAt = undefined
+  await activePool.end()
 }
 
 export const checkHealth = async (): Promise<boolean> => {

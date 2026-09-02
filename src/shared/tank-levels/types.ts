@@ -65,6 +65,8 @@ export type TankLevelSummary = {
   lowLevelLitres: number
   criticalLevelLitres: number
   liveVolumeLitres: number
+  liveTcVolumeLitres: number
+  liveTemperatureC: number
   liveVolumeUpdatedAt: string | null
   manualVolumeLitres: number
   manualVolumeRecordedAt: string | null

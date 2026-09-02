@@ -2,7 +2,8 @@ import {
   ensurePlainObject,
   requireNonEmptyString,
 } from '@/src/shared/utils/inputs'
-import { getVposSupervisorStatus } from '@/src/shared/vpos/supervisor'
+
+import { getVposSupervisorStatus } from '@/src/modules/supervisor/application/vposSupervisor'
 
 export async function getSupervisorStatus(stationId: string) {
   const normalizedStationId = requireNonEmptyString(stationId, 'stationId')

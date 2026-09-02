@@ -12,8 +12,6 @@ export const GET = defineGetRoute({
     const result = await searchCustomers({
       stationId: user.stationId,
       query: searchParams.get('query') || '',
-      includeCloud:
-        (searchParams.get('includeCloud') || '').toLowerCase() === 'true',
     })
     return result instanceof Response ? result : ok(result)
   },

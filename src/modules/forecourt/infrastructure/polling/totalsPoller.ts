@@ -1,6 +1,7 @@
-import { sendForecourtCommand } from '@/src/shared/forecourt/gateway'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
+
+import { sendForecourtCommand } from '@/src/modules/forecourt/infrastructure/gateway'
 
 type Key = string
 

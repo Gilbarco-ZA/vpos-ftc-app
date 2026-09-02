@@ -187,6 +187,7 @@ export function createTransactionStatusService(deps: {
         fiscalizationReference?: string | null
         fiscalizationResponse?: unknown
         fiscalDocumentId?: string | null
+        latestFiscalEventId?: string | null
       } & TransactionStatusPersistenceContext,
     ) {
       return await transition({
@@ -198,6 +199,7 @@ export function createTransactionStatusService(deps: {
           fiscalizationReference: input.fiscalizationReference ?? null,
           fiscalizationResponse: input.fiscalizationResponse,
           fiscalDocumentId: input.fiscalDocumentId ?? null,
+          latestFiscalEventId: input.latestFiscalEventId ?? null,
           touchFiscalizedAt: true,
           clearLastError: true,
         },
@@ -212,6 +214,7 @@ export function createTransactionStatusService(deps: {
         incrementRetryCount?: boolean
         fiscalDocumentId?: string | null
         fiscalizationResponse?: unknown
+        latestFiscalEventId?: string | null
       } & TransactionStatusPersistenceContext,
     ) {
       return await transition({
@@ -224,6 +227,7 @@ export function createTransactionStatusService(deps: {
           incrementRetryCount: input.incrementRetryCount ?? false,
           fiscalDocumentId: input.fiscalDocumentId ?? null,
           fiscalizationResponse: input.fiscalizationResponse,
+          latestFiscalEventId: input.latestFiscalEventId ?? null,
         },
       })
     },

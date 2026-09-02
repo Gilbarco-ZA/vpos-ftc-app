@@ -1,14 +1,14 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
+import { CollapsibleStatusSection } from '@/components/admin/forecourt/CollapsibleStatusSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 
 const fmtTs = (value: unknown) => {
@@ -73,6 +73,11 @@ export function JplWorkflowReviewPanel() {
   const [recoveryMessage, setRecoveryMessage] = useState('')
   const [recoveryError, setRecoveryError] = useState('')
   const [recoveryConfirm, setRecoveryConfirm] = useState('')
+  const [restoreConfirm, setRestoreConfirm] = useState('')
+  const [restoreReason, setRestoreReason] = useState('')
+  const [restoreBusyKey, setRestoreBusyKey] = useState('')
+  const [restoreMessage, setRestoreMessage] = useState('')
+  const [restoreError, setRestoreError] = useState('')
 
   const query = useMemo(() => {
     const params = new URLSearchParams()
@@ -83,7 +88,7 @@ export function JplWorkflowReviewPanel() {
     return params.toString()
   }, [command, status, correlationId])
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -97,12 +102,13 @@ export function JplWorkflowReviewPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [query])
 
   useEffect(() => {
-    void load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query])
+    queueMicrotask(() => {
+      void load()
+    })
+  }, [query, load])
 
   useEffect(() => {
     fetch('/api/security/csrf', { cache: 'no-store' })
@@ -148,6 +154,43 @@ export function JplWorkflowReviewPanel() {
     }
   }
 
+  const restoreReplayTransaction = async (row: any) => {
+    const key = `${row.fpId}:${row.transSeqNo}`
+    setRestoreBusyKey(key)
+    setRestoreMessage('')
+    setRestoreError('')
+    try {
+      const response = await api<any>(
+        '/api/admin/forecourt/transactions/replay/restore',
+        {
+          method: 'POST',
+          headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
+          body: JSON.stringify({
+            fpId: row.fpId,
+            transSeqNo: row.transSeqNo,
+            confirmRestore: restoreConfirm.trim(),
+            reason: restoreReason.trim(),
+            csrf_token: csrfToken,
+          }),
+        },
+      )
+      if (!response.success) {
+        throw new Error(
+          response.error || 'Failed to restore replay transaction',
+        )
+      }
+      setRestoreMessage(
+        response.data?.message ||
+          `Transaction ${response.data?.transactionId ?? ''} restored.`,
+      )
+      await load()
+    } catch (err: any) {
+      setRestoreError(err?.message || 'Failed to restore replay transaction')
+    } finally {
+      setRestoreBusyKey('')
+    }
+  }
+
   const commandHistory = payload?.commandHistory ?? []
   const deliveryCheckpoints = payload?.wetstock?.deliveryCheckpoints ?? []
   const pendingPriceSets = payload?.prices?.pendingPriceSets ?? []
@@ -160,7 +203,6 @@ export function JplWorkflowReviewPanel() {
   const serviceRecordWorkflow = payload?.specialRecords?.serviceMessages ?? {}
   const borRecordWorkflow = payload?.specialRecords?.backOfficeRecords ?? {}
   const serviceMessages = serviceRecordWorkflow.recent ?? []
-  const borRecords = borRecordWorkflow.recent ?? []
   const borReplayCandidates = borRecordWorkflow.replayCandidates ?? []
   const washWorkflow = payload?.washTransactions ?? {}
   const washTransactions = washWorkflow.recent ?? []
@@ -174,8 +216,15 @@ export function JplWorkflowReviewPanel() {
   const dynamicTankAudits = dynamicTankWorkflow.recent ?? []
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
+    <CollapsibleStatusSection
+      title="Production workflow review"
+      status={error ? 'error' : loading ? 'loading' : 'ready'}
+      statusVariant={statusVariant(
+        error ? 'error' : loading ? 'pending' : 'success',
+      )}
+      contentClassName="p-4 pt-0"
+    >
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-base font-semibold">
@@ -294,251 +343,288 @@ export function JplWorkflowReviewPanel() {
           </div>
         </div>
 
-        <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                DOMS backlog
+        <CollapsibleStatusSection
+          title="Transaction-buffer recovery"
+          status={`${replayMetrics.pendingReplayClearCount ?? pendingReplayClears.length} pending`}
+          statusVariant={
+            (replayMetrics.failedClearCount ?? 0) > 0
+              ? STATUS_VARIANT.ERROR
+              : (replayMetrics.pendingReplayClearCount ??
+                    pendingReplayClears.length) > 0
+                ? STATUS_VARIANT.NEUTRAL
+                : STATUS_VARIANT.SUCCESS
+          }
+          contentClassName="p-3 pt-0"
+        >
+          <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  DOMS backlog
+                </div>
+                <div className="text-lg font-semibold">
+                  {replayMetrics.inMemoryBacklogDepth ?? 0}
+                </div>
               </div>
-              <div className="text-lg font-semibold">
-                {replayMetrics.inMemoryBacklogDepth ?? 0}
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Pending clears
+                </div>
+                <div className="text-lg font-semibold">
+                  {replayMetrics.pendingReplayClearCount ??
+                    pendingReplayClears.length}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Stale locks
+                </div>
+                <div className="text-lg font-semibold">
+                  {replayMetrics.staleLockCount ?? 0}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Failed clears
+                </div>
+                <div className="text-lg font-semibold">
+                  {replayMetrics.failedClearCount ?? 0}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Active checkpoints
+                </div>
+                <div className="text-lg font-semibold">
+                  {replayMetrics.activeCheckpointCount ??
+                    transactionCheckpoints.length}
+                </div>
               </div>
             </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Pending clears
-              </div>
-              <div className="text-lg font-semibold">
-                {replayMetrics.pendingReplayClearCount ??
-                  pendingReplayClears.length}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Stale locks
-              </div>
-              <div className="text-lg font-semibold">
-                {replayMetrics.staleLockCount ?? 0}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Failed clears
-              </div>
-              <div className="text-lg font-semibold">
-                {replayMetrics.failedClearCount ?? 0}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Active checkpoints
-              </div>
-              <div className="text-lg font-semibold">
-                {replayMetrics.activeCheckpointCount ??
-                  transactionCheckpoints.length}
-              </div>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">
-                Transaction-buffer recovery
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">
+                  Transaction-buffer recovery
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Dry-run or manually retry durable DOMS/JPL transaction clear
+                  checkpoints. Foreign POS locks are surfaced for operator
+                  action and are not automatically released.
+                </p>
               </div>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Dry-run or manually retry durable DOMS/JPL transaction clear
-                checkpoints. Foreign POS locks are surfaced for operator action
-                and are not automatically released.
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => runRecovery(true)}
+                  disabled={!csrfToken || recoveryBusy}
+                >
+                  {recoveryBusy ? 'Working…' : 'Dry-run recovery'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => runRecovery(false)}
+                  disabled={
+                    !csrfToken ||
+                    recoveryBusy ||
+                    recoveryConfirm.trim() !== 'RECOVER_DOMS_TRANSACTIONS'
+                  }
+                >
+                  Run confirmed recovery
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => runRecovery(true)}
-                disabled={!csrfToken || recoveryBusy}
-              >
-                {recoveryBusy ? 'Working…' : 'Dry-run recovery'}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => runRecovery(false)}
-                disabled={
-                  !csrfToken ||
-                  recoveryBusy ||
-                  recoveryConfirm.trim() !== 'RECOVER_DOMS_TRANSACTIONS'
-                }
-              >
-                Run confirmed recovery
-              </Button>
-            </div>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium">
+                Live recovery confirmation
+              </span>
+              <Input
+                value={recoveryConfirm}
+                onChange={(event) => setRecoveryConfirm(event.target.value)}
+                placeholder="Type RECOVER_DOMS_TRANSACTIONS to enable live retry"
+              />
+            </label>
+            {recoveryMessage ? (
+              <div className="rounded border border-emerald-500/30 bg-emerald-500/5 p-2 text-xs text-emerald-700">
+                {recoveryMessage}
+              </div>
+            ) : null}
+            {recoveryError ? (
+              <div className="rounded border border-red-500/30 bg-red-500/5 p-2 text-xs text-red-700">
+                {recoveryError}
+              </div>
+            ) : null}
           </div>
-          <label className="block space-y-1">
-            <span className="text-xs font-medium">
-              Live recovery confirmation
-            </span>
-            <Input
-              value={recoveryConfirm}
-              onChange={(event) => setRecoveryConfirm(event.target.value)}
-              placeholder="Type RECOVER_DOMS_TRANSACTIONS to enable live retry"
-            />
-          </label>
-          {recoveryMessage ? (
-            <div className="rounded border border-emerald-500/30 bg-emerald-500/5 p-2 text-xs text-emerald-700">
-              {recoveryMessage}
-            </div>
-          ) : null}
-          {recoveryError ? (
-            <div className="rounded border border-red-500/30 bg-red-500/5 p-2 text-xs text-red-700">
-              {recoveryError}
-            </div>
-          ) : null}
-        </div>
+        </CollapsibleStatusSection>
 
-        <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">DOMS special records</div>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Service-log messages and back-office records are persisted
-                before clear attempts. Unknown service messages and replayable
-                BORs stay visible here until reviewed or processed by a
-                downstream workflow.
-              </p>
+        <CollapsibleStatusSection
+          title="DOMS special records"
+          status={`${
+            (serviceRecordWorkflow.reviewCount ?? 0) +
+            (borRecordWorkflow.pendingCount ?? 0) +
+            (borRecordWorkflow.failedCount ?? 0)
+          } open`}
+          statusVariant={
+            (borRecordWorkflow.failedCount ?? 0) > 0
+              ? STATUS_VARIANT.ERROR
+              : (serviceRecordWorkflow.reviewCount ?? 0) +
+                    (borRecordWorkflow.pendingCount ?? 0) >
+                  0
+                ? STATUS_VARIANT.NEUTRAL
+                : STATUS_VARIANT.SUCCESS
+          }
+          contentClassName="p-3 pt-0"
+        >
+          <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">
+                  DOMS special records
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Service-log messages and back-office records are persisted
+                  before clear attempts. Unknown service messages and replayable
+                  BORs stay visible here until reviewed or processed by a
+                  downstream workflow.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Service review
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Service review
+                </div>
+                <div className="text-lg font-semibold">
+                  {serviceRecordWorkflow.reviewCount ?? 0}
+                </div>
               </div>
-              <div className="text-lg font-semibold">
-                {serviceRecordWorkflow.reviewCount ?? 0}
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Escalated service
+                </div>
+                <div className="text-lg font-semibold">
+                  {serviceRecordWorkflow.escalatedCount ?? 0}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  BOR replay pending
+                </div>
+                <div className="text-lg font-semibold">
+                  {borRecordWorkflow.pendingCount ?? 0}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  BOR replay failed
+                </div>
+                <div className="text-lg font-semibold">
+                  {borRecordWorkflow.failedCount ?? 0}
+                </div>
               </div>
             </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Escalated service
-              </div>
-              <div className="text-lg font-semibold">
-                {serviceRecordWorkflow.escalatedCount ?? 0}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                BOR replay pending
-              </div>
-              <div className="text-lg font-semibold">
-                {borRecordWorkflow.pendingCount ?? 0}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                BOR replay failed
-              </div>
-              <div className="text-lg font-semibold">
-                {borRecordWorkflow.failedCount ?? 0}
-              </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="space-y-2">
-              <div className="text-sm font-semibold">
-                Recent service-log messages
-              </div>
-              <MiniTable empty={serviceMessages.length === 0}>
-                <table className="min-w-full text-left text-xs">
-                  <thead className="text-[var(--text-muted)]">
-                    <tr>
-                      <th className="px-2 py-1">Collected</th>
-                      <th className="px-2 py-1">Seq</th>
-                      <th className="px-2 py-1">Route</th>
-                      <th className="px-2 py-1">Severity</th>
-                      <th className="px-2 py-1">Clear</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {serviceMessages.slice(0, 10).map((row: any) => (
-                      <tr
-                        key={`${row.fc_service_msg_seq_no}-${row.collected_at}`}
-                        className="border-t"
-                      >
-                        <td className="whitespace-nowrap px-2 py-1">
-                          {fmtTs(row.collected_at)}
-                        </td>
-                        <td className="px-2 py-1">
-                          {row.fc_service_msg_seq_no ?? '—'}
-                        </td>
-                        <td className="px-2 py-1">
-                          <Badge variant={statusVariant(row.route_status)}>
-                            {row.route_key ?? row.route_status ?? 'unknown'}
-                          </Badge>
-                        </td>
-                        <td className="px-2 py-1">
-                          {row.route_severity ?? 'unknown'}
-                        </td>
-                        <td className="px-2 py-1">
-                          <Badge variant={statusVariant(row.status)}>
-                            {row.status}
-                          </Badge>
-                        </td>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">
+                  Recent service-log messages
+                </div>
+                <MiniTable empty={serviceMessages.length === 0}>
+                  <table className="min-w-full text-left text-xs">
+                    <thead className="text-[var(--text-muted)]">
+                      <tr>
+                        <th className="px-2 py-1">Collected</th>
+                        <th className="px-2 py-1">Seq</th>
+                        <th className="px-2 py-1">Route</th>
+                        <th className="px-2 py-1">Severity</th>
+                        <th className="px-2 py-1">Clear</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </MiniTable>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm font-semibold">
-                Replayable back-office records
+                    </thead>
+                    <tbody>
+                      {serviceMessages.slice(0, 10).map((row: any) => (
+                        <tr
+                          key={`${row.fc_service_msg_seq_no}-${row.collected_at}`}
+                          className="border-t"
+                        >
+                          <td className="whitespace-nowrap px-2 py-1">
+                            {fmtTs(row.collected_at)}
+                          </td>
+                          <td className="px-2 py-1">
+                            {row.fc_service_msg_seq_no ?? '—'}
+                          </td>
+                          <td className="px-2 py-1">
+                            <Badge variant={statusVariant(row.route_status)}>
+                              {row.route_key ?? row.route_status ?? 'unknown'}
+                            </Badge>
+                          </td>
+                          <td className="px-2 py-1">
+                            {row.route_severity ?? 'unknown'}
+                          </td>
+                          <td className="px-2 py-1">
+                            <Badge variant={statusVariant(row.status)}>
+                              {row.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </MiniTable>
               </div>
-              <MiniTable empty={borReplayCandidates.length === 0}>
-                <table className="min-w-full text-left text-xs">
-                  <thead className="text-[var(--text-muted)]">
-                    <tr>
-                      <th className="px-2 py-1">Collected</th>
-                      <th className="px-2 py-1">Seq</th>
-                      <th className="px-2 py-1">Format</th>
-                      <th className="px-2 py-1">Kind</th>
-                      <th className="px-2 py-1">Processing</th>
-                      <th className="px-2 py-1">Attempts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {borReplayCandidates.slice(0, 10).map((row: any) => (
-                      <tr
-                        key={`${row.bor_seq_no}-${row.source_hash}`}
-                        className="border-t"
-                      >
-                        <td className="whitespace-nowrap px-2 py-1">
-                          {fmtTs(row.collected_at)}
-                        </td>
-                        <td className="px-2 py-1">{row.bor_seq_no}</td>
-                        <td className="px-2 py-1">
-                          {row.bor_format_id ?? row.sub_code ?? '—'}
-                        </td>
-                        <td className="px-2 py-1">
-                          {row.record_kind ?? 'unknown'}
-                        </td>
-                        <td className="px-2 py-1">
-                          <Badge variant={statusVariant(row.processing_status)}>
-                            {row.processing_status}
-                          </Badge>
-                        </td>
-                        <td className="px-2 py-1">
-                          {row.process_attempts ?? 0}
-                        </td>
+
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">
+                  Replayable back-office records
+                </div>
+                <MiniTable empty={borReplayCandidates.length === 0}>
+                  <table className="min-w-full text-left text-xs">
+                    <thead className="text-[var(--text-muted)]">
+                      <tr>
+                        <th className="px-2 py-1">Collected</th>
+                        <th className="px-2 py-1">Seq</th>
+                        <th className="px-2 py-1">Format</th>
+                        <th className="px-2 py-1">Kind</th>
+                        <th className="px-2 py-1">Processing</th>
+                        <th className="px-2 py-1">Attempts</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </MiniTable>
+                    </thead>
+                    <tbody>
+                      {borReplayCandidates.slice(0, 10).map((row: any) => (
+                        <tr
+                          key={`${row.bor_seq_no}-${row.source_hash}`}
+                          className="border-t"
+                        >
+                          <td className="whitespace-nowrap px-2 py-1">
+                            {fmtTs(row.collected_at)}
+                          </td>
+                          <td className="px-2 py-1">{row.bor_seq_no}</td>
+                          <td className="px-2 py-1">
+                            {row.bor_format_id ?? row.sub_code ?? '—'}
+                          </td>
+                          <td className="px-2 py-1">
+                            {row.record_kind ?? 'unknown'}
+                          </td>
+                          <td className="px-2 py-1">
+                            <Badge
+                              variant={statusVariant(row.processing_status)}
+                            >
+                              {row.processing_status}
+                            </Badge>
+                          </td>
+                          <td className="px-2 py-1">
+                            {row.process_attempts ?? 0}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </MiniTable>
+              </div>
             </div>
           </div>
-        </div>
+        </CollapsibleStatusSection>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <div className="space-y-2">
@@ -681,285 +767,415 @@ export function JplWorkflowReviewPanel() {
           ) : null}
         </div>
 
-        <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
-          <div>
-            <div className="text-sm font-semibold">Dynamic tank data audit</div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              Manual tank data mutation is restricted to EnteredDensity and is
-              audited before the command is sent to DOMS. Warnings highlight
-              missing business reasons or unexpected operator roles.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Recent changes
-              </div>
-              <div className="text-lg font-semibold">
-                {dynamicTankWorkflow.totalRecent ?? dynamicTankAudits.length}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Warnings
-              </div>
-              <div className="text-lg font-semibold">
-                {dynamicTankWorkflow.warningCount ?? 0}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Failed sends
-              </div>
-              <div className="text-lg font-semibold">
-                {dynamicTankWorkflow.failedCount ?? 0}
-              </div>
-            </div>
-          </div>
-          <MiniTable empty={dynamicTankAudits.length === 0}>
-            <table className="min-w-full text-left text-xs">
-              <thead className="text-[var(--text-muted)]">
-                <tr>
-                  <th className="px-2 py-1">Updated</th>
-                  <th className="px-2 py-1">Tank</th>
-                  <th className="px-2 py-1">Status</th>
-                  <th className="px-2 py-1">Severity</th>
-                  <th className="px-2 py-1">Role</th>
-                  <th className="px-2 py-1">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dynamicTankAudits.slice(0, 10).map((row: any) => (
-                  <tr key={row.id} className="border-t">
-                    <td className="whitespace-nowrap px-2 py-1">
-                      {fmtTs(row.updated_at)}
-                    </td>
-                    <td className="px-2 py-1">{row.tank_id ?? '—'}</td>
-                    <td className="px-2 py-1">
-                      <Badge variant={statusVariant(row.status)}>
-                        {row.status ?? 'requested'}
-                      </Badge>
-                    </td>
-                    <td className="px-2 py-1">
-                      <Badge variant={statusVariant(row.severity)}>
-                        {row.severity ?? 'info'}
-                      </Badge>
-                    </td>
-                    <td className="px-2 py-1">{row.requested_role ?? '—'}</td>
-                    <td className="max-w-[300px] truncate px-2 py-1">
-                      {row.reason ?? row.error_text ?? '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </MiniTable>
-        </div>
-
-        <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
-          <div>
-            <div className="text-sm font-semibold">
-              Optional DOMS module runtime
-            </div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              Price poles, digital I/O pins, sensors, and vending machines are
-              persisted as first-class runtime snapshots when those protocol
-              families are observed. Open alarms and vending totals stay visible
-              for support without inspecting raw JPL logs.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Devices seen
-              </div>
-              <div className="text-lg font-semibold">
-                {optionalSnapshots.length}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Warning/error devices
-              </div>
-              <div className="text-lg font-semibold">
-                {optionalWorkflow.warningOrErrorCount ?? 0}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Open optional faults
-              </div>
-              <div className="text-lg font-semibold">
-                {optionalWorkflow.openErrorCount ?? optionalErrors.length}
-              </div>
-            </div>
-            <div className="rounded border bg-[var(--surface-card)] p-2">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Vending totals
-              </div>
-              <div className="text-lg font-semibold">
-                {vendingTotals.length}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="space-y-2">
+        <CollapsibleStatusSection
+          title="Dynamic tank data audit"
+          status={
+            dynamicTankWorkflow.failedCount
+              ? `${dynamicTankWorkflow.failedCount} failed`
+              : dynamicTankWorkflow.warningCount
+                ? `${dynamicTankWorkflow.warningCount} warnings`
+                : 'healthy'
+          }
+          statusVariant={
+            dynamicTankWorkflow.failedCount
+              ? STATUS_VARIANT.ERROR
+              : dynamicTankWorkflow.warningCount
+                ? STATUS_VARIANT.NEUTRAL
+                : STATUS_VARIANT.SUCCESS
+          }
+          contentClassName="p-3 pt-0"
+        >
+          <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
+            <div>
               <div className="text-sm font-semibold">
-                Recent optional device snapshots
+                Dynamic tank data audit
               </div>
-              <MiniTable empty={optionalSnapshots.length === 0}>
-                <table className="min-w-full text-left text-xs">
-                  <thead className="text-[var(--text-muted)]">
-                    <tr>
-                      <th className="px-2 py-1">Seen</th>
-                      <th className="px-2 py-1">Family</th>
-                      <th className="px-2 py-1">Id</th>
-                      <th className="px-2 py-1">State</th>
-                      <th className="px-2 py-1">Severity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {optionalSnapshots.slice(0, 12).map((row: any) => (
-                      <tr key={row.id} className="border-t">
-                        <td className="whitespace-nowrap px-2 py-1">
-                          {fmtTs(row.updated_at ?? row.last_seen_at)}
-                        </td>
-                        <td className="px-2 py-1">
-                          {row.device_family ?? '—'}
-                        </td>
-                        <td className="px-2 py-1">{row.device_id ?? '—'}</td>
-                        <td className="px-2 py-1">
-                          {row.main_state ?? row.operational_status ?? '—'}
-                        </td>
-                        <td className="px-2 py-1">
-                          <Badge variant={statusVariant(row.severity)}>
-                            {row.severity ?? 'info'}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </MiniTable>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Manual tank data mutation is restricted to EnteredDensity and is
+                audited before the command is sent to DOMS. Warnings highlight
+                missing business reasons or unexpected operator roles.
+              </p>
             </div>
-
-            <div className="space-y-2">
-              <div className="text-sm font-semibold">
-                Open optional device faults
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Recent changes
+                </div>
+                <div className="text-lg font-semibold">
+                  {dynamicTankWorkflow.totalRecent ?? dynamicTankAudits.length}
+                </div>
               </div>
-              <MiniTable empty={optionalErrors.length === 0}>
-                <table className="min-w-full text-left text-xs">
-                  <thead className="text-[var(--text-muted)]">
-                    <tr>
-                      <th className="px-2 py-1">Updated</th>
-                      <th className="px-2 py-1">Family</th>
-                      <th className="px-2 py-1">Id</th>
-                      <th className="px-2 py-1">Error</th>
-                      <th className="px-2 py-1">Severity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {optionalErrors.slice(0, 12).map((row: any) => (
-                      <tr key={row.id} className="border-t">
-                        <td className="whitespace-nowrap px-2 py-1">
-                          {fmtTs(row.updated_at ?? row.discovered_at)}
-                        </td>
-                        <td className="px-2 py-1">
-                          {row.device_family ?? '—'}
-                        </td>
-                        <td className="px-2 py-1">{row.device_id ?? '—'}</td>
-                        <td className="max-w-[260px] truncate px-2 py-1">
-                          {row.error_name ??
-                            row.error_code ??
-                            row.error_text ??
-                            '—'}
-                        </td>
-                        <td className="px-2 py-1">
-                          <Badge variant={statusVariant(row.severity)}>
-                            {row.severity ?? 'error'}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </MiniTable>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Warnings
+                </div>
+                <div className="text-lg font-semibold">
+                  {dynamicTankWorkflow.warningCount ?? 0}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Failed sends
+                </div>
+                <div className="text-lg font-semibold">
+                  {dynamicTankWorkflow.failedCount ?? 0}
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-sm font-semibold">Recent vending totals</div>
-            <MiniTable empty={vendingTotals.length === 0}>
+            <MiniTable empty={dynamicTankAudits.length === 0}>
               <table className="min-w-full text-left text-xs">
                 <thead className="text-[var(--text-muted)]">
                   <tr>
-                    <th className="px-2 py-1">Captured</th>
-                    <th className="px-2 py-1">VmId</th>
-                    <th className="px-2 py-1">Type</th>
-                    <th className="px-2 py-1">Grand count</th>
-                    <th className="px-2 py-1">Items</th>
+                    <th className="px-2 py-1">Updated</th>
+                    <th className="px-2 py-1">Tank</th>
+                    <th className="px-2 py-1">Status</th>
+                    <th className="px-2 py-1">Severity</th>
+                    <th className="px-2 py-1">Role</th>
+                    <th className="px-2 py-1">Reason</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {vendingTotals.slice(0, 8).map((row: any) => (
+                  {dynamicTankAudits.slice(0, 10).map((row: any) => (
                     <tr key={row.id} className="border-t">
                       <td className="whitespace-nowrap px-2 py-1">
-                        {fmtTs(row.updated_at ?? row.captured_at)}
+                        {fmtTs(row.updated_at)}
                       </td>
-                      <td className="px-2 py-1">{row.vm_id ?? '—'}</td>
+                      <td className="px-2 py-1">{row.tank_id ?? '—'}</td>
                       <td className="px-2 py-1">
-                        {row.vm_total_type_label ?? row.vm_total_type ?? '—'}
+                        <Badge variant={statusVariant(row.status)}>
+                          {row.status ?? 'requested'}
+                        </Badge>
                       </td>
                       <td className="px-2 py-1">
-                        {row.grand_count_total ?? row.grand_money_total ?? '—'}
+                        <Badge variant={statusVariant(row.severity)}>
+                          {row.severity ?? 'info'}
+                        </Badge>
                       </td>
-                      <td className="px-2 py-1">{row.item_count ?? 0}</td>
+                      <td className="px-2 py-1">{row.requested_role ?? '—'}</td>
+                      <td className="max-w-[300px] truncate px-2 py-1">
+                        {row.reason ?? row.error_text ?? '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </MiniTable>
           </div>
-        </div>
+        </CollapsibleStatusSection>
 
-        <div className="space-y-2">
-          <div className="text-sm font-semibold">Pending replay clears</div>
-          <MiniTable empty={pendingReplayClears.length === 0}>
-            <table className="min-w-full text-left text-xs">
-              <thead className="text-[var(--text-muted)]">
-                <tr>
-                  <th className="px-2 py-1">FpId</th>
-                  <th className="px-2 py-1">Seq</th>
-                  <th className="px-2 py-1">Stage</th>
-                  <th className="px-2 py-1">Lock</th>
-                  <th className="px-2 py-1">Updated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingReplayClears.slice(0, 10).map((row: any) => (
-                  <tr
-                    key={`${row.fpId}-${row.transSeqNo}`}
-                    className="border-t"
-                  >
-                    <td className="px-2 py-1">{row.fpId}</td>
-                    <td className="px-2 py-1">{row.transSeqNo}</td>
-                    <td className="px-2 py-1">
-                      <Badge variant={statusVariant(row.replayStage)}>
-                        {row.replayStage}
-                      </Badge>
-                    </td>
-                    <td className="px-2 py-1">{row.lockId ?? '—'}</td>
-                    <td className="whitespace-nowrap px-2 py-1">
-                      {fmtTs(row.updatedAt)}
-                    </td>
+        <CollapsibleStatusSection
+          title="Optional DOMS module runtime"
+          status={`${optionalSnapshots.length} devices`}
+          statusVariant={
+            optionalWorkflow.openErrorCount ||
+            optionalWorkflow.warningOrErrorCount
+              ? STATUS_VARIANT.NEUTRAL
+              : STATUS_VARIANT.SUCCESS
+          }
+          contentClassName="p-3 pt-0"
+        >
+          <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
+            <div>
+              <div className="text-sm font-semibold">
+                Optional DOMS module runtime
+              </div>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Price poles, digital I/O pins, sensors, and vending machines are
+                persisted as first-class runtime snapshots when those protocol
+                families are observed. Open alarms and vending totals stay
+                visible for support without inspecting raw JPL logs.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Devices seen
+                </div>
+                <div className="text-lg font-semibold">
+                  {optionalSnapshots.length}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Warning/error devices
+                </div>
+                <div className="text-lg font-semibold">
+                  {optionalWorkflow.warningOrErrorCount ?? 0}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Open optional faults
+                </div>
+                <div className="text-lg font-semibold">
+                  {optionalWorkflow.openErrorCount ?? optionalErrors.length}
+                </div>
+              </div>
+              <div className="rounded border bg-[var(--surface-card)] p-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Vending totals
+                </div>
+                <div className="text-lg font-semibold">
+                  {vendingTotals.length}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">
+                  Recent optional device snapshots
+                </div>
+                <MiniTable empty={optionalSnapshots.length === 0}>
+                  <table className="min-w-full text-left text-xs">
+                    <thead className="text-[var(--text-muted)]">
+                      <tr>
+                        <th className="px-2 py-1">Seen</th>
+                        <th className="px-2 py-1">Family</th>
+                        <th className="px-2 py-1">Id</th>
+                        <th className="px-2 py-1">State</th>
+                        <th className="px-2 py-1">Severity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {optionalSnapshots.slice(0, 12).map((row: any) => (
+                        <tr key={row.id} className="border-t">
+                          <td className="whitespace-nowrap px-2 py-1">
+                            {fmtTs(row.updated_at ?? row.last_seen_at)}
+                          </td>
+                          <td className="px-2 py-1">
+                            {row.device_family ?? '—'}
+                          </td>
+                          <td className="px-2 py-1">{row.device_id ?? '—'}</td>
+                          <td className="px-2 py-1">
+                            {row.main_state ?? row.operational_status ?? '—'}
+                          </td>
+                          <td className="px-2 py-1">
+                            <Badge variant={statusVariant(row.severity)}>
+                              {row.severity ?? 'info'}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </MiniTable>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">
+                  Open optional device faults
+                </div>
+                <MiniTable empty={optionalErrors.length === 0}>
+                  <table className="min-w-full text-left text-xs">
+                    <thead className="text-[var(--text-muted)]">
+                      <tr>
+                        <th className="px-2 py-1">Updated</th>
+                        <th className="px-2 py-1">Family</th>
+                        <th className="px-2 py-1">Id</th>
+                        <th className="px-2 py-1">Error</th>
+                        <th className="px-2 py-1">Severity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {optionalErrors.slice(0, 12).map((row: any) => (
+                        <tr key={row.id} className="border-t">
+                          <td className="whitespace-nowrap px-2 py-1">
+                            {fmtTs(row.updated_at ?? row.discovered_at)}
+                          </td>
+                          <td className="px-2 py-1">
+                            {row.device_family ?? '—'}
+                          </td>
+                          <td className="px-2 py-1">{row.device_id ?? '—'}</td>
+                          <td className="max-w-[260px] truncate px-2 py-1">
+                            {row.error_name ??
+                              row.error_code ??
+                              row.error_text ??
+                              '—'}
+                          </td>
+                          <td className="px-2 py-1">
+                            <Badge variant={statusVariant(row.severity)}>
+                              {row.severity ?? 'error'}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </MiniTable>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">Recent vending totals</div>
+              <MiniTable empty={vendingTotals.length === 0}>
+                <table className="min-w-full text-left text-xs">
+                  <thead className="text-[var(--text-muted)]">
+                    <tr>
+                      <th className="px-2 py-1">Captured</th>
+                      <th className="px-2 py-1">VmId</th>
+                      <th className="px-2 py-1">Type</th>
+                      <th className="px-2 py-1">Grand count</th>
+                      <th className="px-2 py-1">Items</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vendingTotals.slice(0, 8).map((row: any) => (
+                      <tr key={row.id} className="border-t">
+                        <td className="whitespace-nowrap px-2 py-1">
+                          {fmtTs(row.updated_at ?? row.captured_at)}
+                        </td>
+                        <td className="px-2 py-1">{row.vm_id ?? '—'}</td>
+                        <td className="px-2 py-1">
+                          {row.vm_total_type_label ?? row.vm_total_type ?? '—'}
+                        </td>
+                        <td className="px-2 py-1">
+                          {row.grand_count_total ??
+                            row.grand_money_total ??
+                            '—'}
+                        </td>
+                        <td className="px-2 py-1">{row.item_count ?? 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </MiniTable>
+            </div>
+          </div>
+        </CollapsibleStatusSection>
+
+        <CollapsibleStatusSection
+          title="Pending replay clears"
+          status={`${pendingReplayClears.length} pending`}
+          statusVariant={
+            pendingReplayClears.length
+              ? STATUS_VARIANT.NEUTRAL
+              : STATUS_VARIANT.SUCCESS
+          }
+          contentClassName="p-3 pt-0"
+        >
+          <div className="space-y-3 rounded border bg-[var(--surface-card)] p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">
+                  Pending replay clears
+                </div>
+                <div className="text-xs text-[var(--text-secondary)]">
+                  Restore a durable DOMS read payload to the FTC non-fiscalized
+                  transaction list when the transaction row was not captured.
+                  This does not clear, unlock, or write to the DOMS/PSS buffer.
+                </div>
+              </div>
+              <Badge variant={STATUS_VARIANT.INFO}>
+                {pendingReplayClears.length} pending
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-[180px_1fr]">
+              <Input
+                value={restoreConfirm}
+                onChange={(event) => setRestoreConfirm(event.target.value)}
+                placeholder="Type RESTORE"
+              />
+              <Input
+                value={restoreReason}
+                onChange={(event) => setRestoreReason(event.target.value)}
+                placeholder="Reason or ticket reference for the audited restore"
+              />
+            </div>
+
+            {restoreMessage ? (
+              <div className="rounded border border-green-500/30 bg-green-500/5 p-2 text-sm text-green-800">
+                {restoreMessage}
+              </div>
+            ) : null}
+            {restoreError ? (
+              <div className="rounded border border-red-500/30 bg-red-500/5 p-2 text-sm text-red-800">
+                {restoreError}
+              </div>
+            ) : null}
+
+            <MiniTable empty={pendingReplayClears.length === 0}>
+              <table className="min-w-full text-left text-xs">
+                <thead className="text-[var(--text-muted)]">
+                  <tr>
+                    <th className="px-2 py-1">FpId</th>
+                    <th className="px-2 py-1">Seq</th>
+                    <th className="px-2 py-1">Stage</th>
+                    <th className="px-2 py-1">FTC transaction</th>
+                    <th className="px-2 py-1">Lock</th>
+                    <th className="px-2 py-1">Updated</th>
+                    <th className="px-2 py-1 text-right">Recovery</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </MiniTable>
-        </div>
+                </thead>
+                <tbody>
+                  {pendingReplayClears.slice(0, 10).map((row: any) => {
+                    const restoreKey = `${row.fpId}:${row.transSeqNo}`
+                    const alreadyCaptured = Boolean(row.transactionId)
+                    return (
+                      <tr key={restoreKey} className="border-t">
+                        <td className="px-2 py-1">{row.fpId}</td>
+                        <td className="px-2 py-1">{row.transSeqNo}</td>
+                        <td className="px-2 py-1">
+                          <Badge variant={statusVariant(row.replayStage)}>
+                            {row.replayStage}
+                          </Badge>
+                        </td>
+                        <td className="px-2 py-1">
+                          {alreadyCaptured ? (
+                            <div>
+                              <Badge variant={STATUS_VARIANT.SUCCESS}>
+                                {row.transactionStatus ?? 'captured'}
+                              </Badge>
+                              <div className="mt-1 max-w-40 truncate text-[10px] text-[var(--text-muted)]">
+                                {row.transactionId}
+                              </div>
+                            </div>
+                          ) : row.hasReadPayload ? (
+                            <Badge variant={STATUS_VARIANT.NEUTRAL}>
+                              missing, restorable
+                            </Badge>
+                          ) : (
+                            <Badge variant={STATUS_VARIANT.ERROR}>
+                              no durable payload
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-2 py-1">{row.lockId ?? '—'}</td>
+                        <td className="whitespace-nowrap px-2 py-1">
+                          {fmtTs(row.updatedAt)}
+                        </td>
+                        <td className="px-2 py-1 text-right">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={
+                              !csrfToken ||
+                              restoreConfirm.trim().toUpperCase() !==
+                                'RESTORE' ||
+                              !row.hasReadPayload ||
+                              alreadyCaptured ||
+                              restoreBusyKey === restoreKey
+                            }
+                            onClick={() => void restoreReplayTransaction(row)}
+                          >
+                            {restoreBusyKey === restoreKey
+                              ? 'Restoring…'
+                              : alreadyCaptured
+                                ? 'Already captured'
+                                : 'Restore transaction'}
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </MiniTable>
+          </div>
+        </CollapsibleStatusSection>
 
         <div className="space-y-2">
           <div className="text-sm font-semibold">
@@ -1160,7 +1376,7 @@ export function JplWorkflowReviewPanel() {
             ) : null}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleStatusSection>
   )
 }

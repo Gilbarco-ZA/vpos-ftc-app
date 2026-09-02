@@ -51,8 +51,6 @@ const emptyConfig: TankConfig = {
   tankLevels: [],
 }
 
-const normalize = (value: string) => String(value ?? '').trim()
-
 export default function TankGradesClient({ role }: TankGradesClientProps) {
   const [csrfToken, setCsrfToken] = useState('')
   const [config, setConfig] = useState<TankConfig>(emptyConfig)
@@ -79,7 +77,9 @@ export default function TankGradesClient({ role }: TankGradesClientProps) {
   }, [])
 
   useEffect(() => {
-    loadConfig()
+    queueMicrotask(() => {
+      loadConfig()
+    })
   }, [loadConfig])
 
   useEffect(() => {

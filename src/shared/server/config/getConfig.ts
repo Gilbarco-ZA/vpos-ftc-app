@@ -1,46 +1,37 @@
-import { mapRows, queryAll } from '@/src/platform/db/postgres'
+import type { DatasetType } from '@/src/shared/server/config/countryDatasets'
 
-type ConfigRow = {
-  id: string
-  code: string
-  name: string
-  description?: string | null
-  rate?: number | null
-  isActive: boolean
-  sortOrder: number
-}
+import {
+  getDefaultTaxTypeForCountry,
+  listActiveCountryCatalogRows,
+} from '@/src/shared/server/config/countryCatalog'
 
-const listActive = async (table: string) => {
-  const rows = await queryAll<Record<string, unknown>>(
-    `SELECT id, code, name, description, is_active, sort_order
-     FROM ${table}
-     WHERE is_active = TRUE
-     ORDER BY sort_order ASC, name ASC`,
-  )
+const listActive = async (countryCode: string, datasetType: DatasetType) =>
+  await listActiveCountryCatalogRows({ countryCode, datasetType })
 
-  return mapRows<ConfigRow>(rows)
-}
+/** @deprecated Prefer the typed country-catalog adapters directly. */
+export const getTaxTypes = async (countryCode: string) =>
+  await listActive(countryCode, 'taxTypes')
 
-export const getTaxTypes = async () => {
-  const rows = await queryAll<Record<string, unknown>>(
-    `SELECT id, code, name, description, rate, is_active, sort_order
-     FROM cfg_tax_types
-     WHERE is_active = TRUE
-     ORDER BY sort_order ASC, name ASC`,
-  )
+/** @deprecated Prefer the typed country-catalog adapters directly. */
+export const getDefaultTaxType = async (countryCode: string) =>
+  await getDefaultTaxTypeForCountry(countryCode)
 
-  return mapRows<ConfigRow>(rows)
-}
+/** @deprecated Prefer the typed country-catalog adapters directly. */
+export const getProductClassCodes = async (countryCode: string) =>
+  await listActive(countryCode, 'productClassCodes')
 
-export const getProductClassCodes = async () =>
-  listActive('cfg_product_class_codes')
+/** @deprecated Prefer the typed country-catalog adapters directly. */
+export const getProductTypeCodes = async (countryCode: string) =>
+  await listActive(countryCode, 'productTypeCodes')
 
-export const getProductTypeCodes = async () =>
-  listActive('cfg_product_type_codes')
+/** @deprecated Prefer the typed country-catalog adapters directly. */
+export const getCreditNoteReasons = async (countryCode: string) =>
+  await listActive(countryCode, 'creditNoteReasons')
 
-export const getCreditNoteReasons = async () =>
-  listActive('cfg_credit_note_reasons')
+/** @deprecated Prefer the typed country-catalog adapters directly. */
+export const getPackSizes = async (countryCode: string) =>
+  await listActive(countryCode, 'packagingUnits')
 
-export const getPackSizes = async () => listActive('cfg_pack_sizes')
-
-export const getUnitsOfMeasure = async () => listActive('cfg_units_of_measure')
+/** @deprecated Prefer the typed country-catalog adapters directly. */
+export const getUnitsOfMeasure = async (countryCode: string) =>
+  await listActive(countryCode, 'quantityUnits')

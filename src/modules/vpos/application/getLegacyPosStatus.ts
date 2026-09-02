@@ -1,4 +1,7 @@
-import { legacyJson, sendPosCommand } from '@/src/shared/vpos/legacyCompat'
+import {
+  legacyJson,
+  sendPosCommand,
+} from '@/src/modules/vpos/application/legacyCompat'
 
 export async function getLegacyPosStatus(stationId: string) {
   try {

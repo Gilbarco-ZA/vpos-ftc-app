@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
@@ -60,7 +60,7 @@ export const EwuraAdminClient = () => {
     }
   }
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -102,11 +102,13 @@ export const EwuraAdminClient = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    refresh().catch((e) => setError(e?.message ?? String(e)))
-  }, [])
+    queueMicrotask(() => {
+      refresh().catch((e) => setError(e?.message ?? String(e)))
+    })
+  }, [refresh])
 
   const saveConfig = async () => {
     setBusy('save-config')

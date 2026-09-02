@@ -21,6 +21,7 @@ export type FiscalInboxListItem = {
   receivedAt: string | null
   processedAt: string | null
   deadAt: string | null
+  resolvedAt: string | null
   errorText: string | null
   relatedTransactionId: string | null
   relatedTransactionStatus: string | null
@@ -45,6 +46,7 @@ export type FiscalInboxDetailRow = {
   received_at: unknown
   processed_at: unknown
   dead_at: unknown
+  resolved_at: unknown
   error_text: string | null
   message_json: unknown
   related_transaction_id: string | null

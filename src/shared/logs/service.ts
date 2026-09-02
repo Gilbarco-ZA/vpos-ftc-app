@@ -141,14 +141,6 @@ export async function clearLog(
   )
 }
 
-export async function deleteLogsOlderThan(days: number) {
-  const n = Math.max(1, Math.floor(days))
-  await query(
-    `DELETE FROM vpos_logs WHERE created_at < NOW() - ($1 || ' days')::interval`,
-    [String(n)],
-  )
-}
-
 export async function readStationLog(
   stationId: string,
   type: LogType,

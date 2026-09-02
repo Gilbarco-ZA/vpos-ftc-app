@@ -23,6 +23,7 @@ type PssXmlStatus = {
 
 type SetupCounts = {
   products: number
+  pssProducts?: number
   tanks: number
   pumps: number
   nozzles: number
@@ -62,10 +63,14 @@ function Metric({
   label,
   pss,
   ftc,
+  ftcLabel = 'FTC setup',
+  note,
 }: {
   label: string
   pss: number
   ftc: number
+  ftcLabel?: string
+  note?: string
 }) {
   const matches = pss === ftc
   return (
@@ -86,10 +91,13 @@ function Metric({
           <div className="font-semibold">{pss}</div>
         </div>
         <div>
-          <div className="text-xs text-[var(--text-muted)]">FTC setup</div>
+          <div className="text-xs text-[var(--text-muted)]">{ftcLabel}</div>
           <div className="font-semibold">{ftc}</div>
         </div>
       </div>
+      {note ? (
+        <div className="mt-2 text-xs text-[var(--text-muted)]">{note}</div>
+      ) : null}
     </div>
   )
 }
@@ -143,7 +151,9 @@ export default function PssConfigurationVerification({
   }, [])
 
   useEffect(() => {
-    void load()
+    queueMicrotask(() => {
+      void load()
+    })
     const imported = () => void load()
     window.addEventListener('pss-xml-imported', imported)
     return () => window.removeEventListener('pss-xml-imported', imported)
@@ -159,10 +169,11 @@ export default function PssConfigurationVerification({
 
   const pss = xml?.parsedSummary
   const ftc = reconciliation?.summary
+  const pssManagedProductCount = counts?.pssProducts ?? counts?.products ?? 0
   const countsMatch = Boolean(
     pss &&
     counts &&
-    pss.grades === counts.products &&
+    pss.grades === pssManagedProductCount &&
     pss.tanks === counts.tanks &&
     pss.fuellingPoints === counts.pumps,
   )
@@ -239,7 +250,13 @@ export default function PssConfigurationVerification({
               <Metric
                 label="Fuel grades / products"
                 pss={pss.grades}
-                ftc={counts?.products ?? 0}
+                ftc={pssManagedProductCount}
+                ftcLabel="FTC PSS-managed"
+                note={
+                  counts && counts.products !== pssManagedProductCount
+                    ? `${counts.products} total catalog products; POS-only products are excluded from this check.`
+                    : 'Only products managed by the PSS configuration are compared.'
+                }
               />
               <Metric label="Tanks" pss={pss.tanks} ftc={counts?.tanks ?? 0} />
               <Metric

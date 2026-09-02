@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
@@ -92,7 +92,7 @@ export default function ForecourtSettingsCard() {
   const [testError, setTestError] = useState<string | null>(null)
   const [legacyMode, setLegacyMode] = useState<string | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setError(null)
     const res = await fetch('/api/admin/setup/forecourt-settings', {
       cache: 'no-store',
@@ -108,11 +108,13 @@ export default function ForecourtSettingsCard() {
       .toLowerCase()
     setLegacyMode(currentMode === 'jpl_tcp' ? null : currentMode)
     setSettings(toForm(data))
-  }
+  }, [])
 
   useEffect(() => {
-    safeAsync(load(), 'forecourtSettings.load')
-  }, [])
+    queueMicrotask(() => {
+      safeAsync(load(), 'forecourtSettings.load')
+    })
+  }, [load])
 
   const canSave = useMemo(() => {
     if (busy) return false
@@ -317,12 +319,20 @@ export default function ForecourtSettingsCard() {
             JPL heartbeat interval (ms)
           </div>
           <Input
+            type="number"
+            min={1000}
+            max={15000}
+            step={1000}
             value={String(settings?.jplHeartbeatIntervalMs ?? '')}
             placeholder="15000"
             onChange={(e) =>
               update('jplHeartbeatIntervalMs', Number(e.target.value || 0))
             }
           />
+          <div className="text-xs text-[var(--text-muted)]">
+            Use 15000 ms or lower. DOMS recommends sending traffic at least
+            every 15 seconds.
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -330,12 +340,21 @@ export default function ForecourtSettingsCard() {
             JPL dead connection timeout (ms)
           </div>
           <Input
+            type="number"
+            min={2000}
+            max={120000}
+            step={1000}
             value={String(settings?.jplDeadConnectionTimeoutMs ?? '')}
             placeholder="30000"
             onChange={(e) =>
               update('jplDeadConnectionTimeoutMs', Number(e.target.value || 0))
             }
           />
+          <div className="text-xs text-[var(--text-muted)]">
+            Use 30000 ms for field acceptance. It must be greater than the
+            heartbeat interval, so 15000 ms is blocked when heartbeat is also
+            15000 ms.
+          </div>
         </div>
 
         <div className="space-y-2">

@@ -7,9 +7,7 @@ import { requireCsrfFromParts } from '@/src/shared/security/csrf'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import { runPosControlCommand } from '@/src/modules/pos/application/runPosControlCommand'
-import { parsePrinterDeviceConfig } from '@/src/modules/printing/infrastructure/printerConfig'
-import { printJobsRepo } from '@/src/modules/printing/infrastructure/printJobsRepo'
-import { resolvePrinterForTransaction } from '@/src/modules/printing/infrastructure/resolvePrinterForTransaction'
+import { resolveReceiptPrinter } from '@/src/modules/printing/application/resolveReceiptPrinter'
 import { markTransactionReceiptPrinted } from '@/src/modules/transactions/application/commands'
 import {
   getOrCreateLatestTransactionReceipt,
@@ -45,16 +43,11 @@ export const POST = async (req: Request) => {
       transactionId,
     )
 
-    const pumpNumber = await printJobsRepo.getTransactionPumpNumber(
-      user.stationId,
-      transactionId,
-    )
-
-    const resolvedPrinter = await resolvePrinterForTransaction({
-      stationId: user.stationId,
-      transactionId,
-      pumpNumberHint: pumpNumber,
-    })
+    const { pumpNumber, printer: resolvedPrinter } =
+      await resolveReceiptPrinter({
+        stationId: user.stationId,
+        transactionId,
+      })
 
     if (!resolvedPrinter) {
       return fail(
@@ -81,9 +74,6 @@ export const POST = async (req: Request) => {
         receiptId: String(receipt.id),
         receiptNumber: currentReceipt?.receiptNumber ?? receipt.receipt_number,
         isReprint,
-        htmlContent: currentReceipt?.htmlContent ?? receipt.html_content,
-        plainTextContent:
-          currentReceipt?.plainTextContent ?? receipt.plain_text_content ?? '',
         pumpNumber: pumpNumber ?? undefined,
       },
     }

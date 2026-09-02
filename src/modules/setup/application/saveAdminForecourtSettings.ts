@@ -1,7 +1,7 @@
-import type { SaveForecourtSettingsInput } from '@/src/shared/forecourt/settings'
+import type { SaveForecourtSettingsInput } from '@/src/modules/forecourt/application/forecourtSettings'
 import { NextResponse } from 'next/server'
 
-import { saveForecourtSettings } from '@/src/shared/forecourt/settings'
+import { saveForecourtSettings } from '@/src/modules/forecourt/application/forecourtSettings'
 
 export async function saveAdminForecourtSettings(
   stationId: string,

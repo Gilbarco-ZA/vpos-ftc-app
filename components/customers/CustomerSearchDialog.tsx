@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import { api } from '@/src/shared/api/fetch'
 
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -49,51 +48,46 @@ export function CustomerSearchDialog({
 }) {
   const [transactionId, setTransactionId] = useState(initialTransactionId ?? '')
   const [query, setQuery] = useState('')
-  const [includeCloud, setIncludeCloud] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [local, setLocal] = useState<CustomerRow[]>([])
-  const [cloud, setCloud] = useState<CustomerRow[]>([])
+  const [results, setResults] = useState<CustomerRow[]>([])
   const [selected, setSelected] = useState<CustomerRow | null>(null)
 
-  // keep txId in sync when dialog opens with a different row
   useEffect(() => {
-    if (open) setTransactionId(initialTransactionId ?? '')
+    if (open) queueMicrotask(() => setTransactionId(initialTransactionId ?? ''))
   }, [open, initialTransactionId])
 
   useEffect(() => {
     if (!open) return
-    setError(null)
-    setSelected(null)
 
     const q = query.trim()
-    if (!q) {
-      setLocal([])
-      setCloud([])
-      return
-    }
+    const timer = setTimeout(async () => {
+      setError(null)
+      setSelected(null)
+      if (!q) {
+        setResults([])
+        return
+      }
 
-    const t = setTimeout(async () => {
       try {
         setLoading(true)
         const res = await api<any>(
-          `/api/customers/search?query=${encodeURIComponent(q)}&includeCloud=${includeCloud ? 'true' : 'false'}`,
+          `/api/customers/search?query=${encodeURIComponent(q)}`,
         )
         if (!res.ok) throw new Error(res.message)
 
-        setLocal(Array.isArray(res.data?.local) ? res.data.local : [])
-        setCloud(Array.isArray(res.data?.cloud) ? res.data.cloud : [])
+        setResults(Array.isArray(res.data?.local) ? res.data.local : [])
       } catch (e: any) {
         setError(e?.message || 'Search failed')
+        setResults([])
       } finally {
         setLoading(false)
       }
     }, 250)
 
-    return () => clearTimeout(t)
-  }, [open, query, includeCloud])
+    return () => clearTimeout(timer)
+  }, [open, query])
 
-  const results = [...local, ...cloud]
   const canConfirm =
     transactionId.trim().length > 0 && selected != null && !busy
 
@@ -119,15 +113,8 @@ export function CustomerSearchDialog({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by TIN or buyer name…"
+              placeholder="Search station customers by TIN or buyer name..."
             />
-            <label className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={includeCloud}
-                onChange={(e) => setIncludeCloud(e.target.checked)}
-              />
-              Include cloud search if local has no matches
-            </label>
           </div>
 
           {error ? <div className="text-sm text-red-600">{error}</div> : null}
@@ -148,7 +135,7 @@ export function CustomerSearchDialog({
                       colSpan={3}
                       className="text-muted-foreground text-sm"
                     >
-                      Searching…
+                      Searching...
                     </TableCell>
                   </TableRow>
                 ) : results.length === 0 ? (
@@ -161,20 +148,22 @@ export function CustomerSearchDialog({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  results.map((c) => {
-                    const isSelected = selected?.id === c.id
+                  results.map((customer) => {
+                    const isSelected = selected?.id === customer.id
                     return (
                       <TableRow
-                        key={`${c.id}:${c.tin ?? ''}`}
+                        key={`${customer.id}:${customer.tin ?? ''}`}
                         className={isSelected ? 'bg-muted' : 'cursor-pointer'}
-                        onClick={() => setSelected(c)}
+                        onClick={() => setSelected(customer)}
                       >
                         <TableCell className="font-medium">
-                          {displayName(c) || '—'}
+                          {displayName(customer) || '-'}
                         </TableCell>
-                        <TableCell>{(c.tin ?? '').toString() || '—'}</TableCell>
+                        <TableCell>
+                          {(customer.tin ?? '').toString() || '-'}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">
-                          {c.id}
+                          {customer.id}
                         </TableCell>
                       </TableRow>
                     )

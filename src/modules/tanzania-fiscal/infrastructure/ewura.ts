@@ -144,7 +144,7 @@ export async function buildSignedEwuraNpgisXml(args: {
   if (!args.skipSigningForDebug) {
     if (!privateKeyPem) {
       throw new Error(
-        'Tanzania EWURA signing key is not configured in secure artifacts. Store a PEM private key as ewura/private-key.pem or cert/private-key.pem, or enable TZ_FISCAL_SKIP_SIGNING only for developer debugging.',
+        'Tanzania EWURA signing key is not configured in secure artifacts. Store a PEM private key as ewura/private-key.pem or cert/private-key.pem, or enable the Skip TRA/EWURA signing setting only for developer debugging.',
       )
     }
     signature = signXmlSha1Base64({
@@ -235,6 +235,7 @@ export async function postEwuraXml(args: {
   baseUrl: string
   endpoint: string
   xml: string
+  acceptedCodes?: string[]
 }): Promise<EwuraSendResult> {
   const url = urlJoin(args.baseUrl, args.endpoint)
   const response = await fetch(url, {
@@ -244,7 +245,9 @@ export async function postEwuraXml(args: {
   })
   const raw = await response.text().catch(() => '')
   const parsed = parseEwuraResponse(raw)
-  const ok = response.ok && (!parsed.code || parsed.code === '200')
+  const acceptedCodes = args.acceptedCodes ?? ['200']
+  const ok =
+    response.ok && (!parsed.code || acceptedCodes.includes(parsed.code))
   return {
     ok,
     reference: parsed.transactionId ?? null,
@@ -338,6 +341,10 @@ export async function sendEwuraRegistrationFromConfig(args: {
       baseUrl: cfg.ewura.baseUrl,
       endpoint: EWURA_ENDPOINTS.registration,
       xml,
+      // EWURA returns 7203 when the station already exists. The production
+      // integration treats that as a valid registered state rather than a
+      // failed registration attempt.
+      acceptedCodes: ['200', '7203'],
     })
     if (result.ok) {
       await markEwuraRegistrationSent({

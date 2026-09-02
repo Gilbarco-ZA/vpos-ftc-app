@@ -52,7 +52,9 @@ export default function PumpModeClient() {
   }, [])
 
   useEffect(() => {
-    loadConfig()
+    queueMicrotask(() => {
+      loadConfig()
+    })
   }, [loadConfig])
 
   const togglePump = (pumpNumber: number, checked: boolean) => {

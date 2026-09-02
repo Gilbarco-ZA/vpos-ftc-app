@@ -1,6 +1,5 @@
 import type { SessionUser, UserRole } from '@/src/shared/types'
 
-import { query } from '@/src/platform/db/postgres'
 import { readBody, toBool } from '@/src/platform/web/api/request'
 import { fail, ok, serverError } from '@/src/platform/web/api/response'
 import {
@@ -11,6 +10,8 @@ import {
 } from '@/src/shared/auth'
 import { requireCsrfFromParts } from '@/src/shared/security/csrf'
 import { listUsers, userExists } from '@/src/shared/server/users'
+
+import { updateUserMetadata } from '@/src/modules/users/application/manageUsers'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -128,25 +129,14 @@ export const PATCH = async (req: Request) => {
         ? String(body.username).trim()
         : undefined
 
-      await query(
-        `
-        UPDATE users
-        SET role = COALESCE($1, role),
-            full_name = COALESCE($2, full_name),
-            email = COALESCE($3, email),
-            username = COALESCE($4, username),
-            updated_at = NOW()
-        WHERE id = $5 AND station_id = $6 AND deleted_at IS NULL
-        `,
-        [
-          nextRole ?? null,
-          nextFullName ?? null,
-          nextEmail ?? null,
-          nextUsername ?? null,
-          userId,
-          user.stationId,
-        ],
-      )
+      await updateUserMetadata({
+        stationId: user.stationId,
+        userId,
+        role: nextRole,
+        fullName: nextFullName,
+        email: nextEmail,
+        username: nextUsername,
+      })
     }
 
     return ok({ success: true })

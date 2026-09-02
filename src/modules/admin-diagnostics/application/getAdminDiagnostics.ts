@@ -1,6 +1,5 @@
 import { ok } from '@/src/platform/web/api/response'
 import { getAllProcessHeartbeats } from '@/src/shared/runtime/heartbeats'
-import { getRuntimeManager } from '@/src/shared/runtime/manager'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 
 import { getAdminStatus } from '@/src/modules/admin-diagnostics/application/getAdminStatus'
@@ -10,6 +9,7 @@ import {
   listPrintJobStatusCounts,
   listRecentDiagnosticErrors,
 } from '@/src/modules/admin-diagnostics/infrastructure/adminDiagnosticsRepo'
+import { getRuntimeManager } from '@/src/modules/runtime/application/runtimeManager'
 
 export async function getAdminDiagnostics(stationId: string) {
   const dbOk = await safeAsync(checkDiagnosticsDb(), 'diagnostics.dbCheck')

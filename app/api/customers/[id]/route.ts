@@ -11,11 +11,8 @@ import { updateCustomerRecord } from '@/src/modules/customers/application/update
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const getParams = (ctx: any) => ({ id: String(ctx?.params?.id || '') })
-
 export const GET = defineGetRoute<{ id: string }>({
   roles: ['tenant', 'manager', 'administrator'],
-  getParams,
   handler: async (_req, { user, params }) => {
     const result = await getCustomerById({
       stationId: user.stationId,
@@ -27,7 +24,6 @@ export const GET = defineGetRoute<{ id: string }>({
 
 export const PATCH = defineMutationRoute<Record<string, any>, { id: string }>({
   roles: ['tenant', 'manager', 'administrator'],
-  getParams,
   handler: async (_req, { user, body, params }) => {
     const result = await updateCustomerRecord({
       stationId: user.stationId,
@@ -40,7 +36,6 @@ export const PATCH = defineMutationRoute<Record<string, any>, { id: string }>({
 
 export const DELETE = defineMutationRoute<Record<string, any>, { id: string }>({
   roles: ['tenant', 'manager', 'administrator'],
-  getParams,
   handler: async (_req, { body, params }) => {
     const result = await deleteOrRestoreCustomer({
       customerId: params.id,

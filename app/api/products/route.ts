@@ -9,12 +9,12 @@ import { logger } from '@/src/shared/utils/logger'
 
 import { createProducts } from '@/src/modules/products/application/commands/create-product'
 import { updateProductStatus } from '@/src/modules/products/application/commands/update-product-status'
+import { createProductSchema } from '@/src/modules/products/application/productSchemas'
 import { listProducts } from '@/src/modules/products/application/queries/list-products'
 import {
   resolveProductOnlineStatus,
   syncProductsToCloudService,
 } from '@/src/modules/products/application/services/product-service'
-import { createProductSchema } from '@/src/modules/products/infrastructure/validators/product.schemas'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

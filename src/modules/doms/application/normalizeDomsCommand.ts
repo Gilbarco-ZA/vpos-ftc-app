@@ -1,5 +1,6 @@
 import { notFound } from '@/src/platform/web/api/response'
-import { domsCommands } from '@/src/shared/doms/commands'
+
+import { domsCommands } from '@/src/modules/doms/application/domsCommands'
 
 export function normalizeDomsCommand(command: string) {
   const cmdName = String(command || '')

@@ -1,8 +1,8 @@
 import '@/src/modules/forecourt/infrastructure/jpl/globals'
 
-import { serializeForLog } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
 import { appendLogLine } from '@/src/shared/logs/service'
 
+import { serializeForLog } from '@/src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers'
 import { redactJplSensitivePaymentData } from '@/src/modules/forecourt/infrastructure/jpl/unattendedTransactions'
 
 export const JPL_TRAFFIC_LOG = 'doms-jpl.log'
@@ -12,8 +12,6 @@ const shouldSkipTrafficLog = (
   event: string,
   payload: unknown,
 ) => {
-  if (direction !== 'recv') return false
-
   const eventText = String(event || '')
     .trim()
     .toLowerCase()

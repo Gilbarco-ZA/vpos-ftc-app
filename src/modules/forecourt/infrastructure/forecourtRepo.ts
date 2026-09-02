@@ -1,9 +1,9 @@
 import {
   getForecourtSyncConfig,
   runForecourtConfigSync,
-} from '@/src/shared/forecourt/configSync'
-import { sendForecourtCommand } from '@/src/shared/forecourt/gateway'
-import { getForecourtRuntimeConfig } from '@/src/shared/forecourt/runtime'
+} from '@/src/modules/forecourt/application/forecourtConfigSync'
+import { getForecourtRuntimeConfig } from '@/src/modules/forecourt/application/forecourtRuntime'
+import { sendForecourtCommand } from '@/src/modules/forecourt/infrastructure/gateway'
 
 export async function getForecourtSyncConfigRepo(stationId: string) {
   return await getForecourtSyncConfig(stationId)

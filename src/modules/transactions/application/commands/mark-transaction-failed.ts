@@ -1,5 +1,6 @@
-import { enqueueFiscalInboxReviewItem } from '@/src/shared/runtime/fiscalInbox'
+import type { FiscalizationEventWriteDetails } from '@/src/modules/transactions/infrastructure/fiscalization/fiscalization-event.repository'
 
+import { enqueueFiscalInboxReviewItem } from '@/src/modules/fiscal-inbox/application/fiscalInbox'
 import { markTransactionFailedRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction.repository'
 
 export async function markTransactionFailed(input: {
@@ -9,6 +10,7 @@ export async function markTransactionFailed(input: {
   incrementRetryCount?: boolean
   fiscalDocumentId?: string | null
   fiscalizationResponse?: unknown
+  fiscalEvent?: FiscalizationEventWriteDetails
   client?: any | null
 }) {
   const result = await markTransactionFailedRepo(input)
@@ -21,13 +23,8 @@ export async function markTransactionFailed(input: {
     message: {
       source: 'markTransactionFailed',
       fiscalDocumentId: input.fiscalDocumentId ?? null,
-      fiscalizationResponse:
-        input.fiscalizationResponse &&
-        typeof input.fiscalizationResponse === 'object'
-          ? (input.fiscalizationResponse as Record<string, unknown>)
-          : input.fiscalizationResponse != null
-            ? { value: String(input.fiscalizationResponse) }
-            : null,
+      fiscalEventId: result?.latest_fiscal_event_id ?? null,
+      fiscalizationSummary: result?.fiscalization_response ?? null,
     },
   }).catch(() => {})
 

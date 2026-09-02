@@ -2,7 +2,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import type { ImportContext } from '@/src/modules/setup/infrastructure/legacy-importer/types'
 
-import { query, queryOne } from '@/src/platform/db/postgres'
+import { queryOne } from '@/src/platform/db/postgres'
 
 import {
   getFileMeta,

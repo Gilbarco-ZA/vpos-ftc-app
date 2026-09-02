@@ -5,14 +5,25 @@ import { getStationId } from '@/src/shared/utils/getStationId'
 import { isUuid } from '@/src/shared/utils/ids'
 import { logger } from '@/src/shared/utils/logger'
 
+import envDefaults from './env-defaults.cjs'
+
+const { applyEnvironmentDefaults } = envDefaults
+
 let envLoaded = false
 
 export function bootstrapRuntimeEnvironment() {
   if (envLoaded) return
-  // Load local overrides first for developer runs, then package/runtime env files.
-  loadEnv({ path: path.join(process.cwd(), '.env.local') })
-  loadEnv({ path: path.join(process.cwd(), '.env.production') })
-  loadEnv({ path: path.join(process.cwd(), '.env') })
+
+  // .env files are development conveniences only. Production packages use
+  // built-in defaults plus station/database configuration and optional process
+  // environment overrides supplied by the service manager.
+  if (process.env.NODE_ENV !== 'production') {
+    loadEnv({ path: path.join(process.cwd(), '.env.local') })
+    loadEnv({ path: path.join(process.cwd(), '.env.development') })
+    loadEnv({ path: path.join(process.cwd(), '.env') })
+  }
+
+  applyEnvironmentDefaults(process.env)
   envLoaded = true
 }
 

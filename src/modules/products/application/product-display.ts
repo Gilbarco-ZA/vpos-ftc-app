@@ -11,19 +11,15 @@ import {
   listCountryDatasetRows,
 } from '@/src/shared/server/config/countryDatasets'
 
-export const getCurrencyOptions = async (country?: string | null) => {
-  const configuredOptions = getConfiguredCurrencyOptions()
-
-  if (configuredOptions.length > 0) return configuredOptions
-
-  const summary = country ? await getCountryDatasetSummary(country) : null
-  const currency = String(summary?.currencyCode || '').trim()
-  return currency ? [currency] : [process.env.DEFAULT_CURRENCY?.trim() || 'USD']
-}
+import { resolveDefaultProductCurrency } from './product-currency-policy'
 
 export const getDefaultCurrency = async (country?: string | null) => {
-  const options = await getCurrencyOptions(country)
-  return options[0] ?? process.env.DEFAULT_CURRENCY?.trim() ?? 'USD'
+  const summary = country ? await getCountryDatasetSummary(country) : null
+  return resolveDefaultProductCurrency({
+    stationCurrency: summary?.currencyCode,
+    configuredOptions: getConfiguredCurrencyOptions(),
+    environmentDefault: process.env.DEFAULT_CURRENCY,
+  })
 }
 
 export const getTaxTypeOptions = async (

@@ -2,7 +2,7 @@
 
 import type { Dispatch, SetStateAction } from 'react'
 import type { ZodError, ZodType } from 'zod'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 export type UseFormOptions<TForm extends Record<string, any>> = {
   /** Initial form values. */
@@ -46,11 +46,6 @@ export function useForm<TForm extends Record<string, any>>(
 ): UseFormReturn<TForm> {
   const { initial, schema, onSubmit } = options
 
-  const schemaRef = useRef(schema)
-  schemaRef.current = schema
-  const onSubmitRef = useRef(onSubmit)
-  onSubmitRef.current = onSubmit
-
   const [form, setForm] = useState<TForm>(initial)
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof TForm, string>>
@@ -79,8 +74,8 @@ export function useForm<TForm extends Record<string, any>>(
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return
 
-    if (schemaRef.current) {
-      const result = schemaRef.current.safeParse(form)
+    if (schema) {
+      const result = schema.safeParse(form)
       if (!result.success) {
         const zodError = result.error as ZodError
         const next: Partial<Record<keyof TForm, string>> = {}
@@ -100,7 +95,7 @@ export function useForm<TForm extends Record<string, any>>(
     setIsSubmitting(true)
 
     try {
-      const result = await onSubmitRef.current(form, csrfToken)
+      const result = await onSubmit(form, csrfToken)
       if (result === false) {
         return
       }
@@ -109,7 +104,7 @@ export function useForm<TForm extends Record<string, any>>(
     } finally {
       setIsSubmitting(false)
     }
-  }, [form, csrfToken, isSubmitting])
+  }, [csrfToken, form, isSubmitting, onSubmit, schema])
 
   return {
     form,

@@ -79,6 +79,12 @@ export const markReplayCapability = (
   capabilities[mode] = value
 }
 
+export const resetReplayCapabilities = () => {
+  const capabilities = getReplayCapabilities()
+  capabilities.supervised = 'unknown'
+  capabilities.unsupervised = 'unknown'
+}
+
 export const canAttemptReplay = (mode: BufferMode) => {
   const capabilities = getReplayCapabilities()
   return capabilities[mode] !== 'denied'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
@@ -37,7 +37,7 @@ export const ControlPanelClient = () => {
   const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -53,11 +53,13 @@ export const ControlPanelClient = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    refresh().catch((e) => setError(e?.message ?? String(e)))
-  }, [])
+    queueMicrotask(() => {
+      refresh().catch((e) => setError(e?.message ?? String(e)))
+    })
+  }, [refresh])
 
   const run = async (cmd: 'restart' | 'reload-config') => {
     setBusy(cmd)

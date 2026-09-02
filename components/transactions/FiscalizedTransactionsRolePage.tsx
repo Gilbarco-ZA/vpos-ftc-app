@@ -1,12 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAuth } from '@/src/shared/auth'
+import { resolveDateFilter } from '@/src/shared/crud/dateFilters'
 import { getStationDecimalSettings } from '@/src/shared/server/decimalSettings'
+import { getStationCurrentBusinessDate } from '@/src/shared/server/stationBusinessDate'
 
-import { listFiscalizedTransactions } from '@/src/modules/transactions/application/queries/list-fiscalized-transactions'
+import { listTransactions } from '@/src/modules/transactions/application/queries/list-transactions'
 
+import { ListToolbar } from '@/components/crud/ListToolbar'
 import { PageHeader } from '@/components/layout/page-header'
 import ReceiptViewerClient from '@/components/receipts/ReceiptViewerClient'
 import FiscalizedTransactionsManagerClient, {
@@ -18,7 +20,6 @@ import FiscalizedTransactionsPageClient, {
 import { TransactionsStatusToggle } from '@/components/transactions/TransactionsStatusToggle'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 
 export type FiscalizedRole = 'manager' | 'administrator'
 
@@ -42,6 +43,8 @@ const loadManagerTransactions = async (opts: {
   page?: number
   pageSize?: number
   transactionId?: string
+  startDate?: string
+  endDate?: string
 }) => {
   const params = new URLSearchParams()
   params.set('page', String(opts.page ?? 1))
@@ -49,6 +52,8 @@ const loadManagerTransactions = async (opts: {
   params.set('status', 'FISCALIZED')
   params.set('includeCustomer', '1')
   if (opts.transactionId) params.set('transactionId', opts.transactionId)
+  if (opts.startDate) params.set('startDate', opts.startDate)
+  if (opts.endDate) params.set('endDate', opts.endDate)
 
   const res = await fetch(`/api/transactions?${params.toString()}`, {
     cache: 'no-store',
@@ -104,27 +109,59 @@ const ReceiptViewerView = async ({
   const initialQuery = readParam(searchParams, 'q').trim()
   const initialTransactionId = readParam(searchParams, 'transactionId').trim()
   const autoPrint = readParam(searchParams, 'print').trim() === '1'
+  const businessDate = await getStationCurrentBusinessDate(user.stationId)
+  const dateFilter = resolveDateFilter(
+    {
+      startDate: readParam(searchParams, 'startDate'),
+      endDate: readParam(searchParams, 'endDate'),
+      preset: readParam(searchParams, 'preset'),
+    },
+    businessDate,
+  )
 
   return (
     <ReceiptViewerClient
       initialQuery={initialQuery}
       initialTransactionId={initialTransactionId}
       autoPrint={autoPrint}
+      initialFromDate={dateFilter.startDate}
+      initialToDate={dateFilter.endDate}
+      businessDate={businessDate}
     />
   )
 }
 
-const AdminFiscalizedView = async () => {
+const AdminFiscalizedView = async ({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) => {
   const user = await requireAuth(['manager', 'administrator'])
   if (!['administrator', 'manager'].includes(user.role)) redirect('/dashboard')
 
   let rows: FiscalizedTransactionListItem[] = []
   let error: string | null = null
-  const decimals = await getStationDecimalSettings(user.stationId)
+  const [decimals, businessDate] = await Promise.all([
+    getStationDecimalSettings(user.stationId),
+    getStationCurrentBusinessDate(user.stationId),
+  ])
+  const dateFilter = resolveDateFilter(
+    {
+      startDate: readParam(searchParams, 'startDate'),
+      endDate: readParam(searchParams, 'endDate'),
+      preset: readParam(searchParams, 'preset'),
+    },
+    businessDate,
+  )
 
   try {
-    const list = await listFiscalizedTransactions(user.stationId)
-    rows = normalizeAdminRows(list)
+    const list = await listTransactions(user.stationId, {
+      scope: 'fiscalized',
+      limit: 200,
+      startDate: dateFilter.startDate || undefined,
+      endDate: dateFilter.endDate || undefined,
+    })
+    rows = normalizeAdminRows(Array.isArray(list?.items) ? list.items : [])
   } catch (err: any) {
     error = err?.message ?? 'Failed to load transactions'
   }
@@ -134,6 +171,9 @@ const AdminFiscalizedView = async () => {
       initialTransactions={rows}
       error={error}
       decimals={decimals}
+      initialStartDate={dateFilter.startDate}
+      initialEndDate={dateFilter.endDate}
+      businessDate={businessDate}
     />
   )
 }
@@ -149,11 +189,26 @@ const ManagerFiscalizedView = async ({
 
   const page = Number(readParam(searchParams, 'page') || '1') || 1
   const transactionId = readParam(searchParams, 'transactionId').trim()
+  const requestedStartDate = readParam(searchParams, 'startDate').trim()
+  const requestedEndDate = readParam(searchParams, 'endDate').trim()
+  const requestedPreset = readParam(searchParams, 'preset').trim()
+  const businessDate = await getStationCurrentBusinessDate(user.stationId)
+  const dateFilter = resolveDateFilter(
+    {
+      startDate: requestedStartDate,
+      endDate: requestedEndDate,
+      preset: requestedPreset,
+    },
+    businessDate,
+  )
+  const { startDate, endDate, preset } = dateFilter
 
   const data = await loadManagerTransactions({
     page,
     pageSize: 50,
     transactionId: transactionId || undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
   })
 
   const rows: TxnRow[] = data.items || data || []
@@ -175,32 +230,40 @@ const ManagerFiscalizedView = async ({
     status: (t as any)?.status ?? null,
   }))
 
-  const prevHref = `/transactions?status=fiscalized&page=${prevPage}${transactionId ? `&transactionId=${encodeURIComponent(transactionId)}` : ''}`
-  const nextHref = `/transactions?status=fiscalized&page=${nextPage}${transactionId ? `&transactionId=${encodeURIComponent(transactionId)}` : ''}`
+  const pageHref = (targetPage: number) => {
+    const params = new URLSearchParams({
+      status: 'fiscalized',
+      page: String(targetPage),
+      preset,
+    })
+    if (transactionId) params.set('transactionId', transactionId)
+    if (startDate) params.set('startDate', startDate)
+    if (endDate) params.set('endDate', endDate)
+    return `/transactions?${params.toString()}`
+  }
+  const prevHref = pageHref(prevPage)
+  const nextHref = pageHref(nextPage)
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Fiscalized transactions"
-        description="Transactions with status FISCALIZED. Use View receipt to open the rendered receipt."
+        description="Fiscalized transactions for today's station business day. Use the date filter for history."
         actions={<TransactionsStatusToggle active="fiscalized" />}
       />
 
-      <form
-        className="flex flex-wrap items-center gap-2"
-        method="get"
-        action="/transactions?status=fiscalized"
-      >
-        <Input
-          name="transactionId"
-          defaultValue={transactionId}
-          placeholder="Transaction ID (optional)"
-          className="w-full max-w-sm"
-        />
-        <Button type="submit" variant="secondary">
-          Search
-        </Button>
-      </form>
+      <ListToolbar
+        baseActionPath="/transactions?status=fiscalized"
+        searchKey="transactionId"
+        searchPlaceholder="Transaction ID (optional)"
+        initial={{
+          q: transactionId,
+          startDate,
+          endDate,
+          preset,
+        }}
+        currentDate={businessDate}
+      />
 
       <Card className="overflow-hidden">
         <div className="border-b border-border px-4 py-3 text-sm text-[var(--text-secondary)]">
@@ -231,7 +294,7 @@ export const FiscalizedTransactionsRolePage = async ({
   }
 
   if (role === 'administrator') {
-    return <AdminFiscalizedView />
+    return <AdminFiscalizedView searchParams={searchParams} />
   }
 
   return <ManagerFiscalizedView searchParams={searchParams} />

@@ -31,7 +31,7 @@ export function ReplayClient({
     let parsed: any
     try {
       parsed = JSON.parse(text)
-    } catch (e) {
+    } catch {
       alert('Invalid JSON: please fix before cloning')
       return
     }

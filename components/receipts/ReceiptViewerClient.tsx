@@ -56,6 +56,9 @@ type ReceiptViewerClientProps = {
   backHref?: string | null
   backLabel?: string
   alwaysShowResultsList?: boolean
+  initialFromDate?: string
+  initialToDate?: string
+  businessDate?: string
 }
 
 const ReceiptViewerClient = ({
@@ -67,11 +70,14 @@ const ReceiptViewerClient = ({
   backHref = '/transactions?status=fiscalized',
   backLabel = 'Back to fiscalized',
   alwaysShowResultsList = false,
+  initialFromDate = '',
+  initialToDate = '',
+  businessDate = '',
 }: ReceiptViewerClientProps) => {
   const router = useRouter()
   const [search, setSearch] = useState(initialQuery || '')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+  const [fromDate, setFromDate] = useState(initialFromDate)
+  const [toDate, setToDate] = useState(initialToDate)
   const [results, setResults] = useState<TransactionListItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(
     initialTransactionId || null,
@@ -93,8 +99,8 @@ const ReceiptViewerClient = ({
     try {
       const params = new URLSearchParams({ scope: 'fiscalized', limit: '100' })
       if (search.trim()) params.set('search', search.trim())
-      if (fromDate) params.set('from', `${fromDate}T00:00:00`)
-      if (toDate) params.set('to', `${toDate}T23:59:59`)
+      if (fromDate) params.set('startDate', fromDate)
+      if (toDate) params.set('endDate', toDate)
 
       const res = await fetch(`/api/transactions?${params.toString()}`, {
         cache: 'no-store',
@@ -199,20 +205,26 @@ const ReceiptViewerClient = ({
   )
 
   useEffect(() => {
-    fetchResults()
+    queueMicrotask(() => {
+      fetchResults()
+    })
   }, [fetchResults])
 
   useEffect(() => {
-    if (selectedId) {
-      fetchReceipt(selectedId)
-    }
+    queueMicrotask(() => {
+      if (selectedId) {
+        fetchReceipt(selectedId)
+      }
+    })
   }, [selectedId, fetchReceipt])
 
   useEffect(() => {
     if (!autoPrint || !receipt || !selectedId || !csrfToken) return
     if (autoPrintStartedFor.current === selectedId) return
     autoPrintStartedFor.current = selectedId
-    void printReceipt(selectedId, true)
+    queueMicrotask(() => {
+      void printReceipt(selectedId, true)
+    })
   }, [autoPrint, receipt, selectedId, csrfToken, printReceipt])
 
   const selected = useMemo(
@@ -260,6 +272,25 @@ const ReceiptViewerClient = ({
         </div>
         <Button variant="secondary" onClick={fetchResults} disabled={loading}>
           {loading ? 'Searching…' : 'Search'}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setFromDate(businessDate)
+            setToDate(businessDate)
+          }}
+          disabled={!businessDate}
+        >
+          Today
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setFromDate('')
+            setToDate('')
+          }}
+        >
+          All dates
         </Button>
       </div>
 

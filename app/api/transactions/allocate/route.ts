@@ -7,6 +7,11 @@ export const POST = defineMutationRoute<{
   transactionId?: string
   customerId?: string
   tin?: string
+  odometer?: string
+  paymentType?: string
+  payment_type?: string
+  vehicleRegNr?: string
+  vehicle_reg_nr?: string
   csrf_token?: string
 }>({
   roles: ['tenant', 'manager', 'administrator'],
@@ -16,6 +21,11 @@ export const POST = defineMutationRoute<{
       transactionId: String(body.transactionId || '').trim(),
       customerId: String(body.customerId || '').trim(),
       allocatedBy: user.id,
+      vehicleDetails: {
+        odometer: body.odometer,
+        paymentType: body.paymentType ?? body.payment_type,
+        vehicleRegNr: body.vehicleRegNr ?? body.vehicle_reg_nr,
+      },
     })
     return ok(result)
   },

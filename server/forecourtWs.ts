@@ -1,45 +1,37 @@
 /** @deprecated Legacy server entrypoint support. Keep compatibility only while migrations continue. */
+import type { PumpStateSnapshot } from '@/src/modules/pumps/infrastructure/pumpStore'
 import type {
   ForecourtCommand,
   ForecourtCommandAck,
 } from '@/src/shared/forecourt/types'
-import type { PumpStateSnapshot } from '@/src/shared/pumps/store'
 import type { Server as HttpServer } from 'node:http'
 import type { Socket } from 'socket.io'
 import { Server as SocketIOServer } from 'socket.io'
 
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
 import { getJplGatewayState } from '@/src/platform/integrations/jpl/gateway'
+import { readPumpSnapshot } from '@/src/shared/forecourt/sharedState'
+import { getRuntimeBus } from '@/src/shared/runtime/bus'
+import { getStationId } from '@/src/shared/utils/getStationId'
+import { isUuid } from '@/src/shared/utils/uuid'
+
+import { getJplTcpBufferHealth } from '@/src/modules/forecourt/application/forecourtAdapters'
+import { getForecourtRuntimeConfig } from '@/src/modules/forecourt/application/forecourtRuntime'
+import { getForecourtConnectionStatus } from '@/src/modules/forecourt/application/getForecourtConnectionStatus'
+import { ensureGatewayStarted } from '@/src/modules/forecourt/infrastructure/gateway'
+import { enqueue } from '@/src/modules/forecourt/infrastructure/queue/commandQueue'
 import {
-  getJplTcpAdapterState,
-  getJplTcpBufferHealth,
-} from '@/src/shared/forecourt/adapters'
-import { ensureGatewayStarted } from '@/src/shared/forecourt/gateway'
-import {
-  enqueue,
   onForecourtCommandResult,
   startForecourtCommandProcessor,
   triggerForecourtCommandProcessing,
-} from '@/src/shared/forecourt/queue'
-import { getForecourtRuntimeConfig } from '@/src/shared/forecourt/runtime'
-import {
-  readAdapterState,
-  readPumpSnapshot,
-} from '@/src/shared/forecourt/sharedState'
+} from '@/src/modules/forecourt/infrastructure/queue/processor'
 import {
   getPumpState,
   startPumpBusListener,
   subscribePumpState,
-} from '@/src/shared/pumps/store'
-import { getRuntimeBus } from '@/src/shared/runtime/bus'
-import { getStationId } from '@/src/shared/utils/getStationId'
-import { logger } from '@/src/shared/utils/logger'
-import { isUuid } from '@/src/shared/utils/uuid'
-
-import { getForecourtConnectionStatus } from '@/src/modules/forecourt/application/getForecourtConnectionStatus'
+} from '@/src/modules/pumps/infrastructure/pumpStore'
 
 declare global {
-  // eslint-disable-next-line no-var
   var __vposForecourtWsAttached: boolean | undefined
 }
 
@@ -77,92 +69,6 @@ const sendProtocolHealth = (socket: Socket, stationId: string) => {
       ...(gatewayState?.protocolHealth ?? gatewayState?.protocol ?? {}),
     },
   })
-}
-
-type ForecourtConnectionStatus = 'online' | 'offline' | 'degraded'
-
-const selectAdapterState = (
-  localAdapterState: ReturnType<typeof getJplTcpAdapterState>,
-  sharedAdapterState: Awaited<ReturnType<typeof readAdapterState>> | null,
-) => {
-  if (!sharedAdapterState) return localAdapterState
-
-  const localLastSeen =
-    localAdapterState.lastMessageAt ?? localAdapterState.lastConnectAt ?? 0
-  const sharedLastSeen =
-    sharedAdapterState.lastMessageAt ?? sharedAdapterState.lastConnectAt ?? 0
-
-  // Do not let a stale persisted offline snapshot override a live in-process connection.
-  if (localAdapterState.connected && !sharedAdapterState.connected) {
-    return localAdapterState
-  }
-
-  if (sharedAdapterState.connected && !localAdapterState.connected) {
-    return sharedAdapterState
-  }
-
-  return localLastSeen >= sharedLastSeen
-    ? localAdapterState
-    : sharedAdapterState
-}
-
-const FORECOURT_FRESH_MS = 30_000
-const FORECOURT_STALE_MS = 5 * 60_000
-
-const getLastPersistedForecourtSeenAt = async (stationId?: string) => {
-  if (!stationId) return null
-
-  const row = await queryOne<{ last_seen_at: string | null }>(
-    `
-      SELECT MAX(received_at)::text AS last_seen_at
-        FROM forecourt_events
-       WHERE station_id = $1
-         AND source IN ('jpl_tcp', 'ftc')
-    `,
-    [stationId],
-  )
-
-  if (!row?.last_seen_at) return null
-
-  const ts = new Date(row.last_seen_at).getTime()
-  return Number.isFinite(ts) ? ts : null
-}
-
-const resolveForecourtStatus = async (stationId?: string) => {
-  const localAdapterState = getJplTcpAdapterState()
-  const sharedAdapterState = stationId
-    ? await readAdapterState(stationId)
-    : null
-  const adapterState = selectAdapterState(localAdapterState, sharedAdapterState)
-
-  const connected = Boolean(adapterState.connected)
-  const reconnectAttempts = Number(adapterState.reconnectAttempts ?? 0)
-
-  const runtimeLastSeenAt =
-    adapterState.lastMessageAt ?? adapterState.lastConnectAt ?? null
-
-  const persistedLastSeenAt = await getLastPersistedForecourtSeenAt(stationId)
-
-  const lastSeenAt = runtimeLastSeenAt ?? persistedLastSeenAt ?? null
-
-  const ageMs =
-    lastSeenAt == null ? Number.POSITIVE_INFINITY : Date.now() - lastSeenAt
-
-  let status: ForecourtConnectionStatus = 'offline'
-
-  if (connected && ageMs <= FORECOURT_FRESH_MS) {
-    status = 'online'
-  } else if (connected || ageMs <= FORECOURT_STALE_MS) {
-    status = 'degraded'
-  } else {
-    status = 'offline'
-  }
-
-  return {
-    status,
-    lastSeenAt,
-    reconnectAttempts,
-  }
 }
 
 const isRiskyAction = (action: string) =>
@@ -375,7 +281,7 @@ export function attachForecourtWs(server: HttpServer) {
       )
       const statusByStation = new Map<
         string,
-        Awaited<ReturnType<typeof resolveForecourtStatus>>
+        Awaited<ReturnType<typeof getForecourtConnectionStatus>>
       >()
 
       for (const stationId of stationIds) {

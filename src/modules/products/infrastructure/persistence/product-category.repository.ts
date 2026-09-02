@@ -250,3 +250,63 @@ export async function deleteProductCategoryRepo(args: {
     [args.stationId, args.categoryId],
   )
 }
+
+const normalizeCategoryReference = (value: unknown) =>
+  String(value ?? '')
+    .trim()
+    .toUpperCase()
+
+export async function resolveProductCategoriesByReferencesRepo(
+  stationId: string,
+  references: string[],
+): Promise<{
+  categories: Map<string, ProductCategoryRecord>
+  ambiguousReferences: Set<string>
+}> {
+  const normalizedReferences = Array.from(
+    new Set(references.map(normalizeCategoryReference).filter(Boolean)),
+  )
+  if (!normalizedReferences.length) {
+    return { categories: new Map(), ambiguousReferences: new Set() }
+  }
+
+  const rows = await queryAll<Record<string, unknown>>(
+    `SELECT id, station_id, code, name, description, icon, image_path,
+            sort_order, is_active, created_at, updated_at
+       FROM product_categories
+      WHERE station_id = $1
+        AND (
+          UPPER(BTRIM(code)) = ANY($2::text[])
+          OR UPPER(BTRIM(name)) = ANY($2::text[])
+        )`,
+    [stationId, normalizedReferences],
+  )
+
+  const requested = new Set(normalizedReferences)
+  const matches = new Map<string, Map<string, ProductCategoryRecord>>()
+  for (const category of rows.map(mapProductCategoryRow)) {
+    const keys = new Set([
+      normalizeCategoryReference(category.code),
+      normalizeCategoryReference(category.name),
+    ])
+    for (const key of keys) {
+      if (!key || !requested.has(key)) continue
+      const candidates = matches.get(key) ?? new Map()
+      candidates.set(category.id, category)
+      matches.set(key, candidates)
+    }
+  }
+
+  const categories = new Map<string, ProductCategoryRecord>()
+  const ambiguousReferences = new Set<string>()
+  for (const [reference, candidates] of matches) {
+    if (candidates.size === 1) {
+      const category = candidates.values().next().value
+      if (category) categories.set(reference, category)
+    } else if (candidates.size > 1) {
+      ambiguousReferences.add(reference)
+    }
+  }
+
+  return { categories, ambiguousReferences }
+}

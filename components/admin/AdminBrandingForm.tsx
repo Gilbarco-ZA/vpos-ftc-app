@@ -11,6 +11,7 @@ import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { FormField } from '@/components/ui/form-field'
 import { Input } from '@/components/ui/input'
+import { RuntimeImage } from '@/components/ui/runtime-image'
 import { Textarea } from '@/components/ui/textarea'
 
 type Branding = {
@@ -60,12 +61,12 @@ export const AdminBrandingForm = () => {
 
   useEffect(() => {
     if (!selectedLogoFile) {
-      setLogoPreviewUrl(null)
+      queueMicrotask(() => setLogoPreviewUrl(null))
       return
     }
 
     const objectUrl = URL.createObjectURL(selectedLogoFile)
-    setLogoPreviewUrl(objectUrl)
+    queueMicrotask(() => setLogoPreviewUrl(objectUrl))
     return () => URL.revokeObjectURL(objectUrl)
   }, [selectedLogoFile])
 
@@ -124,7 +125,7 @@ export const AdminBrandingForm = () => {
           <Input
             name="primaryColor"
             type="color"
-            defaultValue={initial?.primary_color ?? '#111827'}
+            defaultValue={initial?.primary_color ?? '#00f5ff'}
             className="h-11"
           />
         </FormField>
@@ -135,7 +136,7 @@ export const AdminBrandingForm = () => {
           <Input
             name="secondaryColor"
             type="color"
-            defaultValue={initial?.secondary_color ?? '#64748b'}
+            defaultValue={initial?.secondary_color ?? '#c300ff'}
             className="h-11"
           />
         </FormField>
@@ -157,7 +158,7 @@ export const AdminBrandingForm = () => {
                   {selectedLogoFile ? 'New logo preview' : 'Current logo'}
                 </div>
                 <div className="flex items-center gap-3">
-                  <img
+                  <RuntimeImage
                     src={previewLogoSrc}
                     alt={
                       selectedLogoFile

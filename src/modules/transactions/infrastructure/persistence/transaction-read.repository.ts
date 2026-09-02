@@ -1,10 +1,15 @@
 import { queryAll, queryOne, queryPaginated } from '@/src/platform/db/postgres'
 import { getBrandingSettings } from '@/src/shared/branding/settings'
-import { generateReceipt } from '@/src/shared/receipts/generate'
+import { mapFiscalReceipt } from '@/src/shared/receipts/mapFiscalReceipt'
 import { normalizeReceipt } from '@/src/shared/receipts/normalizeReceipt'
 import { KV_KEYS } from '@/src/shared/setup/keys'
 import { kvGet } from '@/src/shared/storage/stationKv'
 import { uuidv4 } from '@/src/shared/utils/uuid'
+
+import { extractTanzaniaProxyReceiptMetadata } from '@/src/modules/tanzania-fiscal/domain/proxyReceiptMetadata'
+import { buildTanzaniaReceiptVerificationUrl } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
+import { isFuelLikeProduct } from '@/src/modules/transactions/domain/product-classification'
+import { generateReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptGenerator'
 
 import type {
   EditableTransactionLine,
@@ -100,22 +105,27 @@ export async function listPendingTransactionsRepo(stationId: string) {
 
 export async function listNonFiscalizedTransactionsRepo(stationId: string) {
   return await queryAll<any>(
-    `SELECT id,
-            transaction_date_time,
-            pos_reference,
-            pump_number,
-            fuel_type,
-            volume,
-            total_amount,
-            status,
-            retry_count,
-            fiscal_queue_enqueued_at,
-            last_error
-       FROM transactions
-      WHERE station_id = $1
-        AND (status IS NULL OR status <> 'FISCALIZED')
-        AND deleted_at IS NULL
-      ORDER BY transaction_date_time DESC
+    `SELECT t.id,
+            t.transaction_date_time,
+            t.pos_reference,
+            t.pump_number,
+            t.fuel_type,
+            t.volume,
+            t.total_amount,
+            t.status,
+            t.retry_count,
+            t.fiscal_queue_enqueued_at,
+            t.last_error,
+            t.customer_id,
+            t.doms_source_system,
+            c.buyer_name AS customer_buyer_name,
+            c.tin AS customer_tin
+       FROM transactions t
+       LEFT JOIN customers c ON c.id = t.customer_id
+      WHERE t.station_id = $1
+        AND (t.status IS NULL OR t.status <> 'FISCALIZED')
+        AND t.deleted_at IS NULL
+      ORDER BY t.transaction_date_time DESC
       LIMIT 200`,
     [stationId],
   )
@@ -158,10 +168,15 @@ export async function getTransactionEditableLinesRepo(
   stationId: string,
   transactionId: string,
 ) {
-  return await queryAll<EditableTransactionLine>(
+  const rows = await queryAll<Omit<EditableTransactionLine, 'isFuel'>>(
     getTransactionEditableLinesSql,
     [stationId, transactionId],
   )
+
+  return rows.map((row) => ({
+    ...row,
+    isFuel: isFuelLikeProduct(row),
+  }))
 }
 
 export async function getLatestTransactionReceiptRepo(
@@ -187,9 +202,10 @@ export async function createTransactionReceiptRepo(
     `
       INSERT INTO receipts (
         id, transaction_id, station_id, receipt_number,
-        html_content, plain_text_content, fiscal_data, branding_snapshot
+        html_content, plain_text_content, fiscal_data, branding_snapshot,
+        render_version
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      VALUES ($1,$2,$3,$4,NULL,$5,$6,$7,$8)
       RETURNING *
     `,
     [
@@ -197,12 +213,12 @@ export async function createTransactionReceiptRepo(
       transactionId,
       stationId,
       receiptPayload.receiptNumber,
-      receiptPayload.htmlContent,
-      receiptPayload.plainTextContent ?? null,
+      receiptPayload.plainTextContent,
       JSON.stringify(receiptPayload.fiscalData),
       receiptPayload.brandingSnapshot
         ? JSON.stringify(receiptPayload.brandingSnapshot)
         : null,
+      receiptPayload.renderVersion,
     ],
   )
 }
@@ -215,7 +231,113 @@ export async function getOrCreateLatestTransactionReceiptRepo(
     stationId,
     transactionId,
   )
-  if (existing) return existing
+  if (existing) {
+    const fiscalState = await queryOne<Record<string, any>>(
+      `SELECT t.fiscalized_at,
+              fs.country,
+              c.tin AS customer_tin,
+              ss.tanzania_receipt_verification_prefix_mode,
+              event.request_payload,
+              event.response_payload
+         FROM transactions t
+         JOIN fuel_stations fs ON fs.id = t.station_id
+         LEFT JOIN customers c
+           ON c.id = t.customer_id
+          AND c.station_id = t.station_id
+         LEFT JOIN station_settings ss ON ss.station_id = t.station_id
+         LEFT JOIN LATERAL (
+           SELECT fe.request_payload, fe.response_payload
+             FROM fiscalization_events fe
+            WHERE fe.station_id = t.station_id
+              AND fe.transaction_id = t.id
+              AND fe.status = 'SUCCESS'
+            ORDER BY fe.occurred_at DESC, fe.created_at DESC
+            LIMIT 1
+         ) event ON TRUE
+        WHERE t.station_id = $1
+          AND t.id = $2::uuid
+        LIMIT 1`,
+      [stationId, transactionId],
+    )
+    const generatedAt = new Date(existing.generated_at ?? 0).getTime()
+    const fiscalizedAt = new Date(fiscalState?.fiscalized_at ?? 0).getTime()
+    const predatesFiscalization =
+      Number.isFinite(generatedAt) &&
+      Number.isFinite(fiscalizedAt) &&
+      fiscalizedAt > 0 &&
+      generatedAt < fiscalizedAt
+    const isTanzania = ['TZ', 'TZA', 'TANZANIA'].includes(
+      String(fiscalState?.country ?? '')
+        .trim()
+        .toUpperCase(),
+    )
+    const metadata = isTanzania
+      ? extractTanzaniaProxyReceiptMetadata(fiscalState?.request_payload)
+      : null
+    const proxyReceipt = isTanzania
+      ? mapFiscalReceipt(fiscalState?.response_payload)
+      : null
+    const storedFiscalData =
+      typeof existing.fiscal_data === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(existing.fiscal_data)
+            } catch {
+              return null
+            }
+          })()
+        : existing.fiscal_data
+    const storedVerificationCode = String(
+      storedFiscalData?.receipt?.fiscalVerificationCode ?? '',
+    ).trim()
+    const storedQrData = String(
+      storedFiscalData?.receipt?.fiscalQrCodeData ?? '',
+    ).trim()
+    const expectedVerificationCode = firstNonEmpty(
+      proxyReceipt?.fiscalVerificationCode,
+      metadata?.receiptVerificationNumber,
+    )
+    const expectedProxyQrData = firstNonEmpty(
+      proxyReceipt?.fiscalQrCodeData,
+      metadata?.receiptVerificationNumber
+        ? buildTanzaniaReceiptVerificationUrl({
+            receiptVerificationNumber: metadata.receiptVerificationNumber,
+            mode: fiscalState?.tanzania_receipt_verification_prefix_mode,
+            invoiceDate: metadata.invoiceDate,
+            receiptTime: proxyReceipt?.receiptTime,
+          })
+        : null,
+    )
+    const hasStaleVerificationCode = Boolean(
+      expectedVerificationCode &&
+      storedVerificationCode !== expectedVerificationCode,
+    )
+    const hasStaleQrData = Boolean(
+      expectedProxyQrData && storedQrData !== expectedProxyQrData,
+    )
+    const hasStaleTanzaniaCustomerIdType = Boolean(
+      isTanzania &&
+      firstNonEmpty(fiscalState?.customer_tin) &&
+      /CUSTOMER ID TYPE:\s*6\b/i.test(
+        String(existing.plain_text_content ?? ''),
+      ),
+    )
+    const hasStaleTanzaniaPrintLayout = Boolean(
+      isTanzania &&
+      !String(existing.plain_text_content ?? '').includes(
+        '[IMAGE:TRA_RECEIPT_START]',
+      ),
+    )
+
+    if (
+      !predatesFiscalization &&
+      !hasStaleVerificationCode &&
+      !hasStaleQrData &&
+      !hasStaleTanzaniaCustomerIdType &&
+      !hasStaleTanzaniaPrintLayout
+    )
+      return existing
+  }
   return await createTransactionReceiptRepo(stationId, transactionId)
 }
 

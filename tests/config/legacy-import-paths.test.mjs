@@ -13,14 +13,18 @@ const importer = fs.readFileSync(
   'src/modules/setup/infrastructure/legacy-importer/index.ts',
   'utf8',
 )
-const bundle = fs.readFileSync('vpos-server.cjs', 'utf8')
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+const gitignore = fs.readFileSync('.gitignore', 'utf8')
+const hygieneCheck = fs.readFileSync(
+  'scripts/check-repository-hygiene.mjs',
+  'utf8',
+)
 
 test('legacy import defaults archive under the vposftc permanent directory', () => {
   assert.match(appConfig, /DEFAULT_PERM_DIR = '\/opt\/fccapps\/vpos-perm\/vposftc'/)
   assert.match(appConfig, /DEFAULT_LEGACY_PERM_DIR = '\/opt\/fccapps\/vpos-perm\/vposfiscal'/)
   assert.match(appConfig, /DEFAULT_LEGACY_ARCHIVE_DIR = `\$\{DEFAULT_PERM_DIR\}\/legacy-archive`/)
   assert.doesNotMatch(server, /vposfiscal\/legacy/)
-  assert.doesNotMatch(bundle, /vposfiscal\/legacy/)
 })
 
 test('all runtime import entry points use shared path resolvers', () => {
@@ -29,5 +33,13 @@ test('all runtime import entry points use shared path resolvers', () => {
     assert.match(source, /getLegacyArchiveDir\(\)/)
   }
   assert.match(importer, /opts\.moveAsideRoot \?\? getLegacyArchiveDir\(\)/)
-  assert.match(bundle, /opts\.moveAsideRoot \?\? getLegacyArchiveDir\(\)/)
+})
+
+test('the standalone server bundle is generated rather than committed source', () => {
+  assert.match(
+    packageJson.scripts['server:gen'],
+    /esbuild server\.ts .*--outfile=vpos-server\.cjs/,
+  )
+  assert.match(gitignore, /^\/vpos-server\.cjs$/m)
+  assert.match(hygieneCheck, /'vpos-server\.cjs'/)
 })

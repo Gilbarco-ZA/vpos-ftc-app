@@ -2,13 +2,19 @@ import type { FiscalRunResult } from '@/src/modules/transactions/infrastructure/
 
 import { queryOne, txQuery, withTransaction } from '@/src/platform/db/postgres'
 import { getEnvValue } from '@/src/shared/config/envDb'
-import { enqueuePrintJob } from '@/src/shared/print/queue'
-import { generateReceipt } from '@/src/shared/receipts/generate'
+import { resolveReceiptContent } from '@/src/shared/receipts/receiptContent'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import { enqueuePrintJob } from '@/src/modules/printing/application/enqueuePrintJob'
+import { buildReferencePrintJobPayload } from '@/src/modules/printing/domain/printJobPayload'
+import { persistFiscalizationEventRepo } from '@/src/modules/transactions/infrastructure/fiscalization/fiscalization-event.repository'
+import { generateReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptGenerator'
 import { mapTransactionToProxyInvoice } from '@/src/modules/transactions/infrastructure/fiscalization/transaction-proxy.mapper'
 import { toSampleInvoicePayload } from '@/src/modules/transactions/infrastructure/fiscalization/transaction-proxy.payload'
-import { getTransactionDetailsRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction-read.repository'
+import {
+  getOrCreateLatestTransactionReceiptRepo,
+  getTransactionDetailsRepo,
+} from '@/src/modules/transactions/infrastructure/persistence/transaction-read.repository'
 import { transactionStatusService } from '@/src/modules/transactions/infrastructure/persistence/transaction-status.repository'
 import { mapTransactionInvoiceLines } from '@/src/modules/transactions/infrastructure/persistence/transaction.mapper'
 import {
@@ -20,14 +26,23 @@ export async function enqueueTransactionReceiptPrintRepo(
   stationId: string,
   transactionId: string,
 ) {
+  const receipt = await getOrCreateLatestTransactionReceiptRepo(
+    stationId,
+    transactionId,
+  )
   return await enqueuePrintJob(
     stationId,
-    'TRANSACTION_RECEIPT',
-    { transactionId },
+    'print.receipt',
+    {
+      receiptId: receipt?.id ?? undefined,
+      receiptNumber: receipt?.receipt_number ?? undefined,
+      source: 'vpos.transaction-receipt',
+    },
     0,
     {
       idempotencyKey: `txn-receipt:${transactionId}`,
       sourceTransactionId: transactionId,
+      payloadMode: 'reference',
     },
   )
 }
@@ -36,7 +51,31 @@ export async function getTransactionReceiptRepo(
   stationId: string,
   transactionId: string,
 ) {
-  return await generateReceipt({ stationId, transactionId })
+  const receipt = await getOrCreateLatestTransactionReceiptRepo(
+    stationId,
+    transactionId,
+  )
+  if (!receipt) return null
+
+  const content = resolveReceiptContent({
+    plainTextContent: receipt.plain_text_content,
+    htmlContent: receipt.html_content,
+    renderVersion: receipt.render_version,
+  })
+
+  return {
+    id: receipt.id,
+    transactionId: receipt.transaction_id,
+    stationId: receipt.station_id,
+    receiptNumber: receipt.receipt_number,
+    htmlContent: content.htmlContent,
+    plainTextContent: content.plainTextContent,
+    renderVersion: content.renderVersion,
+    fiscalData: receipt.fiscal_data,
+    brandingSnapshot: receipt.branding_snapshot,
+    generatedAt: receipt.generated_at,
+    voidedAt: receipt.voided_at ?? null,
+  }
 }
 
 export async function getTransactionInvoicePayloadRepo(
@@ -52,6 +91,7 @@ export async function getTransactionInvoicePayloadRepo(
     ]),
     queryOne<{ code: string; rate: number | string | null }>(
       getDefaultTaxTypeSql,
+      [stationId],
     ),
   ])
 
@@ -108,41 +148,35 @@ export async function completeTransactionFiscalizationRepo(input: {
 }) {
   const { stationId, transactionId, fiscalResult } = input
   return await withTransaction(async (client) => {
+    const recorded = await persistFiscalizationEventRepo({
+      stationId,
+      transactionId,
+      engine: fiscalResult.engine,
+      transport: 'internal',
+      status: 'SUCCESS',
+      reference: fiscalResult.reference ?? null,
+      requestPayload: fiscalResult.requestPayload,
+      responsePayload:
+        fiscalResult.responsePayload ?? fiscalResult.rawResponse ?? null,
+      client,
+    })
+
     await transactionStatusService.markFiscalized({
       stationId,
       transactionId,
       fiscalizationReference: fiscalResult.reference ?? null,
-      fiscalizationResponse: fiscalResult.rawResponse,
+      fiscalizationResponse: recorded.compatibilitySummary,
+      latestFiscalEventId: recorded.event.id,
       client,
     })
 
-    await txQuery(
-      client,
-      `
-        INSERT INTO fiscalization_events (
-          id, station_id, transaction_id, engine, status, reference,
-          request_payload, response_payload, error_message
-        )
-        VALUES ($1,$2,$3,$4,'SUCCESS',$5,$6,$7,NULL)
-      `,
-      [
-        uuidv4(),
-        stationId,
-        transactionId,
-        fiscalResult.engine,
-        fiscalResult.reference ?? null,
-        fiscalResult.requestPayload
-          ? JSON.stringify(fiscalResult.requestPayload)
-          : null,
-        fiscalResult.responsePayload
-          ? JSON.stringify(fiscalResult.responsePayload)
-          : null,
-      ],
-    )
-
     const existingReceipt = await txQuery<any>(
       client,
-      `SELECT id FROM receipts WHERE transaction_id = $1 AND station_id = $2 LIMIT 1`,
+      `SELECT id, receipt_number
+         FROM receipts
+        WHERE transaction_id = $1 AND station_id = $2
+        ORDER BY generated_at DESC
+        LIMIT 1`,
       [transactionId, stationId],
     )
 
@@ -154,62 +188,77 @@ export async function completeTransactionFiscalizationRepo(input: {
     const autoPrintReceipts =
       stationSettings.rows?.[0]?.auto_print_receipts === true
 
-    if (!existingReceipt.rows?.[0] || autoPrintReceipts) {
-      const receiptPayload = await generateReceipt({ stationId, transactionId })
+    let receiptId = String(existingReceipt.rows?.[0]?.id ?? '')
+    let receiptNumber = String(existingReceipt.rows?.[0]?.receipt_number ?? '')
 
-      if (!existingReceipt.rows?.[0]) {
-        await txQuery(
-          client,
-          `
-            INSERT INTO receipts (
-              id, transaction_id, station_id, receipt_number,
-              html_content, plain_text_content, fiscal_data, branding_snapshot
-            )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-          `,
-          [
-            uuidv4(),
-            transactionId,
-            stationId,
-            receiptPayload.receiptNumber,
-            receiptPayload.htmlContent,
-            receiptPayload.plainTextContent || null,
-            JSON.stringify(receiptPayload.fiscalData),
-            receiptPayload.brandingSnapshot
-              ? JSON.stringify(receiptPayload.brandingSnapshot)
-              : null,
-          ],
-        )
-      }
+    if (!receiptId) {
+      const receiptPayload = await generateReceipt({
+        stationId,
+        transactionId,
+      })
+      receiptId = uuidv4()
+      receiptNumber = receiptPayload.receiptNumber
 
-      if (autoPrintReceipts) {
-        await txQuery(
-          client,
-          `
-            INSERT INTO print_jobs (
-              id, station_id, job_type, payload, priority,
-              idempotency_key, source_transaction_id
-            )
-            VALUES ($1, $2, 'print.receipt', $3::jsonb, 10, $4, $5)
-            ON CONFLICT (station_id, idempotency_key) DO UPDATE
-            SET updated_at = CURRENT_TIMESTAMP
-          `,
-          [
-            uuidv4(),
-            stationId,
-            JSON.stringify({
-              type: 'receiptData',
-              data: receiptPayload,
-              state: { transactionId },
-            }),
-            `receipt:${transactionId}:default`,
-            transactionId,
-          ],
-        )
-      }
+      await txQuery(
+        client,
+        `
+          INSERT INTO receipts (
+            id, transaction_id, station_id, receipt_number,
+            html_content, plain_text_content, fiscal_data, branding_snapshot,
+            render_version
+          )
+          VALUES ($1,$2,$3,$4,NULL,$5,$6,$7,$8)
+        `,
+        [
+          receiptId,
+          transactionId,
+          stationId,
+          receiptNumber,
+          receiptPayload.plainTextContent,
+          JSON.stringify(receiptPayload.fiscalData),
+          receiptPayload.brandingSnapshot
+            ? JSON.stringify(receiptPayload.brandingSnapshot)
+            : null,
+          receiptPayload.renderVersion,
+        ],
+      )
     }
 
-    return { success: true, transactionId }
+    if (autoPrintReceipts) {
+      await txQuery(
+        client,
+        `
+          INSERT INTO print_jobs (
+            id, station_id, job_type, payload, priority,
+            idempotency_key, source_transaction_id
+          )
+          VALUES ($1, $2, 'print.receipt', $3::jsonb, 10, $4, $5)
+          ON CONFLICT (station_id, idempotency_key) DO UPDATE
+          SET updated_at = CURRENT_TIMESTAMP
+        `,
+        [
+          uuidv4(),
+          stationId,
+          JSON.stringify(
+            buildReferencePrintJobPayload({
+              type: 'receipt',
+              source: 'vpos.auto-print-receipt',
+              receiptId,
+              receiptNumber,
+            }),
+          ),
+          `receipt:${transactionId}:default`,
+          transactionId,
+        ],
+      )
+    }
+
+    return {
+      success: true,
+      transactionId,
+      fiscalEventId: recorded.event.id,
+      fiscalizationSummary: recorded.compatibilitySummary,
+    }
   })
 }
 
@@ -220,39 +269,34 @@ export async function failTransactionFiscalizationRepo(input: {
 }) {
   const { stationId, transactionId, fiscalResult } = input
   return await withTransaction(async (client) => {
+    const recorded = await persistFiscalizationEventRepo({
+      stationId,
+      transactionId,
+      engine: fiscalResult.engine,
+      transport: 'internal',
+      status: 'FAILED',
+      requestPayload: fiscalResult.requestPayload,
+      responsePayload:
+        fiscalResult.responsePayload ?? fiscalResult.rawResponse ?? null,
+      errorMessage: fiscalResult.errorMessage || 'Fiscalization failed',
+      client,
+    })
+
     await transactionStatusService.markFailed({
       stationId,
       transactionId,
       lastError: fiscalResult.errorMessage || 'Fiscalization failed',
       incrementRetryCount: true,
-      fiscalizationResponse: fiscalResult.rawResponse,
+      fiscalizationResponse: recorded.compatibilitySummary,
+      latestFiscalEventId: recorded.event.id,
       client,
     })
 
-    await txQuery(
-      client,
-      `
-        INSERT INTO fiscalization_events (
-          id, station_id, transaction_id, engine, status, reference,
-          request_payload, response_payload, error_message
-        )
-        VALUES ($1,$2,$3,$4,'FAILED',NULL,$5,$6,$7)
-      `,
-      [
-        uuidv4(),
-        stationId,
-        transactionId,
-        fiscalResult.engine,
-        fiscalResult.requestPayload
-          ? JSON.stringify(fiscalResult.requestPayload)
-          : null,
-        fiscalResult.responsePayload
-          ? JSON.stringify(fiscalResult.responsePayload)
-          : null,
-        fiscalResult.errorMessage || 'Fiscalization failed',
-      ],
-    )
-
-    return { success: false, transactionId }
+    return {
+      success: false,
+      transactionId,
+      fiscalEventId: recorded.event.id,
+      fiscalizationSummary: recorded.compatibilitySummary,
+    }
   })
 }

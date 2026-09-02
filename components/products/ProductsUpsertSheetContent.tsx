@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 import CsrfBootstrap from '../security/CsrfBootstrap'
 import { CsrfHiddenInput } from '../security/CsrfHiddenInput'
@@ -18,6 +19,8 @@ import {
   AddProductFormState,
   buildPayload,
   createEmptyForm,
+  withPackagingSelection,
+  withStationCurrency,
 } from './products.types'
 import { useProductConfigOptions } from './useProductConfigOptions'
 import { useProductsUI } from './useProductsUI'
@@ -26,7 +29,6 @@ export type ProductsUpsertSheetContentProps = {
   title: string
   submitLabel?: string
   onClose: () => void
-  currencyOptions: string[]
   defaultCurrency: string
   taxTypeOptions: import('./products.types').ConfigOption[]
   isDevEnv: boolean
@@ -46,7 +48,6 @@ export const ProductsUpsertSheetContent = ({
   title,
   submitLabel = 'Save',
   onClose,
-  currencyOptions,
   defaultCurrency,
   taxTypeOptions,
   isDevEnv,
@@ -54,7 +55,7 @@ export const ProductsUpsertSheetContent = ({
   onSubmit,
   onSuccess,
 }: ProductsUpsertSheetContentProps) => {
-  const { showToast, openCategories } = useProductsUI()
+  const { showToast } = useProductsUI()
   const [csrfToken, setCsrfToken] = useState('')
   const [form, setForm] = useState<AddProductFormState>(() => ({
     ...createEmptyForm(defaultCurrency),
@@ -76,30 +77,51 @@ export const ProductsUpsertSheetContent = ({
   useEffect(() => {
     if (!taxTypeOptions.length) return
 
-    setForm((prev) => {
-      if ((prev.taxRate || '').trim()) return prev
+    queueMicrotask(() =>
+      setForm((prev) => {
+        if ((prev.taxRate || '').trim()) return prev
 
-      const selectedCode = (prev.extTaxCode || prev.taxCode || '').trim()
-      if (!selectedCode) return prev
+        const selectedCode = (prev.extTaxCode || prev.taxCode || '').trim()
+        if (!selectedCode) return prev
 
-      const match = taxTypeOptions.find(
-        (option) => option.code === selectedCode,
-      )
-      if (!match || match.rate == null) return prev
+        const match = taxTypeOptions.find(
+          (option) => option.code === selectedCode,
+        )
+        if (!match || match.rate == null) return prev
 
-      return {
-        ...prev,
-        taxRate: String(match.rate),
-      }
-    })
+        return {
+          ...prev,
+          taxRate: String(match.rate),
+        }
+      }),
+    )
   }, [taxTypeOptions])
 
   // If initialValues change (e.g. switching which product is being edited), update form.
   useEffect(() => {
     if (!initialValues) return
-    setForm((prev) => ({ ...prev, ...initialValues }))
-    setAdvancedOpen(true)
-  }, [initialValues])
+    queueMicrotask(() => {
+      setForm((prev) =>
+        withStationCurrency({ ...prev, ...initialValues }, defaultCurrency),
+      )
+      setAdvancedOpen(true)
+    })
+  }, [defaultCurrency, initialValues])
+
+  useEffect(() => {
+    queueMicrotask(() =>
+      setForm((prev) => {
+        if (
+          prev.currency === defaultCurrency &&
+          prev.extCurrency === defaultCurrency
+        ) {
+          return prev
+        }
+
+        return withStationCurrency(prev, defaultCurrency)
+      }),
+    )
+  }, [defaultCurrency])
 
   const handleClose = () => {
     setErrors({})
@@ -306,22 +328,12 @@ export const ProductsUpsertSheetContent = ({
                 />
               </FormField>
             </div>
-            <FormField label="Currency" error={errors.currency}>
-              <Select
-                value={form.extCurrency}
-                onChange={(event) =>
-                  setForm((prev: any) => ({
-                    ...prev,
-                    extCurrency: event.target.value,
-                  }))
-                }
-              >
-                {currencyOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </Select>
+            <FormField
+              label="Currency"
+              error={errors.currency}
+              helpText="Set automatically from the station country."
+            >
+              <Input value={defaultCurrency} readOnly disabled />
             </FormField>
             <FormField label="Tax code" error={errors.taxCode}>
               <Select
@@ -397,18 +409,6 @@ export const ProductsUpsertSheetContent = ({
                       }))
                     }
                     placeholder="123456789"
-                  />
-                </FormField>
-                <FormField label="Unit of packaging">
-                  <Input
-                    value={form.extUnitOfPackaging}
-                    onChange={(event) =>
-                      setForm((prev: any) => ({
-                        ...prev,
-                        extUnitOfPackaging: event.target.value,
-                      }))
-                    }
-                    placeholder="TY"
                   />
                 </FormField>
               </div>
@@ -490,12 +490,17 @@ export const ProductsUpsertSheetContent = ({
                       }}
                     />
                     <Button
-                      type="button"
+                      asChild
                       variant="secondary"
-                      onClick={openCategories}
                       className="w-full sm:w-auto"
                     >
-                      Manage categories
+                      <Link
+                        href="/admin/products/categories"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Manage categories
+                      </Link>
                     </Button>
                   </div>
                 </FormField>
@@ -528,12 +533,11 @@ export const ProductsUpsertSheetContent = ({
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField label="Pack size">
                   <Select
-                    value={form.packSize}
+                    value={form.extUnitOfPackaging || form.unitOfPackaging}
                     onChange={(event) =>
-                      setForm((prev: any) => ({
-                        ...prev,
-                        packSize: event.target.value,
-                      }))
+                      setForm((prev) =>
+                        withPackagingSelection(prev, event.target.value),
+                      )
                     }
                     disabled={configLoading}
                   >
@@ -627,7 +631,7 @@ export const ProductsUpsertSheetContent = ({
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save product'}
+              {isSubmitting ? 'Saving...' : submitLabel}
             </Button>
           </SheetFooter>
         </div>

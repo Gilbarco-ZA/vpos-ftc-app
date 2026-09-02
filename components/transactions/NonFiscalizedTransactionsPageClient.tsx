@@ -18,15 +18,22 @@ import {
   AlertTriangle,
   Copy,
   FileText,
+  LockKeyhole,
   Pencil,
   RotateCcw,
   Send,
+  UserRound,
 } from 'lucide-react'
 
 import { safeCopy } from '@/src/shared/utils/clipboard'
 import { formatDate } from '@/src/shared/utils/dates'
 import { formatNumber } from '@/src/shared/utils/format'
-import { logger } from '@/src/shared/utils/logger'
+
+import { requiresCustomerForFiscalizationRetry } from '@/src/modules/transactions/domain/fiscalization-retry-policy'
+import {
+  getTransactionItemEditability,
+  isTransactionItemStatusEditable,
+} from '@/src/modules/transactions/domain/transaction-editability'
 
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import NonFiscalizedDetailsSheet from '@/components/transactions/non-fiscalized/NonFiscalizedDetailsSheet'
@@ -37,8 +44,8 @@ import StatusBadge from '@/components/transactions/StatusBadge'
 import { buildNonFiscalizedSupportBundle } from '@/components/transactions/supportBundle'
 import TransactionErrorDialog from '@/components/transactions/TransactionErrorDialog'
 import TransactionLinesEditorSheet from '@/components/transactions/TransactionLinesEditorSheet'
+import TransactionReceiptSheet from '@/components/transactions/TransactionReceiptSheet'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import ConfirmDialog from '@/components/ui/confirm-dialog'
 import {
   DropdownMenu,
@@ -73,6 +80,9 @@ type NonFiscalizedTransactionsPageClientProps = {
   children: ReactNode
   decimals: DecimalSettings
   stationCountry?: string | null
+  initialStartDate?: string
+  initialEndDate?: string
+  businessDate?: string
 }
 
 type TransactionsUIContextValue = {
@@ -115,38 +125,28 @@ const canRetryFiscalization = (status: string) =>
   String(status || '').toUpperCase() === 'FAILED'
 
 const canSendNow = (status: string) =>
-  ['OPEN', 'ALLOCATED', 'FAILED'].includes(String(status || '').toUpperCase())
-
-const canFiscalize = (status: string) =>
-  ['OPEN', 'ALLOCATED', 'FAILED'].includes(String(status || '').toUpperCase())
-
-const canEditItems = (status: string) =>
   ['OPEN', 'ALLOCATED', 'FAILED', 'PENDING'].includes(
     String(status || '').toUpperCase(),
   )
 
-async function copySupportBundle(transaction: any) {
-  try {
-    const payload = {
-      id: transaction.id,
-      productId: transaction.productId,
-      productCode: transaction.productCode,
-      quantity: transaction.quantity,
-      unitPrice: transaction.unitPrice,
-      totalAmount: transaction.totalAmount,
-      createdAt: transaction.createdAt,
-    }
+const canFiscalize = (status: string) =>
+  ['OPEN', 'ALLOCATED', 'FAILED', 'PENDING'].includes(
+    String(status || '').toUpperCase(),
+  )
 
-    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+const canEditItems = (transaction: TransactionListItem) =>
+  isTransactionItemStatusEditable(transaction?.status) &&
+  getTransactionItemEditability(transaction).editable
 
-    logger.info('[transactions]', { msg: 'Support bundle copied' })
-  } catch (error) {
-    logger.error('[transactions]', {
-      msg: 'Failed to copy support bundle',
-      error,
-    })
-  }
-}
+const hasLinkedCustomer = (transaction: TransactionListItem) =>
+  Boolean(String(transaction.customerId || '').trim())
+
+const canRetryTransaction = (transaction: TransactionListItem) =>
+  canRetryFiscalization(transaction.status) &&
+  !requiresCustomerForFiscalizationRetry({
+    customerId: transaction.customerId,
+    domsSourceSystem: transaction.domsSourceSystem,
+  })
 
 const mapTransactionRow = (item: any): TransactionListItem => ({
   id: String(item?.id ?? ''),
@@ -162,6 +162,18 @@ const mapTransactionRow = (item: any): TransactionListItem => ({
   fiscalQueueEnqueuedAt:
     item?.fiscal_queue_enqueued_at ?? item?.fiscalQueueEnqueuedAt ?? null,
   lastError: item?.last_error ?? item?.lastError ?? null,
+  customerId: item?.customer_id ?? item?.customerId ?? null,
+  customerName:
+    item?.customer_buyer_name ??
+    item?.customer_trade_name ??
+    item?.buyer_name ??
+    item?.customerName ??
+    null,
+  customerTin: item?.customer_tin ?? item?.tin ?? item?.customerTin ?? null,
+  domsSourceSystem: item?.doms_source_system ?? item?.domsSourceSystem ?? null,
+  odometer: item?.odometer ?? null,
+  paymentType: item?.payment_type ?? item?.paymentType ?? null,
+  vehicleRegNr: item?.vehicle_reg_nr ?? item?.vehicleRegNr ?? null,
 })
 
 const NonFiscalizedTransactionsPageClient = ({
@@ -171,6 +183,9 @@ const NonFiscalizedTransactionsPageClient = ({
   children,
   decimals,
   stationCountry,
+  initialStartDate = '',
+  initialEndDate = '',
+  businessDate = '',
 }: NonFiscalizedTransactionsPageClientProps) => {
   const [transactions, setTransactions] = useState(initialTransactions)
   const [loadError, setLoadError] = useState<unknown>(error ?? null)
@@ -178,11 +193,13 @@ const NonFiscalizedTransactionsPageClient = ({
   const [buyerTypeOptions, setBuyerTypeOptions] = useState<SelectOption[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('ALL')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(initialStartDate)
+  const [endDate, setEndDate] = useState(initialEndDate)
   const [detailsTransaction, setDetailsTransaction] =
     useState<TransactionListItem | null>(null)
   const [errorTransaction, setErrorTransaction] =
+    useState<TransactionListItem | null>(null)
+  const [receiptPreviewTransaction, setReceiptPreviewTransaction] =
     useState<TransactionListItem | null>(null)
   const [fiscalizeTransaction, setFiscalizeTransaction] =
     useState<TransactionListItem | null>(null)
@@ -194,8 +211,10 @@ const NonFiscalizedTransactionsPageClient = ({
   const [confirmLoading, setConfirmLoading] = useState(false)
 
   useEffect(() => {
-    setTransactions(initialTransactions)
-    setLoadError(error ?? null)
+    queueMicrotask(() => {
+      setTransactions(initialTransactions)
+      setLoadError(error ?? null)
+    })
   }, [error, initialTransactions])
 
   useEffect(() => {
@@ -322,8 +341,8 @@ const NonFiscalizedTransactionsPageClient = ({
       })
       if (search.trim()) params.set('search', search.trim())
       if (status !== 'ALL') params.set('status', status)
-      if (startDate) params.set('from', `${startDate}T00:00:00`)
-      if (endDate) params.set('to', `${endDate}T23:59:59`)
+      if (startDate) params.set('startDate', startDate)
+      if (endDate) params.set('endDate', endDate)
 
       const res = await fetch(`/api/transactions?${params.toString()}`, {
         cache: 'no-store',
@@ -384,6 +403,15 @@ const NonFiscalizedTransactionsPageClient = ({
           onStatusChange={setStatus}
           onStartDateChange={setStartDate}
           onEndDateChange={setEndDate}
+          onToday={() => {
+            setStartDate(businessDate)
+            setEndDate(businessDate)
+          }}
+          onAllDates={() => {
+            setStartDate('')
+            setEndDate('')
+          }}
+          todayDisabled={!businessDate}
           onRefresh={refresh}
         />
 
@@ -392,7 +420,7 @@ const NonFiscalizedTransactionsPageClient = ({
         ) : loading && filteredTransactions.length === 0 ? (
           <TableSkeleton
             rows={8}
-            columns={8}
+            columns={9}
             showHeader={false}
             showFilters={false}
           />
@@ -416,6 +444,7 @@ const NonFiscalizedTransactionsPageClient = ({
                     <TableHead>Volume</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Customer</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -459,6 +488,24 @@ const NonFiscalizedTransactionsPageClient = ({
                           ) : null}
                         </div>
                       </TableCell>
+                      <TableCell>
+                        {hasLinkedCustomer(row) ? (
+                          <div className="min-w-0">
+                            <div className="truncate text-sm text-[var(--text-secondary)]">
+                              {row.customerName || 'Linked customer'}
+                            </div>
+                            {row.customerTin ? (
+                              <div className="truncate text-xs text-[var(--text-muted)]">
+                                {row.customerTin}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-amber-700">
+                            Unlinked
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -472,7 +519,17 @@ const NonFiscalizedTransactionsPageClient = ({
                             >
                               View details
                             </DropdownMenuItem>
-                            {canEditItems(row.status) ? (
+                            <DropdownMenuItem
+                              onSelect={() => setReceiptPreviewTransaction(row)}
+                              className="gap-2"
+                            >
+                              <FileText
+                                className="h-4 w-4"
+                                aria-hidden="true"
+                              />
+                              Preview receipt
+                            </DropdownMenuItem>
+                            {canEditItems(row) ? (
                               <DropdownMenuItem
                                 onSelect={() => setEditingTransaction(row)}
                                 className="gap-2"
@@ -483,7 +540,16 @@ const NonFiscalizedTransactionsPageClient = ({
                                 />
                                 Edit items
                               </DropdownMenuItem>
-                            ) : null}
+                            ) : getTransactionItemEditability(row)
+                                .editable ? null : (
+                              <DropdownMenuItem disabled className="gap-2">
+                                <LockKeyhole
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
+                                Pump fuel items are read-only
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               onSelect={() =>
                                 copyValue('Transaction ID', row.id)
@@ -524,7 +590,7 @@ const NonFiscalizedTransactionsPageClient = ({
                                 View error
                               </DropdownMenuItem>
                             ) : null}
-                            {canRetryFiscalization(row.status) ? (
+                            {canRetryTransaction(row) ? (
                               <DropdownMenuItem
                                 onSelect={() =>
                                   setConfirmAction({
@@ -541,7 +607,22 @@ const NonFiscalizedTransactionsPageClient = ({
                                 Retry fiscalization
                               </DropdownMenuItem>
                             ) : null}
-                            {canSendNow(row.status) ? (
+                            {canFiscalize(row.status) ? (
+                              <DropdownMenuItem
+                                onSelect={() => setFiscalizeTransaction(row)}
+                                className="gap-2"
+                              >
+                                <UserRound
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
+                                {hasLinkedCustomer(row)
+                                  ? 'Review customer & fiscalize'
+                                  : 'Link customer & fiscalize'}
+                              </DropdownMenuItem>
+                            ) : null}
+                            {canSendNow(row.status) &&
+                            hasLinkedCustomer(row) ? (
                               <DropdownMenuItem
                                 onSelect={() =>
                                   setConfirmAction({
@@ -552,14 +633,7 @@ const NonFiscalizedTransactionsPageClient = ({
                                 className="gap-2"
                               >
                                 <Send className="h-4 w-4" aria-hidden="true" />
-                                Send now
-                              </DropdownMenuItem>
-                            ) : null}
-                            {canFiscalize(row.status) ? (
-                              <DropdownMenuItem
-                                onSelect={() => setFiscalizeTransaction(row)}
-                              >
-                                Fiscalize
+                                Send linked transaction now
                               </DropdownMenuItem>
                             ) : null}
                           </DropdownMenuContent>
@@ -582,6 +656,16 @@ const NonFiscalizedTransactionsPageClient = ({
         ))}
       </ToastViewport>
 
+      <TransactionReceiptSheet
+        open={Boolean(receiptPreviewTransaction)}
+        transactionId={receiptPreviewTransaction?.id ?? null}
+        title="Non-fiscalized receipt preview"
+        previewMode
+        csrfToken={csrfToken}
+        onOpenChange={(open) => {
+          if (!open) setReceiptPreviewTransaction(null)
+        }}
+      />
       <NonFiscalizedDetailsSheet
         transaction={detailsTransaction}
         onClose={() => setDetailsTransaction(null)}
@@ -591,6 +675,7 @@ const NonFiscalizedTransactionsPageClient = ({
         onSendNow={(txn) =>
           setConfirmAction({ type: 'send_now', transaction: txn })
         }
+        onFiscalize={setFiscalizeTransaction}
         onCopySupportBundle={copySupportBundle}
         decimals={decimals}
       />

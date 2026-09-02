@@ -49,6 +49,11 @@ export async function getPumpsConfigFromDb(stationId: string) {
 export async function syncForecourtFromPumpsConfig(
   stationId: string,
   pumpsConfig: unknown,
+  options: { authoritativeDomsSnapshot?: boolean } = {},
 ) {
-  return await sharedSyncForecourtFromPumpsConfig(stationId, pumpsConfig as any)
+  return await sharedSyncForecourtFromPumpsConfig(
+    stationId,
+    pumpsConfig as any,
+    options,
+  )
 }

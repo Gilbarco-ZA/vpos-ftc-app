@@ -4,11 +4,11 @@ import {
   normalizeJplTankDeliveryData,
   normalizeJplTankGaugeData,
 } from '@/src/shared/doms/tankGaugeProtocol'
+
 import {
   extractNozzleNumber,
   mapJplMainState,
-} from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
-
+} from '@/src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers'
 import { derivePumpErrorGuidance } from '@/src/modules/forecourt/infrastructure/jpl/dispense'
 
 const asObject = (value: any) =>
@@ -41,7 +41,6 @@ export const normalizeFpStatusPayload = (payload: any, subCode?: string) => {
   const supplementary = asObject(data?.FpSupplStatusPars)
   const subStates = asObject(data?.FpSubStates)
   const subStates2 = asObject(supplementary?.FpSubStates2)
-  const subStates3 = asObject(supplementary?.FpSubStates3)
   const subStates4 = asObject(supplementary?.FpSubStates4)
 
   return {

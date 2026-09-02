@@ -6,11 +6,11 @@ import type {
   PumpStateSnapshot,
 } from '@/src/shared/pumps/types'
 
-import { ensureGatewayStarted } from '@/src/shared/forecourt/gateway'
 import { persistPumpSnapshot } from '@/src/shared/forecourt/sharedState'
 import { getRuntimeBus } from '@/src/shared/runtime/bus'
 import { logger } from '@/src/shared/utils/logger'
 
+import { ensureGatewayStarted } from '@/src/modules/forecourt/infrastructure/gateway'
 import {
   cleanupStalePendingAuths,
   handlePumpEventMessage,

@@ -10,6 +10,7 @@ export type PrintJobRow = {
   attempts?: number
   max_attempts?: number
   source_transaction_id?: string | null
+  source_report_id?: string | null
 }
 
 export const printJobsRepo = {
@@ -32,6 +33,37 @@ export const printJobsRepo = {
     )
     const pumpNumber = row?.pump_number
     return pumpNumber == null ? null : Number(pumpNumber)
+  },
+
+  async getReceiptPrintSource(
+    stationId: string,
+    transactionId: string,
+    receiptId?: string | null,
+  ) {
+    return await queryOne<{
+      id: string
+      receipt_number: string
+      plain_text_content: string | null
+      html_content: string | null
+      fiscal_data: unknown
+      branding_snapshot: unknown
+      station_country: string | null
+      station_name: string | null
+      station_tin: string | null
+    }>(printJobsSql.selectReceiptPrintSource, [
+      stationId,
+      transactionId,
+      receiptId ?? null,
+    ])
+  },
+
+  async getReportPrintSource(stationId: string, reportId: string) {
+    return await queryOne<{
+      id: string
+      report_type: string
+      report_date_time: string | Date | null
+      payload: unknown
+    }>(printJobsSql.selectReportPrintSource, [stationId, reportId])
   },
 
   async markDone(id: string) {

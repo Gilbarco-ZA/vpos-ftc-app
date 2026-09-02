@@ -10,6 +10,8 @@ export type ListTransactionsFilterOptions = {
   search?: string | null
   from?: string | null
   to?: string | null
+  startDate?: string | null
+  endDate?: string | null
 }
 
 export const getTransactionStatusSnapshotSql = `SELECT id,
@@ -151,6 +153,7 @@ export function buildPersistTransactionStatusUpdate(input: {
   fiscalizationReference?: string | null
   fiscalizationResponse?: unknown
   fiscalDocumentId?: string | null
+  latestFiscalEventId?: string | null
   touchFiscalizedAt?: boolean
   lastError?: string | null
   clearLastError?: boolean
@@ -197,6 +200,12 @@ export function buildPersistTransactionStatusUpdate(input: {
   if (input.fiscalDocumentId !== undefined) {
     sets.push(
       `fiscal_document_id = COALESCE(NULLIF(BTRIM(CAST(${addParam(input.fiscalDocumentId)} AS text)), ''), fiscal_document_id)`,
+    )
+  }
+
+  if (input.latestFiscalEventId !== undefined) {
+    sets.push(
+      `latest_fiscal_event_id = COALESCE(${addParam(input.latestFiscalEventId)}::uuid, latest_fiscal_event_id)`,
     )
   }
 
@@ -254,6 +263,8 @@ export function buildTransactionsFilter(
   const search = String(opts.search || '').trim()
   const from = String(opts.from || '').trim()
   const to = String(opts.to || '').trim()
+  const startDate = String(opts.startDate || '').trim()
+  const endDate = String(opts.endDate || '').trim()
 
   if (status) {
     conditions.push(`UPPER(COALESCE(t.status, '')) = ${addParam(status)}`)
@@ -301,6 +312,27 @@ export function buildTransactionsFilter(
 
   if (to) {
     conditions.push(`t.transaction_date_time <= ${addParam(to)}`)
+  }
+
+  const stationTimezone = `COALESCE(
+    (SELECT NULLIF(BTRIM(fs.timezone), '')
+       FROM fuel_stations fs
+      WHERE fs.id = $1
+        AND fs.deleted_at IS NULL
+      LIMIT 1),
+    'UTC'
+  )`
+
+  if (startDate) {
+    conditions.push(
+      `t.transaction_date_time >= (${addParam(startDate)}::date::timestamp AT TIME ZONE ${stationTimezone})`,
+    )
+  }
+
+  if (endDate) {
+    conditions.push(
+      `t.transaction_date_time < ((${addParam(endDate)}::date + 1)::timestamp AT TIME ZONE ${stationTimezone})`,
+    )
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -466,11 +498,15 @@ export const getTransactionEditableLinesSql = `SELECT
     (tl.quantity * tl.unit_price) AS "lineTotal",
     p.product_code AS "productCode",
     p.product_name AS "productName",
-    COALESCE(p.ext_currency, p.currency) AS currency
+    COALESCE(p.ext_currency, p.currency) AS currency,
+    COALESCE(pc.name, p.category) AS "categoryName"
   FROM transaction_lines tl
   LEFT JOIN products p
     ON p.id = tl.product_id
    AND p.station_id = $1
+  LEFT JOIN product_categories pc
+    ON pc.id = p.category_id
+   AND pc.station_id = p.station_id
   JOIN transactions t
     ON t.id = tl.transaction_id
    AND t.station_id = $1
@@ -531,11 +567,25 @@ export const getTransactionForUpdateSql = `SELECT id,
   WHERE station_id = $1 AND id = $2
   FOR UPDATE`
 
-export const getExistingTransactionLinesForUpdateSql = `SELECT id, product_id
-   FROM transaction_lines
-  WHERE transaction_id = $1
-  ORDER BY created_at ASC, id ASC
-  FOR UPDATE`
+export const getExistingTransactionLinesForUpdateSql = `SELECT
+    tl.id,
+    tl.product_id,
+    tl.quantity,
+    tl.unit_price,
+    p.product_name,
+    p.product_code,
+    p.category,
+    COALESCE(pc.name, p.category) AS category_name
+  FROM transaction_lines tl
+  LEFT JOIN products p
+    ON p.id = tl.product_id
+   AND p.station_id = $2
+  LEFT JOIN product_categories pc
+    ON pc.id = p.category_id
+   AND pc.station_id = p.station_id
+  WHERE tl.transaction_id = $1
+  ORDER BY tl.created_at ASC, tl.id ASC
+  FOR UPDATE OF tl`
 
 export const deleteTransactionLinesByProductSql = `DELETE FROM transaction_lines
    WHERE transaction_id = $1
@@ -612,10 +662,18 @@ export const insertManualTransactionSql = `INSERT INTO transactions (
 
 export const getStationCountrySql = `SELECT id, country FROM fuel_stations WHERE id = $1`
 
-export const getDefaultTaxTypeSql = `SELECT code, rate
-   FROM cfg_tax_types
-   WHERE is_active = TRUE
-   ORDER BY sort_order ASC, name ASC
+export const getDefaultTaxTypeSql = `SELECT r.code, r.rate
+   FROM fuel_stations fs
+   JOIN country_datasets d
+     ON d.country_code = UPPER(BTRIM(fs.country))
+    AND d.is_active = TRUE
+   JOIN country_dataset_rows r
+     ON r.country_code = d.country_code
+    AND r.dataset_type = 'taxTypes'
+    AND r.is_active = TRUE
+   WHERE fs.id = $1
+     AND fs.deleted_at IS NULL
+   ORDER BY r.sort_order ASC, r.name ASC, r.code ASC
    LIMIT 1`
 
 export const upsertTransactionQueueSql = `INSERT INTO transaction_queue (id, station_id, status, payload, transaction_id)

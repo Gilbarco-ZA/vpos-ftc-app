@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
+import { CollapsibleStatusSection } from '@/components/admin/forecourt/CollapsibleStatusSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 
 const fmtTs = (value: unknown) => {
   if (value == null || value === '') return '—'
@@ -53,7 +53,7 @@ export function JplMaintenancePlanPanel() {
   const [confirmationNote, setConfirmationNote] = useState('')
   const [recordingReview, setRecordingReview] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -67,20 +67,22 @@ export function JplMaintenancePlanPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void load()
+    queueMicrotask(() => {
+      void load()
+    })
     fetch('/api/security/csrf', { cache: 'no-store' })
       .then((response) => response.json())
       .then((data) => {
         if (typeof data?.token === 'string') setCsrfToken(data.token)
       })
       .catch(() => setCsrfToken(''))
-  }, [])
+  }, [load])
 
-  const steps = plan?.steps ?? []
-  const topSteps = useMemo(() => steps.slice(0, 18), [steps])
+  const steps = Array.isArray(plan?.steps) ? plan.steps : []
+  const topSteps = steps.slice(0, 18)
   const pssWriteCandidates = plan?.pssWriteCandidates ?? []
 
   const recordReview = async () => {
@@ -114,8 +116,13 @@ export function JplMaintenancePlanPanel() {
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
+    <CollapsibleStatusSection
+      title="DOMS maintenance plan"
+      status={String(plan?.readiness?.severity ?? 'unknown').toUpperCase()}
+      statusVariant={variantForSeverity(plan?.readiness?.severity)}
+      contentClassName="p-4 pt-0"
+    >
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-base font-semibold">DOMS maintenance plan</div>
@@ -190,116 +197,148 @@ export function JplMaintenancePlanPanel() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="rounded border bg-[var(--surface-card)] p-3">
-            <div className="mb-2 text-sm font-semibold">Dry-run plan steps</div>
-            {topSteps.length ? (
-              <div className="space-y-2">
-                {topSteps.map((step: any) => (
-                  <div key={step.id} className="rounded border p-3 text-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={variantForSeverity(step.severity)}>
-                        {step.severity}
-                      </Badge>
-                      <Badge variant={STATUS_VARIANT.NEUTRAL}>
-                        {step.category}
-                      </Badge>
-                      <span className="font-medium">{step.title}</span>
-                    </div>
-                    <div className="mt-2 text-[var(--text-secondary)]">
-                      {step.description}
-                    </div>
-                    <div className="mt-2 text-xs text-[var(--text-muted)]">
-                      {step.suggestedAction}
-                    </div>
-                    {step.plannedJplCommandName ? (
-                      <div className="mt-2 rounded bg-[var(--surface-muted)] p-2 text-xs">
-                        Planned command reference: {step.plannedJplCommandName}
-                        {step.plannedJplSubCode
-                          ? ` / ${step.plannedJplSubCode}`
-                          : ''}
+          <CollapsibleStatusSection
+            title="Dry-run plan steps"
+            status={`${topSteps.length} steps`}
+            statusVariant={variantForSeverity(plan?.readiness?.severity)}
+            contentClassName="p-3 pt-0"
+          >
+            <div className="rounded border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 text-sm font-semibold">
+                Dry-run plan steps
+              </div>
+              {topSteps.length ? (
+                <div className="space-y-2">
+                  {topSteps.map((step: any) => (
+                    <div key={step.id} className="rounded border p-3 text-sm">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={variantForSeverity(step.severity)}>
+                          {step.severity}
+                        </Badge>
+                        <Badge variant={STATUS_VARIANT.NEUTRAL}>
+                          {step.category}
+                        </Badge>
+                        <span className="font-medium">{step.title}</span>
                       </div>
-                    ) : null}
-                    <div className="mt-2 text-xs text-amber-700">
-                      {step.safetyNote}
+                      <div className="mt-2 text-[var(--text-secondary)]">
+                        {step.description}
+                      </div>
+                      <div className="mt-2 text-xs text-[var(--text-muted)]">
+                        {step.suggestedAction}
+                      </div>
+                      {step.plannedJplCommandName ? (
+                        <div className="mt-2 rounded bg-[var(--surface-muted)] p-2 text-xs">
+                          Planned command reference:{' '}
+                          {step.plannedJplCommandName}
+                          {step.plannedJplSubCode
+                            ? ` / ${step.plannedJplSubCode}`
+                            : ''}
+                        </div>
+                      ) : null}
+                      <div className="mt-2 text-xs text-amber-700">
+                        {step.safetyNote}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-[var(--text-secondary)]">
-                No plan steps generated.
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-[var(--text-secondary)]">
+                  No plan steps generated.
+                </div>
+              )}
+            </div>
+          </CollapsibleStatusSection>
 
+          <CollapsibleStatusSection
+            title="Possible PSS maintenance candidates"
+            status={`${pssWriteCandidates.length} candidates`}
+            statusVariant={
+              pssWriteCandidates.length
+                ? STATUS_VARIANT.NEUTRAL
+                : STATUS_VARIANT.SUCCESS
+            }
+            contentClassName="p-3 pt-0"
+          >
+            <div className="rounded border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 text-sm font-semibold">
+                Possible PSS maintenance candidates
+              </div>
+              {pssWriteCandidates.length ? (
+                <div className="space-y-2">
+                  {pssWriteCandidates.slice(0, 10).map((step: any) => (
+                    <div
+                      key={step.id}
+                      className="rounded border border-amber-500/20 p-3 text-sm"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={STATUS_VARIANT.NEUTRAL}>
+                          manual review
+                        </Badge>
+                        <span className="font-medium">{step.title}</span>
+                      </div>
+                      <div className="mt-2 text-[var(--text-secondary)]">
+                        {step.description}
+                      </div>
+                      <div className="mt-2 text-xs text-amber-700">
+                        {step.safetyNote}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-[var(--text-secondary)]">
+                  No possible PSS write candidates were detected. Continue with
+                  FTC-side mapping verification and snapshot refresh.
+                </div>
+              )}
+            </div>
+          </CollapsibleStatusSection>
+        </div>
+
+        <CollapsibleStatusSection
+          title="Record maintenance plan review"
+          status={recordingReview ? 'recording' : 'ready'}
+          statusVariant={
+            recordingReview ? STATUS_VARIANT.INFO : STATUS_VARIANT.SUCCESS
+          }
+          contentClassName="p-3 pt-0"
+        >
           <div className="rounded border bg-[var(--surface-card)] p-3">
             <div className="mb-2 text-sm font-semibold">
-              Possible PSS maintenance candidates
+              Record maintenance plan review
             </div>
-            {pssWriteCandidates.length ? (
-              <div className="space-y-2">
-                {pssWriteCandidates.slice(0, 10).map((step: any) => (
-                  <div
-                    key={step.id}
-                    className="rounded border border-amber-500/20 p-3 text-sm"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={STATUS_VARIANT.NEUTRAL}>
-                        manual review
-                      </Badge>
-                      <span className="font-medium">{step.title}</span>
-                    </div>
-                    <div className="mt-2 text-[var(--text-secondary)]">
-                      {step.description}
-                    </div>
-                    <div className="mt-2 text-xs text-amber-700">
-                      {step.safetyNote}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-[var(--text-secondary)]">
-                No possible PSS write candidates were detected. Continue with
-                FTC-side mapping verification and snapshot refresh.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded border bg-[var(--surface-card)] p-3">
-          <div className="mb-2 text-sm font-semibold">
-            Record maintenance plan review
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_2fr_auto]">
-            <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={confirmDryRunOnly}
-                onChange={(event) => setConfirmDryRunOnly(event.target.checked)}
-                className="mt-1"
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_2fr_auto]">
+              <label className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={confirmDryRunOnly}
+                  onChange={(event) =>
+                    setConfirmDryRunOnly(event.target.checked)
+                  }
+                  className="mt-1"
+                />
+                <span>
+                  I understand this records a dry-run review only and sends no
+                  DOMS/PSS command.
+                </span>
+              </label>
+              <textarea
+                value={confirmationNote}
+                onChange={(event) => setConfirmationNote(event.target.value)}
+                placeholder="Optional review note, for example: compared with PSS Configurator export before scheduling maintenance."
+                className="min-h-16 rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
               />
-              <span>
-                I understand this records a dry-run review only and sends no
-                DOMS/PSS command.
-              </span>
-            </label>
-            <textarea
-              value={confirmationNote}
-              onChange={(event) => setConfirmationNote(event.target.value)}
-              placeholder="Optional review note, for example: compared with PSS Configurator export before scheduling maintenance."
-              className="min-h-16 rounded border bg-[var(--surface-card)] p-2 text-sm text-[var(--text-primary)]"
-            />
-            <Button
-              type="button"
-              disabled={!csrfToken || !confirmDryRunOnly || recordingReview}
-              onClick={recordReview}
-            >
-              {recordingReview ? 'Recording...' : 'Record review'}
-            </Button>
+              <Button
+                type="button"
+                disabled={!csrfToken || !confirmDryRunOnly || recordingReview}
+                onClick={recordReview}
+              >
+                {recordingReview ? 'Recording...' : 'Record review'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CollapsibleStatusSection>
+      </div>
+    </CollapsibleStatusSection>
   )
 }

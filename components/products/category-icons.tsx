@@ -223,10 +223,11 @@ export function CategoryIconChip({
   className?: string
 }) {
   return (
-    <span className={cx('inline-flex items-center gap-2', className)}>
-      <span className="inline-flex h-4 w-4 items-center justify-center">
+    <span className={cx('inline-flex min-w-0 items-center gap-2', className)}>
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
         <CategoryIconGlyph icon={icon} className="h-4 w-4" />
       </span>
+      <span className="truncate">{label}</span>
     </span>
   )
 }

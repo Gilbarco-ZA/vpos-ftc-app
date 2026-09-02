@@ -1,7 +1,8 @@
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
 import { getEnvValue } from '@/src/shared/config/envDb'
-import { mapTransactionToProxyInvoice } from '@/src/shared/fiscalization/proxy/mapper'
+import { getDefaultTaxTypeForCountry } from '@/src/shared/server/config/countryCatalog'
 
+import { mapTransactionToProxyInvoice } from '@/src/modules/transactions/infrastructure/fiscalization/transaction-proxy.mapper'
 import { getTransactionDetailsRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction-read.repository'
 import { mapTransactionInvoiceLines } from '@/src/modules/transactions/infrastructure/persistence/transaction.mapper'
 
@@ -33,24 +34,6 @@ async function vatRateForCountry(stationId: string, country: string | null) {
   )
 }
 
-async function loadDefaultTaxType() {
-  const row = await queryOne<{ code: string; rate: number | string | null }>(
-    `SELECT code, rate
-     FROM cfg_tax_types
-     WHERE is_active = TRUE
-     ORDER BY sort_order ASC, name ASC
-     LIMIT 1`,
-  )
-
-  if (!row?.code) return null
-  const rate =
-    row.rate === null || row.rate === undefined ? null : Number(row.rate)
-  return {
-    code: String(row.code),
-    rate: Number.isFinite(rate) ? rate : null,
-  }
-}
-
 async function resolveEnrichmentFromTables(
   stationId: string,
   transactionId: string,
@@ -70,7 +53,7 @@ async function resolveEnrichmentFromTables(
     tank_id: string | null
     nozzle_number: number | null
   }>(
-    `SELECT id, tank_id, nozzle_number FROM nozzles WHERE station_id = $1 AND pump_id = $2 ORDER BY nozzle_number`,
+    `SELECT id, tank_id, nozzle_number FROM nozzles WHERE station_id = $1 AND pump_id = $2 AND is_active = TRUE ORDER BY nozzle_number`,
     [stationId, pump.id],
   )
   if (!nozzles.length) return { pumpId: String(pump.id) }
@@ -217,9 +200,8 @@ export async function buildProxyInvoiceForTransaction(input: {
   )
   if (!transaction) return null
 
-  const [station, defaultTaxType, customer] = await Promise.all([
+  const [station, customer] = await Promise.all([
     loadStation(input.stationId),
-    loadDefaultTaxType(),
     transaction.customer_id
       ? loadCustomer(input.stationId, String(transaction.customer_id))
       : Promise.resolve(null),
@@ -228,6 +210,7 @@ export async function buildProxyInvoiceForTransaction(input: {
   const country = station?.country
     ? String(station.country).toUpperCase()
     : null
+  const defaultTaxType = await getDefaultTaxTypeForCountry(country)
   const vatRate =
     defaultTaxType?.rate != null
       ? Number(defaultTaxType.rate)

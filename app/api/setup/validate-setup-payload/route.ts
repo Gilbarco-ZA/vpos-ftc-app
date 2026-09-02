@@ -1,26 +1,9 @@
-import { NextResponse } from 'next/server'
+import { POST as validateSetupPost } from '../validate-setup/route'
 
-import { definePublicMutationRoute } from '@/src/shared/http/defineRoute'
-
-import { resolveSetupRequestContext } from '@/src/modules/setup/application/context'
-import { validateSetupPayloadAction } from '@/src/modules/setup/application/validateSetupPayloadAction'
-
+// Compatibility alias. Prefer /api/setup/validate-setup.
+// Route segment configuration must be declared locally so Next.js can
+// statically evaluate it during the production build.
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const POST = definePublicMutationRoute({
-  csrf: false,
-  handler: async (_req, { body }) => {
-    await resolveSetupRequestContext({
-      rolesWhenConfigured: ['administrator', 'manager'],
-    })
-    const result = await validateSetupPayloadAction(body || {})
-    if (!result.ok) {
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: 400 },
-      )
-    }
-    return NextResponse.json({ success: true })
-  },
-})
+export const POST = validateSetupPost

@@ -1,5 +1,6 @@
 import { badRequest } from '@/src/platform/web/api/response'
-import { addPendingAttendantAuthRequest } from '@/src/shared/pos/events'
+
+import { addPendingAttendantAuthRequest } from '@/src/modules/pos/application/legacy/events'
 
 import type { PosPendingAttendantAuthRecordInput } from './posEventTypes'
 

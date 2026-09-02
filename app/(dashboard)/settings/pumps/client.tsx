@@ -98,9 +98,14 @@ export default function PumpSettingsClient({
 }) {
   const [csrfToken, setCsrfToken] = useState('')
   const [pumps, setPumps] = useState<PumpListItem[]>([])
-  const [statusOptions, setStatusOptions] = useState<Option[]>([])
-  const [tankGroups, setTankGroups] = useState<TankGroupOption[]>([])
-  const [yesNoOptions, setYesNoOptions] = useState<Option[]>([])
+  const [statusOptions, setStatusOptions] = useState<Option[]>([
+    { value: 'ACTIVE', label: 'ACTIVE' },
+    { value: 'INACTIVE', label: 'INACTIVE' },
+  ])
+  const [yesNoOptions, setYesNoOptions] = useState<Option[]>([
+    { value: 'true', label: 'Yes' },
+    { value: 'false', label: 'No' },
+  ])
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -122,7 +127,6 @@ export default function PumpSettingsClient({
       }
       if (!res.ok) throw body
       setPumps(body?.data?.pumps ?? [])
-      setTankGroups(body?.data?.tankGroups ?? [])
     } catch (err) {
       setLoadError(err)
     } finally {
@@ -154,28 +158,15 @@ export default function PumpSettingsClient({
   }, [])
 
   useEffect(() => {
-    if (statusOptions.length === 0) {
-      setStatusOptions([
-        { value: 'ACTIVE', label: 'ACTIVE' },
-        { value: 'INACTIVE', label: 'INACTIVE' },
-      ])
-    }
-    if (yesNoOptions.length === 0) {
-      setYesNoOptions([
-        { value: 'true', label: 'Yes' },
-        { value: 'false', label: 'No' },
-      ])
-    }
-  }, [statusOptions.length, yesNoOptions.length])
-
-  useEffect(() => {
-    loadData()
-    loadConfig()
+    queueMicrotask(() => {
+      loadData()
+    })
+    queueMicrotask(() => {
+      loadConfig()
+    })
   }, [loadData, loadConfig])
 
   useEffect(() => {
-    let mounted = true
-
     const socket = io(window.location.origin, {
       path: '/ws/forecourt',
       transports: ['websocket'],
@@ -187,7 +178,6 @@ export default function PumpSettingsClient({
     socketRef.current = socket
 
     return () => {
-      mounted = false
       socketRef.current?.disconnect()
     }
   }, [stationId])

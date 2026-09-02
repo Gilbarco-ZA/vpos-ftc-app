@@ -9,12 +9,11 @@ import type { FuelingSession } from '@/src/modules/forecourt/infrastructure/sess
 import type { NozzleState, PumpStateSnapshot } from '@/src/shared/pumps/types'
 
 import { queryOne, txQuery, withTransaction } from '@/src/platform/db/postgres'
-import { getForecourtRuntimeConfig } from '@/src/shared/forecourt/runtimeConfig'
 import { toNumberStrict as parseNumber } from '@/src/shared/numbers'
-import { enqueueFiscalInboxMessage } from '@/src/shared/runtime/fiscalInbox'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import { enqueueFiscalInboxMessage } from '@/src/modules/fiscal-inbox/application/fiscalInbox'
 import {
   requestPostSaleTotalsRefresh,
   startSaleTotalsPolling,
@@ -33,6 +32,11 @@ import {
   updateFuelingMetrics,
 } from '@/src/modules/forecourt/infrastructure/sessions/fuelingSessions'
 import { syncDeductionForTransaction } from '@/src/modules/tank-levels/application/syncTransactionTankDeduction'
+import { ensureTanzaniaTransactionTankProjection } from '@/src/modules/tanzania-fiscal/infrastructure/transactionTankProjection'
+import {
+  buildForecourtTransactionCorrelationLockKey,
+  normalizeForecourtTransactionCorrelationSeconds,
+} from '@/src/modules/transactions/infrastructure/forecourtTransactionCorrelation'
 import { getStationLinkingWindowSecondsTx } from '@/src/modules/transactions/infrastructure/linkingWindow'
 
 type NozzleNumberCache = Map<string, number>
@@ -81,6 +85,8 @@ const resolveNozzleNumber = async (opts: {
          JOIN pumps p ON p.id = n.pump_id AND p.station_id = n.station_id
         WHERE n.station_id = $1
           AND p.pump_number = $2
+          AND p.status <> 'INACTIVE'
+          AND n.is_active = TRUE
           AND n.id = $3
         LIMIT 1`,
       [opts.stationId, opts.pumpNumber, opts.nozzleId],
@@ -136,6 +142,12 @@ const deterministicUuid = (input: string) => {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
+const resolveSessionTransactionDateTime = (session: FuelingSession) => {
+  const timestamp =
+    session.completionCandidateAt ?? session.lastUpdateAt ?? session.startedAt
+  return Number.isFinite(timestamp) ? new Date(timestamp) : new Date()
+}
+
 const createTransactionForSession = async (session: FuelingSession) => {
   if (session.finalized) return
 
@@ -178,6 +190,8 @@ const createTransactionForSession = async (session: FuelingSession) => {
          JOIN products pr ON pr.id = t.product_id AND pr.station_id = t.station_id
         WHERE p.station_id = $1
           AND p.pump_number = $2
+          AND p.status <> 'INACTIVE'
+          AND n.is_active = TRUE
           AND n.nozzle_number = $3
         LIMIT 1`,
       [
@@ -191,7 +205,7 @@ const createTransactionForSession = async (session: FuelingSession) => {
     if (!nozzleRow?.rows?.[0]) return null
     const nozzle = nozzleRow.rows[0]
 
-    let priceSlice = await txQuery<{
+    const priceSlice = await txQuery<{
       id: string
       unit_price: number
     }>(
@@ -249,7 +263,25 @@ const createTransactionForSession = async (session: FuelingSession) => {
 
     const totals = computeTotals(session, unitPrice)
     if (!Number.isFinite(totals.volume) || totals.volume <= 0) return null
+    const transactionDateTime = resolveSessionTransactionDateTime(session)
 
+    const linkingWindowSeconds = await getStationLinkingWindowSecondsTx(
+      client,
+      session.stationId,
+    )
+    const correlationSeconds =
+      normalizeForecourtTransactionCorrelationSeconds(linkingWindowSeconds)
+    const correlationLockKey = buildForecourtTransactionCorrelationLockKey({
+      stationId: session.stationId,
+      pumpNumber: session.pumpNumber,
+      nozzleNumber: session.nozzleNumber,
+    })
+
+    // Serialize the pump-session and JPL-buffer creation paths so whichever
+    // observes the physical sale first becomes the single canonical row.
+    await txQuery(client, `SELECT pg_advisory_xact_lock(hashtext($1))`, [
+      correlationLockKey,
+    ])
     await txQuery(client, `SELECT pg_advisory_xact_lock(hashtext($1))`, [
       sourceQueueId,
     ])
@@ -265,10 +297,96 @@ const createTransactionForSession = async (session: FuelingSession) => {
       return existingId
     }
 
-    const linkingWindowSeconds = await getStationLinkingWindowSecondsTx(
+    const existingJpl = await txQuery<{ id: string }>(
       client,
-      session.stationId,
+      `SELECT id
+         FROM transactions
+        WHERE station_id = $1::uuid
+          AND pump_number = $2::int
+          AND deleted_at IS NULL
+          AND doms_source_system = 'jpl'
+          AND doms_transaction_identity IS NOT NULL
+          AND (nozzle_number = $3::int OR nozzle_number IS NULL)
+          AND ABS(total_amount - $4::numeric) <= 0.01
+          AND ABS(volume - $5::numeric) <= 0.001
+          AND ABS(EXTRACT(EPOCH FROM (transaction_date_time - $6::timestamptz))) <= $7::int
+        ORDER BY ABS(EXTRACT(EPOCH FROM (transaction_date_time - $6::timestamptz))) ASC,
+                 transaction_date_time DESC
+        LIMIT 1
+        FOR UPDATE`,
+      [
+        session.stationId,
+        session.pumpNumber,
+        session.nozzleNumber,
+        totals.amount,
+        totals.volume,
+        transactionDateTime,
+        correlationSeconds,
+      ],
     )
+
+    const existingJplId = existingJpl.rows[0]?.id ?? null
+    if (existingJplId) {
+      await txQuery(
+        client,
+        `UPDATE transactions
+            SET source_queue_id = COALESCE(source_queue_id, $3::uuid),
+                tank_id = COALESCE(tank_id, $4::uuid),
+                nozzle_id = COALESCE(nozzle_id, $5::uuid),
+                nozzle_number = COALESCE(nozzle_number, $6::int),
+                grade_id = COALESCE(grade_id, $7),
+                grade_name = COALESCE(grade_name, $8),
+                updated_at = NOW()
+          WHERE station_id = $1::uuid
+            AND id = $2::uuid`,
+        [
+          session.stationId,
+          existingJplId,
+          sourceQueueId,
+          nozzle.tank_id,
+          nozzle.nozzle_id,
+          nozzle.nozzle_number,
+          nozzle.product_id ?? nozzle.product_code ?? null,
+          nozzle.product_name ?? nozzle.product_code ?? null,
+        ],
+      )
+
+      await txQuery(
+        client,
+        `INSERT INTO transaction_lines (
+          id,
+          transaction_id,
+          product_id,
+          quantity,
+          unit_price,
+          tax_code,
+          tax_rate,
+          price_slice_id
+        )
+        SELECT $1, $2::uuid, $3::uuid, $4, $5, $6, $7, $8::uuid
+         WHERE NOT EXISTS (
+           SELECT 1 FROM transaction_lines WHERE transaction_id = $2::uuid
+         )
+           AND EXISTS (
+             SELECT 1
+               FROM transactions
+              WHERE id = $2::uuid
+                AND status NOT IN ('FISCALIZED', 'PRINTED', 'REPRINTED', 'CREDITED')
+           )`,
+        [
+          uuidv4(),
+          existingJplId,
+          nozzle.product_row_id,
+          totals.volume,
+          unitPrice,
+          nozzle.tax_code,
+          nozzle.tax_rate,
+          slice.id,
+        ],
+      )
+
+      return existingJplId
+    }
 
     const transactionId = uuidv4()
     const transactionInsert = await txQuery<{ id: string }>(
@@ -295,28 +413,29 @@ const createTransactionForSession = async (session: FuelingSession) => {
         $1,
         $2,
         $3,
-        NOW(),
-        $4,
+        $4::timestamptz,
         $5,
         $6,
-        'OPEN',
         $7,
+        'OPEN',
         $8,
+        $9,
         CASE
-          WHEN $9::int IS NULL THEN NULL
-          ELSE NOW() + ($9::int * INTERVAL '1 second')
+          WHEN $10::int IS NULL THEN NULL
+          ELSE $4::timestamptz + ($10::int * INTERVAL '1 second')
         END,
-        $10,
         $11,
         $12,
         $13,
-        $14
+        $14,
+        $15
       )
       RETURNING id`,
       [
         transactionId,
         session.stationId,
         session.pumpNumber,
+        transactionDateTime,
         totals.amount,
         totals.volume,
         nozzle.product_name ?? nozzle.product_code ?? null,
@@ -416,6 +535,16 @@ const createTransactionForSession = async (session: FuelingSession) => {
         })
       },
     )
+    await ensureTanzaniaTransactionTankProjection({
+      stationId: session.stationId,
+      transactionId: insertedId,
+    }).catch((err) => {
+      logger.error('[pump-store]', {
+        msg: 'Failed to capture Tanzania transaction tank projection',
+        error: err,
+        transactionId: insertedId,
+      })
+    })
     session.finalized = true
   }
 }
@@ -517,7 +646,6 @@ export async function handlePumpEventMessage(msg: any) {
   }
 
   if (target && !target.finalized) {
-    const cfg = getForecourtRuntimeConfig()
     const finalizeCfg = {
       stableIdleMs: 5000,
       stableIdleFallbackMs: 8000,

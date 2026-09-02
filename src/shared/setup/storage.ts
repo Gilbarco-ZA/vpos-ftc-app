@@ -1,7 +1,7 @@
-import { query, queryOne } from '@/src/platform/db/postgres'
+import { queryOne } from '@/src/platform/db/postgres'
 import { KV_KEYS } from '@/src/shared/setup/keys'
 import { getRegistrationStatusViaProxy } from '@/src/shared/setup/proxy'
-import { kvGet } from '@/src/shared/storage/stationKv'
+import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 import { requireNonEmptyString } from '@/src/shared/utils/inputs'
 
 type JsonValue = unknown
@@ -11,14 +11,10 @@ export async function storeStationKv(
   key: string,
   value: unknown,
 ): Promise<void> {
-  const normalizedStationId = requireNonEmptyString(stationId, 'stationId')
-  const normalizedKey = requireNonEmptyString(key, 'key')
-  await query(
-    `INSERT INTO station_kv (station_id, key, value)
-     VALUES ($1, $2, $3::jsonb)
-     ON CONFLICT (station_id, key)
-     DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [normalizedStationId, normalizedKey, JSON.stringify(value ?? null)],
+  await kvSet(
+    requireNonEmptyString(stationId, 'stationId'),
+    requireNonEmptyString(key, 'key'),
+    value,
   )
 }
 

@@ -28,6 +28,11 @@ const dec6Schema = z
   .trim()
   .regex(/^\d{6}$/)
 
+const dec10Schema = z
+  .string()
+  .trim()
+  .regex(/^\d{10}$/, 'Expected DEC10 string')
+
 const num2Schema = z.number().int().nonnegative()
 
 const fcDateTimeSchema = z
@@ -217,7 +222,7 @@ const supportedRequestSchemas = {
   }),
   clear_FpSupTrans_req: requestEnvelopeSchema.extend({
     name: z.literal('clear_FpSupTrans_req'),
-    subCode: z.enum(['00H', '04H']),
+    subCode: z.literal('04H'),
     data: z
       .object({
         FpId: id2Schema,
@@ -226,6 +231,13 @@ const supportedRequestSchemas = {
           .string()
           .trim()
           .regex(/^\d{4}$/, 'Expected DEC4 TransSeqNo'),
+        Vol_e: dec10Schema,
+        Money_e: dec10Schema,
+        PaymentParameters: z
+          .object({
+            ReferenceNo: z.array(z.number().int().min(0).max(255)).optional(),
+          })
+          .passthrough(),
       })
       .passthrough(),
   }),

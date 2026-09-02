@@ -2,7 +2,8 @@ import {
   ensurePlainObject,
   requireNonEmptyString,
 } from '@/src/shared/utils/inputs'
-import { getVposDailyData } from '@/src/shared/vpos/pos'
+
+import { getVposDailyData } from '@/src/modules/vpos/application/pos'
 
 export async function readVposDailyData(args: { stationId: string }) {
   const normalizedStationId = requireNonEmptyString(args.stationId, 'stationId')

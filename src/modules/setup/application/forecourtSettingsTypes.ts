@@ -1,1 +1,1 @@
-export type { SaveForecourtSettingsInput } from '@/src/shared/forecourt/settings'
+export type { SaveForecourtSettingsInput } from '@/src/modules/forecourt/application/forecourtSettings'

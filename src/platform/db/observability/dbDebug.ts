@@ -58,7 +58,7 @@ function sanitizeValue(value: any, depth = 0): any {
 
   if (Array.isArray(value)) {
     const max = Math.min(value.length, 50)
-    const output = new Array(max)
+    const output = Array(max)
     for (let index = 0; index < max; index += 1) {
       output[index] = sanitizeValue(value[index], depth + 1)
     }

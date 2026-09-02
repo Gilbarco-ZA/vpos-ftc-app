@@ -28,10 +28,6 @@ function asNonNegativeInt(value: unknown, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : fallback
 }
 
-function applyStationFilter(baseSql: string, stationId?: string | null) {
-  return stationId ? `${baseSql} AND station_id = $2::text` : baseSql
-}
-
 export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
   return {
     async list(filters: FiscalInboxListFilters) {
@@ -198,7 +194,19 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
           input.messageJson != null ? input.messageJson : src.message_json,
         ],
       )
-      return Number(insertRes.rows?.[0]?.id ?? 0) || null
+      const insertedId = Number(insertRes.rows?.[0]?.id ?? 0) || null
+      if (insertedId) {
+        await query(
+          `UPDATE fiscal_inbox
+              SET resolved_at = COALESCE(resolved_at, NOW()),
+                  updated_at = NOW()
+            WHERE id = $1
+              AND station_id::text = $2::text
+              AND status = 'DEAD'`,
+          [input.id, input.stationId],
+        )
+      }
+      return insertedId
     },
 
     async exportRows(ids: number[], stationId?: string | null) {
@@ -215,7 +223,7 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
 
     async exportRowsMetadata(ids: number[], stationId?: string | null) {
       const res = await query(
-        `SELECT id, station_id, topic, status, request_id, attempt_count, next_attempt_at, received_at, processed_at, dead_at, error_text
+        `SELECT id, station_id, topic, status, request_id, attempt_count, next_attempt_at, received_at, processed_at, dead_at, resolved_at, error_text
            FROM fiscal_inbox
           WHERE id = ANY($1::bigint[])
             AND ($2::text IS NULL OR station_id = $2::text)
@@ -238,7 +246,7 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
       if (input.action === 'REQUEUE') {
         await query(
           `UPDATE fiscal_inbox
-              SET status='PENDING', attempt_count=0, next_attempt_at=NOW(), dead_at=NULL, processed_at=NULL, error_text=NULL
+              SET status='PENDING', attempt_count=0, next_attempt_at=NOW(), dead_at=NULL, processed_at=NULL, resolved_at=NULL, error_text=NULL
             WHERE id = ANY($1::bigint[]) ${stationFilter}`,
           argsBase,
         )
@@ -249,7 +257,7 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
         const qargs = [...argsBase, input.errorText ?? null]
         await query(
           `UPDATE fiscal_inbox
-              SET status='FAILED', next_attempt_at=NOW(), error_text = COALESCE($${qargs.length}::text, error_text)
+              SET status='FAILED', next_attempt_at=NOW(), resolved_at=NULL, error_text = COALESCE($${qargs.length}::text, error_text)
             WHERE id = ANY($1::bigint[]) ${stationFilter}`,
           qargs,
         )
@@ -260,7 +268,7 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
         const qargs = [...argsBase, input.errorText ?? null]
         await query(
           `UPDATE fiscal_inbox
-              SET status='DEAD', dead_at=NOW(), error_text = COALESCE($${qargs.length}::text, error_text)
+              SET status='DEAD', dead_at=NOW(), resolved_at=NULL, error_text = COALESCE($${qargs.length}::text, error_text)
             WHERE id = ANY($1::bigint[]) ${stationFilter}`,
           qargs,
         )
@@ -270,7 +278,7 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
       if (input.action === 'MARK_PROCESSED') {
         await query(
           `UPDATE fiscal_inbox
-              SET status='PROCESSED', processed_at=NOW()
+              SET status='PROCESSED', processed_at=NOW(), resolved_at=COALESCE(resolved_at, NOW())
             WHERE id = ANY($1::bigint[]) ${stationFilter}`,
           argsBase,
         )
@@ -326,6 +334,18 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
         if (inserted.rows?.[0]) created.push(inserted.rows[0])
       }
 
+      if (created.length) {
+        await query(
+          `UPDATE fiscal_inbox
+              SET resolved_at = COALESCE(resolved_at, NOW()),
+                  updated_at = NOW()
+            WHERE id = ANY($1::bigint[])
+              AND ($2::text IS NULL OR station_id = $2::text)
+              AND status = 'DEAD'`,
+          [input.ids, input.stationId ?? null],
+        )
+      }
+
       return { createdCount: created.length, created }
     },
 
@@ -337,6 +357,7 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
                     attempt_count = 0,
                     next_attempt_at = NOW(),
                     dead_at = NULL,
+                    resolved_at = NULL,
                     error_text = NULL,
                     updated_at = NOW()
               WHERE station_id = $1
@@ -348,6 +369,7 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
                     attempt_count = 0,
                     next_attempt_at = NOW(),
                     dead_at = NULL,
+                    resolved_at = NULL,
                     error_text = NULL,
                     updated_at = NOW()
               WHERE station_id = $1

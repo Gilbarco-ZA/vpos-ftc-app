@@ -87,26 +87,39 @@ export const exportPssConfigXml = async (args: {
       const nozzles = (p.nozzles || [])
         .map((n: any) => {
           const nozzleId = safeTrim(n.nozzleId)
-          const gradeId = safeTrim(n.productId) || safeTrim(n.productCode)
+          const gradeOptionId = safeTrim(n.domsGradeOptionId) || nozzleId
+          const gradeId =
+            safeTrim(n.domsGradeId) ||
+            safeTrim(n.productId) ||
+            safeTrim(n.productCode)
           const dbTankId = safeTrim(n.tankId)
-          if (!nozzleId || !dbTankId) return null
+          if (!nozzleId || !gradeOptionId || !dbTankId) return null
 
-          const pssTankId =
+          const storedTankIds = Array.isArray(n.domsTankIds)
+            ? n.domsTankIds.map(safeTrim).filter(Boolean)
+            : []
+          const fallbackTankId =
             dbTankToPss.get(dbTankId) || parsePssTankIdFromCode(n.tankCode)
+          const tankIds = storedTankIds.length
+            ? Array.from(new Set(storedTankIds))
+            : fallbackTankId
+              ? [fallbackTankId]
+              : []
 
-          if (!pssTankId) return null
-          if (!gradeId) return null
+          if (!tankIds.length || !gradeId) return null
 
           return {
+            gradeOptionId,
             nozzleId,
             gradeId,
-            tankId: pssTankId,
+            tankIds,
           }
         })
         .filter(Boolean) as Array<{
+        gradeOptionId: string
         nozzleId: string
         gradeId: string
-        tankId: string
+        tankIds: string[]
       }>
 
       return nozzles.length ? { pumpId, nozzles } : null

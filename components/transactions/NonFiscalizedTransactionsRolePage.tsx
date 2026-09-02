@@ -2,9 +2,10 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { requireAuth } from '@/src/shared/auth'
-import { applyDateRangeParams } from '@/src/shared/crud/filters'
+import { resolveDateFilter } from '@/src/shared/crud/dateFilters'
 import { getCsrfToken } from '@/src/shared/security/csrf'
 import { getStationDecimalSettings } from '@/src/shared/server/decimalSettings'
+import { getStationCurrentBusinessDate } from '@/src/shared/server/stationBusinessDate'
 
 import { listTransactionCatalogProducts } from '@/src/modules/transactions/application/queries/list-transaction-catalog-products'
 import { listTransactions } from '@/src/modules/transactions/application/queries/list-transactions'
@@ -47,12 +48,6 @@ const loadManagerTransactions = async (
     endDate?: string
   },
 ) => {
-  const params = new URLSearchParams()
-  applyDateRangeParams(params, {
-    startDate: opts.startDate,
-    endDate: opts.endDate,
-  })
-
   const rows = await listTransactions(stationId, {
     page: opts.page ?? 1,
     pageSize: opts.pageSize ?? 50,
@@ -60,8 +55,8 @@ const loadManagerTransactions = async (
     transactionId: opts.transactionId || undefined,
     pumpNumber: opts.pumpNumber ? Number(opts.pumpNumber) : undefined,
     search: opts.search || undefined,
-    from: params.get('from') || undefined,
-    to: params.get('to') || undefined,
+    startDate: opts.startDate || undefined,
+    endDate: opts.endDate || undefined,
   })
 
   return {
@@ -72,11 +67,18 @@ const loadManagerTransactions = async (
   }
 }
 
-const loadTenantTransactions = async (stationId: string, pump?: string) => {
+const loadTenantTransactions = async (
+  stationId: string,
+  pump?: string,
+  startDate?: string,
+  endDate?: string,
+) => {
   const rows = await listTransactions(stationId, {
     limit: 200,
     excludeStatus: 'FISCALIZED',
     pumpNumber: pump ? Number(pump) : undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
   })
 
   return {
@@ -99,24 +101,52 @@ const normalizeAdminRows = (items: any[]): TransactionListItem[] => {
     fiscalQueueEnqueuedAt:
       item?.fiscal_queue_enqueued_at ?? item?.fiscalQueueEnqueuedAt ?? null,
     lastError: item?.last_error ?? item?.lastError ?? null,
+    customerId: item?.customer_id ?? item?.customerId ?? null,
+    customerName:
+      item?.customer_buyer_name ??
+      item?.customer_trade_name ??
+      item?.buyer_name ??
+      item?.customerName ??
+      null,
+    customerTin: item?.customer_tin ?? item?.tin ?? item?.customerTin ?? null,
+    domsSourceSystem:
+      item?.doms_source_system ?? item?.domsSourceSystem ?? null,
+    odometer: item?.odometer ?? null,
+    paymentType: item?.payment_type ?? item?.paymentType ?? null,
+    vehicleRegNr: item?.vehicle_reg_nr ?? item?.vehicleRegNr ?? null,
   }))
 }
 
-const AdminNonFiscalizedView = async () => {
+const AdminNonFiscalizedView = async ({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) => {
   const user = await requireAuth(['manager', 'administrator'])
   if (!['administrator', 'manager'].includes(user.role)) redirect('/dashboard')
 
   let rows: TransactionListItem[] = []
   let error: string | null = null
-  const [decimals, products] = await Promise.all([
+  const [decimals, products, businessDate] = await Promise.all([
     getStationDecimalSettings(user.stationId),
     listTransactionCatalogProducts(user.stationId),
+    getStationCurrentBusinessDate(user.stationId),
   ])
+  const dateFilter = resolveDateFilter(
+    {
+      startDate: readParam(searchParams, 'startDate'),
+      endDate: readParam(searchParams, 'endDate'),
+      preset: readParam(searchParams, 'preset'),
+    },
+    businessDate,
+  )
 
   try {
     const list = await listTransactions(user.stationId, {
       scope: 'non-fiscalized',
       limit: 200,
+      startDate: dateFilter.startDate || undefined,
+      endDate: dateFilter.endDate || undefined,
     })
     rows = normalizeAdminRows(Array.isArray(list?.items) ? list.items : [])
   } catch (err: any) {
@@ -134,14 +164,19 @@ const AdminNonFiscalizedView = async () => {
         unitPrice: Number(product.unitPrice ?? 0),
         currency: product.currency,
         unitOfMeasure: product.unitOfMeasure,
+        categoryId: product.categoryId,
+        categoryName: product.categoryName,
       }))}
       error={error}
       decimals={decimals}
       stationCountry={user.station?.country ?? null}
+      initialStartDate={dateFilter.startDate}
+      initialEndDate={dateFilter.endDate}
+      businessDate={businessDate}
     >
       <PageHeader
         title="Non-fiscalized transactions"
-        description="All transactions that are not in FISCALIZED status."
+        description="Transactions that are not in FISCALIZED status. Defaults to today's station business day."
         actions={
           <div className="flex items-center gap-2">
             <Button asChild variant="primary">
@@ -169,9 +204,19 @@ const ManagerNonFiscalizedView = async ({
   const pump = readParam(searchParams, 'pump').trim()
   const transactionId = readParam(searchParams, 'transactionId').trim()
   const q = readParam(searchParams, 'q').trim()
-  const startDate = readParam(searchParams, 'startDate').trim()
-  const endDate = readParam(searchParams, 'endDate').trim()
-  const preset = readParam(searchParams, 'preset').trim()
+  const requestedStartDate = readParam(searchParams, 'startDate').trim()
+  const requestedEndDate = readParam(searchParams, 'endDate').trim()
+  const requestedPreset = readParam(searchParams, 'preset').trim()
+  const businessDate = await getStationCurrentBusinessDate(user.stationId)
+  const dateFilter = resolveDateFilter(
+    {
+      startDate: requestedStartDate,
+      endDate: requestedEndDate,
+      preset: requestedPreset,
+    },
+    businessDate,
+  )
+  const { startDate, endDate, preset } = dateFilter
 
   const data = await loadManagerTransactions(user.stationId, {
     page,
@@ -213,7 +258,7 @@ const ManagerNonFiscalizedView = async ({
     <div className="space-y-4">
       <PageHeader
         title="Non-fiscalized transactions"
-        description="All transactions that are not in FISCALIZED status."
+        description="Transactions that are not in FISCALIZED status. Defaults to today's station business day."
         actions={
           <>
             <Button asChild variant="primary">
@@ -232,8 +277,9 @@ const ManagerNonFiscalizedView = async ({
           q,
           startDate,
           endDate,
-          preset: (preset as any) || 'last7',
+          preset,
         }}
+        currentDate={businessDate}
         facets={[
           {
             key: 'pump',
@@ -262,6 +308,8 @@ const ManagerNonFiscalizedView = async ({
             unitPrice: Number(product.unitPrice ?? 0),
             currency: product.currency,
             unitOfMeasure: product.unitOfMeasure,
+            categoryId: product.categoryId,
+            categoryName: product.categoryName,
           }))}
           csrfToken={csrfToken}
           decimals={decimals}
@@ -306,7 +354,21 @@ const TenantNonFiscalizedView = async ({
   if (user.role !== 'tenant') redirect('/dashboard')
 
   const pump = readParam(searchParams, 'pump').trim()
-  const txns = await loadTenantTransactions(user.stationId, pump || undefined)
+  const businessDate = await getStationCurrentBusinessDate(user.stationId)
+  const dateFilter = resolveDateFilter(
+    {
+      startDate: readParam(searchParams, 'startDate'),
+      endDate: readParam(searchParams, 'endDate'),
+      preset: readParam(searchParams, 'preset'),
+    },
+    businessDate,
+  )
+  const txns = await loadTenantTransactions(
+    user.stationId,
+    pump || undefined,
+    dateFilter.startDate,
+    dateFilter.endDate,
+  )
   const decimals = await getStationDecimalSettings(user.stationId)
 
   return (
@@ -330,14 +392,30 @@ const TenantNonFiscalizedView = async ({
           method="get"
           action="/transactions"
         >
+          <input type="hidden" name="preset" value="custom" />
           <Input
             name="pump"
             defaultValue={pump}
             placeholder="Pump number (e.g., 1)"
             className="w-48"
           />
+          <Input
+            type="date"
+            name="startDate"
+            defaultValue={dateFilter.startDate}
+            className="w-40"
+          />
+          <Input
+            type="date"
+            name="endDate"
+            defaultValue={dateFilter.endDate}
+            className="w-40"
+          />
           <Button type="submit" variant="primary">
             Load open transactions
+          </Button>
+          <Button asChild variant="secondary">
+            <Link href="/transactions?preset=all">All dates</Link>
           </Button>
         </form>
         <p className="text-sm text-[var(--text-secondary)]">
@@ -350,6 +428,8 @@ const TenantNonFiscalizedView = async ({
       <TenantTransactionsClient
         initial={txns?.data || txns || []}
         decimals={decimals}
+        startDate={dateFilter.startDate}
+        endDate={dateFilter.endDate}
       />
     </div>
   )
@@ -367,7 +447,7 @@ export const NonFiscalizedTransactionsRolePage = async ({
   }
 
   if (role === 'administrator') {
-    return <AdminNonFiscalizedView />
+    return <AdminNonFiscalizedView searchParams={searchParams} />
   }
 
   return <ManagerNonFiscalizedView searchParams={searchParams} />

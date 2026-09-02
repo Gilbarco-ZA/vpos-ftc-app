@@ -4,7 +4,7 @@ import type {
   DeviceRow,
   PrinterConfig,
 } from '@/src/modules/admin-config/presentation/printers'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 
@@ -101,7 +101,7 @@ export default function PrinterConfigPage() {
     return conflicts
   }, [printer.fpIds, printers, selectedKey])
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setError(null)
     setNotice(null)
     setIsLoading(true)
@@ -134,34 +134,43 @@ export default function PrinterConfigPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  useEffect(() => {
-    safeAsync(loadAll(), 'printers.loadAll')
   }, [])
 
   useEffect(() => {
-    const row = selectedRow
-    if (!row) {
-      const defaults = defaultPrinterConfig()
-      setEnabled(true)
-      setSchemaVersion(1)
-      setPrinter(defaults)
-      setConfigJsonText(pretty(defaults))
-      return
+    queueMicrotask(() => {
+      safeAsync(loadAll(), 'printers.loadAll')
+    })
+  }, [loadAll])
+
+  useEffect(() => {
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      const row = selectedRow
+      if (!row) {
+        const defaults = defaultPrinterConfig()
+        setEnabled(true)
+        setSchemaVersion(1)
+        setPrinter(defaults)
+        setConfigJsonText(pretty(defaults))
+        return
+      }
+
+      setEnabled(!!row.enabled)
+      setSchemaVersion(Number(row.schemaVersion ?? 1))
+
+      const cfg = normalizePrinterConfig(row.configJson ?? {})
+      setPrinter(cfg)
+      setConfigJsonText(pretty(cfg))
+    })
+    return () => {
+      cancelled = true
     }
-
-    setEnabled(!!row.enabled)
-    setSchemaVersion(Number(row.schemaVersion ?? 1))
-
-    const cfg = normalizePrinterConfig(row.configJson ?? {})
-    setPrinter(cfg)
-    setConfigJsonText(pretty(cfg))
   }, [selectedRow])
 
   useEffect(() => {
     if (advancedJsonOpen) return
-    setConfigJsonText(pretty(printer))
+    queueMicrotask(() => setConfigJsonText(pretty(printer)))
   }, [printer, advancedJsonOpen])
 
   const parsedAdvanced = useMemo(() => {

@@ -56,6 +56,20 @@ const previewFrame = (buffer: Buffer) =>
       return `\\x${code.toString(16).toUpperCase().padStart(2, '0')}`
     })
 
+const hasValidDecodedEnvelope = (parsed: any) => {
+  const name = String(parsed?.name ?? '').trim()
+  const subCode = String(parsed?.subCode ?? '').trim()
+  const data = parsed?.data
+  const rejectWithoutSubCode = name === 'RejectMessage_resp' && !subCode
+
+  return Boolean(
+    name &&
+    data != null &&
+    typeof data === 'object' &&
+    (subCode || rejectWithoutSubCode),
+  )
+}
+
 const buildDiagnostic = (
   args: Omit<
     JplFrameDiagnostic,
@@ -122,9 +136,7 @@ export const inspectJplFrame = (frame: unknown): JplFrameDiagnostic => {
         const parsed = JSON.parse(jsonText)
         const name = parsed?.name
         const subCode = parsed?.subCode
-        const data = parsed?.data
-
-        if (name && subCode && data != null && typeof data === 'object') {
+        if (hasValidDecodedEnvelope(parsed)) {
           return buildDiagnostic({
             buffer,
             valid: true,
@@ -134,7 +146,7 @@ export const inspectJplFrame = (frame: unknown): JplFrameDiagnostic => {
             stxIndex,
             etxIndex,
             name: String(name),
-            subCode: String(subCode).trim().toUpperCase(),
+            subCode: subCode ? String(subCode).trim().toUpperCase() : undefined,
             solicited:
               typeof parsed?.solicited === 'boolean'
                 ? parsed.solicited
@@ -201,9 +213,7 @@ export const inspectJplFrame = (frame: unknown): JplFrameDiagnostic => {
 
   const name = parsed?.name
   const subCode = parsed?.subCode
-  const data = parsed?.data
-
-  if (!name || !subCode || data == null || typeof data !== 'object') {
+  if (!hasValidDecodedEnvelope(parsed)) {
     return buildDiagnostic({
       buffer,
       valid: false,
@@ -227,7 +237,7 @@ export const inspectJplFrame = (frame: unknown): JplFrameDiagnostic => {
     stxIndex,
     etxIndex,
     name: String(name),
-    subCode: String(subCode).trim().toUpperCase(),
+    subCode: subCode ? String(subCode).trim().toUpperCase() : undefined,
     solicited:
       typeof parsed?.solicited === 'boolean' ? parsed.solicited : undefined,
     correlationId: parsed?.correlationId,

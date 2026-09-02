@@ -23,7 +23,7 @@ import {
 import { buildJplCommandRequest } from '@/src/modules/forecourt/infrastructure/jpl/protocol/commands'
 import { getJplGatewayState } from '@/src/platform/integrations/jpl/gateway'
 import { setJplAdapterState, setJplBufferHealth } from '@/src/shared/forecourt/jplState'
-import { unwrapMultiMessage } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
+import { unwrapMultiMessage } from '@/src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers'
 import {
   buildClearSupervisedTransactionRequest,
   buildClearUnsupervisedTransactionRequest,
@@ -103,15 +103,56 @@ test('validateJplOutboundMessage validates supported requests', () => {
   assert.equal(request.name, 'open_Fp_req')
 })
 
+test('validateJplOutboundMessage accepts empty supervised clear payment group and requires the group', () => {
+  const clear = validateJplOutboundMessage({
+    name: 'clear_FpSupTrans_req',
+    subCode: '04H',
+    data: {
+      FpId: '01',
+      PosId: '01',
+      TransSeqNo: '0001',
+      Vol_e: '0000000100',
+      Money_e: '0000001000',
+      PaymentParameters: {},
+    },
+  })
+  const clearData = clear.data as {
+    PaymentParameters: Record<string, never>
+  }
+  assert.deepEqual(clearData.PaymentParameters, {})
+
+  assert.throws(
+    () =>
+      validateJplOutboundMessage({
+        name: 'clear_FpSupTrans_req',
+        subCode: '04H',
+        data: {
+          FpId: '01',
+          PosId: '01',
+          TransSeqNo: '0001',
+          Vol_e: '0000000100',
+          Money_e: '0000001000',
+        },
+      }),
+    /PaymentParameters/,
+  )
+})
+
 test('buildJplCommandRequest returns validated finalize transaction request', () => {
   const request = buildJplCommandRequest('FINALIZE_TRANSACTION', {
     pumpNumber: 2,
     posId: 3,
     transSeqNo: 17,
+    Vol_e: '0000001234',
     Money_e: '0000004321',
   })
   assert.equal(request?.name, 'clear_FpSupTrans_req')
+  assert.equal(request?.subCode, '04H')
   assert.equal(request?.data?.TransSeqNo, '0017')
+  const requestData = request?.data as {
+    PaymentParameters?: Record<string, never>
+  }
+  assert.deepEqual(requestData.PaymentParameters, {})
 })
 
 test('buildJplCommandRequest delegates core status and fuelling envelopes to doms-pos-jpl builders', () => {
@@ -183,7 +224,7 @@ test('transaction builders delegate supervised transaction envelopes to doms-pos
     fpId: 2,
     posId: 3,
     transSeqNo: 17,
-    payload: { Money_e: '0000004321' },
+    payload: { Vol_e: '0000001234', Money_e: '0000004321' },
   })
   const expectedClear = validateJplOutboundMessage(
     domsPosJpl.buildClearFpSupTransEnvelope
@@ -192,7 +233,11 @@ test('transaction builders delegate supervised transaction envelopes to doms-pos
           posId: '03',
           transSeqNo: '0017',
           subCode: '04H',
-          extraData: { Money_e: '0000004321' },
+          extraData: {
+            Vol_e: '0000001234',
+            Money_e: '0000004321',
+            PaymentParameters: {},
+          },
         })
       : {
           name: 'clear_FpSupTrans_req',
@@ -201,7 +246,9 @@ test('transaction builders delegate supervised transaction envelopes to doms-pos
             FpId: '02',
             PosId: '03',
             TransSeqNo: '0017',
+            Vol_e: '0000001234',
             Money_e: '0000004321',
+            PaymentParameters: {},
           },
         },
   )
@@ -274,6 +321,27 @@ test('inspectJplFrame accepts decoded JSON envelopes with delimiters already rem
   assert.equal(diagnostic.subCode, '01H')
   assert.equal(diagnostic.correlationId, 'decoded-correlation')
   assert.match(diagnostic.message, /delimiters were removed/i)
+})
+
+test('inspectJplFrame accepts decoded reject messages without a subCode', () => {
+  const diagnostic = inspectJplFrame(
+    JSON.stringify({
+      correlationId: 'reject-correlation',
+      name: 'RejectMessage_resp',
+      solicited: true,
+      data: {
+        RejectCode: { value: '02H' },
+        RejectInfoText:
+          'Message "clear_PendingFcPriceSet_req" with subCode "00H" is unknown.',
+      },
+    }),
+  )
+
+  assert.equal(diagnostic.valid, true)
+  assert.equal(diagnostic.code, 'ok')
+  assert.equal(diagnostic.name, 'RejectMessage_resp')
+  assert.equal(diagnostic.subCode, undefined)
+  assert.equal(diagnostic.correlationId, 'reject-correlation')
 })
 
 test('inspectJplFrame reports malformed framed JPL payloads', () => {
@@ -876,6 +944,11 @@ test('transaction service builds supervised transaction command family', () => {
   assert.equal(clearReq.name, 'clear_FpSupTrans_req')
   assert.equal(clearReq.subCode, '04H')
   assert.equal(clearReq.data.Vol_e, '0000001234')
+  assert.equal(clearReq.data.Money_e, '0000005678')
+  const clearReqData = clearReq.data as {
+    PaymentParameters: Record<string, never>
+  }
+  assert.deepEqual(clearReqData.PaymentParameters, {})
 })
 
 test('transaction service builds unsupervised transaction command family', () => {
@@ -937,15 +1010,15 @@ test('getJplGatewayState exposes replay capabilities', () => {
 
 
 test('transaction service keeps supervised clear explicit and read-derived', () => {
-  const withoutRead = buildClearSupervisedTransactionRequest({
-    fpId: 1,
-    posId: 4,
-    transSeqNo: 27,
-  })
-  assert.equal(withoutRead.name, 'clear_FpSupTrans_req')
-  assert.equal(withoutRead.subCode, '00H')
-  assert.equal(Object.prototype.hasOwnProperty.call(withoutRead.data, 'Vol_e'), false)
-  assert.equal(Object.prototype.hasOwnProperty.call(withoutRead.data, 'Money_e'), false)
+  assert.throws(
+    () =>
+      buildClearSupervisedTransactionRequest({
+        fpId: 1,
+        posId: 4,
+        transSeqNo: 27,
+      }),
+    /requires Vol_e and Money_e/,
+  )
 
   const readResult = {
     data: {
@@ -969,6 +1042,27 @@ test('transaction service keeps supervised clear explicit and read-derived', () 
   assert.equal(withRead.subCode, '04H')
   assert.equal(withRead.data.Vol_e, '0000001234')
   assert.equal(withRead.data.Money_e, '0000005678')
+  const withReadData = withRead.data as {
+    PaymentParameters: Record<string, never>
+  }
+  assert.deepEqual(withReadData.PaymentParameters, {})
+
+  const withReference = buildClearSupervisedTransactionRequest({
+    fpId: 1,
+    posId: 4,
+    transSeqNo: 27,
+    txData: {
+      ...readResult,
+      data: {
+        ...readResult.data,
+        PaymentParameters: { ReferenceNo: [7, 9] },
+      },
+    },
+  })
+  const withReferenceData = withReference.data as {
+    PaymentParameters: Record<string, never>
+  }
+  assert.deepEqual(withReferenceData.PaymentParameters, {})
 })
 
 test('getJplGatewayState keeps last reject and protocol health in sync', () => {

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type {
   BaseRow,
   CountryDataset,
@@ -39,6 +40,7 @@ export type CountryDatasetSummary = {
   isSystem: boolean
   source?: string | null
   version: number
+  contentHash?: string | null
   rowCount: number
   importedAt?: string | null
   updatedAt?: string | null
@@ -112,6 +114,88 @@ const datasetRows = (
 ): Array<BaseRow | TaxRow> => {
   const rows = dataset[datasetType]
   return Array.isArray(rows) ? rows : []
+}
+
+const normalizeDatasetRowForHash = (row: BaseRow | TaxRow) => ({
+  code: String(row.code || '').trim(),
+  name: String(row.name || '').trim(),
+  description: row.description == null ? null : String(row.description).trim(),
+  rate:
+    'rate' in row && row.rate != null && Number.isFinite(Number(row.rate))
+      ? Number(row.rate)
+      : null,
+  isActive: row.isActive ?? true,
+  sortOrder: Number(row.sortOrder ?? 0),
+})
+
+export const calculateCountryDatasetHash = (dataset: CountryDataset) => {
+  const canonical = Object.fromEntries(
+    DATASET_TYPES.map((datasetType) => [
+      datasetType,
+      datasetRows(dataset, datasetType)
+        .map(normalizeDatasetRowForHash)
+        .sort(
+          (left, right) =>
+            left.sortOrder - right.sortOrder ||
+            left.code.localeCompare(right.code) ||
+            left.name.localeCompare(right.name),
+        ),
+    ]),
+  )
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex')
+}
+
+const mapDatasetRowsToDataset = (rows: CountryDatasetRow[]): CountryDataset => {
+  const byType = (datasetType: DatasetType) =>
+    rows.filter((row) => row.datasetType === datasetType)
+  const toBaseRows = (datasetType: DatasetType): BaseRow[] =>
+    byType(datasetType).map((row) => ({
+      code: row.code,
+      name: row.name,
+      description: row.description ?? null,
+      sortOrder: row.sortOrder,
+      isActive: row.isActive,
+    }))
+
+  return {
+    taxTypes: byType('taxTypes').map((row) => ({
+      code: row.code,
+      name: row.name,
+      description: row.description ?? null,
+      rate: Number(row.rate ?? 0),
+      sortOrder: row.sortOrder,
+      isActive: row.isActive,
+    })),
+    productClassCodes: toBaseRows('productClassCodes'),
+    productTypeCodes: toBaseRows('productTypeCodes'),
+    creditNoteReasons: toBaseRows('creditNoteReasons'),
+    packagingUnits: toBaseRows('packagingUnits'),
+    quantityUnits: toBaseRows('quantityUnits'),
+  }
+}
+
+export const refreshCountryDatasetContentHash = async (
+  countryCodeInput: string,
+) => {
+  const countryCode = normalizeCountryCode(countryCodeInput)
+  const rows = await queryAll<Record<string, unknown>>(
+    `SELECT id, country_code, dataset_type, code, name, description, rate, is_active, sort_order, metadata_json
+       FROM country_dataset_rows
+      WHERE country_code = $1
+      ORDER BY dataset_type, sort_order ASC, name ASC, code ASC`,
+    [countryCode],
+  )
+  const dataset = mapDatasetRowsToDataset(mapRows<CountryDatasetRow>(rows))
+  const contentHash = calculateCountryDatasetHash(dataset)
+  await query(
+    `UPDATE country_datasets
+        SET content_hash = $2,
+            updated_at = NOW()
+      WHERE country_code = $1
+        AND content_hash IS DISTINCT FROM $2`,
+    [countryCode, contentHash],
+  )
+  return contentHash
 }
 
 const assertDatasetShape = (payload: CountryDatasetImportPayload) => {
@@ -220,24 +304,26 @@ export const upsertCountryDataset = async (
   const replaceRows = options?.replaceRows !== false
   const overwriteRows = options?.overwriteRows !== false
   const overwriteMetadata = options?.overwriteMetadata !== false
+  const contentHash = calculateCountryDatasetHash(payload.dataset)
 
   await withTransaction(async (client) => {
     await txQuery(
       client,
       `INSERT INTO country_datasets
-         (id, country_code, country_name, currency_code, timezone, default_language_code, is_active, is_system, source, version, imported_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+         (id, country_code, country_name, currency_code, timezone, default_language_code, is_active, is_system, source, version, content_hash, imported_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
        ON CONFLICT (country_code) DO UPDATE SET
-         country_name = CASE WHEN $11 THEN EXCLUDED.country_name ELSE country_datasets.country_name END,
-         currency_code = CASE WHEN $11 THEN EXCLUDED.currency_code ELSE country_datasets.currency_code END,
-         timezone = CASE WHEN $11 THEN EXCLUDED.timezone ELSE country_datasets.timezone END,
-         default_language_code = CASE WHEN $11 THEN EXCLUDED.default_language_code ELSE country_datasets.default_language_code END,
-         is_active = CASE WHEN $11 THEN EXCLUDED.is_active ELSE country_datasets.is_active END,
+         country_name = CASE WHEN $12 THEN EXCLUDED.country_name ELSE country_datasets.country_name END,
+         currency_code = CASE WHEN $12 THEN EXCLUDED.currency_code ELSE country_datasets.currency_code END,
+         timezone = CASE WHEN $12 THEN EXCLUDED.timezone ELSE country_datasets.timezone END,
+         default_language_code = CASE WHEN $12 THEN EXCLUDED.default_language_code ELSE country_datasets.default_language_code END,
+         is_active = CASE WHEN $12 THEN EXCLUDED.is_active ELSE country_datasets.is_active END,
          is_system = country_datasets.is_system OR EXCLUDED.is_system,
-         source = CASE WHEN $11 THEN EXCLUDED.source ELSE country_datasets.source END,
-         version = CASE WHEN $11 THEN EXCLUDED.version ELSE country_datasets.version END,
-         imported_at = CASE WHEN $11 THEN NOW() ELSE country_datasets.imported_at END,
-         updated_at = CASE WHEN $11 THEN NOW() ELSE country_datasets.updated_at END`,
+         source = CASE WHEN $12 THEN EXCLUDED.source ELSE country_datasets.source END,
+         version = CASE WHEN $12 THEN EXCLUDED.version ELSE country_datasets.version END,
+         content_hash = CASE WHEN $12 THEN EXCLUDED.content_hash ELSE country_datasets.content_hash END,
+         imported_at = CASE WHEN $12 THEN NOW() ELSE country_datasets.imported_at END,
+         updated_at = CASE WHEN $12 THEN NOW() ELSE country_datasets.updated_at END`,
       [
         uuidv4(),
         countryCode,
@@ -249,6 +335,7 @@ export const upsertCountryDataset = async (
         payload.isSystem ?? false,
         payload.source ?? null,
         payload.version ?? 1,
+        contentHash,
         overwriteMetadata,
       ],
     )
@@ -302,6 +389,7 @@ export const bootstrapBundledCountryDatasets = async () => {
             overwriteMetadata: false,
           },
         )
+        await refreshCountryDatasetContentHash(item.countryCode)
       }
     })()
   }
@@ -325,6 +413,7 @@ export const listCountryDatasetSummaries = async (opts?: {
        d.is_system,
        d.source,
        d.version,
+       d.content_hash,
        d.imported_at,
        d.updated_at,
        COALESCE(COUNT(r.id), 0)::int AS row_count
@@ -351,6 +440,7 @@ const getCountryDatasetSummaryInternal = async (countryCodeInput: string) => {
        d.is_system,
        d.source,
        d.version,
+       d.content_hash,
        d.imported_at,
        d.updated_at,
        COALESCE(COUNT(r.id), 0)::int AS row_count
@@ -464,6 +554,7 @@ export const upsertCountryDatasetRow = async (input: {
     ],
   )
 
+  await refreshCountryDatasetContentHash(countryCode)
   return await listCountryDatasetRows({ countryCode, datasetType })
 }
 
@@ -529,28 +620,44 @@ export const loadCountryDataset = async (
     }),
   ])
 
-  const toBaseRows = (rows: CountryDatasetRow[]): BaseRow[] =>
-    rows.map((row) => ({
-      code: row.code,
-      name: row.name,
-      description: row.description ?? null,
-      sortOrder: row.sortOrder,
-      isActive: row.isActive,
-    }))
+  return mapDatasetRowsToDataset([
+    ...taxTypes,
+    ...productClassCodes,
+    ...productTypeCodes,
+    ...creditNoteReasons,
+    ...packagingUnits,
+    ...quantityUnits,
+  ])
+}
 
-  return {
-    taxTypes: taxTypes.map((row) => ({
-      code: row.code,
-      name: row.name,
-      description: row.description ?? null,
-      rate: Number(row.rate ?? 0),
-      sortOrder: row.sortOrder,
-      isActive: row.isActive,
-    })),
-    productClassCodes: toBaseRows(productClassCodes),
-    productTypeCodes: toBaseRows(productTypeCodes),
-    creditNoteReasons: toBaseRows(creditNoteReasons),
-    packagingUnits: toBaseRows(packagingUnits),
-    quantityUnits: toBaseRows(quantityUnits),
+export const resetCountryDatasetToBundledDefaults = async (
+  countryCodeInput: string,
+) => {
+  const countryCode = normalizeCountryCode(countryCodeInput)
+  const bundled = BUNDLED_COUNTRY_DATASETS.find(
+    (item) => item.countryCode === countryCode,
+  )
+  if (!bundled) {
+    throw new Error(`No bundled defaults are available for ${countryCodeInput}`)
   }
+
+  return await upsertCountryDataset(
+    {
+      countryCode: bundled.countryCode,
+      countryName: bundled.countryName,
+      currencyCode: bundled.currencyCode ?? null,
+      timezone: bundled.timezone ?? null,
+      defaultLanguageCode: bundled.defaultLanguageCode ?? 'en',
+      isActive: true,
+      isSystem: true,
+      source: `src/shared/config/datasets/${bundled.countryCode}.ts`,
+      version: 1,
+      dataset: bundled.dataset,
+    },
+    {
+      replaceRows: true,
+      overwriteRows: true,
+      overwriteMetadata: true,
+    },
+  )
 }

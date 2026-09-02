@@ -2,7 +2,8 @@ import {
   ensurePlainObject,
   requireNonEmptyString,
 } from '@/src/shared/utils/inputs'
-import { getVposSafetyCheck } from '@/src/shared/vpos/restart'
+
+import { getVposSafetyCheck } from '@/src/modules/supervisor/application/vposRestart'
 
 export async function readVposSafetyCheck(args: { stationId: string }) {
   const normalizedStationId = requireNonEmptyString(args.stationId, 'stationId')

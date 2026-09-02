@@ -1,4 +1,5 @@
 import { fiscalizedFuelOptions } from '@/components/transactions/fiscalized/constants'
+import { Button } from '@/components/ui/button'
 import { FiltersRow } from '@/components/ui/filters-row'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -14,6 +15,9 @@ type FiscalizedFiltersRowProps = {
   onFuelTypeChange: (value: string) => void
   onStartDateChange: (value: string) => void
   onEndDateChange: (value: string) => void
+  onToday: () => void
+  onAllDates: () => void
+  todayDisabled?: boolean
   onRefresh: () => void
   loading: boolean
 }
@@ -29,6 +33,9 @@ const FiscalizedFiltersRow = ({
   onFuelTypeChange,
   onStartDateChange,
   onEndDateChange,
+  onToday,
+  onAllDates,
+  todayDisabled,
   onRefresh,
   loading,
 }: FiscalizedFiltersRowProps) => (
@@ -63,6 +70,17 @@ const FiscalizedFiltersRow = ({
       onFromChange={onStartDateChange}
       onToChange={onEndDateChange}
     />
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={onToday}
+      disabled={todayDisabled}
+    >
+      Today
+    </Button>
+    <Button type="button" variant="secondary" onClick={onAllDates}>
+      All dates
+    </Button>
     <FiltersRow.Action onClick={onRefresh} loading={loading} />
   </FiltersRow>
 )

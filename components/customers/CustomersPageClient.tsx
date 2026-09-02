@@ -3,7 +3,7 @@
 import type {
   CustomerListResult,
   CustomerSummary,
-} from '@/src/shared/server/customersTypes'
+} from '@/src/modules/customers/application/customerTypes'
 import {
   createContext,
   ReactNode,
@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorDetails } from '@/components/ui/error-details'
 import { Input } from '@/components/ui/input'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
 import { Select } from '@/components/ui/select'
@@ -300,13 +301,13 @@ const CustomersPageClient = ({
           </div>
         </Card>
 
-        {/* {loadError && (
+        {loadError != null && (
           <ErrorDetails
             title="Unable to load customers"
             message="Check the filter settings and try again."
             error={loadError}
           />
-        )} */}
+        )}
 
         <div className="relative">
           {loading && tableRows.length > 0 ? (

@@ -20,6 +20,13 @@ extends:
     nodeVersion: '22.15.0'
     esbuildTarget: 'node22'
     startScriptTemplate: 'node-web'
+    nextRuntimeIncludes:
+      - src/platform/runtime/env-defaults.cjs
+      - scripts/trace-net.cjs
+    nextRuntimeRequiredPaths:
+      - start.cjs
+      - vpos-server.cjs
+      - src/platform/runtime/env-defaults.cjs
     packageTargets:
       - id: cpb539_node22
         name: 'cpb-539-node22'

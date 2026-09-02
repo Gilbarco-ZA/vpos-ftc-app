@@ -211,7 +211,9 @@ export default function ForecourtPricingClient() {
   }, [loadProducts, refreshPriceState])
 
   useEffect(() => {
-    loadInitial()
+    queueMicrotask(() => {
+      loadInitial()
+    })
   }, [loadInitial])
 
   const updateRow = useCallback((id: string, patch: Partial<EntryRow>) => {

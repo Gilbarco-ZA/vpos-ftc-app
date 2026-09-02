@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Eye, EyeOff, ShieldCheck } from 'lucide-react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
@@ -19,17 +19,21 @@ import {
 import { FormField } from '@/components/ui/form-field'
 import { Input } from '@/components/ui/input'
 
+const subscribe = () => () => {}
+
 const LoginForm = () => {
   const [csrfToken, setCsrfToken] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
-  const [setupComplete, setSetupComplete] = useState(false)
+  const mounted = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  )
+  const searchParams = mounted
+    ? new URLSearchParams(window.location.search)
+    : null
+  const errorMessage = (searchParams?.get('error') || '').trim()
+  const setupComplete = searchParams?.get('setup') === 'complete'
   const [showPassword, setShowPassword] = useState(false)
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    setErrorMessage((params.get('error') || '').trim())
-    setSetupComplete(params.get('setup') === 'complete')
-  }, [])
 
   return (
     <Card className="animate-scale-in overflow-hidden shadow-elevated">

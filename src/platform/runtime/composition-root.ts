@@ -11,6 +11,7 @@ import {
 } from './env'
 import {
   RuntimeWorkerStopHandle,
+  startAtgPollingRuntimeWorker,
   startEwuraRetryRuntimeWorker,
   startForecourtConfigSyncRuntimeWorker,
   startInProcessRuntimeServices,
@@ -20,6 +21,7 @@ import {
   startReceiptPrintRuntimeWorker,
   startReportQueueRuntimeWorker,
   startSupervisorMonitorRuntimeWorker,
+  startTanzaniaDailyTotalsRuntimeWorker,
   startTransactionFiscalizationRuntimeWorker,
   startTransactionFiscalizationSchedulerRuntimeWorker,
 } from './worker-services'
@@ -88,6 +90,10 @@ export function startDedicatedWorkerProcess() {
     process.env.VPOS_EWURA_RETRY_POLL_MS,
     30_000,
   )
+  const tanzaniaDailyTotalsPollMs = parseRuntimeInterval(
+    process.env.VPOS_TANZANIA_DAILY_TOTALS_POLL_MS,
+    60_000,
+  )
 
   const stationId = requireRuntimeStationId('worker')
 
@@ -102,6 +108,7 @@ export function startDedicatedWorkerProcess() {
       startForecourtConfigSyncRuntimeWorker({ pollMs: forecourtSyncPollMs }),
     ),
   )
+  stopFns.push(toStopFn(startAtgPollingRuntimeWorker({ stationId })))
   if (shouldRunInternalFiscalizationWorkers()) {
     stopFns.push(
       toStopFn(
@@ -132,6 +139,14 @@ export function startDedicatedWorkerProcess() {
       startProxyFiscalSenderRuntimeWorker({ stationId, pollMs: proxyPollMs }),
     ),
   )
+  stopFns.push(
+    toStopFn(
+      startTanzaniaDailyTotalsRuntimeWorker({
+        stationId,
+        pollMs: tanzaniaDailyTotalsPollMs,
+      }),
+    ),
+  )
   stopFns.push(toStopFn(startSupervisorMonitorRuntimeWorker(stationId)))
   stopFns.push(toStopFn(startPssXmlSyncRuntimeWorker({ stationId, pollMs })))
 
@@ -160,11 +175,8 @@ export function startDedicatedWorkerProcess() {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __proxyFiscalSenderWorkerStarted: boolean | undefined
-  // eslint-disable-next-line no-var
   var __supervisorMonitorWorkerStarted: boolean | undefined
-  // eslint-disable-next-line no-var
   var __pssXmlSyncWorkerStarted: boolean | undefined
 }
 

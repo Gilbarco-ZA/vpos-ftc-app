@@ -1,4 +1,4 @@
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   // Activate SW ASAP
   self.skipWaiting()
 })

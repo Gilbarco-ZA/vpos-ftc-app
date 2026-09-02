@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 
-const CsrfBootstrap = (props: { onToken?: (token: string) => void }) => {
+const CsrfBootstrap = ({ onToken }: { onToken?: (token: string) => void }) => {
   useEffect(() => {
     let cancelled = false
     // On first boot, migrations and initial I/O can take a few seconds.
@@ -23,7 +23,7 @@ const CsrfBootstrap = (props: { onToken?: (token: string) => void }) => {
           const j = await r.json().catch(() => ({}))
           if (cancelled) return
           if (j?.token && typeof j.token === 'string') {
-            props.onToken?.(j.token)
+            onToken?.(j.token)
             return
           }
         } catch {
@@ -41,7 +41,7 @@ const CsrfBootstrap = (props: { onToken?: (token: string) => void }) => {
     return () => {
       cancelled = true
     }
-  }, [props.onToken])
+  }, [onToken])
 
   return null
 }

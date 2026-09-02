@@ -10,7 +10,6 @@ import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FormField } from '@/components/ui/form-field'
 import { Input } from '@/components/ui/input'
@@ -55,6 +54,7 @@ type TankSummary = {
   lowLevelLitres: number | null
   criticalLevelLitres: number | null
   liveVolumeLitres: number | null
+  liveVolumeUpdatedAt: string | null
   manualVolumeLitres: number | null
   baselineSource: 'stock_count' | 'manual' | 'live' | 'none'
   baselineLitres: number
@@ -262,7 +262,9 @@ export default function TankLevelsPageClient({
   }, [])
 
   useEffect(() => {
-    loadData()
+    queueMicrotask(() => {
+      loadData()
+    })
   }, [loadData])
 
   const selectedTank = useMemo(
@@ -504,6 +506,21 @@ export default function TankLevelsPageClient({
                           {tank.movementBalanceLitres >= 0 ? '+' : ''}
                           {formatLitres(tank.movementBalanceLitres)}
                         </div>
+                      </div>
+                      <div>
+                        <div className="text-[var(--text-muted)]">
+                          Current source
+                        </div>
+                        <div>
+                          {tank.liveVolumeLitres !== null
+                            ? 'Live ATG'
+                            : 'Inventory ledger'}
+                        </div>
+                        {tank.liveVolumeLitres !== null && (
+                          <div className="text-[var(--text-muted)]">
+                            {formatDateTime(tank.liveVolumeUpdatedAt)}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <div className="text-[var(--text-muted)]">

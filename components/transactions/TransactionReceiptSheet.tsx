@@ -26,6 +26,7 @@ export type TransactionReceiptSheetProps = {
   title?: string
   autoPrint?: boolean
   csrfToken?: string
+  previewMode?: boolean
   onOpenChange: (open: boolean) => void
 }
 
@@ -45,6 +46,7 @@ export const TransactionReceiptSheet = ({
   title = 'Receipt preview',
   autoPrint,
   csrfToken,
+  previewMode = false,
   onOpenChange,
 }: TransactionReceiptSheetProps) => {
   const [loading, setLoading] = useState(false)
@@ -70,6 +72,7 @@ export const TransactionReceiptSheet = ({
       try {
         const params = new URLSearchParams({ transactionId })
         if (refresh) params.set('refresh', '1')
+        if (previewMode) params.set('preview', '1')
         const res = await fetch(`/api/receipts?${params.toString()}`, {
           cache: 'no-store',
         })
@@ -87,12 +90,14 @@ export const TransactionReceiptSheet = ({
         setLoading(false)
       }
     },
-    [transactionId],
+    [previewMode, transactionId],
   )
 
   useEffect(() => {
     if (!canFetch) return
-    fetchReceipt()
+    queueMicrotask(() => {
+      fetchReceipt()
+    })
   }, [canFetch, fetchReceipt])
 
   const printReceipt = useCallback(async () => {
@@ -139,11 +144,29 @@ export const TransactionReceiptSheet = ({
   }, [open, transactionId])
 
   useEffect(() => {
-    if (!open || !autoPrint || !receipt || !transactionId || !csrfToken) return
+    if (
+      previewMode ||
+      !open ||
+      !autoPrint ||
+      !receipt ||
+      !transactionId ||
+      !csrfToken
+    )
+      return
     if (autoPrintStartedFor.current === transactionId) return
     autoPrintStartedFor.current = transactionId
-    void printReceipt()
-  }, [open, autoPrint, receipt, transactionId, csrfToken, printReceipt])
+    queueMicrotask(() => {
+      void printReceipt()
+    })
+  }, [
+    open,
+    autoPrint,
+    receipt,
+    transactionId,
+    csrfToken,
+    previewMode,
+    printReceipt,
+  ])
 
   const rawText = useMemo(() => toText(raw), [raw])
 
@@ -189,6 +212,15 @@ export const TransactionReceiptSheet = ({
             />
           ) : receipt ? (
             <div className="space-y-4">
+              {previewMode ? (
+                <Alert
+                  variant={STATUS_VARIANT.INFO}
+                  title="Receipt preview only"
+                >
+                  This transaction has not been fiscalized. The preview is for
+                  review only and is not a valid fiscal receipt.
+                </Alert>
+              ) : null}
               {voided && (
                 <Alert variant={STATUS_VARIANT.ERROR} title="VOIDED">
                   This receipt has been voided by a credit note.
@@ -235,14 +267,18 @@ export const TransactionReceiptSheet = ({
                     >
                       Refresh
                     </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => void printReceipt()}
-                      disabled={!csrfToken || printing}
-                      title={!csrfToken ? 'Loading security token…' : undefined}
-                    >
-                      {printing ? 'Printing…' : 'Print via JPL'}
-                    </Button>
+                    {!previewMode ? (
+                      <Button
+                        variant="secondary"
+                        onClick={() => void printReceipt()}
+                        disabled={!csrfToken || printing}
+                        title={
+                          !csrfToken ? 'Loading security token…' : undefined
+                        }
+                      >
+                        {printing ? 'Printing…' : 'Print via JPL'}
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 <Receipt80mm receipt={receipt} />

@@ -1,5 +1,3 @@
-import type { QueryResult, QueryResultRow } from 'pg'
-
 import {
   db,
   query,

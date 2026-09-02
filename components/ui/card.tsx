@@ -35,7 +35,7 @@ export const CardTitle = forwardRef<
   <h3
     ref={ref}
     className={cx(
-      'text-[15px] font-semibold bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--text-primary)] to-[var(--text-primary)] bg-clip-text text-transparent transition-all duration-300',
+      'bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--text-primary)] to-[var(--text-primary)] bg-clip-text text-[15px] font-semibold text-transparent transition-all duration-300',
       className,
     )}
     {...props}

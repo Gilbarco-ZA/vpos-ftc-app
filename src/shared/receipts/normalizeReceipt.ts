@@ -16,6 +16,7 @@ export type NormalizedReceipt = {
     companyVrn?: string
     companyMobile?: string
     companySerial?: string
+    companyUin?: string
     companyTaxOffice?: string
     country?: string
   }
@@ -23,6 +24,11 @@ export type NormalizedReceipt = {
     receiptNumber?: string
     receiptZNumber?: string
     receiptDateTime?: string
+    receiptDate?: string
+    receiptTime?: string
+    receiptTraNumber?: string
+    pumpNumber?: string
+    nozzleNumber?: string
     documentNumber?: string
     fiscalReference?: string
     attendant?: string
@@ -36,6 +42,7 @@ export type NormalizedReceipt = {
     name?: string
     tin?: string
     pin?: string
+    buyerType?: string
     odometer?: string
     paymentType?: string
     vehicleRegNr?: string
@@ -55,6 +62,8 @@ export type NormalizedReceipt = {
     tax?: number
     net?: number
     currency?: string
+    discount?: number
+    paymentMethod?: string
   }
   footer: {
     receiptInternalData?: string
@@ -109,6 +118,28 @@ const scuIdFromReceiptNumber = (value: any) => {
 }
 
 const extractReceipt = (raw: any) => {
+  const model = raw?.model ?? raw?.fiscalData?.model
+  if (model?.station && model?.fiscalMeta) {
+    const zNumber = toStringSafe(model.fiscalMeta.zNumber)
+    return {
+      companyName: model.station.name,
+      companyTin: model.station.taxId,
+      companyVrn: model.station.vrn,
+      companyMobile: model.station.mobile,
+      companySerial: model.station.serial,
+      companyUin: model.station.uin,
+      companyTaxOffice: model.station.taxOffice,
+      receiptNumber: model.fiscalMeta.receiptNumber,
+      receiptTraNumber: model.fiscalMeta.traReceiptNumber,
+      receiptZNumber: zNumber,
+      receiptDate: model.transaction?.receiptDate,
+      receiptTime: model.transaction?.receiptTime,
+      fiscalVerificationCode: model.fiscalMeta.verificationCode,
+      fiscalQrCodeData:
+        model.qrPayload?.data ?? model.fiscalMeta.verificationUrl,
+    }
+  }
+
   const explicitReceipt =
     raw?.receipt ||
     raw?.details?.receipt ||
@@ -145,6 +176,8 @@ const extractReceipt = (raw: any) => {
 
 const extractItems = (raw: any) => {
   const list =
+    raw?.model?.items ||
+    raw?.fiscalData?.model?.items ||
     raw?.details?.items ||
     raw?.details?.lines ||
     raw?.items ||
@@ -156,6 +189,23 @@ const extractItems = (raw: any) => {
 }
 
 const extractTotals = (raw: any) => {
+  const model = raw?.model ?? raw?.fiscalData?.model
+  if (model?.payment) {
+    const tax = Array.isArray(model.taxSummary)
+      ? model.taxSummary.reduce(
+          (sum: number, entry: any) => sum + Number(entry?.taxAmount || 0),
+          0,
+        )
+      : undefined
+    return {
+      total: model.payment.amount,
+      tax,
+      net: tax == null ? undefined : Number(model.payment.amount || 0) - tax,
+      currency: model.payment.currency,
+      discount: model.payment.discount,
+      paymentMethod: model.payment.method,
+    }
+  }
   return (
     raw?.details?.totals ||
     raw?.details?.summary ||
@@ -265,6 +315,8 @@ export const normalizeReceipt = (opts: {
   decimalOverrides?: DecimalSettingsOverrides
   /** Override the receipt title (e.g. 'CREDIT NOTE'). */
   titleOverride?: string
+  /** Allow a non-fiscalized transaction to render as a clearly labelled preview. */
+  allowUnfiscalizedPreview?: boolean
   branding?: {
     logoPath?: string | null
     primaryColor?: string | null
@@ -285,6 +337,7 @@ export const normalizeReceipt = (opts: {
     attendantName,
     decimalOverrides,
     titleOverride,
+    allowUnfiscalizedPreview = false,
     branding,
   } = opts
   const transactionStatus = String(transaction?.status ?? '')
@@ -309,6 +362,7 @@ export const normalizeReceipt = (opts: {
     ['ALLOCATED', 'FISCALIZING', 'FAILED'].includes(transactionStatus),
   )
   const parsed = safeParse(raw) ?? {}
+  const receiptModel = parsed?.model ?? parsed?.fiscalData?.model ?? null
 
   const extractedReceipt = extractReceipt(parsed)
   const fiscalReference = pickFirst(
@@ -330,7 +384,8 @@ export const normalizeReceipt = (opts: {
     transaction?.fiscalized_at ||
     transaction?.fiscalizedAt ||
     isFinalFiscalized ||
-    isOfflineFiscalization,
+    isOfflineFiscalization ||
+    allowUnfiscalizedPreview,
   )
   if (
     extractedReceipt &&
@@ -478,19 +533,81 @@ export const normalizeReceipt = (opts: {
         })()
 
   const totalsSource = extractTotals(parsed)
-  const totalAmount = toNumberSafe(
-    totalsSource?.total ||
-      totalsSource?.grandTotal ||
-      totalsSource?.grand_total ||
-      totalsSource?.amount ||
-      transaction?.total_amount ||
+  const explicitTotalAmount = toNumberSafe(
+    totalsSource?.total ??
+      totalsSource?.grandTotal ??
+      totalsSource?.grand_total ??
+      totalsSource?.amount ??
+      transaction?.total_amount ??
       transaction?.totalAmount,
   )
-  const taxAmount = toNumberSafe(
-    totalsSource?.tax || totalsSource?.taxAmount || totalsSource?.tax_amount,
+  const explicitTaxAmount = toNumberSafe(
+    totalsSource?.tax ?? totalsSource?.taxAmount ?? totalsSource?.tax_amount,
   )
-  const netAmount = toNumberSafe(
-    totalsSource?.net || totalsSource?.netAmount || totalsSource?.net_amount,
+  const explicitNetAmount = toNumberSafe(
+    totalsSource?.net ?? totalsSource?.netAmount ?? totalsSource?.net_amount,
+  )
+
+  const itemTotals = items.reduce(
+    (acc, item) => {
+      const amount =
+        item.amount ??
+        (item.qty != null && item.unitPrice != null
+          ? item.qty * item.unitPrice
+          : undefined)
+      if (amount == null || !Number.isFinite(amount)) return acc
+
+      acc.gross += amount
+
+      if (item.taxRate == null || !Number.isFinite(Number(item.taxRate))) {
+        acc.net += amount
+        return acc
+      }
+
+      const rawRate = Number(item.taxRate)
+      const ratePercent = rawRate > 0 && rawRate <= 1 ? rawRate * 100 : rawRate
+      const lineNet =
+        ratePercent > 0 ? amount / (1 + ratePercent / 100) : amount
+      acc.net += lineNet
+      acc.tax += amount - lineNet
+      acc.hasTaxRate = true
+      return acc
+    },
+    { gross: 0, net: 0, tax: 0, hasTaxRate: false },
+  )
+
+  const totalAmount =
+    explicitTotalAmount ??
+    (itemTotals.gross > 0 ? Number(itemTotals.gross.toFixed(2)) : undefined)
+  const hasInvalidZeroNet = Boolean(
+    explicitNetAmount === 0 &&
+    (totalAmount ?? itemTotals.gross) > 0 &&
+    itemTotals.net > 0,
+  )
+  const taxAmount =
+    explicitTaxAmount == null ||
+    (hasInvalidZeroNet && explicitTaxAmount === 0 && itemTotals.tax > 0)
+      ? itemTotals.hasTaxRate
+        ? Number(itemTotals.tax.toFixed(2))
+        : undefined
+      : explicitTaxAmount
+  const derivedNetAmount =
+    itemTotals.gross > 0
+      ? Number(itemTotals.net.toFixed(2))
+      : totalAmount != null
+        ? Number((totalAmount - (taxAmount ?? 0)).toFixed(2))
+        : undefined
+  const netAmount =
+    explicitNetAmount == null ||
+    (hasInvalidZeroNet && (derivedNetAmount ?? 0) > 0)
+      ? derivedNetAmount
+      : explicitNetAmount
+  const discountAmount = toNumberSafe(totalsSource?.discount)
+  const paymentMethod = pickFirst(
+    totalsSource?.paymentMethod,
+    receiptModel?.payment?.method,
+    transaction?.payment_type,
+    transaction?.paymentType,
   )
 
   const receiptDateTime = buildReceiptDateTime(
@@ -514,7 +631,20 @@ export const normalizeReceipt = (opts: {
     header: {
       title:
         titleOverride ||
-        (isOfflinePending ? 'OFFLINE RECEIPT' : 'NORMAL SALES RECEIPT'),
+        (allowUnfiscalizedPreview ? 'RECEIPT PREVIEW' : undefined) ||
+        (String(
+          receipt?.country ??
+            receiptModel?.station?.country ??
+            station?.country ??
+            transaction?.station_country ??
+            '',
+        )
+          .trim()
+          .toUpperCase() === 'TZ'
+          ? 'TRA FISCAL RECEIPT'
+          : isOfflinePending
+            ? 'OFFLINE RECEIPT'
+            : 'NORMAL SALES RECEIPT'),
       stationName,
       stationId: toStringSafe(
         transaction?.station_id ?? transaction?.stationId,
@@ -524,6 +654,7 @@ export const normalizeReceipt = (opts: {
         receipt?.company_name,
         receipt?.stationName,
         receipt?.station_name,
+        receiptModel?.station?.name,
         station?.name,
       ),
       companyTin: pickFirst(
@@ -533,6 +664,7 @@ export const normalizeReceipt = (opts: {
         station?.tin,
         station?.tax_pin,
         station?.taxPin,
+        receiptModel?.station?.taxId,
       ),
       companyPin:
         pickFirst(
@@ -541,14 +673,34 @@ export const normalizeReceipt = (opts: {
           stationPin,
           station?.pin,
         ) || 'D000000003K',
-      companyVrn: pickFirst(receipt?.companyVrn, receipt?.company_vrn),
-      companyMobile: pickFirst(receipt?.companyMobile, receipt?.company_mobile),
-      companySerial: pickFirst(receipt?.companySerial, receipt?.company_serial),
+      companyVrn: pickFirst(
+        receipt?.companyVrn,
+        receipt?.company_vrn,
+        receiptModel?.station?.vrn,
+      ),
+      companyMobile: pickFirst(
+        receipt?.companyMobile,
+        receipt?.company_mobile,
+        receiptModel?.station?.mobile,
+      ),
+      companySerial: pickFirst(
+        receipt?.companySerial,
+        receipt?.company_serial,
+        receiptModel?.station?.serial,
+      ),
+      companyUin: pickFirst(
+        receipt?.companyUin,
+        receipt?.company_uin,
+        receiptModel?.station?.uin,
+      ),
       companyTaxOffice: pickFirst(
         receipt?.companyTaxOffice,
         receipt?.company_tax_office,
+        receiptModel?.station?.taxOffice,
       ),
       country: pickFirst(
+        receipt?.country,
+        receiptModel?.station?.country,
         station?.country,
         transaction?.station_country,
         transaction?.stationCountry,
@@ -562,6 +714,31 @@ export const normalizeReceipt = (opts: {
         receipt?.receipt_z_number,
       ),
       receiptDateTime,
+      receiptDate: pickFirst(
+        receipt?.receiptDate,
+        receipt?.receipt_date,
+        receiptModel?.transaction?.receiptDate,
+      ),
+      receiptTime: pickFirst(
+        receipt?.receiptTime,
+        receipt?.receipt_time,
+        receiptModel?.transaction?.receiptTime,
+      ),
+      receiptTraNumber: pickFirst(
+        receipt?.receiptTraNumber,
+        receipt?.receipt_tra_number,
+        receiptModel?.fiscalMeta?.traReceiptNumber,
+      ),
+      pumpNumber: pickFirst(
+        receiptModel?.transaction?.pumpNumber,
+        transaction?.pump_number,
+        transaction?.pumpNumber,
+      ),
+      nozzleNumber: pickFirst(
+        receiptModel?.transaction?.nozzleNumber,
+        transaction?.nozzle_number,
+        transaction?.nozzleNumber,
+      ),
       documentNumber: pickFirst(
         receipt?.documentNumber,
         receipt?.document_number,
@@ -589,13 +766,27 @@ export const normalizeReceipt = (opts: {
       ),
     },
     buyer: {
-      name: pickFirst(transaction?.buyer_name, transaction?.buyerName),
-      tin: pickFirst(transaction?.tin, transaction?.buyer_tin),
+      name: pickFirst(
+        transaction?.buyer_name,
+        transaction?.buyerName,
+        receiptModel?.customer?.name,
+      ),
+      tin: pickFirst(
+        transaction?.tin,
+        transaction?.buyer_tin,
+        receiptModel?.customer?.tin,
+      ),
       pin: pickFirst(transaction?.pin, transaction?.buyer_pin),
+      buyerType: pickFirst(
+        transaction?.buyer_type,
+        transaction?.buyerType,
+        receiptModel?.customer?.buyerType,
+      ),
       odometer: pickFirst(transaction?.odometer),
       paymentType: pickFirst(
         transaction?.payment_type,
         transaction?.paymentType,
+        receiptModel?.payment?.method,
       ),
       vehicleRegNr: pickFirst(
         transaction?.vehicle_reg_nr,
@@ -608,11 +799,15 @@ export const normalizeReceipt = (opts: {
       tax: taxAmount,
       net: netAmount,
       currency: pickFirst(
+        receiptModel?.payment?.currency,
+        totalsSource?.currency,
         transaction?.currency,
         dbLines?.[0]?.currency,
         parsed?.currency,
         parsed?.details?.currency,
       ),
+      discount: discountAmount,
+      paymentMethod,
     },
     footer: {
       receiptInternalData: pickFirst(
@@ -627,12 +822,20 @@ export const normalizeReceipt = (opts: {
       fiscalVerificationCode: pickFirst(
         receipt?.fiscalVerificationCode,
         receipt?.fiscal_verification_code,
+        receiptModel?.fiscalMeta?.verificationCode,
       ),
       fiscalQrCodeData: pickFirst(
         receipt?.fiscalQrCodeData,
         receipt?.fiscal_qr_code_data,
+        receiptModel?.qrPayload?.data,
+        receiptModel?.fiscalMeta?.verificationUrl,
       ),
-      copyLabel: 'This is a COPY 1',
+      copyLabel:
+        String(receiptModel?.station?.country ?? station?.country ?? '')
+          .trim()
+          .toUpperCase() === 'TZ'
+          ? undefined
+          : 'This is a COPY 1',
     },
     branding: branding
       ? {

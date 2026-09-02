@@ -78,6 +78,8 @@ export type AuditAction =
   | 'DOMS_MAINTENANCE_COMMAND_FAILED'
   | 'DOMS_FIELD_VALIDATION_CHECKPOINT_RECORDED'
   | 'DOMS_DEPLOYMENT_SIGN_OFF_RECORDED'
+  | 'DOMS_COMMISSIONING_CHECKLIST_UPDATED'
+  | 'DOMS_REPLAY_TRANSACTION_RESTORED'
   | 'PLUGIN_CONFIG_UPDATED'
   | 'PLUGIN_CONFIG_UPSERTED'
   | 'BRANDING_UPDATED'
@@ -88,6 +90,10 @@ export type AuditAction =
   | 'SYNC_STARTED'
   | 'RECEIPT_REPRINTED'
   | 'RECEIPT_PRINTED'
+  | 'APPLICATION_SERVICE_RESTART_REQUESTED'
+  | 'DATABASE_BACKUP_CREATED'
+  | 'FULL_SYSTEM_BACKUP_CREATED'
+  | 'APPLICATION_DATABASE_RESET_REQUESTED'
 
 export type AuditLog = {
   id: string
@@ -102,24 +108,6 @@ export type AuditLog = {
   userAgent?: string
   metadata?: Record<string, unknown>
   createdAt: Date
-}
-
-export type SyncConflict = {
-  tableName: string
-  localId: string
-  cloudId?: string | null
-  reason: string
-  payload?: Record<string, unknown> | null
-}
-
-export type SyncResult = {
-  success: boolean
-  message?: string
-  summary?: Record<string, unknown>
-  conflicts?: SyncConflict[]
-  recordsPushed?: number
-  recordsPulled?: number
-  errors?: Array<{ message?: string } | string>
 }
 
 export type ProductSyncStatus = 'pending' | 'synced' | 'failed' | 'skipped'

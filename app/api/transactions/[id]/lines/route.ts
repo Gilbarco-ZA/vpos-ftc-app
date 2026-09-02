@@ -8,6 +8,10 @@ import { ensureTransactionFuelLine } from '@/src/modules/transactions/applicatio
 import { replaceTransactionLines } from '@/src/modules/transactions/application/commands/replace-transaction-lines'
 import { getTransactionDetails } from '@/src/modules/transactions/application/queries/get-transaction-details'
 import { getTransactionEditableLines } from '@/src/modules/transactions/application/queries/get-transaction-editable-lines'
+import {
+  getTransactionItemEditability,
+  isTransactionItemStatusEditable,
+} from '@/src/modules/transactions/domain/transaction-editability'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -60,13 +64,39 @@ export const GET = defineGetRoute<{ id: string }>({
   roles: ['tenant', 'manager', 'administrator'],
   handler: async (_req, { user, params }) => {
     const transactionId = String(params?.id || '').trim()
-    await ensureTransactionFuelLine(user.stationId, transactionId)
-    const [lines, transaction] = await Promise.all([
-      getTransactionEditableLines(user.stationId, transactionId),
-      getTransactionDetails(user.stationId, transactionId),
-    ])
+    const transaction = await getTransactionDetails(
+      user.stationId,
+      transactionId,
+    )
+    const editability = getTransactionItemEditability(transaction)
+    const statusEditable = isTransactionItemStatusEditable(transaction?.status)
+    const editable = statusEditable && editability.editable
+    const fuelItemsLocked = editable && editability.fuelItemsLocked
+
+    if (editable) {
+      await ensureTransactionFuelLine(user.stationId, transactionId)
+    }
+
+    const lines = await getTransactionEditableLines(
+      user.stationId,
+      transactionId,
+    )
+    const lockedProductIds = fuelItemsLocked
+      ? lines.filter((line) => line.isFuel).map((line) => line.productId)
+      : []
+
     return ok({
       lines,
+      editable,
+      fuelItemsLocked,
+      lockedProductIds,
+      excludeFuelProductsFromCatalog: fuelItemsLocked,
+      editabilityReason: statusEditable
+        ? editability.reason
+        : 'Only non-fiscalized pending transactions can be edited.',
+      editabilityCode: statusEditable
+        ? editability.code
+        : 'TRANSACTION_STATUS_NOT_EDITABLE',
       fuelSelection: transaction
         ? {
             tankId: transaction.tank_id ?? null,
@@ -96,6 +126,10 @@ export const POST = defineMutationRoute<UpdateLinesBody, { id: string }>({
                 : Number(line.unitPrice),
           }))
         : [],
+      {
+        userId: user.id,
+        name: user.fullName || user.name || user.username || user.email,
+      },
       Array.isArray(body?.removedProductIds)
         ? body.removedProductIds
             .map((value) => String(value || '').trim())

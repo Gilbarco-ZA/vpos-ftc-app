@@ -3,29 +3,37 @@ import { Slot } from '@radix-ui/react-slot'
 
 import { cx } from '@/src/shared/utils/cx'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive' | 'neon-cyan' | 'neon-magenta' | 'neon-green' | 'neon-amber'
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'ghost'
+  | 'destructive'
+  | 'neon-cyan'
+  | 'neon-magenta'
+  | 'neon-green'
+  | 'neon-amber'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const baseStyles =
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:pointer-events-none disabled:opacity-40 active:scale-[0.98]'
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--neon-cyan)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:pointer-events-none disabled:opacity-40 active:scale-[0.98]'
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--brand-primary,var(--text-primary))] text-[var(--brand-primary-foreground,var(--surface-page))] shadow-card hover:opacity-90 hover:shadow-elevated focus-visible:ring-[var(--border-focus,var(--brand-primary,var(--text-primary)))]',
+    'border border-[var(--neon-cyan)] bg-[var(--neon-cyan)] text-[var(--neon-primary-foreground,#031316)] shadow-[var(--shadow-glow-cyan)] hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_0_30px_var(--neon-cyan)] focus-visible:ring-[var(--neon-cyan)]',
   secondary:
-    'border border-[var(--border-default)] bg-[var(--surface-hover)] text-[var(--text-primary)] shadow-card backdrop-blur-sm hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:shadow-elevated',
+    'border border-[var(--neon-magenta)] bg-[color-mix(in_srgb,var(--neon-magenta)_12%,transparent)] text-[var(--neon-magenta)] shadow-[var(--shadow-glow-magenta)] backdrop-blur-sm hover:-translate-y-0.5 hover:bg-[color-mix(in_srgb,var(--neon-magenta)_20%,transparent)] hover:shadow-[0_0_30px_var(--neon-magenta)] focus-visible:ring-[var(--neon-magenta)]',
   ghost:
-    'bg-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]',
+    'border border-transparent bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-neon-cyan)] hover:bg-[color-mix(in_srgb,var(--neon-cyan)_8%,transparent)] hover:text-[var(--neon-cyan)]',
   destructive:
-    'border border-red-500/20 bg-red-500/10 text-red-500 shadow-card hover:border-red-500/30 hover:bg-red-500/20 hover:shadow-elevated',
+    'border border-red-500/30 bg-red-500/10 text-red-500 shadow-card hover:border-red-500/50 hover:bg-red-500/20 hover:shadow-elevated',
   'neon-cyan':
-    'border-2 border-[var(--neon-cyan)] text-[var(--neon-cyan)] bg-[var(--surface-card)] hover:shadow-[0_0_20px_rgba(0,245,255,0.3)] hover:border-[var(--neon-cyan)] active:scale-[0.95] active:shadow-[0_0_30px_rgba(0,245,255,0.5)]',
+    'border border-[var(--neon-cyan)] bg-[color-mix(in_srgb,var(--neon-cyan)_12%,transparent)] text-[var(--neon-cyan)] shadow-[var(--shadow-glow-cyan)] hover:bg-[color-mix(in_srgb,var(--neon-cyan)_20%,transparent)] hover:shadow-[0_0_30px_var(--neon-cyan)] focus-visible:ring-[var(--neon-cyan)]',
   'neon-magenta':
-    'border-2 border-[var(--neon-magenta)] text-[var(--neon-magenta)] bg-[var(--surface-card)] hover:shadow-[0_0_20px_rgba(195,0,255,0.3)] hover:border-[var(--neon-magenta)] active:scale-[0.95] active:shadow-[0_0_30px_rgba(195,0,255,0.5)]',
+    'border border-[var(--neon-magenta)] bg-[color-mix(in_srgb,var(--neon-magenta)_12%,transparent)] text-[var(--neon-magenta)] shadow-[var(--shadow-glow-magenta)] hover:bg-[color-mix(in_srgb,var(--neon-magenta)_20%,transparent)] hover:shadow-[0_0_30px_var(--neon-magenta)] focus-visible:ring-[var(--neon-magenta)]',
   'neon-green':
-    'border-2 border-[var(--neon-green)] text-[var(--neon-green)] bg-[var(--surface-card)] hover:shadow-[0_0_20px_rgba(57,255,20,0.3)] hover:border-[var(--neon-green)] active:scale-[0.95] active:shadow-[0_0_30px_rgba(57,255,20,0.5)]',
+    'border border-[var(--neon-green)] bg-[color-mix(in_srgb,var(--neon-green)_12%,transparent)] text-[var(--neon-green)] shadow-[var(--shadow-glow-green)] hover:bg-[color-mix(in_srgb,var(--neon-green)_20%,transparent)] hover:shadow-[0_0_30px_var(--neon-green)] focus-visible:ring-[var(--neon-green)]',
   'neon-amber':
-    'border-2 border-[var(--neon-amber)] text-[var(--neon-amber)] bg-[var(--surface-card)] hover:shadow-[0_0_20px_rgba(255,149,0,0.3)] hover:border-[var(--neon-amber)] active:scale-[0.95] active:shadow-[0_0_30px_rgba(255,149,0,0.5)]',
+    'border border-[var(--neon-amber)] bg-[color-mix(in_srgb,var(--neon-amber)_12%,transparent)] text-[var(--neon-amber)] shadow-[var(--shadow-glow-amber)] hover:bg-[color-mix(in_srgb,var(--neon-amber)_20%,transparent)] hover:shadow-[0_0_30px_var(--neon-amber)] focus-visible:ring-[var(--neon-amber)]',
 }
 
 const sizeStyles: Record<ButtonSize, string> = {

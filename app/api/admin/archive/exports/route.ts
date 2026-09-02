@@ -4,7 +4,7 @@ import { fail, ok, serverError } from '@/src/platform/web/api/response'
 import { requireAuth } from '@/src/shared/auth'
 
 import { getAdminArchiveExports } from '@/src/modules/archive/application/getAdminArchiveExports'
-import { getArchiveExportsDeprecatedMessage } from '@/src/modules/archive/infrastructure/archiveExports'
+import { getArchiveExportsDeprecatedMessage } from '@/src/modules/archive/application/getArchiveExportsDeprecatedMessage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

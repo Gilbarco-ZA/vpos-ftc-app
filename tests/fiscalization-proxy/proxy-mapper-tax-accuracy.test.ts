@@ -1,11 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { mapTransactionToProxyInvoice } from '../../src/shared/fiscalization/proxy/mapper'
+import { mapTransactionToProxyInvoice } from '../../src/modules/transactions/infrastructure/fiscalization/transaction-proxy.mapper'
 
 const TAX_RATE = 0.16
-const TAX_MULTIPLIER = 1 + TAX_RATE
-
 function round2(value: number): number {
   return Number(value.toFixed(2))
 }

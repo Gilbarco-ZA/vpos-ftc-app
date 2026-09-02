@@ -1,9 +1,10 @@
+import { startStorageRetentionWorker } from '@/src/platform/retention/storageRetention'
 import { getRuntimeUptimeSeconds } from '@/src/platform/runtime/nodeProcess'
 import { getSystemConfiguration } from '@/src/shared/config/loader'
-import { drainFiscalInbox } from '@/src/shared/runtime/fiscalInbox'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 
+import { drainFiscalInbox } from '@/src/modules/fiscal-inbox/application/fiscalInbox'
 import {
   startArchiveBusListener,
   startFiscalBusListener,
@@ -17,13 +18,20 @@ const DEFAULT_POLL_MS = 5_000
 const HEARTBEAT_MS = 5_000
 
 let controller: AbortController | null = null
+let retentionHandle: { stop: () => void } | null = null
+
+function stopSupervisorMonitorWorker() {
+  controller?.abort()
+  retentionHandle?.stop()
+  retentionHandle = null
+}
 
 export function startSupervisorMonitorWorker(
   stationId: string,
   opts?: { pollMs?: number },
 ) {
   if (controller && !controller.signal.aborted) {
-    return { stop: () => controller?.abort() }
+    return { stop: stopSupervisorMonitorWorker }
   }
 
   controller = new AbortController()
@@ -33,6 +41,7 @@ export function startSupervisorMonitorWorker(
   startPosBusListener()
   startFiscalBusListener()
   startArchiveBusListener()
+  retentionHandle = startStorageRetentionWorker(stationId)
 
   const supervisor = new SupervisorRuntime(stationId)
 
@@ -105,5 +114,5 @@ export function startSupervisorMonitorWorker(
     }
   })()
 
-  return { stop: () => controller?.abort() }
+  return { stop: stopSupervisorMonitorWorker }
 }

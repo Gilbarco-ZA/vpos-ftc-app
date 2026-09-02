@@ -10,18 +10,11 @@ export const TZ_DATASET: CountryDataset = {
       sortOrder: 1,
     },
     {
-      code: 'Z',
-      name: 'Zero rated',
-      description: 'Zero rated supplies',
-      rate: 0,
-      sortOrder: 2,
-    },
-    {
       code: 'E',
       name: 'Exempt',
       description: 'Exempt supplies',
       rate: 0,
-      sortOrder: 3,
+      sortOrder: 2,
     },
   ],
   productClassCodes: [

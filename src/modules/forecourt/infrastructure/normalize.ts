@@ -30,6 +30,9 @@ export type NormalizedTransaction = {
   transLockId?: number | null
   transInfoMask?: number | null
   fcGradeId?: number | null
+  fpGradeOptionNo?: number | null
+  finishDate?: string | null
+  finishTime?: string | null
   moneyDue?: number | null
   volume?: number | null
   sourceMode?: 'supervised' | 'unsupervised'
@@ -339,7 +342,28 @@ function normalizeTransactions(
               'transInfoFlags',
             ]),
           ) ?? null,
-        fcGradeId: num(getAny(payload, ['FcGradeId', 'fcGradeId'])) ?? null,
+        fcGradeId:
+          num(
+            getAny(payload, ['FcGradeId', 'fcGradeId']) ??
+              getAny(rootTransPars, ['FcGradeId', 'fcGradeId']),
+          ) ?? null,
+        fpGradeOptionNo:
+          num(
+            getAny(payload, ['FpGradeOptionNo', 'fpGradeOptionNo']) ??
+              getAny(rootTransPars, ['FpGradeOptionNo', 'fpGradeOptionNo']),
+          ) ?? null,
+        finishDate:
+          String(
+            getAny(payload, ['FinishDate', 'finishDate']) ??
+              getAny(rootTransPars, ['FinishDate', 'finishDate']) ??
+              '',
+          ).trim() || null,
+        finishTime:
+          String(
+            getAny(payload, ['FinishTime', 'finishTime']) ??
+              getAny(rootTransPars, ['FinishTime', 'finishTime']) ??
+              '',
+          ).trim() || null,
         moneyDue: rootMoney ?? null,
         volume: rootVol ?? null,
 
@@ -419,6 +443,12 @@ function normalizeTransactions(
           ]),
         ) ?? null,
       fcGradeId: num(getAny(t, ['FcGradeId', 'fcGradeId'])) ?? null,
+      fpGradeOptionNo:
+        num(getAny(t, ['FpGradeOptionNo', 'fpGradeOptionNo'])) ?? null,
+      finishDate:
+        String(getAny(t, ['FinishDate', 'finishDate']) ?? '').trim() || null,
+      finishTime:
+        String(getAny(t, ['FinishTime', 'finishTime']) ?? '').trim() || null,
       moneyDue,
       volume,
       sourceMode: entrySourceMode,

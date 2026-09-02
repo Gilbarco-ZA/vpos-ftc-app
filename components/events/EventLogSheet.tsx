@@ -29,12 +29,8 @@ export function useEventLog<T extends { id: string }, E>(
   const [error, setError] = useState<unknown>(null)
   const [events, setEvents] = useState<E[]>([])
 
-  const sort =
-    options?.sort ??
-    ((list: E[]) =>
-      [...list].sort((a: any, b: any) =>
-        String(b?.dateTime ?? '').localeCompare(String(a?.dateTime ?? '')),
-      ))
+  const sortEvents = options?.sort
+  const auto = options?.auto ?? true
 
   const fetchEvents = useCallback(async () => {
     if (!entity) return
@@ -59,19 +55,25 @@ export function useEventLog<T extends { id: string }, E>(
           ? data
           : []
 
-      setEvents(sort(list))
+      const sorted = sortEvents
+        ? sortEvents(list)
+        : [...list].sort((a: any, b: any) =>
+            String(b?.dateTime ?? '').localeCompare(String(a?.dateTime ?? '')),
+          )
+      setEvents(sorted)
     } catch (err: unknown) {
       setError(err)
     } finally {
       setLoading(false)
     }
-  }, [entity, buildUrl, sort])
+  }, [entity, buildUrl, sortEvents])
 
   useEffect(() => {
-    const auto = options?.auto ?? true
     if (!auto || !entity) return
-    fetchEvents()
-  }, [entity, fetchEvents, options?.auto])
+    queueMicrotask(() => {
+      fetchEvents()
+    })
+  }, [auto, entity, fetchEvents])
 
   return { events, loading, error, fetchEvents, setEvents }
 }

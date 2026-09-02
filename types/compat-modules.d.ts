@@ -31,3 +31,14 @@ declare module '@gilbarcoafs/doms-pos-jpl' {
   const whatever: any
   export default whatever
 }
+
+declare module 'pngjs' {
+  export class PNG {
+    width: number
+    height: number
+    data: Buffer
+    static sync: {
+      read(input: Buffer): PNG
+    }
+  }
+}

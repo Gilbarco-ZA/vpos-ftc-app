@@ -38,6 +38,16 @@ export type NormalizedTankGaugeAlarmStatus = {
 
 export type NormalizedTankGaugeData = {
   tgId: string
+  flags: {
+    online: boolean
+    alarmActive: boolean
+    errorActive: boolean
+    ticketedDeliveryInProgress: boolean
+    ticketedDeliveryDataReady: boolean
+    deliveryInProgress: boolean
+    deliveryDataReady: boolean
+    allInventoryDataReady: boolean
+  }
   tankId?: string
   productCode?: string
   groupId?: string
@@ -175,6 +185,20 @@ const toNumberOrNull = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const toScaledNumberOrNull = (
+  value: unknown,
+  divisor: number,
+): number | null => {
+  const parsed = toNumberOrNull(value)
+  return parsed === null ? null : parsed / divisor
+}
+
+const decodeTankLevel = (value: unknown) => toScaledNumberOrNull(value, 10)
+const decodeTankVolume = (value: unknown) => toScaledNumberOrNull(value, 100)
+const decodeTankMass = (value: unknown) => toScaledNumberOrNull(value, 10)
+const decodeTankQuantity = (value: unknown) => toScaledNumberOrNull(value, 100)
+const decodePressure = (value: unknown) => toScaledNumberOrNull(value, 10)
+
 const toRawValue = (value: unknown) => {
   if (isRecord(value) && Object.prototype.hasOwnProperty.call(value, 'value')) {
     return value.value
@@ -198,12 +222,123 @@ export const normalizeId2 = (value: unknown): string | undefined => {
   return raw.padStart(2, '0')
 }
 
-export const parseFcDateAndTime = (value: unknown): string | null => {
+type FcDateTimeParts = {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+}
+
+const parseFcDateTimeParts = (value: unknown): FcDateTimeParts | null => {
   const raw = String(value ?? '').replace(/\D/g, '')
   if (raw.length !== 14 || raw === '00000000000000') return null
-  const iso = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}T${raw.slice(8, 10)}:${raw.slice(10, 12)}:${raw.slice(12, 14)}Z`
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+  const parts = {
+    year: Number(raw.slice(0, 4)),
+    month: Number(raw.slice(4, 6)),
+    day: Number(raw.slice(6, 8)),
+    hour: Number(raw.slice(8, 10)),
+    minute: Number(raw.slice(10, 12)),
+    second: Number(raw.slice(12, 14)),
+  }
+  const probe = new Date(
+    Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+    ),
+  )
+  if (
+    probe.getUTCFullYear() !== parts.year ||
+    probe.getUTCMonth() + 1 !== parts.month ||
+    probe.getUTCDate() !== parts.day ||
+    probe.getUTCHours() !== parts.hour ||
+    probe.getUTCMinutes() !== parts.minute ||
+    probe.getUTCSeconds() !== parts.second
+  ) {
+    return null
+  }
+  return parts
+}
+
+const localDateTimePartsAt = (
+  date: Date,
+  timeZone: string,
+): FcDateTimeParts => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, Number(part.value)]),
+  )
+  return {
+    year: values.year,
+    month: values.month,
+    day: values.day,
+    hour: values.hour,
+    minute: values.minute,
+    second: values.second,
+  }
+}
+
+const utcLikeMillis = (parts: FcDateTimeParts) =>
+  Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  )
+
+const sameDateTimeParts = (left: FcDateTimeParts, right: FcDateTimeParts) =>
+  left.year === right.year &&
+  left.month === right.month &&
+  left.day === right.day &&
+  left.hour === right.hour &&
+  left.minute === right.minute &&
+  left.second === right.second
+
+export const parseFcDateAndTime = (
+  value: unknown,
+  timeZone?: string | null,
+): string | null => {
+  const target = parseFcDateTimeParts(value)
+  if (!target) return null
+
+  const zone = String(timeZone ?? '').trim()
+  if (!zone || zone.toUpperCase() === 'UTC') {
+    return new Date(utcLikeMillis(target)).toISOString()
+  }
+
+  try {
+    let candidate = utcLikeMillis(target)
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const rendered = localDateTimePartsAt(new Date(candidate), zone)
+      const correction = utcLikeMillis(target) - utcLikeMillis(rendered)
+      candidate += correction
+      if (correction === 0) break
+    }
+    const date = new Date(candidate)
+    return sameDateTimeParts(localDateTimePartsAt(date, zone), target)
+      ? date.toISOString()
+      : null
+  } catch {
+    return null
+  }
 }
 
 export const decodeSignedTemperature = (value: unknown): number | null => {
@@ -414,6 +549,7 @@ export const normalizeJplTankAlarmStatus = (
 
 export const normalizeJplTankGaugeData = (
   payload: unknown,
+  options: { timeZone?: string | null } = {},
 ): NormalizedTankGaugeData | null => {
   const data = unwrapEnvelope(payload)
   const items = asRecord(
@@ -422,58 +558,83 @@ export const normalizeJplTankGaugeData = (
   const tgId = normalizeId2(getAny(data, ['TgId', 'TankId']))
   if (!tgId) return null
 
+  const subStates = getAny(data, ['TgSubStates', 'TankGaugeSubStates'])
+
   return {
     tgId,
+    flags: {
+      online:
+        bitActive(subStates, ['TankGaugeOnline']) ||
+        bitActive(subStates, ['TankGaugeOnLine']),
+      alarmActive: bitActive(subStates, ['TankGaugeAlarmActive']),
+      errorActive: bitActive(subStates, ['TankGaugeErrorActive']),
+      ticketedDeliveryInProgress: bitActive(subStates, [
+        'TicketedDeliveryInProgress',
+      ]),
+      ticketedDeliveryDataReady: bitActive(subStates, [
+        'TicketedDeliveryDataReady',
+      ]),
+      deliveryInProgress: bitActive(subStates, ['DeliveryInProgress']),
+      deliveryDataReady:
+        bitActive(subStates, ['DeliveryDataReady']) ||
+        bitActive(subStates, ['DelvieryDataReady']),
+      allInventoryDataReady: bitActive(subStates, [
+        'AllAvailableInventoryDataReady',
+      ]),
+    },
     tankId: normalizeId2(getAny(items, ['TankId']) ?? getAny(data, ['TankId'])),
     productCode: toStringOrUndefined(
       getAny(items, ['TgProductCode', 'ProductCode']) ?? data.TgProductCode,
     ),
     groupId: toStringOrUndefined(getAny(items, ['TankGroupId'])),
     gaugeType: toStringOrUndefined(getAny(items, ['TankGaugeType'])),
-    productLevel: toNumberOrNull(getAny(items, ['TankProductLevel'])),
-    waterLevel: toNumberOrNull(getAny(items, ['TankWaterLevel'])),
-    totalObservedVolume: toNumberOrNull(
+    productLevel: decodeTankLevel(getAny(items, ['TankProductLevel'])),
+    waterLevel: decodeTankLevel(getAny(items, ['TankWaterLevel'])),
+    totalObservedVolume: decodeTankVolume(
       getAny(items, ['TankTotalObservedVol']),
     ),
-    waterVolume: toNumberOrNull(getAny(items, ['TankWaterVol'])),
-    grossObservedVolume: toNumberOrNull(
+    waterVolume: decodeTankVolume(getAny(items, ['TankWaterVol'])),
+    grossObservedVolume: decodeTankVolume(
       getAny(items, ['TankGrossObservedVol']),
     ),
-    grossStandardVolume: toNumberOrNull(getAny(items, ['TankGrossStdVol'])),
-    availableRoom: toNumberOrNull(getAny(items, ['TankAvailableRoom'])),
+    grossStandardVolume: decodeTankVolume(getAny(items, ['TankGrossStdVol'])),
+    availableRoom: decodeTankVolume(getAny(items, ['TankAvailableRoom'])),
     averageTemperatureC: decodeSignedTemperature(
       getAny(items, ['TankAverageTemp']),
     ),
     lastUpdatedAt: parseFcDateAndTime(
       getAny(items, ['TankDataLastUpdateDateAndTime']),
+      options.timeZone,
     ),
-    maxSafeFillCapacity: toNumberOrNull(
+    maxSafeFillCapacity: decodeTankVolume(
       getAny(items, ['TankMaxSafeFillCapacity']),
     ),
-    shellCapacity: toNumberOrNull(getAny(items, ['TankShellCapacity'])),
-    productMass: toNumberOrNull(getAny(items, ['TankProductMass'])),
+    shellCapacity: decodeTankVolume(getAny(items, ['TankShellCapacity'])),
+    productMass: decodeTankMass(getAny(items, ['TankProductMass'])),
     productDensity: toNumberOrNull(getAny(items, ['TankProductDensity'])),
     productTcDensity: toNumberOrNull(getAny(items, ['TankProductTcDensity'])),
     densityProbeTemperatureC: decodeSignedTemperature(
       getAny(items, ['TankDensityProbeTemp']),
     ),
-    sludgeLevel: toNumberOrNull(getAny(items, ['TankSludgeLevel'])),
-    oilSeparatorOilThickness: toNumberOrNull(
+    sludgeLevel: decodeTankLevel(getAny(items, ['TankSludgeLevel'])),
+    oilSeparatorOilThickness: decodeTankLevel(
       getAny(items, ['TankOilSepOilThickness']),
     ),
-    oilSeparatorOilVolume: toNumberOrNull(
+    oilSeparatorOilVolume: decodeTankVolume(
       getAny(items, ['TankOilSepOilVolume']),
     ),
     tempSensor1C: decodeSignedTemperature(getAny(items, ['TankTempSensor1'])),
     tempSensor2C: decodeSignedTemperature(getAny(items, ['TankTempSensor2'])),
     tempSensor3C: decodeSignedTemperature(getAny(items, ['TankTempSensor3'])),
-    pressure: toNumberOrNull(getAny(items, ['TankPressure'])),
-    adjustedVolume: toNumberOrNull(getAny(items, ['TankAdjustedVolume'])),
-    adjustedTcVolume: toNumberOrNull(getAny(items, ['TankAdjustedTCVolume'])),
-    deliveredVolume: toNumberOrNull(getAny(items, ['TankDeliveredVol'])),
-    deliveredTcVolume: toNumberOrNull(getAny(items, ['TankDeliveredTcVol'])),
-    deliveredMass: toNumberOrNull(getAny(items, ['TankDeliveredMass'])),
-    deliveredQuantity: toNumberOrNull(getAny(items, ['TankDeliveredQuantity'])),
+    pressure: decodePressure(getAny(items, ['TankPressure'])),
+    adjustedVolume: decodeTankVolume(getAny(items, ['TankAdjustedVolume'])),
+    adjustedTcVolume: decodeTankVolume(getAny(items, ['TankAdjustedTCVolume'])),
+    deliveredVolume: decodeTankVolume(getAny(items, ['TankDeliveredVol'])),
+    deliveredTcVolume: decodeTankVolume(getAny(items, ['TankDeliveredTcVol'])),
+    deliveredMass: decodeTankMass(getAny(items, ['TankDeliveredMass'])),
+    deliveredQuantity: decodeTankQuantity(
+      getAny(items, ['TankDeliveredQuantity']),
+    ),
     inflowControlMode: toStringOrUndefined(
       getAny(items, ['TankInflowControlMode']),
     ),

@@ -1,9 +1,10 @@
 import { queryOne } from '@/src/platform/db/postgres'
 import { getAllProcessHeartbeats } from '@/src/shared/runtime/heartbeats'
-import { getRuntimeManager } from '@/src/shared/runtime/manager'
 import { getSetupFlags, getSetupStatus } from '@/src/shared/setup/storage'
 import { kvGet } from '@/src/shared/storage/stationKv'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
+
+import { getRuntimeManager } from '@/src/modules/runtime/application/runtimeManager'
 
 export async function getAdminStatus(stationId: string) {
   const setupFlags = await getSetupFlags(stationId)

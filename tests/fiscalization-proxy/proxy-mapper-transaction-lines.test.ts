@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { toSampleInvoicePayload } from '../../src/shared/fiscalization/proxy/payload'
-import { mapTransactionToProxyInvoice } from '../../src/shared/fiscalization/proxy/mapper'
+import { toCountrySpecificInvoicePayload } from '../../src/modules/transactions/infrastructure/fiscalization/transaction-proxy.payload'
+import { mapTransactionToProxyInvoice } from '../../src/modules/transactions/infrastructure/fiscalization/transaction-proxy.mapper'
 
 test('maps transaction lines into the expected fiscal product payload shape', () => {
   const invoice = mapTransactionToProxyInvoice({
@@ -58,7 +58,9 @@ test('maps transaction lines into the expected fiscal product payload shape', ()
     createdByName: 'Test User',
   })
 
-  const payload = toSampleInvoicePayload(invoice) as any
+  assert.equal(invoice.countryCode, 'KE')
+
+  const payload = toCountrySpecificInvoicePayload(invoice) as any
 
   assert.equal(payload.DocumentId, 'POS-1')
   assert.equal(payload.createdByName, 'Test User')
@@ -105,6 +107,6 @@ test('keeps zero-rated lines at 0 instead of coercing them to 16', () => {
     vatRate: 16,
   })
 
-  const payload = toSampleInvoicePayload(invoice) as any
+  const payload = toCountrySpecificInvoicePayload(invoice) as any
   assert.deepEqual(payload.Lines[0].taxes, [{ type: 'C', rate: 0 }])
 })

@@ -1,5 +1,6 @@
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
-import { enqueuePrintJob } from '@/src/shared/print/queue'
+
+import { enqueuePrintJob } from '@/src/modules/printing/application/enqueuePrintJob'
 
 export async function listReportsRepo(stationId: string, limit = 200) {
   return await queryAll<any>(
@@ -92,8 +93,9 @@ export async function enqueueReportPrintRepo(
   stationId: string,
   reportId: string,
 ) {
-  return await enqueuePrintJob(stationId, 'REPORT', { reportId }, 0, {
+  return await enqueuePrintJob(stationId, 'print.report', {}, 0, {
     idempotencyKey: `report:${reportId}`,
     sourceReportId: reportId,
+    payloadMode: 'reference',
   })
 }

@@ -3,12 +3,11 @@ import type {
   SharedForecourtCommandPayload,
 } from '@/src/shared/forecourt/types'
 
-import { subscribeForecourtRuntimeConfig } from '@/src/shared/forecourt/runtimeConfig'
-
 import {
   sendJplTcpCommand,
   startJplTcpAdapter,
 } from '@/src/modules/forecourt/infrastructure/jpl/adapter'
+import { subscribeForecourtRuntimeConfig } from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 
 declare global {
   var __forecourtGatewayStarted: boolean | undefined

@@ -7,6 +7,13 @@ export type EscposLine =
     }
   | { type: 'separator' }
   | { type: 'qr'; value: string }
+  | {
+      type: 'image'
+      asset: 'tra-receipt-start' | 'branding-logo' | 'tra-receipt-end'
+      dataBase64?: string
+      width?: number
+      height?: number
+    }
   | { type: 'empty'; lines?: number }
 
 /**

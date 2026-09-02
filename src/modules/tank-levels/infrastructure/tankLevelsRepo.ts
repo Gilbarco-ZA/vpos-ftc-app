@@ -4,7 +4,6 @@ import type {
 } from '@/src/shared/tank-levels/types'
 
 import { query, queryAll, queryOne } from '@/src/platform/db/postgres'
-import { submitStockInToProxy } from '@/src/shared/fiscalization/proxy/client'
 import {
   buildGeneratedDocumentId,
   formatDateOnly,
@@ -16,12 +15,14 @@ import {
 } from '@/src/shared/tank-levels/helpers'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import { submitStockInToProxy } from '@/src/modules/transactions/infrastructure/fiscalization/proxyClient'
+
 import { resolveDeductionProxyStatusForFiscalizedTransaction } from '../application/deductionProxyStatus'
 
 const resolveExistingTable = async (tables: string[]) => {
   const checks = tables
     .map(
-      (table, index) =>
+      (_, index) =>
         `WHEN to_regclass($${index + 1}) IS NOT NULL THEN $${index + 1}`,
     )
     .join(' ')
@@ -37,11 +38,6 @@ const getTankInventoryTable = async () => {
     'tank_inventory_ledger',
     'tank_inventory_movements',
   ])
-}
-
-const hasTankLevelsTable = async () => {
-  const table = await resolveExistingTable(['tank_levels'])
-  return table === 'tank_levels'
 }
 
 const toUpperTrimmed = (value: unknown): string | null => {
@@ -277,11 +273,13 @@ export async function getTankLevelsSnapshotRepo(
           0
         ) AS baseline_litres,
         COALESCE(
-          tm.stock_count_litres,
-          t.manual_volume_litres,
           t.live_volume_litres,
-          0
-        ) + COALESCE(tm.movement_balance_litres, 0) AS current_volume_litres,
+          COALESCE(
+            tm.stock_count_litres,
+            t.manual_volume_litres,
+            0
+          ) + COALESCE(tm.movement_balance_litres, 0)
+        ) AS current_volume_litres,
         COALESCE(tm.movement_balance_litres, 0) AS movement_balance_litres,
         tm.last_stock_count_at,
         tm.last_delivery_at,
@@ -294,7 +292,7 @@ export async function getTankLevelsSnapshotRepo(
           ELSE 'none'
         END AS baseline_source,
         COALESCE(t.manual_volume_litres, t.live_volume_litres, 0) AS baseline_litres,
-        COALESCE(t.manual_volume_litres, t.live_volume_litres, 0) AS current_volume_litres,
+        COALESCE(t.live_volume_litres, t.manual_volume_litres, 0) AS current_volume_litres,
         0 AS movement_balance_litres,
         NULL::timestamptz AS last_stock_count_at,
         NULL::timestamptz AS last_delivery_at,
@@ -306,7 +304,8 @@ export async function getTankLevelsSnapshotRepo(
     `SELECT t.id AS tank_id, t.code AS tank_code, t.name AS tank_name, t.status,
             p.id AS product_id, p.product_name, p.product_code,
             t.capacity_litres, t.low_level_litres, t.critical_level_litres,
-            t.live_volume_litres, t.live_volume_updated_at,
+            t.live_volume_litres, t.live_tc_volume_litres, t.live_temperature_c,
+            t.live_volume_updated_at,
             t.manual_volume_litres, t.manual_volume_recorded_at,
             ${movementSummarySelects}
        FROM tanks t
@@ -329,6 +328,8 @@ export async function getTankLevelsSnapshotRepo(
     lowLevelLitres: toFiniteNumber(row.low_level_litres),
     criticalLevelLitres: toFiniteNumber(row.critical_level_litres),
     liveVolumeLitres: toFiniteNumber(row.live_volume_litres),
+    liveTcVolumeLitres: toFiniteNumber(row.live_tc_volume_litres),
+    liveTemperatureC: toFiniteNumber(row.live_temperature_c),
     liveVolumeUpdatedAt: toIso(row.live_volume_updated_at),
     manualVolumeLitres: toFiniteNumber(row.manual_volume_litres),
     manualVolumeRecordedAt: toIso(row.manual_volume_recorded_at),
@@ -625,6 +626,8 @@ export async function syncDeductionForTransactionRepo(
         AND t.station_id = p.station_id
       WHERE p.station_id = $1
         AND p.pump_number = $2
+        AND p.status <> 'INACTIVE'
+        AND n.is_active = TRUE
         AND ($3::text IS NULL OR n.id::text = $3::text)
         AND ($4::int IS NULL OR n.nozzle_number = $4::int)
       ORDER BY n.nozzle_number ASC
@@ -649,6 +652,8 @@ export async function syncDeductionForTransactionRepo(
           AND t.station_id = p.station_id
         WHERE p.station_id = $1
           AND p.pump_number = $2
+          AND p.status <> 'INACTIVE'
+          AND n.is_active = TRUE
         ORDER BY n.nozzle_number ASC
         LIMIT 1`,
       [stationId, txn.pump_number],

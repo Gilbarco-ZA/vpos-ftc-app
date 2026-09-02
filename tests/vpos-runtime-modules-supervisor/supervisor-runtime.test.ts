@@ -4,6 +4,14 @@ import { SupervisorRuntime } from '../../src/modules/supervisor/infrastructure/s
 
 type KvStore = Map<string, any>
 
+const isolatedSupervisorDeps = {
+  upsertProcessHeartbeat: async () => undefined,
+  getAllProcessHeartbeats: async () => [],
+  getFiscalRecoveryMeta: async () => null,
+  getFiscalInboxMetrics: async () => null,
+  sleep: async () => undefined,
+}
+
 const createRuntime = () => {
 	const store: KvStore = new Map()
 
@@ -87,6 +95,7 @@ const createRuntime = () => {
 	})
 
 	const runtime = new SupervisorRuntime('station-1', {
+    ...isolatedSupervisorDeps,
 		query: query as any,
 		kvGet,
 		kvSet,
@@ -173,6 +182,7 @@ test('SupervisorRuntime reloadConfig works without a custom withLock dependency'
 	}
 
 	const runtime = new SupervisorRuntime('station-1', {
+    ...isolatedSupervisorDeps,
 		query: (async (sql: string) => {
 			queries.push(sql)
 			return { rows: [], rowCount: 0 }

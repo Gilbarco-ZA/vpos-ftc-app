@@ -1,7 +1,9 @@
 'use client'
 
+import type { ToastMessage } from '@/components/ui/toast'
 import type { FormEvent, ReactNode } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
@@ -11,18 +13,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-
-type CommandStatus = 'idle' | 'loading' | 'success' | 'error'
-
-type CommandResult = {
-  title: string
-  status: CommandStatus
-  message?: string
-  data?: unknown
-}
+import { ToastItem, ToastViewport } from '@/components/ui/toast'
 
 type CommandRequest = {
   title: string
+  commandId?: string
   url: string
   method?: 'GET' | 'POST'
   params?: Record<string, string | number | boolean | null | undefined>
@@ -46,63 +41,30 @@ const appendParams = (
   return suffix ? `${url}?${suffix}` : url
 }
 
-const requestJson = async (request: CommandRequest) => {
+const requestJson = async (request: CommandRequest, csrfToken: string) => {
   const method = request.method ?? 'GET'
   const response = await fetch(appendParams(request.url, request.params), {
     method,
     cache: 'no-store',
-    headers: method === 'POST' ? { 'content-type': 'application/json' } : {},
+    headers:
+      method === 'POST'
+        ? {
+            'content-type': 'application/json',
+            ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+          }
+        : {},
     body: method === 'POST' ? JSON.stringify(request.body ?? {}) : undefined,
   })
   const body = await response.json().catch(() => ({}))
   if (!response.ok || body?.success === false || body?.ok === false) {
     const message =
-      body?.message ||
       body?.error?.message ||
-      body?.error ||
+      body?.message ||
+      (typeof body?.error === 'string' ? body.error : '') ||
       `HTTP ${response.status}`
     throw Object.assign(new Error(String(message)), { body })
   }
   return body?.data ?? body
-}
-
-function ResultPanel({ result }: { result: CommandResult }) {
-  if (result.status === 'idle') {
-    return (
-      <div className="rounded border bg-[var(--surface-card)] p-3 text-sm text-[var(--text-muted)]">
-        Run a command to see the controller response.
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded border bg-[var(--surface-card)] p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-semibold">{result.title}</div>
-        <Badge
-          variant={
-            result.status === 'success'
-              ? STATUS_VARIANT.SUCCESS
-              : result.status === 'error'
-                ? STATUS_VARIANT.ERROR
-                : STATUS_VARIANT.NEUTRAL
-          }
-        >
-          {result.status}
-        </Badge>
-      </div>
-      {result.message ? (
-        <div className="mb-2 text-sm text-[var(--text-secondary)]">
-          {result.message}
-        </div>
-      ) : null}
-      {result.data !== undefined ? (
-        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words text-xs text-[var(--text-secondary)]">
-          {JSON.stringify(result.data, null, 2)}
-        </pre>
-      ) : null}
-    </div>
-  )
 }
 
 function Field({
@@ -125,11 +87,33 @@ function Field({
   )
 }
 
-export function JplProductionControls() {
-  const [result, setResult] = useState<CommandResult>({
-    title: 'JPL command result',
-    status: 'idle',
-  })
+export type JplProductionControlsProps = {
+  embedded?: boolean
+  validationChecklistItemId?: string
+  onValidationRecorded?: () => void | Promise<void>
+}
+
+export function JplProductionControls({
+  embedded = false,
+  validationChecklistItemId = 'production-workflows-exercised',
+  onValidationRecorded,
+}: JplProductionControlsProps = {}) {
+  const [busyCommandTitle, setBusyCommandTitle] = useState('')
+  const [csrfToken, setCsrfToken] = useState('')
+  const [toast, setToast] = useState<ToastMessage | null>(null)
+
+  useEffect(() => {
+    fetch('/api/security/csrf', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((body) => {
+        if (typeof body?.token === 'string') setCsrfToken(body.token)
+      })
+      .catch(() => setCsrfToken(''))
+  }, [])
+
+  const showToast = (variant: ToastMessage['variant'], message: string) => {
+    setToast({ id: `${variant}:${message}`, variant, message })
+  }
 
   const [pumpId, setPumpId] = useState('00')
   const [pumpGradeId, setPumpGradeId] = useState('00')
@@ -164,17 +148,74 @@ export function JplProductionControls() {
   }, [echoData])
 
   const run = async (request: CommandRequest) => {
-    setResult({ title: request.title, status: 'loading' })
+    if (busyCommandTitle) return
+    setBusyCommandTitle(request.title)
     try {
-      const data = await requestJson(request)
-      setResult({ title: request.title, status: 'success', data })
+      const data = await requestJson(request, csrfToken)
+      let validationRecorded = false
+      let validationErrorMessage = ''
+      if (validationChecklistItemId && csrfToken) {
+        try {
+          const validationResponse = await fetch(
+            '/api/admin/forecourt/field-validation',
+            {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                'x-csrf-token': csrfToken,
+              },
+              body: JSON.stringify({
+                action: 'record-command-result',
+                checklistItemId: validationChecklistItemId,
+                commandId:
+                  request.commandId ??
+                  `${request.method ?? 'GET'}:${request.url}`,
+                commandTitle: request.title,
+                success: true,
+                evidence: {
+                  url: request.url,
+                  method: request.method ?? 'GET',
+                  responseReceived: data != null,
+                },
+              }),
+            },
+          )
+          const validationBody = await validationResponse
+            .json()
+            .catch(() => ({}))
+          if (!validationResponse.ok || validationBody?.success === false) {
+            throw new Error(
+              validationBody?.error?.message ||
+                validationBody?.error ||
+                'Validation evidence could not be recorded',
+            )
+          }
+          validationRecorded = true
+          await onValidationRecorded?.()
+        } catch (validationError: any) {
+          validationErrorMessage =
+            validationError?.message || 'unknown readiness-recording error'
+        }
+      }
+
+      if (validationErrorMessage) {
+        showToast(
+          'info',
+          `${request.title} succeeded, but readiness evidence was not recorded: ${validationErrorMessage}`,
+        )
+      } else {
+        showToast(
+          'success',
+          validationRecorded
+            ? `${request.title} succeeded and DOMS field readiness was marked passed.`
+            : `${request.title} succeeded.`,
+        )
+      }
     } catch (error: any) {
-      setResult({
-        title: request.title,
-        status: 'error',
-        message: error?.message || 'Command failed',
-        data: error?.body,
-      })
+      const message = error?.message || 'Command failed'
+      showToast('error', `${request.title} failed: ${message}`)
+    } finally {
+      setBusyCommandTitle('')
     }
   }
 
@@ -219,699 +260,723 @@ export function JplProductionControls() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-base font-semibold">
-                JPL production controls
-              </div>
-              <p className="text-sm text-[var(--text-secondary)]">
-                Operator/admin screens for the production-module commands added
-                in the latest JPL passes.
-              </p>
-            </div>
-            <Badge variant={STATUS_VARIANT.INFO}>JPL guarded</Badge>
-          </div>
+      {toast ? (
+        <ToastViewport>
+          <ToastItem variant={toast.variant} onDismiss={() => setToast(null)}>
+            {toast.message}
+          </ToastItem>
+        </ToastViewport>
+      ) : null}
 
-          <Alert variant="warn" title="Use live controls carefully">
-            These actions send live DOMS JPL commands. Totals reads are safe;
-            fallback clearing, tank blocking, tank resets, and forecourt mode
-            changes affect controller state and should be used only during
-            approved site operations.
-          </Alert>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      {!embedded ? (
         <Card>
           <CardContent className="space-y-4 p-4">
-            <div>
-              <div className="text-sm font-semibold">
-                Pump totals and fallback totals
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-base font-semibold">
+                  JPL production controls
+                </div>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Operator/admin screens for the production-module commands
+                  added in the latest JPL passes.
+                </p>
               </div>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Read JPL pump totals and clear fallback totals only after totals
-                have been collected and reconciled.
-              </p>
+              <Badge variant={STATUS_VARIANT.INFO}>JPL guarded</Badge>
             </div>
 
-            <form
-              className="space-y-3"
-              onSubmit={runForm({
-                title: 'Fuelling point grade totals',
-                url: '/api/pos/doms/getFpGradeTotals',
-                params: commonPumpParams,
-              })}
-            >
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <Field label="FpId">
-                  <Input
-                    value={pumpId}
-                    onChange={(event) => setPumpId(event.target.value)}
-                    placeholder="00"
-                  />
-                </Field>
-                <Field label="FcGradeId">
-                  <Input
-                    value={pumpGradeId}
-                    onChange={(event) => setPumpGradeId(event.target.value)}
-                    placeholder="00"
-                  />
-                </Field>
-                <Field label="subCode">
-                  <Select
-                    value={totalsSubCode}
-                    onChange={(event) => setTotalsSubCode(event.target.value)}
-                  >
-                    <option value="00H">00H</option>
-                    <option value="01H">01H</option>
-                  </Select>
-                </Field>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit">Read FP grade totals</Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'Pump grade totals',
-                      url: '/api/pos/doms/getPumpGradeTotals',
-                      params: commonPumpParams,
-                    })
-                  }
-                >
-                  Read pump grade totals
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'Pump grade blend totals',
-                      url: '/api/pos/doms/getPumpGradeBlendTotals',
-                      params: commonPumpParams,
-                    })
-                  }
-                >
-                  Read blend totals
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'Fallback totals',
-                      url: '/api/pos/doms/getFallbackTotals',
-                      params: commonPumpParams,
-                    })
-                  }
-                >
-                  Read fallback totals
-                </Button>
-              </div>
-            </form>
-
-            <div className="rounded border border-amber-500/20 bg-amber-500/5 p-3">
-              <div className="mb-2 text-sm font-semibold">
-                Clear fallback totals
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <Field
-                  label="FbTotalsSeqNo"
-                  hint="Sequence number returned by fallback totals."
-                >
-                  <Input
-                    value={fallbackTotalsSeqNo}
-                    onChange={(event) =>
-                      setFallbackTotalsSeqNo(event.target.value)
-                    }
-                    placeholder="00"
-                  />
-                </Field>
-                <Field
-                  label="TotalNoFbTransactions"
-                  hint="Use 0 only when protocol flow requires ZERO."
-                >
-                  <Input
-                    value={fallbackTotalCount}
-                    onChange={(event) =>
-                      setFallbackTotalCount(event.target.value)
-                    }
-                    placeholder="0"
-                  />
-                </Field>
-                <label className="flex items-center gap-2 pt-7 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={fallbackClearConfirmed}
-                    onChange={(event) =>
-                      setFallbackClearConfirmed(event.target.checked)
-                    }
-                  />
-                  Totals collected and reconciled
-                </label>
-              </div>
-              <div className="mt-3">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={!fallbackClearConfirmed}
-                  onClick={() =>
-                    void run({
-                      title: 'Clear fallback totals',
-                      url: '/api/pos/doms/clearFallbackTotals',
-                      method: 'POST',
-                      body: {
-                        FbTotalsSeqNo: fallbackTotalsSeqNo,
-                        TotalNoFbTransactions: fallbackTotalCount,
-                      },
-                    })
-                  }
-                >
-                  Clear fallback totals
-                </Button>
-              </div>
-            </div>
+            <Alert variant="warn" title="Use live controls carefully">
+              These actions send live DOMS JPL commands. Totals reads are safe;
+              fallback clearing, tank blocking, tank resets, and forecourt mode
+              changes affect controller state and should be used only during
+              approved site operations.
+            </Alert>
           </CardContent>
         </Card>
+      ) : null}
 
-        <Card>
-          <CardContent className="space-y-4 p-4">
-            <div>
-              <div className="text-sm font-semibold">
-                Wetstock lifecycle and tank controls
-              </div>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Delivery marking, tank blocking, and tank gauge error recovery
-                for active DOMS wetstock operations.
-              </p>
-            </div>
+      {busyCommandTitle ? (
+        <div className="flex items-center gap-2 rounded border bg-[var(--surface-muted)] p-3 text-sm text-[var(--text-secondary)]">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Sending {busyCommandTitle}. Controls are locked until the response
+          arrives.
+        </div>
+      ) : null}
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-              <Field label="TankId">
-                <Input
-                  value={tankId}
-                  onChange={(event) => setTankId(event.target.value)}
-                  placeholder="00"
-                />
-              </Field>
-              <Field label="TgId">
-                <Input
-                  value={tgId}
-                  onChange={(event) => setTgId(event.target.value)}
-                  placeholder="00"
-                />
-              </Field>
-              <Field label="PosId">
-                <Input
-                  value={wetstockPosId}
-                  onChange={(event) => setWetstockPosId(event.target.value)}
-                  placeholder="00"
-                />
-              </Field>
-              <Field label="TgErrorCode">
-                <Input
-                  value={tgErrorCode}
-                  onChange={(event) => setTgErrorCode(event.target.value)}
-                  placeholder="00H"
-                />
-              </Field>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Tank control status',
-                    url: '/api/pos/doms/getTankControlStatus',
-                    params: { tankId, TankId: tankId },
-                  })
-                }
-              >
-                Read tank control status
-              </Button>
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Mark delivery starting',
-                    url: '/api/pos/doms/markDeliveryStarting',
-                    method: 'POST',
-                    body: commonTankBody,
-                  })
-                }
-              >
-                Mark delivery starting
-              </Button>
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Mark delivery finished',
-                    url: '/api/pos/doms/markDeliveryFinished',
-                    method: 'POST',
-                    body: commonTankBody,
-                  })
-                }
-              >
-                Mark delivery finished
-              </Button>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() =>
-                  void run({
-                    title: 'Block tank',
-                    url: '/api/pos/doms/blockTank',
-                    method: 'POST',
-                    body: commonTankBody,
-                  })
-                }
-              >
-                Block tank
-              </Button>
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Unblock tank',
-                    url: '/api/pos/doms/unblockTank',
-                    method: 'POST',
-                    body: commonTankBody,
-                  })
-                }
-              >
-                Unblock tank
-              </Button>
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Clear tank gauge error',
-                    url: '/api/pos/doms/clearTgError',
-                    method: 'POST',
-                    body: { ...commonTankBody, TgErrorCode: tgErrorCode },
-                  })
-                }
-              >
-                Clear TG error
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() =>
-                  void run({
-                    title: 'Reset tank gauge',
-                    url: '/api/pos/doms/resetTg',
-                    method: 'POST',
-                    body: commonTankBody,
-                  })
-                }
-              >
-                Reset TG
-              </Button>
-            </div>
-
-            <div className="rounded border bg-[var(--surface-card)] p-3">
-              <div className="mb-2 text-sm font-semibold">
-                Guided delivery workflow
-              </div>
-              <p className="mb-3 text-xs text-[var(--text-secondary)]">
-                Use these in sequence during a controlled delivery: open tank
-                controller, start process, mark start/finish, stop process, read
-                delivery data, then clear only the exact collected delivery
-                sequence.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'Open tank controller',
-                      url: '/api/pos/doms/openTankController',
-                      method: 'POST',
-                      body: commonTankBody,
-                    })
-                  }
-                >
-                  1. Open controller
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'Start delivery process',
-                      url: '/api/pos/doms/startDeliveryProcess',
-                      method: 'POST',
-                      body: commonTankBody,
-                    })
-                  }
-                >
-                  2. Start process
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'Site delivery status',
-                      url: '/api/pos/doms/getSiteDeliveryStatus',
-                    })
-                  }
-                >
-                  Read site status
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'All tank delivery data',
-                      url: '/api/pos/doms/getAllTankDeliveryData',
-                    })
-                  }
-                >
-                  Read delivery data
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'Stop delivery process',
-                      url: '/api/pos/doms/stopDeliveryProcess',
-                      method: 'POST',
-                      body: commonTankBody,
-                    })
-                  }
-                >
-                  Stop process
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void run({
-                      title: 'Close tank controller',
-                      url: '/api/pos/doms/closeTankController',
-                      method: 'POST',
-                      body: commonTankBody,
-                    })
-                  }
-                >
-                  Close controller
-                </Button>
+      <fieldset
+        disabled={Boolean(busyCommandTitle)}
+        className="space-y-4 disabled:opacity-70"
+      >
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <Card>
+            <CardContent className="space-y-4 p-4">
+              <div>
+                <div className="text-sm font-semibold">
+                  Pump totals and fallback totals
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Read JPL pump totals and clear fallback totals only after
+                  totals have been collected and reconciled.
+                </p>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-                <Field label="DeliveryReportSeqNo">
-                  <Input
-                    value={deliveryReportSeqNo}
-                    onChange={(event) =>
-                      setDeliveryReportSeqNo(event.target.value)
+              <form
+                className="space-y-3"
+                onSubmit={runForm({
+                  title: 'Fuelling point grade totals',
+                  url: '/api/pos/doms/getFpGradeTotals',
+                  params: commonPumpParams,
+                })}
+              >
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <Field label="FpId">
+                    <Input
+                      value={pumpId}
+                      onChange={(event) => setPumpId(event.target.value)}
+                      placeholder="00"
+                    />
+                  </Field>
+                  <Field label="FcGradeId">
+                    <Input
+                      value={pumpGradeId}
+                      onChange={(event) => setPumpGradeId(event.target.value)}
+                      placeholder="00"
+                    />
+                  </Field>
+                  <Field label="subCode">
+                    <Select
+                      value={totalsSubCode}
+                      onChange={(event) => setTotalsSubCode(event.target.value)}
+                    >
+                      <option value="00H">00H</option>
+                      <option value="01H">01H</option>
+                    </Select>
+                  </Field>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit">Read FP grade totals</Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'Pump grade totals',
+                        url: '/api/pos/doms/getPumpGradeTotals',
+                        params: commonPumpParams,
+                      })
                     }
+                  >
+                    Read pump grade totals
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'Pump grade blend totals',
+                        url: '/api/pos/doms/getPumpGradeBlendTotals',
+                        params: commonPumpParams,
+                      })
+                    }
+                  >
+                    Read blend totals
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'Fallback totals',
+                        url: '/api/pos/doms/getFallbackTotals',
+                        params: commonPumpParams,
+                      })
+                    }
+                  >
+                    Read fallback totals
+                  </Button>
+                </div>
+              </form>
+
+              <div className="rounded border border-amber-500/20 bg-amber-500/5 p-3">
+                <div className="mb-2 text-sm font-semibold">
+                  Clear fallback totals
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <Field
+                    label="FbTotalsSeqNo"
+                    hint="Sequence number returned by fallback totals."
+                  >
+                    <Input
+                      value={fallbackTotalsSeqNo}
+                      onChange={(event) =>
+                        setFallbackTotalsSeqNo(event.target.value)
+                      }
+                      placeholder="00"
+                    />
+                  </Field>
+                  <Field
+                    label="TotalNoFbTransactions"
+                    hint="Use 0 only when protocol flow requires ZERO."
+                  >
+                    <Input
+                      value={fallbackTotalCount}
+                      onChange={(event) =>
+                        setFallbackTotalCount(event.target.value)
+                      }
+                      placeholder="0"
+                    />
+                  </Field>
+                  <label className="flex items-center gap-2 pt-7 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={fallbackClearConfirmed}
+                      onChange={(event) =>
+                        setFallbackClearConfirmed(event.target.checked)
+                      }
+                    />
+                    Totals collected and reconciled
+                  </label>
+                </div>
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={!fallbackClearConfirmed}
+                    onClick={() =>
+                      void run({
+                        title: 'Clear fallback totals',
+                        url: '/api/pos/doms/clearFallbackTotals',
+                        method: 'POST',
+                        body: {
+                          FbTotalsSeqNo: fallbackTotalsSeqNo,
+                          TotalNoFbTransactions: fallbackTotalCount,
+                        },
+                      })
+                    }
+                  >
+                    Clear fallback totals
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-4 p-4">
+              <div>
+                <div className="text-sm font-semibold">
+                  Wetstock lifecycle and tank controls
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Delivery marking, tank blocking, and tank gauge error recovery
+                  for active DOMS wetstock operations.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <Field label="TankId">
+                  <Input
+                    value={tankId}
+                    onChange={(event) => setTankId(event.target.value)}
                     placeholder="00"
                   />
                 </Field>
-                <Field label="TankDeliverySeqNo">
-                  <Input
-                    value={tankDeliverySeqNo}
-                    onChange={(event) =>
-                      setTankDeliverySeqNo(event.target.value)
-                    }
-                    placeholder="00"
-                  />
-                </Field>
-                <Field label="Clear TgId">
+                <Field label="TgId">
                   <Input
                     value={tgId}
                     onChange={(event) => setTgId(event.target.value)}
                     placeholder="00"
                   />
                 </Field>
-                <label className="flex items-center gap-2 pt-7 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={deliveryClearConfirmed}
-                    onChange={(event) =>
-                      setDeliveryClearConfirmed(event.target.checked)
-                    }
+                <Field label="PosId">
+                  <Input
+                    value={wetstockPosId}
+                    onChange={(event) => setWetstockPosId(event.target.value)}
+                    placeholder="00"
                   />
-                  Delivery data reconciled
-                </label>
+                </Field>
+                <Field label="TgErrorCode">
+                  <Input
+                    value={tgErrorCode}
+                    onChange={(event) => setTgErrorCode(event.target.value)}
+                    placeholder="00H"
+                  />
+                </Field>
               </div>
-              <div className="mt-3">
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title: 'Tank control status',
+                      url: '/api/pos/doms/getTankControlStatus',
+                      params: { tankId, TankId: tankId },
+                    })
+                  }
+                >
+                  Read tank control status
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title: 'Mark delivery starting',
+                      url: '/api/pos/doms/markDeliveryStarting',
+                      method: 'POST',
+                      body: commonTankBody,
+                    })
+                  }
+                >
+                  Mark delivery starting
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title: 'Mark delivery finished',
+                      url: '/api/pos/doms/markDeliveryFinished',
+                      method: 'POST',
+                      body: commonTankBody,
+                    })
+                  }
+                >
+                  Mark delivery finished
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="destructive"
-                  disabled={!deliveryClearConfirmed}
                   onClick={() =>
                     void run({
-                      title: 'Clear tank delivery data',
-                      url: '/api/pos/doms/clearTankDeliveryData',
+                      title: 'Block tank',
+                      url: '/api/pos/doms/blockTank',
                       method: 'POST',
-                      body: deliveryClearBody,
+                      body: commonTankBody,
                     })
                   }
                 >
-                  Clear collected delivery data
+                  Block tank
                 </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Card>
-          <CardContent className="space-y-4 p-4">
-            <div>
-              <div className="text-sm font-semibold">
-                Price-bank verification and pending queue
-              </div>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Read the active controller price bank, verify pending scheduled
-                prices, and clear a pending price set only after confirming the
-                activation target.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <Field label="Read type">
-                <Select
-                  value={priceReadType}
-                  onChange={(event) => setPriceReadType(event.target.value)}
-                >
-                  <option value="current">current</option>
-                  <option value="pending">pending</option>
-                </Select>
-              </Field>
-              <Field label="Pending FcPriceSetId">
-                <Input
-                  value={pendingPriceSetId}
-                  onChange={(event) => setPendingPriceSetId(event.target.value)}
-                  placeholder="00"
-                />
-              </Field>
-              <Field label="Pending activation">
-                <Input
-                  value={pendingActivationAt}
-                  onChange={(event) =>
-                    setPendingActivationAt(event.target.value)
-                  }
-                  placeholder="YYYYMMDDhhmmss"
-                />
-              </Field>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title:
-                      priceReadType === 'pending'
-                        ? 'Pending DOMS price set'
-                        : 'Current DOMS price bank',
-                    url: '/api/pos/doms/getGradePrices',
-                    params: {
-                      type: priceReadType,
-                      fcPriceSetId:
-                        priceReadType === 'pending'
-                          ? pendingPriceSetId
-                          : undefined,
-                      activationAt:
-                        priceReadType === 'pending'
-                          ? pendingActivationAt
-                          : undefined,
-                    },
-                  })
-                }
-              >
-                Read price bank
-              </Button>
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Pending DOMS price queue',
-                    url: '/api/pos/doms/getGradePrices',
-                    params: { type: 'pending' },
-                  })
-                }
-              >
-                List pending queue
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={
-                  !hasValue(pendingPriceSetId) || !hasValue(pendingActivationAt)
-                }
-                onClick={() =>
-                  void run({
-                    title: 'Clear pending DOMS price set',
-                    url: '/api/pos/doms/clearPendingPriceSet',
-                    method: 'POST',
-                    body: pendingPriceBody,
-                  })
-                }
-              >
-                Clear pending price set
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="space-y-4 p-4">
-            <div>
-              <div className="text-sm font-semibold">
-                Forecourt controller utilities
-              </div>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Date/time, operation mode, and JPL echo diagnostics.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field
-                label="FcDateAndTime"
-                hint="YYYYMMDDhhmmss, or leave blank and use Set controller time to now."
-              >
-                <Input
-                  value={fcDateTime}
-                  onChange={(event) => setFcDateTime(event.target.value)}
-                  placeholder="20260707213000"
-                />
-              </Field>
-              <Field label="FcOperationModeNo">
-                <Input
-                  value={operationModeNo}
-                  onChange={(event) => setOperationModeNo(event.target.value)}
-                  placeholder="0"
-                />
-              </Field>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Forecourt date/time',
-                    url: '/api/pos/doms/getFcDateTime',
-                  })
-                }
-              >
-                Read date/time
-              </Button>
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Set forecourt date/time',
-                    url: '/api/pos/doms/changeFcDateTime',
-                    method: 'POST',
-                    body: {
-                      FcDateAndTime:
-                        trim(fcDateTime) ||
-                        new Date()
-                          .toISOString()
-                          .replaceAll('-', '')
-                          .replaceAll(':', '')
-                          .replaceAll('T', '')
-                          .replaceAll('Z', '')
-                          .replaceAll('.', '')
-                          .slice(0, 14),
-                    },
-                  })
-                }
-              >
-                Set controller time
-              </Button>
-              <Button
-                type="button"
-                onClick={() =>
-                  void run({
-                    title: 'Forecourt operation mode status',
-                    url: '/api/pos/doms/getFcOperationModeStatus',
-                  })
-                }
-              >
-                Read operation mode
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() =>
-                  void run({
-                    title: 'Change forecourt operation mode',
-                    url: '/api/pos/doms/changeFcOperationMode',
-                    method: 'POST',
-                    body: { FcOperationModeNo: operationModeNo },
-                  })
-                }
-              >
-                Change operation mode
-              </Button>
-            </div>
-
-            <div className="rounded border bg-[var(--surface-card)] p-3">
-              <Field
-                label="Echo bytes"
-                hint="Comma-separated byte values, for example 1,2,3."
-              >
-                <Input
-                  value={echoData}
-                  onChange={(event) => setEchoData(event.target.value)}
-                  placeholder="1,2,3"
-                />
-              </Field>
-              <div className="mt-3 flex items-center gap-2">
                 <Button
                   type="button"
                   onClick={() =>
                     void run({
-                      title: 'JPL echo',
-                      url: '/api/pos/doms/utilEcho',
+                      title: 'Unblock tank',
+                      url: '/api/pos/doms/unblockTank',
                       method: 'POST',
-                      body: { EchoData: normalizedEchoData },
+                      body: commonTankBody,
                     })
                   }
                 >
-                  Send echo
+                  Unblock tank
                 </Button>
-                <span className="text-xs text-[var(--text-muted)]">
-                  {normalizedEchoData.length} byte(s)
-                </span>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title: 'Clear tank gauge error',
+                      url: '/api/pos/doms/clearTgError',
+                      method: 'POST',
+                      body: { ...commonTankBody, TgErrorCode: tgErrorCode },
+                    })
+                  }
+                >
+                  Clear TG error
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() =>
+                    void run({
+                      title: 'Reset tank gauge',
+                      url: '/api/pos/doms/resetTg',
+                      method: 'POST',
+                      body: commonTankBody,
+                    })
+                  }
+                >
+                  Reset TG
+                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <ResultPanel result={result} />
-      </div>
+              <div className="rounded border bg-[var(--surface-card)] p-3">
+                <div className="mb-2 text-sm font-semibold">
+                  Guided delivery workflow
+                </div>
+                <p className="mb-3 text-xs text-[var(--text-secondary)]">
+                  Use these in sequence during a controlled delivery: open tank
+                  controller, start process, mark start/finish, stop process,
+                  read delivery data, then clear only the exact collected
+                  delivery sequence.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'Open tank controller',
+                        url: '/api/pos/doms/openTankController',
+                        method: 'POST',
+                        body: commonTankBody,
+                      })
+                    }
+                  >
+                    1. Open controller
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'Start delivery process',
+                        url: '/api/pos/doms/startDeliveryProcess',
+                        method: 'POST',
+                        body: commonTankBody,
+                      })
+                    }
+                  >
+                    2. Start process
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'Site delivery status',
+                        url: '/api/pos/doms/getSiteDeliveryStatus',
+                      })
+                    }
+                  >
+                    Read site status
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'All tank delivery data',
+                        url: '/api/pos/doms/getAllTankDeliveryData',
+                      })
+                    }
+                  >
+                    Read delivery data
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'Stop delivery process',
+                        url: '/api/pos/doms/stopDeliveryProcess',
+                        method: 'POST',
+                        body: commonTankBody,
+                      })
+                    }
+                  >
+                    Stop process
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'Close tank controller',
+                        url: '/api/pos/doms/closeTankController',
+                        method: 'POST',
+                        body: commonTankBody,
+                      })
+                    }
+                  >
+                    Close controller
+                  </Button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <Field label="DeliveryReportSeqNo">
+                    <Input
+                      value={deliveryReportSeqNo}
+                      onChange={(event) =>
+                        setDeliveryReportSeqNo(event.target.value)
+                      }
+                      placeholder="00"
+                    />
+                  </Field>
+                  <Field label="TankDeliverySeqNo">
+                    <Input
+                      value={tankDeliverySeqNo}
+                      onChange={(event) =>
+                        setTankDeliverySeqNo(event.target.value)
+                      }
+                      placeholder="00"
+                    />
+                  </Field>
+                  <Field label="Clear TgId">
+                    <Input
+                      value={tgId}
+                      onChange={(event) => setTgId(event.target.value)}
+                      placeholder="00"
+                    />
+                  </Field>
+                  <label className="flex items-center gap-2 pt-7 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={deliveryClearConfirmed}
+                      onChange={(event) =>
+                        setDeliveryClearConfirmed(event.target.checked)
+                      }
+                    />
+                    Delivery data reconciled
+                  </label>
+                </div>
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={!deliveryClearConfirmed}
+                    onClick={() =>
+                      void run({
+                        title: 'Clear tank delivery data',
+                        url: '/api/pos/doms/clearTankDeliveryData',
+                        method: 'POST',
+                        body: deliveryClearBody,
+                      })
+                    }
+                  >
+                    Clear collected delivery data
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <Card>
+            <CardContent className="space-y-4 p-4">
+              <div>
+                <div className="text-sm font-semibold">
+                  Price-bank verification and pending queue
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Read the active controller price bank, verify pending
+                  scheduled prices, and clear a pending price set only after
+                  confirming the activation target.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <Field label="Read type">
+                  <Select
+                    value={priceReadType}
+                    onChange={(event) => setPriceReadType(event.target.value)}
+                  >
+                    <option value="current">current</option>
+                    <option value="pending">pending</option>
+                  </Select>
+                </Field>
+                <Field label="Pending FcPriceSetId">
+                  <Input
+                    value={pendingPriceSetId}
+                    onChange={(event) =>
+                      setPendingPriceSetId(event.target.value)
+                    }
+                    placeholder="00"
+                  />
+                </Field>
+                <Field label="Pending activation">
+                  <Input
+                    value={pendingActivationAt}
+                    onChange={(event) =>
+                      setPendingActivationAt(event.target.value)
+                    }
+                    placeholder="YYYYMMDDhhmmss"
+                  />
+                </Field>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title:
+                        priceReadType === 'pending'
+                          ? 'Pending DOMS price set'
+                          : 'Current DOMS price bank',
+                      url: '/api/pos/doms/getGradePrices',
+                      params: {
+                        type: priceReadType,
+                        fcPriceSetId:
+                          priceReadType === 'pending'
+                            ? pendingPriceSetId
+                            : undefined,
+                        activationAt:
+                          priceReadType === 'pending'
+                            ? pendingActivationAt
+                            : undefined,
+                      },
+                    })
+                  }
+                >
+                  Read price bank
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title: 'Pending DOMS price queue',
+                      url: '/api/pos/doms/getGradePrices',
+                      params: { type: 'pending' },
+                    })
+                  }
+                >
+                  List pending queue
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={
+                    !hasValue(pendingPriceSetId) ||
+                    !hasValue(pendingActivationAt)
+                  }
+                  onClick={() =>
+                    void run({
+                      title: 'Clear pending DOMS price set',
+                      url: '/api/pos/doms/clearPendingPriceSet',
+                      method: 'POST',
+                      body: pendingPriceBody,
+                    })
+                  }
+                >
+                  Clear pending price set
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-4 p-4">
+              <div>
+                <div className="text-sm font-semibold">
+                  Forecourt controller utilities
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Date/time, operation mode, and JPL echo diagnostics.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Field
+                  label="FcDateAndTime"
+                  hint="YYYYMMDDhhmmss, or leave blank and use Set controller time to now."
+                >
+                  <Input
+                    value={fcDateTime}
+                    onChange={(event) => setFcDateTime(event.target.value)}
+                    placeholder="20260707213000"
+                  />
+                </Field>
+                <Field label="FcOperationModeNo">
+                  <Input
+                    value={operationModeNo}
+                    onChange={(event) => setOperationModeNo(event.target.value)}
+                    placeholder="0"
+                  />
+                </Field>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title: 'Forecourt date/time',
+                      url: '/api/pos/doms/getFcDateTime',
+                    })
+                  }
+                >
+                  Read date/time
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title: 'Set forecourt date/time',
+                      url: '/api/pos/doms/changeFcDateTime',
+                      method: 'POST',
+                      body: {
+                        FcDateAndTime:
+                          trim(fcDateTime) ||
+                          new Date()
+                            .toISOString()
+                            .replaceAll('-', '')
+                            .replaceAll(':', '')
+                            .replaceAll('T', '')
+                            .replaceAll('Z', '')
+                            .replaceAll('.', '')
+                            .slice(0, 14),
+                      },
+                    })
+                  }
+                >
+                  Set controller time
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void run({
+                      title: 'Forecourt operation mode status',
+                      url: '/api/pos/doms/getFcOperationModeStatus',
+                    })
+                  }
+                >
+                  Read operation mode
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() =>
+                    void run({
+                      title: 'Change forecourt operation mode',
+                      url: '/api/pos/doms/changeFcOperationMode',
+                      method: 'POST',
+                      body: { FcOperationModeNo: operationModeNo },
+                    })
+                  }
+                >
+                  Change operation mode
+                </Button>
+              </div>
+
+              <div className="rounded border bg-[var(--surface-card)] p-3">
+                <Field
+                  label="Echo bytes"
+                  hint="Comma-separated byte values, for example 1,2,3."
+                >
+                  <Input
+                    value={echoData}
+                    onChange={(event) => setEchoData(event.target.value)}
+                    placeholder="1,2,3"
+                  />
+                </Field>
+                <div className="mt-3 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      void run({
+                        title: 'JPL echo',
+                        url: '/api/pos/doms/utilEcho',
+                        method: 'POST',
+                        body: { EchoData: normalizedEchoData },
+                      })
+                    }
+                  >
+                    Send echo
+                  </Button>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {normalizedEchoData.length} byte(s)
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </fieldset>
     </div>
   )
 }

@@ -7,7 +7,6 @@ import { formatDate } from '@/src/shared/utils/dates'
 
 import { PageHeader } from '@/components/layout/page-header'
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
-import { CsrfHiddenInput } from '@/components/security/CsrfHiddenInput'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -132,7 +131,9 @@ export const UsersPageClient = () => {
   }, [])
 
   useEffect(() => {
-    loadUsers()
+    queueMicrotask(() => {
+      loadUsers()
+    })
   }, [loadUsers])
 
   const roleLabel = useMemo(() => {
@@ -152,7 +153,9 @@ export const UsersPageClient = () => {
 
   useEffect(() => {
     if (!createForm.role && roleOptions.length > 0) {
-      setCreateForm((prev) => ({ ...prev, role: roleOptions[0].value }))
+      queueMicrotask(() =>
+        setCreateForm((prev) => ({ ...prev, role: roleOptions[0].value })),
+      )
     }
   }, [roleOptions, createForm.role])
 

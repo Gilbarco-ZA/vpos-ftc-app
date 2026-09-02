@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useEffect, useMemo, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { Alert } from '@/components/ui/alert'
@@ -110,52 +110,58 @@ export default function DatasetsClient({ children }: { children: ReactNode }) {
     [countries, countryCode],
   )
 
-  const load = async (nextCountry = countryCode, nextType = datasetType) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams()
-      if (nextCountry) params.set('country', nextCountry)
-      if (nextType) params.set('datasetType', nextType)
-      const res = await fetch(`/api/admin/datasets?${params.toString()}`, {
-        cache: 'no-store',
-      })
-      const json = await res.json().catch(() => ({}))
-      const payload = readPayload(json)
-      if (!res.ok)
-        throw new Error(
-          json?.error?.message || payload?.message || 'Failed to load datasets',
+  const load = useCallback(
+    async (nextCountry: string, nextType: DatasetType) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const params = new URLSearchParams()
+        if (nextCountry) params.set('country', nextCountry)
+        if (nextType) params.set('datasetType', nextType)
+        const res = await fetch(`/api/admin/datasets?${params.toString()}`, {
+          cache: 'no-store',
+        })
+        const json = await res.json().catch(() => ({}))
+        const payload = readPayload(json)
+        if (!res.ok)
+          throw new Error(
+            json?.error?.message ||
+              payload?.message ||
+              'Failed to load datasets',
+          )
+        const incomingCountries = Array.isArray(payload.countries)
+          ? payload.countries
+          : []
+        const incomingTypes = Array.isArray(payload.datasetTypes)
+          ? payload.datasetTypes
+          : []
+        setCountries(incomingCountries)
+        setDatasetTypes(incomingTypes)
+        const incomingCountry = String(
+          payload.selected?.countryCode ||
+            incomingCountries[0]?.countryCode ||
+            '',
         )
-      const incomingCountries = Array.isArray(payload.countries)
-        ? payload.countries
-        : []
-      const incomingTypes = Array.isArray(payload.datasetTypes)
-        ? payload.datasetTypes
-        : []
-      setCountries(incomingCountries)
-      setDatasetTypes(incomingTypes)
-      const incomingCountry = String(
-        payload.selected?.countryCode ||
-          incomingCountries[0]?.countryCode ||
-          '',
-      )
-      const incomingType = (payload.selected?.datasetType ||
-        incomingTypes[0] ||
-        'taxTypes') as DatasetType
-      setCountryCode(incomingCountry)
-      setDatasetType(incomingType)
-      setRows(Array.isArray(payload.rows) ? payload.rows : [])
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load datasets')
-    } finally {
-      setLoading(false)
-    }
-  }
+        const incomingType = (payload.selected?.datasetType ||
+          incomingTypes[0] ||
+          'taxTypes') as DatasetType
+        setCountryCode(incomingCountry)
+        setDatasetType(incomingType)
+        setRows(Array.isArray(payload.rows) ? payload.rows : [])
+      } catch (err: any) {
+        setError(err?.message || 'Failed to load datasets')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
-    void load('', 'taxTypes')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    queueMicrotask(() => {
+      void load('', 'taxTypes')
+    })
+  }, [load])
 
   const refreshSelection = async (
     nextCountry: string,

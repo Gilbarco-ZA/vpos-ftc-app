@@ -1,8 +1,8 @@
 import type { FiscalRunResult } from '@/src/modules/transactions/infrastructure/fiscalization/fiscal-run-result'
 
-import { enqueueFiscalInboxReviewItem } from '@/src/shared/runtime/fiscalInbox'
 import { requireNonEmptyString } from '@/src/shared/utils/inputs'
 
+import { enqueueFiscalInboxReviewItem } from '@/src/modules/fiscal-inbox/application/fiscalInbox'
 import { failTransactionFiscalizationRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction.repository'
 
 export async function failTransactionFiscalization(input: {
@@ -29,9 +29,8 @@ export async function failTransactionFiscalization(input: {
     message: {
       source: 'failTransactionFiscalization',
       engine: input.fiscalResult.engine,
-      requestPayload: input.fiscalResult.requestPayload ?? null,
-      responsePayload: input.fiscalResult.responsePayload ?? null,
-      rawResponse: input.fiscalResult.rawResponse ?? null,
+      fiscalEventId: result.fiscalEventId,
+      fiscalizationSummary: result.fiscalizationSummary,
     },
   }).catch(() => {})
 

@@ -1,11 +1,17 @@
 import { query } from '@/src/platform/db/postgres'
-import { recordPendingAttendantAuthRequest } from '@/src/shared/pos/attendantAuth'
 import { getRuntimeBus } from '@/src/shared/runtime/bus'
 import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import {
+  buildCompactRuntimeArchivePayload,
+  getRuntimeArchivePolicy,
+  isRuntimeArchiveMessageAllowed,
+} from '@/src/modules/archive/domain/runtimeArchivePolicy'
 import { archiveEvent } from '@/src/modules/archive/infrastructure/archiveEventsRepo'
+import { startArchiveRetentionWorker } from '@/src/modules/archive/infrastructure/archiveRetention'
+import { recordPendingAttendantAuthRequest } from '@/src/modules/pos/application/legacy/attendantAuth'
 
 import {
   clearPendingFiscalAuth,
@@ -131,6 +137,23 @@ export function startArchiveBusListener() {
   if (archiveStarted) return
   archiveStarted = true
 
+  const policy = getRuntimeArchivePolicy()
+  startArchiveRetentionWorker(policy)
+
+  if (policy.mode === 'off') {
+    logger.info('[archiveBusListener]', {
+      msg: 'Runtime bus archive disabled',
+    })
+    return
+  }
+
+  if (policy.allowlist.length === 0) {
+    logger.warn('[archiveBusListener]', {
+      msg: 'Runtime bus archive enabled without an allowlist; no messages will be archived',
+    })
+    return
+  }
+
   const bus = getRuntimeBus()
   bus.subscribe('*', async (msg: AnyBusMsg) => {
     try {
@@ -139,11 +162,13 @@ export function startArchiveBusListener() {
       const messageType = String(msg?.type ?? 'message')
       const requestId = msg?.requestId ? String(msg.requestId) : null
 
+      if (!isRuntimeArchiveMessageAllowed(policy, topic, messageType)) return
+
       await archiveEvent({
         stationId,
         topic,
         messageType,
-        payload: msg,
+        payload: buildCompactRuntimeArchivePayload(msg, topic, messageType),
         source: 'runtimeBus',
         requestId,
       })

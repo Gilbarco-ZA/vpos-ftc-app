@@ -1,8 +1,9 @@
-import { testTransactionPrintout } from '@/src/shared/setup/printouts'
 import {
   ensurePlainObject,
   requireNonEmptyString,
 } from '@/src/shared/utils/inputs'
+
+import { testTransactionPrintout } from '@/src/modules/setup/application/printouts'
 
 export async function runTestTransactionPrintout(
   stationId: string,

@@ -9,7 +9,6 @@ import { safeAsync } from '@/src/shared/utils/safeAsync'
 import {
   checkDiagnosticsDb,
   countPendingCustomerTransactions,
-  getSyncState,
   listPrintJobStatusCounts,
   listRecentControlEvents,
   listTransactionsByStatus,
@@ -36,10 +35,6 @@ export async function getAdminDiagnosticsOverview(stationId: string) {
       listPrintJobStatusCounts(stationId),
       'diagnostics.overview.printJobs',
     )) ?? []
-  const syncState = await safeAsync(
-    getSyncState(stationId),
-    'diagnostics.overview.syncState',
-  )
   const lastControlEvents =
     (await safeAsync(
       listRecentControlEvents(stationId),
@@ -75,7 +70,7 @@ export async function getAdminDiagnosticsOverview(stationId: string) {
       transactionsPendingCustomer: pendingCustomer?.count ?? '0',
       printJobsByStatus: printJobs,
     },
-    sync: syncState,
+    cloudDelivery: { owner: 'vpos-proxy', legacyAzureSqlSync: 'retired' },
     control: { lastEvents: lastControlEvents },
     ts: new Date().toISOString(),
   })

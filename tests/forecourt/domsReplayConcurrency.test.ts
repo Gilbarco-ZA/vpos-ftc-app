@@ -9,25 +9,41 @@ import {
   withReplayLock,
 } from '../../src/modules/forecourt/infrastructure/jpl/replayState'
 
-const delay = async (milliseconds: number) =>
-  await new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
+const deferred = <T = void>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
 
 describe('DOMS replay concurrency state', () => {
   it('serializes work for one key and removes the completed lock tail', async () => {
     resetReplayConcurrencyState()
     const order: string[] = []
+    const firstStarted = deferred()
+    const releaseFirst = deferred()
 
-    await Promise.all([
-      withReplayLock('station-a:supervised:01', async () => {
-        order.push('first:start')
-        await delay(20)
-        order.push('first:end')
-      }),
-      withReplayLock('station-a:supervised:01', async () => {
-        order.push('second:start')
-        order.push('second:end')
-      }),
-    ])
+    const first = withReplayLock('station-a:supervised:01', async () => {
+      order.push('first:start')
+      firstStarted.resolve()
+      await releaseFirst.promise
+      order.push('first:end')
+    })
+
+    await firstStarted.promise
+    const second = withReplayLock('station-a:supervised:01', async () => {
+      order.push('second:start')
+      order.push('second:end')
+    })
+
+    await Promise.resolve()
+    assert.deepEqual(order, ['first:start'])
+
+    releaseFirst.resolve()
+    await Promise.all([first, second])
 
     assert.deepEqual(order, [
       'first:start',
@@ -44,21 +60,35 @@ describe('DOMS replay concurrency state', () => {
   it('allows unrelated station keys to run concurrently', async () => {
     resetReplayConcurrencyState()
     const order: string[] = []
+    const stationAStarted = deferred()
+    const stationBStarted = deferred()
+    const releaseStationA = deferred()
 
-    await Promise.all([
-      withReplayLock('station-a:supervised:01', async () => {
+    const stationA = withReplayLock(
+      'station-a:supervised:01',
+      async () => {
         order.push('a:start')
-        await delay(20)
+        stationAStarted.resolve()
+        await releaseStationA.promise
         order.push('a:end')
-      }),
-      withReplayLock('station-b:supervised:01', async () => {
+      },
+    )
+    const stationB = withReplayLock(
+      'station-b:supervised:01',
+      async () => {
         order.push('b:start')
-        await delay(5)
+        stationBStarted.resolve()
         order.push('b:end')
-      }),
-    ])
+      },
+    )
 
-    assert.ok(order.indexOf('b:start') < order.indexOf('a:end'))
+    await Promise.all([stationAStarted.promise, stationBStarted.promise])
+    assert.ok(order.includes('b:end'))
+    assert.equal(order.includes('a:end'), false)
+
+    releaseStationA.resolve()
+    await Promise.all([stationA, stationB])
+
     assert.deepEqual(getReplayConcurrencySnapshot(), {
       queuedLockCount: 0,
       inFlightKeyCount: 0,

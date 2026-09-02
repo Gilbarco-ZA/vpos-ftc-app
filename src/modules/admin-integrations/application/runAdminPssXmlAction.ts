@@ -1,9 +1,14 @@
 import type { SessionUser } from '@/src/shared/types'
 import { NextResponse } from 'next/server'
 
-import { kvSet, PSS_XML_KEYS } from '@/src/shared/integrations/pssXml'
+import { PSS_XML_KEYS } from '@/src/shared/integrations/pssXml/keys'
+import { kvSet } from '@/src/shared/storage/stationKv'
 
-import { importPssConfigXml } from '@/src/modules/setup/infrastructure/pssXmlImporter'
+import { refreshDomsReplayAfterConfiguration } from '@/src/modules/forecourt/application/refreshDomsReplayAfterConfiguration'
+import {
+  importPssConfigXml,
+  PssXmlImportValidationError,
+} from '@/src/modules/setup/infrastructure/pssXmlImporter'
 
 import type { PssXmlActionBody } from './pssXmlTypes'
 
@@ -97,12 +102,41 @@ export async function runAdminPssXmlAction(
       )
     }
 
-    const res = await importPssConfigXml({
-      stationId: user.stationId,
-      xml,
-      sourcePath,
-    })
-    return { imported: true, result: res }
+    try {
+      const res = await importPssConfigXml({
+        stationId: user.stationId,
+        xml,
+        sourcePath,
+      })
+      const domsReplay = await refreshDomsReplayAfterConfiguration(
+        user.stationId,
+      )
+      return { imported: true, result: res, domsReplay }
+    } catch (error: any) {
+      if (error instanceof PssXmlImportValidationError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'PSS topology validation failed',
+            details: error.issues,
+          },
+          { status: 422 },
+        )
+      }
+
+      if (String(error?.code ?? '') === '23505') {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'PSS topology conflicts with an existing pump/nozzle identity. Apply the latest database migrations and retry the import.',
+          },
+          { status: 409 },
+        )
+      }
+
+      throw error
+    }
   }
 
   return NextResponse.json(

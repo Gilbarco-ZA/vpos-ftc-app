@@ -1,13 +1,24 @@
 import { queryOne } from '@/src/platform/db/postgres'
+import { getEnvValue } from '@/src/shared/config/envDb'
 import { kvGetMany } from '@/src/shared/storage/stationKv'
 
 import {
   readTanzaniaCertSerialBase64,
   readTanzaniaPrivateKeyPem,
 } from './certificates'
+import {
+  EWURA_DEFAULT_API_SOURCE_ID,
+  EWURA_PRODUCTION_BASE_URL,
+  TRA_PRODUCTION_BASE_URL,
+} from './defaults'
 
 export type TanzaniaFiscalConfig = {
   stationId: string
+  proxy: {
+    deviceId: string | null
+    registeredDeviceId: string | null
+    deviceIdOverride: string | null
+  }
   station: {
     id: string
     code: string | null
@@ -55,6 +66,7 @@ type StationRow = TanzaniaFiscalConfig['station'] & {
   fiscalization_engine: string | null
   fiscalization_transport: 'proxy' | 'local_tz' | null
   vat_rate_tz: string | number | null
+  tanzania_device_id_override: string | null
 }
 
 const toObject = (value: unknown): Record<string, any> =>
@@ -126,23 +138,8 @@ function normalizeEwuraFailureMode(
 }
 
 async function getStationEnvValue(stationId: string, name: string) {
-  const row = await queryOne<{ value: unknown }>(
-    `SELECT value
-       FROM station_kv
-      WHERE station_id = $1 AND key = $2
-      LIMIT 1`,
-    [stationId, `env:${name}`],
-  )
-  if (row?.value != null) {
-    const text = String(row.value).trim()
-    if (text) return text
-  }
-
-  // Developer-only fallback. Production packages should persist these values in DB.
-  const debugValue = process.env[name]
-  return debugValue && String(debugValue).trim().length
-    ? String(debugValue).trim()
-    : null
+  const value = await getEnvValue(stationId, name)
+  return value && value.trim().length ? value.trim() : null
 }
 
 async function getFirstEnvValue(stationId: string, names: string[]) {
@@ -168,7 +165,8 @@ export async function readTanzaniaFiscalConfig(
             COALESCE(NULLIF(BTRIM(fs.timezone), ''), 'Africa/Dar_es_Salaam') AS timezone,
             ss.fiscalization_engine,
             ss.fiscalization_transport,
-            ss.vat_rate_tz
+            ss.vat_rate_tz,
+            ss.tanzania_device_id_override
        FROM fuel_stations fs
        LEFT JOIN station_settings ss ON ss.station_id = fs.id
       WHERE fs.id = $1
@@ -280,7 +278,8 @@ export async function readTanzaniaFiscalConfig(
       'TZ_TRA_BASE_URL',
       'TRA_BASE_URL',
       'TZ_FISCAL_ENDPOINT',
-    ]))
+    ])) ??
+    TRA_PRODUCTION_BASE_URL
 
   const ewuraBaseUrl =
     pickString(sources, [
@@ -289,7 +288,11 @@ export async function readTanzaniaFiscalConfig(
       'ewuraBaseUrl',
       'ewura.baseUrl',
     ]) ??
-    (await getFirstEnvValue(stationId, ['EWURA_BASE_URL', 'TZ_EWURA_BASE_URL']))
+    (await getFirstEnvValue(stationId, [
+      'EWURA_BASE_URL',
+      'TZ_EWURA_BASE_URL',
+    ])) ??
+    EWURA_PRODUCTION_BASE_URL
 
   const vatRate = (() => {
     const fromSettings = Number(row.vat_rate_tz)
@@ -297,15 +300,37 @@ export async function readTanzaniaFiscalConfig(
     return pickNumber(sources, ['vatRate', 'VAT_RATE', 'tax.rate'], 0.18)
   })()
 
-  const skipSigningForDebug =
-    pickBoolean(sources, ['skipSigningForDebug', 'SKIP_SIGNING'], false) ||
-    (await getFirstEnvValue(stationId, [
-      'TZ_FISCAL_SKIP_SIGNING',
-      'VPOS_TZ_SKIP_SIGNING',
-    ])) === 'true'
+  const skipSigningForDebug = pickBoolean(
+    sources,
+    ['skipSigningForDebug', 'SKIP_SIGNING'],
+    false,
+  )
+
+  const registeredDeviceId = pickString(
+    [deviceData, deviceRegistration],
+    [
+      'deviceId',
+      'device_id',
+      'deviceSettings.deviceId',
+      'deviceSettings.device_id',
+      'registrationStatus.deviceSettings.deviceId',
+      'registrationStatus.deviceSettings.device_id',
+      'data.deviceId',
+      'data.device_id',
+      'data.deviceSettings.deviceId',
+      'data.deviceSettings.device_id',
+    ],
+  )
+  const deviceIdOverride =
+    String(row.tanzania_device_id_override ?? '').trim() || null
 
   return {
     stationId,
+    proxy: {
+      deviceId: deviceIdOverride ?? registeredDeviceId,
+      registeredDeviceId,
+      deviceIdOverride,
+    },
     station: {
       id: row.id,
       code: row.code ?? null,
@@ -380,13 +405,14 @@ export async function readTanzaniaFiscalConfig(
     },
     ewura: {
       baseUrl: ewuraBaseUrl,
-      apiSourceId: pickString(sources, [
-        'apiSourceId',
-        'APISourceId',
-        'EWURA_API_SOURCE_ID',
-        'data.APISourceId',
-        'data.registration.APISourceId',
-      ]),
+      apiSourceId:
+        pickString(sources, [
+          'apiSourceId',
+          'APISourceId',
+          'EWURA_API_SOURCE_ID',
+          'data.APISourceId',
+          'data.registration.APISourceId',
+        ]) ?? EWURA_DEFAULT_API_SOURCE_ID,
       licenseNo: pickString(sources, [
         'licenseNo',
         'EWURALicenseNo',

@@ -8,6 +8,7 @@ import { readOptions } from '@/app/setup/helpers'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 
+import { TanzaniaProxyRegistrationClient } from '@/components/admin/TanzaniaProxyRegistrationClient'
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -30,9 +31,11 @@ type Props = {
   proxyUrl?: string
   initialError?: string
   isRegistered?: boolean
+  proxyCountryCode?: string
+  stationCountry?: string
 }
 
-type SetupStep = 'register' | 'country' | 'admin'
+type SetupStep = 'register' | 'country' | 'tanzania' | 'admin'
 
 type SiteProfile = {
   siteName: string
@@ -56,29 +59,32 @@ const SetupWizard = ({
   proxyUrl,
   initialError,
   isRegistered,
+  proxyCountryCode,
+  stationCountry,
 }: Props) => {
   const router = useRouter()
   const [proxyOk, setProxyOk] = useState(proxyReachable)
   const [csrfToken, setCsrfToken] = useState('')
-  const [step, setStep] = useState<SetupStep>(
-    isRegistered ? 'country' : 'register',
+  const [deviceRegistered, setDeviceRegistered] = useState(
+    Boolean(isRegistered),
   )
+  const [step, setStep] = useState<SetupStep>('register')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [siteSyncing, setSiteSyncing] = useState(false)
   const [error, setError] = useState<string | null>(initialError || null)
-  const [didSync, setDidSync] = useState(false)
 
   useEffect(() => {
+    if (isRegistered) return
+
     const restoreStoredStep = window.setTimeout(() => {
       try {
         const stored = window.localStorage.getItem('vpos.setup.step')
         if (
           stored === 'register' ||
           stored === 'country' ||
+          stored === 'tanzania' ||
           stored === 'admin'
         ) {
-          // If the device is already registered, never force the wizard back to register.
-          if (isRegistered && stored === 'register') return
           setStep(stored)
         }
       } catch {}
@@ -100,7 +106,11 @@ const SetupWizard = ({
   const [needsCountry, setNeedsCountry] = useState(false)
   const [countryOptions, setCountryOptions] = useState<SetupCountryOption[]>([])
   const [loadingCountries, setLoadingCountries] = useState(true)
-  const [country, setCountry] = useState('')
+  const [country, setCountry] = useState(
+    String(proxyCountryCode || stationCountry || '')
+      .trim()
+      .toUpperCase(),
+  )
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -119,9 +129,15 @@ const SetupWizard = ({
         const json = await res.json().catch(() => ({}))
         const options = readOptions(json) as SetupCountryOption[]
         setCountryOptions(options)
-        if (!country && options.length > 0) {
-          setCountry(options[0].value)
-        }
+        setCountry(
+          (current) =>
+            current ||
+            String(
+              proxyCountryCode || stationCountry || options[0]?.value || '',
+            )
+              .trim()
+              .toUpperCase(),
+        )
       } catch {
       } finally {
         setLoadingCountries(false)
@@ -129,7 +145,7 @@ const SetupWizard = ({
     }
 
     safeAsync(loadCountries(), 'setup.loadCountries')
-  }, [])
+  }, [proxyCountryCode, stationCountry])
 
   const registrationCodeValid = registrationCode.trim().length >= 6
 
@@ -138,24 +154,35 @@ const SetupWizard = ({
     password.trim().length >= 6 &&
     password === confirmPassword
 
-  const registrationDone = registrationSuccess || Boolean(isRegistered)
+  const registrationDone = registrationSuccess || deviceRegistered
   const siteReady = Boolean(siteProfile) && !needsCountry
-  const steps = [
-    {
-      key: 'register',
-      label: 'Device Registration',
-      done: registrationDone,
-    },
-    {
-      key: 'country',
-      label: 'Site & Country',
-      done: siteReady,
-    },
-    {
-      key: 'admin',
-      label: 'Admin User',
-      done: false,
-    },
+  const normalizedCountry = country.trim().toUpperCase()
+  const isTanzania = [
+    'TZ',
+    'TZA',
+    'TANZANIA',
+    'UNITED REPUBLIC OF TANZANIA',
+  ].includes(normalizedCountry)
+
+  useEffect(() => {
+    if (step === 'tanzania' && !isTanzania && !loadingCountries) {
+      queueMicrotask(() => setStep('country'))
+    }
+  }, [isTanzania, loadingCountries, step])
+
+  const steps: Array<{ key: SetupStep; label: string; done: boolean }> = [
+    { key: 'register', label: 'Device Registration', done: registrationDone },
+    { key: 'country', label: 'Site & Country', done: siteReady },
+    ...(isTanzania
+      ? [
+          {
+            key: 'tanzania' as SetupStep,
+            label: 'Tanzania Fiscal',
+            done: false,
+          },
+        ]
+      : []),
+    { key: 'admin', label: 'Admin User', done: false },
   ]
 
   const syncSiteProfile = async () => {
@@ -192,11 +219,19 @@ const SetupWizard = ({
       setSiteProfile(profile)
       const needs = Boolean(payload?.needsCountry)
       setNeedsCountry(needs)
-      setStep(needs ? 'country' : 'admin')
-      setDidSync(true)
-
-      const incomingCountry = String(payload?.country || '').trim()
+      const incomingCountry = String(
+        payload?.country || profile?.country || country,
+      )
+        .trim()
+        .toUpperCase()
       if (incomingCountry) setCountry(incomingCountry)
+      const incomingIsTanzania = [
+        'TZ',
+        'TZA',
+        'TANZANIA',
+        'UNITED REPUBLIC OF TANZANIA',
+      ].includes(incomingCountry)
+      setStep(needs ? 'country' : incomingIsTanzania ? 'tanzania' : 'admin')
     } catch (err: any) {
       setError(err?.message || 'Site sync failed')
     } finally {
@@ -212,12 +247,7 @@ const SetupWizard = ({
       if (data?.adminExists) router.replace('/login?setup=complete')
     }
     safeAsync(check(), 'setup.checkAdmin')
-  }, [csrfToken])
-
-  useEffect(() => {
-    if (!isRegistered || didSync) return
-    safeAsync(syncSiteProfile(), 'setup.syncSiteProfile')
-  }, [didSync, isRegistered])
+  }, [csrfToken, router])
 
   const handleRegisterDevice = async () => {
     if (!registrationCodeValid) return
@@ -233,7 +263,9 @@ const SetupWizard = ({
         },
         body: JSON.stringify({
           csrf_token: csrfToken,
+          action: 'register',
           registrationCode: registrationCode.trim(),
+          countryCode: country.trim().toUpperCase(),
         }),
       })
 
@@ -251,16 +283,53 @@ const SetupWizard = ({
       }
 
       setRegistrationSuccess(true)
+      setDeviceRegistered(true)
+      const returnedCountry = String(
+        payload?.countryCode || payload?.countryId || '',
+      )
+        .trim()
+        .toUpperCase()
+      if (returnedCountry) setCountry(returnedCountry)
       if (payload?.siteProfile) setSiteProfile(payload.siteProfile)
       if (typeof payload?.needsCountry === 'boolean') {
-        setNeedsCountry(payload.needsCountry)
-        setStep(payload.needsCountry ? 'country' : 'admin')
-        setDidSync(true)
-      } else {
-        await syncSiteProfile()
+        setNeedsCountry(Boolean(payload.needsCountry))
       }
+      await syncSiteProfile()
     } catch (err: any) {
       setError(err?.message || 'Device registration failed')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleResetRegistration = async () => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/setup/device', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
+        body: JSON.stringify({ csrf_token: csrfToken, action: 'reset' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(
+          data?.error?.message ||
+            data?.message ||
+            data?.error ||
+            'Failed to reset registration',
+        )
+      }
+      setDeviceRegistered(false)
+      setRegistrationSuccess(false)
+      setRegistrationCode('')
+      setSiteProfile(null)
+      setStep('register')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to reset registration')
     } finally {
       setIsSubmitting(false)
     }
@@ -300,7 +369,7 @@ const SetupWizard = ({
 
       if (payload?.siteProfile) setSiteProfile(payload.siteProfile)
       setNeedsCountry(false)
-      setStep('admin')
+      setStep(country.trim().toUpperCase() === 'TZ' ? 'tanzania' : 'admin')
     } catch (err: any) {
       setError(err?.message || 'Failed to save country')
     } finally {
@@ -326,7 +395,7 @@ const SetupWizard = ({
           password: password.trim(),
           email: email.trim() || `administrator@local`,
           fullName: fullName.trim() || 'Administrator',
-          deviceRegistered: registrationSuccess || isRegistered,
+          deviceRegistered: registrationSuccess || deviceRegistered,
         }),
       })
 
@@ -358,6 +427,7 @@ const SetupWizard = ({
   const headerCopy = useMemo(() => {
     if (step === 'register') return 'Register this device with the VPOS cloud'
     if (step === 'country') return 'Confirm site details and country'
+    if (step === 'tanzania') return 'Register TRA and EWURA through vpos-proxy'
     return 'Create the administrator account'
   }, [step])
 
@@ -460,7 +530,7 @@ const SetupWizard = ({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Progress indicator */}
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((item, index) => {
             const active = step === item.key
             const variant = item.done
@@ -491,56 +561,81 @@ const SetupWizard = ({
         {/* Step 1: Device Registration */}
         {step === 'register' && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <FormField
-                label="Registration Code"
-                error={
-                  registrationCode && !registrationCodeValid
-                    ? 'Registration code must be at least 6 characters'
-                    : undefined
-                }
-              >
-                <Input
-                  id="registrationCode"
-                  name="registrationCode"
-                  value={registrationCode}
-                  onChange={(e) =>
-                    setRegistrationCode(e.target.value.toUpperCase())
+            {deviceRegistered ? (
+              <>
+                <Alert variant={STATUS_VARIANT.SUCCESS}>
+                  This proxy is already registered. Continue with the current
+                  registration or reset it to enter a new registration code.
+                </Alert>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    onClick={handleResetRegistration}
+                    disabled={isSubmitting}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    {isSubmitting ? 'Resetting…' : 'Reset Registration'}
+                  </Button>
+                  <Button
+                    onClick={syncSiteProfile}
+                    disabled={siteSyncing}
+                    variant="primary"
+                    className="w-full"
+                  >
+                    {siteSyncing ? 'Syncing…' : 'Continue'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <FormField
+                  label="Country"
+                  helpText="The selected country is stored on vpos-ftc-app and vpos-proxy."
+                >
+                  <Select
+                    id="registrationCountry"
+                    value={country}
+                    onChange={(event) => setCountry(event.target.value)}
+                    disabled={loadingCountries}
+                  >
+                    {countryOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Registration Code"
+                  error={
+                    registrationCode && !registrationCodeValid
+                      ? 'Registration code must be at least 6 characters'
+                      : undefined
                   }
-                  onBlur={(e) => {
-                    const v = e.target.value.toUpperCase()
-                    if (v !== registrationCode) setRegistrationCode(v)
-                  }}
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="Enter registration code"
-                  autoFocus
-                />
-              </FormField>
-            </div>
-
-            <p className="text-xs text-[var(--text-muted)]">
-              Enter the registration code provided by your administrator to
-              register this device with the VPOS cloud service.
-            </p>
-
-            <Button
-              onClick={handleRegisterDevice}
-              disabled={!registrationCodeValid || isSubmitting}
-              variant="primary"
-              className="w-full"
-            >
-              {isSubmitting ? 'Registering...' : 'Register Device'}
-            </Button>
-
-            <Button
-              onClick={syncSiteProfile}
-              disabled={siteSyncing}
-              variant="secondary"
-              className="w-full"
-            >
-              {siteSyncing ? 'Syncing…' : 'Sync site details'}
-            </Button>
+                >
+                  <Input
+                    id="registrationCode"
+                    name="registrationCode"
+                    value={registrationCode}
+                    onChange={(e) =>
+                      setRegistrationCode(e.target.value.toUpperCase())
+                    }
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Enter registration code"
+                    autoFocus
+                  />
+                </FormField>
+                <Button
+                  onClick={handleRegisterDevice}
+                  disabled={!registrationCodeValid || !country || isSubmitting}
+                  variant="primary"
+                  className="w-full"
+                >
+                  {isSubmitting ? 'Registering...' : 'Register Device'}
+                </Button>
+              </>
+            )}
           </div>
         )}
 
@@ -607,7 +702,34 @@ const SetupWizard = ({
           </div>
         )}
 
-        {/* Step 3: Admin User */}
+        {/* Tanzania proxy registration */}
+        {step === 'tanzania' && (
+          <div className="space-y-4">
+            <TanzaniaProxyRegistrationClient
+              endpoint="/api/setup/tanzania-fiscal"
+              compact
+              onComplete={() => setStep('admin')}
+            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                onClick={() => setStep('country')}
+                variant="ghost"
+                className="w-full"
+              >
+                Back
+              </Button>
+              <Button
+                onClick={() => setStep('admin')}
+                variant="secondary"
+                className="w-full"
+              >
+                Continue to Admin
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Admin User */}
         {step === 'admin' && (
           <div className="space-y-4">
             {registrationDone && (
@@ -710,7 +832,15 @@ const SetupWizard = ({
             </Button>
 
             <Button
-              onClick={() => setStep(needsCountry ? 'country' : 'register')}
+              onClick={() =>
+                setStep(
+                  needsCountry
+                    ? 'country'
+                    : isTanzania
+                      ? 'tanzania'
+                      : 'country',
+                )
+              }
               disabled={isSubmitting}
               variant="ghost"
               className="w-full"

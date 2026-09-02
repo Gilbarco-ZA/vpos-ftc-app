@@ -3,7 +3,6 @@ import os from 'os'
 import { query } from '@/src/platform/db/postgres'
 import { getRuntimeUptimeSeconds } from '@/src/platform/runtime/nodeProcess'
 import { getSystemConfiguration } from '@/src/shared/config/loader'
-import { getFiscalInboxMetrics } from '@/src/shared/runtime/fiscalInbox'
 import {
   getAllProcessHeartbeats,
   upsertProcessHeartbeat,
@@ -11,6 +10,7 @@ import {
 import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 
+import { getFiscalInboxMetrics } from '@/src/modules/fiscal-inbox/application/fiscalInbox'
 import { getFiscalRecoveryMeta } from '@/src/modules/runtime/infrastructure/fiscalRecoveryPolicy'
 import {
   getRuntimeState,
@@ -60,6 +60,21 @@ export class SupervisorRuntime {
         deps.getSystemConfiguration ?? getSystemConfiguration,
       getRuntimeState: deps.getRuntimeState ?? getRuntimeState,
       setRuntimeState: deps.setRuntimeState ?? setRuntimeState,
+      upsertProcessHeartbeat:
+        deps.upsertProcessHeartbeat ?? upsertProcessHeartbeat,
+      getAllProcessHeartbeats:
+        deps.getAllProcessHeartbeats ?? getAllProcessHeartbeats,
+      getFiscalRecoveryMeta:
+        deps.getFiscalRecoveryMeta ?? getFiscalRecoveryMeta,
+      getFiscalInboxMetrics:
+        deps.getFiscalInboxMetrics ?? getFiscalInboxMetrics,
+      sleep:
+        deps.sleep ??
+        (async (milliseconds: number) => {
+          await new Promise((resolveSleep) =>
+            setTimeout(resolveSleep, milliseconds),
+          )
+        }),
       withLock: deps.withLock,
     }
   }
@@ -119,7 +134,7 @@ export class SupervisorRuntime {
     const now = Date.now()
 
     safeAsync(
-      upsertProcessHeartbeat({
+      this.deps.upsertProcessHeartbeat({
         stationId: this.stationId,
         processName: 'api',
         pid: process.pid,
@@ -157,7 +172,7 @@ export class SupervisorRuntime {
     // Pull heartbeats (real status) if schema is present.
     let heartbeats: Record<string, any> = {}
     try {
-      const hb = await getAllProcessHeartbeats(this.stationId)
+      const hb = await this.deps.getAllProcessHeartbeats(this.stationId)
       for (const r of hb ?? []) {
         heartbeats[String((r as any).processName)] = r
       }
@@ -220,11 +235,11 @@ export class SupervisorRuntime {
     const meta =
       (await this.deps.kvGet<any>(this.stationId, SUPERVISOR_META_KEY)) ?? {}
     const fiscalRecovery = await safeAsync(
-      getFiscalRecoveryMeta(this.stationId),
+      this.deps.getFiscalRecoveryMeta(this.stationId),
       'supervisor.fiscalRecoveryMeta',
     )
     const fiscalInbox = await safeAsync(
-      getFiscalInboxMetrics(this.stationId),
+      this.deps.getFiscalInboxMetrics(this.stationId),
       'supervisor.fiscalInboxMetrics',
     )
 
@@ -282,7 +297,7 @@ export class SupervisorRuntime {
 
   private async getProcessPid(name: string): Promise<number | undefined> {
     try {
-      const hb = await getAllProcessHeartbeats(this.stationId)
+      const hb = await this.deps.getAllProcessHeartbeats(this.stationId)
       const row = (hb ?? []).find(
         (r: any) => String(r.processName ?? r.process_name) === name,
       )
@@ -370,7 +385,7 @@ export class SupervisorRuntime {
     }
 
     // Give external supervisor a chance to restart the process.
-    await new Promise((r) => setTimeout(r, restartDelay))
+    await this.deps.sleep(restartDelay)
 
     await this.updateProcessOverride(canonical, {
       status: 'running',

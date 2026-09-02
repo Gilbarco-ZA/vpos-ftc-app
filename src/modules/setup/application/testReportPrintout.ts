@@ -1,8 +1,9 @@
-import { testReportPrintout } from '@/src/shared/setup/printouts'
 import {
   ensurePlainObject,
   requireNonEmptyString,
 } from '@/src/shared/utils/inputs'
+
+import { testReportPrintout } from '@/src/modules/setup/application/printouts'
 
 export async function runTestReportPrintout(
   stationId: string,

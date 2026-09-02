@@ -4,7 +4,7 @@ export const transactionQueueSql = {
         FROM transaction_queue tq
         JOIN station_settings ss ON ss.station_id = tq.station_id
        WHERE tq.status = 'PENDING'
-         AND ss.fiscalization_transport = 'local_tz'
+         AND FALSE /* direct TRA/EWURA fiscalization retired; proxy owns delivery */
          AND COALESCE(tq.payload->>'kind', '') <> 'CREDIT_NOTE'
          AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
        ORDER BY tq.created_at ASC
@@ -24,7 +24,7 @@ export const transactionQueueSql = {
       JOIN station_settings ss ON ss.station_id = tq.station_id
       WHERE tq.station_id = $1
         AND tq.status = 'PENDING'
-        AND ss.fiscalization_transport = 'local_tz'
+        AND FALSE /* direct TRA/EWURA fiscalization retired; proxy owns delivery */
         AND COALESCE(tq.payload->>'kind', '') <> 'CREDIT_NOTE'
         AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
       ORDER BY tq.created_at ASC
@@ -43,7 +43,7 @@ export const transactionQueueSql = {
         FROM transaction_queue tq
         JOIN station_settings ss ON ss.station_id = tq.station_id
        WHERE tq.status = 'PENDING'
-         AND ss.fiscalization_transport = 'local_tz'
+         AND FALSE /* direct TRA/EWURA fiscalization retired; proxy owns delivery */
          AND tq.payload->>'kind' = 'CREDIT_NOTE'
          AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
        ORDER BY tq.created_at ASC
@@ -63,7 +63,7 @@ export const transactionQueueSql = {
       JOIN station_settings ss ON ss.station_id = tq.station_id
       WHERE tq.station_id = $1
         AND tq.status = 'PENDING'
-        AND ss.fiscalization_transport = 'local_tz'
+        AND FALSE /* direct TRA/EWURA fiscalization retired; proxy owns delivery */
         AND tq.payload->>'kind' = 'CREDIT_NOTE'
         AND (tq.next_attempt_at IS NULL OR tq.next_attempt_at <= NOW())
       ORDER BY tq.created_at ASC

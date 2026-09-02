@@ -1,6 +1,7 @@
 export const PSS_XML_KEYS = {
   RAW_XML: 'pss.xml.raw',
   PARSED_JSON: 'pss.xml.parsed',
+  IMPORT_SUMMARY: 'pss.xml.importSummary',
   ID_MAP: 'pss.xml.idMap',
   LAST_IMPORT_AT: 'pss.xml.lastImportAt',
   LAST_IMPORT_CHECKSUM: 'pss.xml.lastImportChecksum',

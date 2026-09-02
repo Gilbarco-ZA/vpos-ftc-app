@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useEffect, useMemo, useState } from 'react'
+import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 
 import { PageHeader } from '@/components/layout/page-header'
@@ -43,16 +43,18 @@ export default function FiscalInboxByRequestIdPage(props: {
   const [data, setData] = useState<{ items: Row[]; count: number } | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
-  const fetchIt = async () => {
+  const fetchIt = useCallback(async () => {
     setErr(null)
     const query = qs({ requestId, stationId: stationId || undefined })
     const d = await apiGet(`/api/runtime/fiscal/inbox/by-request?${query}`)
     setData(d)
-  }
+  }, [requestId, stationId])
 
   useEffect(() => {
-    fetchIt().catch((e) => setErr(e.message)) /* eslint-disable-next-line */
-  }, [])
+    queueMicrotask(() => {
+      fetchIt().catch((e) => setErr(e.message))
+    })
+  }, [fetchIt])
 
   const items = data?.items ?? []
 

@@ -1,4 +1,4 @@
-import { setVposRestartConfig } from '@/src/shared/vpos/supervisor'
+import { setVposRestartConfig } from '@/src/modules/supervisor/application/vposSupervisor'
 
 export async function updateVposRestartConfig(args: {
   stationId: string

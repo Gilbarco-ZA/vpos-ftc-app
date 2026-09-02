@@ -8,6 +8,7 @@ export type ReconciliationPumpRow = {
   status: string
   pump_number: number
   doms_fp_id: number | null
+  doms_physical_address: number | null
   doms_device_sub_address: number | null
   doms_pss_port_no: number | null
   doms_endpoint_host: string | null
@@ -49,6 +50,8 @@ export type ReconciliationTankRow = {
   live_volume_litres: string | null
   live_volume_updated_at: string | null
   last_tg_payload: any
+  last_tg_payload_hash?: string | null
+  last_tg_payload_cleared_at?: string | null
 }
 
 export type ReconciliationEventRow = {
@@ -79,6 +82,7 @@ export async function listConfiguredPumpsForReconciliation(stationId: string) {
             p.status,
             p.pump_number,
             p.doms_fp_id,
+            p.doms_physical_address,
             p.doms_device_sub_address,
             p.doms_pss_port_no,
             p.doms_endpoint_host,
@@ -86,8 +90,9 @@ export async function listConfiguredPumpsForReconciliation(stationId: string) {
             p.doms_last_seen_at::text AS doms_last_seen_at,
             COUNT(n.id)::int AS nozzle_count
        FROM pumps p
-       LEFT JOIN nozzles n ON n.pump_id = p.id AND n.station_id = p.station_id
+       LEFT JOIN nozzles n ON n.pump_id = p.id AND n.station_id = p.station_id AND n.is_active = TRUE
       WHERE p.station_id = $1
+        AND p.status <> 'INACTIVE'
       GROUP BY p.id
       ORDER BY COALESCE(p.doms_fp_id, p.pump_number), p.pump_number`,
     [stationId],
@@ -120,6 +125,8 @@ export async function listConfiguredNozzlesForReconciliation(
        LEFT JOIN tanks t ON t.id = n.tank_id AND t.station_id = n.station_id
        LEFT JOIN products pr ON pr.id = t.product_id AND pr.station_id = n.station_id
       WHERE n.station_id = $1
+        AND n.is_active = TRUE
+        AND p.status <> 'INACTIVE'
       ORDER BY COALESCE(p.doms_fp_id, p.pump_number), n.nozzle_number`,
     [stationId],
   )
@@ -138,7 +145,9 @@ export async function listConfiguredTanksForReconciliation(stationId: string) {
             t.capacity_litres::text AS capacity_litres,
             t.live_volume_litres::text AS live_volume_litres,
             t.live_volume_updated_at::text AS live_volume_updated_at,
-            t.last_tg_payload
+            COALESCE(t.last_tg_diagnostics, t.last_tg_payload) AS last_tg_payload,
+            t.last_tg_payload_hash,
+            t.last_tg_payload_cleared_at::text AS last_tg_payload_cleared_at
        FROM tanks t
        LEFT JOIN products pr ON pr.id = t.product_id AND pr.station_id = t.station_id
       WHERE t.station_id = $1

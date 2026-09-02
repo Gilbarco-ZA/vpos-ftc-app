@@ -1,4 +1,4 @@
-import type { PosCommandResult } from '@/src/shared/vpos/commands'
+import type { PosCommandResult } from '@/src/modules/pos/contracts/commands'
 
 import { sendPosCommand } from '@/src/platform/integrations/posGateway'
 import { getEffectivePosBackend } from '@/src/shared/integrations/posBackend'

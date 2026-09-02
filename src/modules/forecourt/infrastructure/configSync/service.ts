@@ -762,10 +762,12 @@ async function applySnapshot(
 
       await txQuery(
         client,
-        `INSERT INTO nozzles (id, station_id, pump_id, tank_id, nozzle_number)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (pump_id, nozzle_number) DO UPDATE SET
+        `INSERT INTO nozzles (
+           id, station_id, pump_id, tank_id, nozzle_number, is_active
+         ) VALUES ($1, $2, $3, $4, $5, TRUE)
+         ON CONFLICT (pump_id, nozzle_number) WHERE is_active = TRUE DO UPDATE SET
            tank_id = EXCLUDED.tank_id,
+           is_active = TRUE,
            updated_at = NOW()`,
         [uuidv4(), stationId, pumpId, tankId, nozzle.nozzleNumber],
       )
@@ -781,7 +783,8 @@ async function applySnapshot(
         client,
         `SELECT id, pump_id, nozzle_number
            FROM nozzles
-          WHERE station_id = $1`,
+          WHERE station_id = $1
+            AND is_active = TRUE`,
         [stationId],
       )
 
@@ -794,7 +797,11 @@ async function applySnapshot(
       if (nozzlesToDelete.length) {
         await txQuery(
           client,
-          `DELETE FROM nozzles WHERE station_id = $1 AND id = ANY($2::uuid[])`,
+          `UPDATE nozzles
+              SET is_active = FALSE,
+                  updated_at = NOW()
+            WHERE station_id = $1
+              AND id = ANY($2::uuid[])`,
           [stationId, nozzlesToDelete],
         )
       }
@@ -803,7 +810,10 @@ async function applySnapshot(
     if (snapshot.pumps.length > 0) {
       const existingPumps = await txQuery<{ id: string; pump_number: number }>(
         client,
-        `SELECT id, pump_number FROM pumps WHERE station_id = $1`,
+        `SELECT id, pump_number
+           FROM pumps
+          WHERE station_id = $1
+            AND status <> 'INACTIVE'`,
         [stationId],
       )
 
@@ -815,12 +825,21 @@ async function applySnapshot(
       if (pumpsToDelete.length) {
         await txQuery(
           client,
-          `DELETE FROM nozzles WHERE station_id = $1 AND pump_id = ANY($2::uuid[])`,
+          `UPDATE nozzles
+              SET is_active = FALSE,
+                  updated_at = NOW()
+            WHERE station_id = $1
+              AND pump_id = ANY($2::uuid[])
+              AND is_active = TRUE`,
           [stationId, pumpsToDelete],
         )
         await txQuery(
           client,
-          `DELETE FROM pumps WHERE station_id = $1 AND id = ANY($2::uuid[])`,
+          `UPDATE pumps
+              SET status = 'INACTIVE',
+                  updated_at = NOW()
+            WHERE station_id = $1
+              AND id = ANY($2::uuid[])`,
           [stationId, pumpsToDelete],
         )
       }
@@ -849,12 +868,21 @@ async function applySnapshot(
       if (tanksToDelete.length) {
         await txQuery(
           client,
-          `DELETE FROM nozzles WHERE station_id = $1 AND tank_id = ANY($2::uuid[])`,
+          `UPDATE nozzles
+              SET is_active = FALSE,
+                  updated_at = NOW()
+            WHERE station_id = $1
+              AND tank_id = ANY($2::uuid[])
+              AND is_active = TRUE`,
           [stationId, tanksToDelete],
         )
         await txQuery(
           client,
-          `DELETE FROM tanks WHERE station_id = $1 AND id = ANY($2::uuid[])`,
+          `UPDATE tanks
+              SET status = 'INACTIVE',
+                  updated_at = NOW()
+            WHERE station_id = $1
+              AND id = ANY($2::uuid[])`,
           [stationId, tanksToDelete],
         )
       }

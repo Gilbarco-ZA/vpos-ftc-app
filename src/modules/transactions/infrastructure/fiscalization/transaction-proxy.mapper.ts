@@ -3,7 +3,7 @@ import type {
   InvoiceLineProductDto,
   InvoiceLineTaxDto,
   ProxyInvoiceRequest,
-} from './proxy.types'
+} from '@/src/shared/fiscalization/proxy/contracts'
 
 function iso(dt: any) {
   try {
@@ -72,107 +72,6 @@ type MappableTransactionLine = {
   tankId?: string | null
   pumpId?: string | null
   nozzleId?: string | null
-}
-
-function buildLegacyFallbackLine(args: {
-  txn: any
-  enrichment: NonNullable<
-    Parameters<typeof mapTransactionToProxyInvoice>[0]['enrichment']
-  >
-}): MappableTransactionLine {
-  const { txn, enrichment } = args
-  const volumeQty = Math.max(0, num(txn.volume, 0))
-  const unitQty = Math.max(
-    0,
-    num(
-      txn.quantity ??
-        txn.qty ??
-        txn.unit_quantity ??
-        txn.unitQuantity ??
-        txn.volume ??
-        0,
-    ),
-  )
-  const fallbackQty = volumeQty > 0 ? volumeQty : unitQty > 0 ? unitQty : 1
-  const gross = roundMoney(num(txn.total_amount ?? txn.totalAmount, 0))
-  const inferredUnitPrice = fallbackQty > 0 ? gross / fallbackQty : gross
-
-  return {
-    productId: strOrNull(
-      enrichment.productId ?? txn.product_id ?? txn.productId,
-    ),
-    productCode: strOrNull(
-      enrichment.productCode ?? txn.product_code ?? txn.productCode,
-    ),
-    productClassCode: strOrNull(
-      enrichment.productClassCode ??
-        txn.product_class_code ??
-        txn.productClassCode,
-    ),
-    productTypeCode: strOrNull(
-      enrichment.productTypeCode ??
-        txn.product_type_code ??
-        txn.productTypeCode,
-    ),
-    description: strOrNull(
-      enrichment.description ?? txn.fuel_type ?? txn.fuelType ?? 'Fuel',
-    ),
-    productName: strOrNull(txn.product_name ?? txn.productName),
-    unitOfMeasure: strOrNull(
-      enrichment.unitOfMeasure ?? txn.unit_of_measure ?? txn.unitOfMeasure,
-    ),
-    unitOfPackaging: strOrNull(
-      enrichment.unitOfPackaging ??
-        txn.unit_of_packaging ??
-        txn.unitOfPackaging,
-    ),
-    quantity: fallbackQty,
-    unitPrice:
-      typeof enrichment.unitPrice === 'number' &&
-      Number.isFinite(enrichment.unitPrice)
-        ? enrichment.unitPrice
-        : inferredUnitPrice,
-    lineTotal: gross,
-    currency: strOrNull(
-      enrichment.currency ?? txn.currency ?? txn.currencyCode,
-    ),
-    taxRate: enrichment.taxRate ?? txn.tax_rate ?? txn.taxRate,
-    taxCode: strOrNull(enrichment.taxCode ?? txn.tax_code ?? txn.taxCode),
-    commodityCode: strOrNull(
-      enrichment.commodityCode ?? txn.commodity_code ?? txn.commodityCode,
-    ),
-    hazardousIndicator:
-      enrichment.hazardousIndicator != null
-        ? enrichment.hazardousIndicator
-        : typeof txn.hazardous_indicator === 'boolean'
-          ? txn.hazardous_indicator
-          : typeof txn.hazardousIndicator === 'boolean'
-            ? txn.hazardousIndicator
-            : null,
-    gradeId: strOrNull(
-      enrichment.gradeId ??
-        txn.grade_id ??
-        txn.gradeId ??
-        enrichment.productCode ??
-        txn.product_code ??
-        txn.productCode,
-    ),
-    gradeName: strOrNull(
-      enrichment.gradeName ??
-        txn.grade_name ??
-        txn.gradeName ??
-        enrichment.description ??
-        txn.fuel_type ??
-        txn.fuelType,
-    ),
-    tankId: strOrNull(enrichment.tankId ?? txn.tank_id ?? txn.tankId),
-    pumpId: strOrNull(
-      enrichment.pumpId ?? txn.pump_id ?? txn.pumpId ?? txn.pump_number,
-    ),
-    nozzleId: strOrNull(
-      enrichment.nozzleId ?? txn.nozzle_id ?? txn.nozzleId ?? txn.nozzle_number,
-    ),
-  }
 }
 
 function isFuelLikeLine(
@@ -272,12 +171,8 @@ export function mapTransactionToProxyInvoice(args: {
 }): ProxyInvoiceRequest {
   const txn = args.transaction ?? {}
   const customer = args.customer ?? null
-  const station = args.station ?? null
   const enrichment = args.enrichment ?? {}
 
-  const country = station?.country
-    ? String(station.country).toUpperCase()
-    : null
   const currency =
     enrichment.currency != null
       ? String(enrichment.currency)
@@ -311,21 +206,12 @@ export function mapTransactionToProxyInvoice(args: {
     const gross = roundMoney(num(txn.total_amount ?? txn.totalAmount, 0))
     const priceExtensionValue = roundMoney(gross, 0)
 
-    const costPrice = priceExtensionValue / unitQty
-    const pumpLiters = volumeQty
-
     const taxTypeCode = String(enrichment.taxCode || args.taxType || 'B')
     const codeFallback = defaultRateForTaxCode(taxTypeCode, vatRate)
     const lineTaxRate = roundMoney(
       normalizeRate(enrichment.taxRate ?? args.taxRate, codeFallback),
     )
     const taxRatePercent = roundMoney(lineTaxRate * 100)
-
-    const taxRate = lineTaxRate > 0 ? 1 + lineTaxRate : lineTaxRate
-
-    const unitPrice = roundMoney(costPrice / taxRate)
-
-    const unitPriceTotal = roundMoney(unitPrice * pumpLiters)
 
     const net = roundMoney(
       lineTaxRate > 0 ? gross / (1 + lineTaxRate) : gross,
@@ -629,6 +515,7 @@ export function mapTransactionToProxyInvoice(args: {
         txn.createdAt,
     ),
     currency: strOrNull(currency),
+    countryCode: strOrNull(args.station?.country)?.toUpperCase() ?? null,
     createdByName: strOrNull(
       args.createdByName ?? txn.created_by_name ?? txn.createdByName,
     ),
@@ -717,7 +604,7 @@ export function mapTransactionToProxyCreditNote(
     reasonCode?: string | null
     notes?: string | null
   },
-): import('./proxy.types').ProxyCreditNotesRequest {
+): import('@/src/shared/fiscalization/proxy/contracts').ProxyCreditNotesRequest {
   // Reuse the invoice mapper because it already applies ext_* product overrides.
   const invoice = mapTransactionToProxyInvoice(args)
 

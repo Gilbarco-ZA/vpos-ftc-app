@@ -1,10 +1,22 @@
 import { query, txQuery, withTransaction } from '@/src/platform/db/postgres'
+import { AppError } from '@/src/shared/errors/AppError'
 import { shortenUUID } from '@/src/shared/utils/shortenUUID'
 import { uuidv4 } from '@/src/shared/utils/uuid'
+
+import { reconcileTransactionStockRepo } from '@/src/modules/stock/infrastructure/stock.repository'
+import { isFuelLikeProduct } from '@/src/modules/transactions/domain/product-classification'
+import { findPumpTransactionLineViolation } from '@/src/modules/transactions/domain/pump-transaction-line-policy'
+import {
+  getTransactionItemEditability,
+  isPumpRecordedFuelTransaction,
+  isTransactionItemStatusEditable,
+} from '@/src/modules/transactions/domain/transaction-editability'
 
 import type {
   FuelSelectionInput,
   ManualTransactionInput,
+  TransactionMutationActor,
+  TransactionVehicleDetailsInput,
   UpsertTransactionLineInput,
 } from './transaction.types'
 import { enqueueTransactionQueueRepo } from './transaction-queue.repository'
@@ -62,6 +74,8 @@ type FuelSummaryState = {
 
 type TransactionForUpdateRow = {
   id: string
+  status?: string | null
+  deleted_at?: string | null
   pump_number?: number | null
   total_amount?: number | string | null
   tank_id?: string | null
@@ -88,9 +102,6 @@ type SyntheticFuelLine = {
   gradeName: string | null
 }
 
-const FUEL_PRODUCT_PATTERN =
-  /(fuel|petrol|diesel|gasoline|gasolina|kerosene|super|unleaded|octane|lpg|cng|ago|pms)/i
-
 const cleanText = (value: unknown) => {
   const text = String(value ?? '').trim()
   return text.length > 0 ? text : null
@@ -105,29 +116,6 @@ const parseNullableNumber = (value: unknown) => {
   if (value == null || value === '') return null
   const num = Number(value)
   return Number.isFinite(num) ? num : null
-}
-
-const isFuelLikeProduct = (product: ValidatedProductRow | null | undefined) => {
-  if (!product) return false
-
-  const categoryTokens = [product.category, product.category_name]
-    .filter(Boolean)
-    .map((value) => String(value).trim().toUpperCase())
-
-  if (categoryTokens.includes('FUEL')) {
-    return true
-  }
-
-  const haystack = [
-    product.product_name,
-    product.product_code,
-    product.category,
-    product.category_name,
-  ]
-    .filter(Boolean)
-    .join(' ')
-
-  return FUEL_PRODUCT_PATTERN.test(haystack)
 }
 
 const loadValidatedProducts = async (
@@ -212,9 +200,11 @@ const resolveSyntheticFuelLine = async (
        LEFT JOIN nozzles n
          ON n.tank_id = t.id
         AND n.station_id = t.station_id
+        AND n.is_active = TRUE
        LEFT JOIN pumps p
          ON p.id = n.pump_id
         AND p.station_id = n.station_id
+        AND p.status <> 'INACTIVE'
       WHERE pr.station_id = $1
         AND (
           ($2::text IS NOT NULL AND t.id::text = $2::text)
@@ -256,6 +246,7 @@ const resolveSyntheticFuelLine = async (
          LEFT JOIN nozzles n
            ON n.tank_id = t.id
           AND n.station_id = t.station_id
+          AND n.is_active = TRUE
         WHERE pr.station_id = $1
           AND (
             ($2::text IS NOT NULL AND (
@@ -366,9 +357,17 @@ export async function ensureTransactionFuelLineRepo(
     const existingRows = await txQuery<any>(
       client,
       getExistingTransactionLinesForUpdateSql,
-      [transactionId],
+      [transactionId, stationId],
     )
-    if (existingRows.rows.length > 0) {
+    const pumpRecorded = isPumpRecordedFuelTransaction(current)
+    const hasExistingFuelLine = existingRows.rows.some((row: any) =>
+      isFuelLikeProduct(row),
+    )
+
+    if (
+      existingRows.rows.length > 0 &&
+      (!pumpRecorded || hasExistingFuelLine)
+    ) {
       return { inserted: false, reason: 'existing-lines' }
     }
 
@@ -457,6 +456,58 @@ const resolveFuelSummaryState = (args: {
   } satisfies FuelSummaryState
 }
 
+const resolvePumpRecordedFuelSummaryState = (args: {
+  current: TransactionForUpdateRow
+  normalizedLines: NormalizedTransactionLine[]
+  syntheticFuelLine?: SyntheticFuelLine | null
+}) => {
+  const fuelLines = args.normalizedLines.filter((line) =>
+    isFuelLikeProduct(line.product),
+  )
+  const firstFuelLine = fuelLines[0] ?? null
+  const calculatedVolume = fuelLines.reduce(
+    (sum, line) => sum + Number(line.quantity || 0),
+    0,
+  )
+  const volume =
+    parseNullableNumber(args.current.volume) ??
+    (Number.isFinite(calculatedVolume) && calculatedVolume > 0
+      ? calculatedVolume
+      : null)
+  const gradeId =
+    cleanText(args.current.grade_id) ??
+    args.syntheticFuelLine?.gradeId ??
+    cleanText(firstFuelLine?.product.product_code) ??
+    cleanText(firstFuelLine?.product.id)
+  const gradeName =
+    cleanText(args.current.grade_name) ??
+    cleanText(args.current.fuel_type) ??
+    args.syntheticFuelLine?.gradeName ??
+    cleanText(firstFuelLine?.product.product_name) ??
+    cleanText(firstFuelLine?.product.product_code) ??
+    'Fuel'
+
+  return {
+    hasFuel: fuelLines.length > 0,
+    tankId:
+      cleanUuidLike(args.current.tank_id) ??
+      args.syntheticFuelLine?.tankId ??
+      null,
+    nozzleId:
+      cleanUuidLike(args.current.nozzle_id) ??
+      args.syntheticFuelLine?.nozzleId ??
+      null,
+    nozzleNumber:
+      parseNullableNumber(args.current.nozzle_number) ??
+      args.syntheticFuelLine?.nozzleNumber ??
+      null,
+    gradeId,
+    gradeName,
+    fuelType: cleanText(args.current.fuel_type) ?? gradeName,
+    volume,
+  } satisfies FuelSummaryState
+}
+
 const updateTransactionSummary = async (
   client: any,
   stationId: string,
@@ -488,6 +539,7 @@ export async function replaceTransactionLinesRepo(
   stationId: string,
   transactionId: string,
   lines: UpsertTransactionLineInput[],
+  actor: TransactionMutationActor,
   removedProductIds: string[] = [],
   fuelSelection?: FuelSelectionInput | null,
 ) {
@@ -500,11 +552,43 @@ export async function replaceTransactionLinesRepo(
     const current = transaction.rows[0]
     if (!current) throw new Error('Transaction not found')
 
+    const status = String(current.status || '')
+      .trim()
+      .toUpperCase()
+    if (!isTransactionItemStatusEditable(status)) {
+      throw new AppError(
+        'CONFLICT',
+        'Only non-fiscalized pending transactions can be edited.',
+        409,
+        { transactionId, status },
+      )
+    }
+
+    const editability = getTransactionItemEditability(current)
+    if (!editability.editable) {
+      throw new AppError(
+        'CONFLICT',
+        editability.reason ?? 'Transaction items cannot be edited.',
+        409,
+        {
+          code: editability.code,
+          transactionId,
+        },
+      )
+    }
+
+    const pumpRecorded = isPumpRecordedFuelTransaction(current)
     const normalizedLines = Array.isArray(lines) ? lines : []
     const removedProductIdSet = new Set(
       removedProductIds
         .map((value) => String(value || '').trim())
         .filter(Boolean),
+    )
+
+    let existingRows = await txQuery<any>(
+      client,
+      getExistingTransactionLinesForUpdateSql,
+      [transactionId, stationId],
     )
     const syntheticFuelLine = await resolveSyntheticFuelLine(
       client,
@@ -512,12 +596,51 @@ export async function replaceTransactionLinesRepo(
       current,
     )
 
+    if (
+      pumpRecorded &&
+      !existingRows.rows.some((row: any) => isFuelLikeProduct(row)) &&
+      syntheticFuelLine
+    ) {
+      await seedMissingFuelLine(
+        client,
+        stationId,
+        transactionId,
+        current,
+        syntheticFuelLine,
+      )
+      existingRows = await txQuery<any>(
+        client,
+        getExistingTransactionLinesForUpdateSql,
+        [transactionId, stationId],
+      )
+    }
+
+    const lockedFuelRows = pumpRecorded
+      ? existingRows.rows.filter((row: any) => isFuelLikeProduct(row))
+      : []
+    const lockedFuelByProductId = new Map(
+      lockedFuelRows.map((row: any) => [String(row.product_id), row] as const),
+    )
+
+    if (pumpRecorded && lockedFuelByProductId.size === 0) {
+      throw new AppError(
+        'CONFLICT',
+        'The pump-recorded fuel item could not be resolved. Configure the matching fuel product before adding other products.',
+        409,
+        {
+          code: 'PUMP_RECORDED_FUEL_ITEM_UNRESOLVED',
+          transactionId,
+        },
+      )
+    }
+
     const uniqueProductIds = Array.from(
       new Set(
         [
           ...normalizedLines.map((line) =>
             String(line?.productId || '').trim(),
           ),
+          ...lockedFuelRows.map((row: any) => String(row.product_id || '')),
           syntheticFuelLine?.productId ?? '',
         ].filter(Boolean),
       ),
@@ -563,10 +686,55 @@ export async function replaceTransactionLinesRepo(
       },
     )
 
+    if (pumpRecorded) {
+      const violation = findPumpTransactionLineViolation({
+        existingFuelLines: lockedFuelRows.map((row: any) => ({
+          productId: String(row.product_id || ''),
+          quantity: Number(row.quantity),
+          unitPrice: Number(row.unit_price),
+          isFuel: true,
+        })),
+        requestedLines: normalized.map((line) => ({
+          productId: line.productId,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          isFuel: isFuelLikeProduct(line.product),
+        })),
+        removedProductIds: Array.from(removedProductIdSet),
+      })
+
+      if (violation?.code === 'PUMP_RECORDED_FUEL_ADDITION_BLOCKED') {
+        throw new AppError(
+          'CONFLICT',
+          'Additional fuel products cannot be added to a pump-recorded transaction.',
+          409,
+          {
+            code: violation.code,
+            transactionId,
+            productId: violation.productId,
+          },
+        )
+      }
+
+      if (violation?.code === 'PUMP_RECORDED_FUEL_ITEM_IMMUTABLE') {
+        throw new AppError(
+          'CONFLICT',
+          'The pump-recorded fuel item cannot be changed or removed.',
+          409,
+          {
+            code: violation.code,
+            transactionId,
+            productId: violation.productId,
+          },
+        )
+      }
+    }
+
     const hasRequestedFuelLine = normalized.some((line) =>
       isFuelLikeProduct(line.product),
     )
     if (
+      !pumpRecorded &&
       syntheticFuelLine &&
       !hasRequestedFuelLine &&
       !removedProductIdSet.has(syntheticFuelLine.productId)
@@ -588,23 +756,25 @@ export async function replaceTransactionLinesRepo(
       throw new Error('At least one transaction line is required')
     }
 
-    const fuelState = resolveFuelSummaryState({
-      normalizedLines: normalized,
-      fuelSelection,
-      fallbackFuelSelection: {
-        tankId: current.tank_id ?? syntheticFuelLine?.tankId,
-        nozzleId: current.nozzle_id ?? syntheticFuelLine?.nozzleId,
-        nozzleNumber: current.nozzle_number ?? syntheticFuelLine?.nozzleNumber,
-        gradeId: current.grade_id ?? syntheticFuelLine?.gradeId,
-        gradeName: current.grade_name ?? syntheticFuelLine?.gradeName,
-      },
-    })
+    const fuelState = pumpRecorded
+      ? resolvePumpRecordedFuelSummaryState({
+          current,
+          normalizedLines: normalized,
+          syntheticFuelLine,
+        })
+      : resolveFuelSummaryState({
+          normalizedLines: normalized,
+          fuelSelection,
+          fallbackFuelSelection: {
+            tankId: current.tank_id ?? syntheticFuelLine?.tankId,
+            nozzleId: current.nozzle_id ?? syntheticFuelLine?.nozzleId,
+            nozzleNumber:
+              current.nozzle_number ?? syntheticFuelLine?.nozzleNumber,
+            gradeId: current.grade_id ?? syntheticFuelLine?.gradeId,
+            gradeName: current.grade_name ?? syntheticFuelLine?.gradeName,
+          },
+        })
 
-    const existingRows = await txQuery<any>(
-      client,
-      getExistingTransactionLinesForUpdateSql,
-      [transactionId],
-    )
     const existingByProductId = new Map<string, any>()
     for (const row of existingRows.rows) {
       const productId = String(row.product_id || '')
@@ -615,7 +785,9 @@ export async function replaceTransactionLinesRepo(
 
     for (const productId of removedProductIds) {
       const scopedProductId = String(productId || '').trim()
-      if (!scopedProductId) continue
+      if (!scopedProductId || lockedFuelByProductId.has(scopedProductId)) {
+        continue
+      }
       await txQuery(client, deleteTransactionLinesByProductSql, [
         transactionId,
         scopedProductId,
@@ -628,14 +800,16 @@ export async function replaceTransactionLinesRepo(
       const existing = existingByProductId.get(line.productId)
       if (existing?.id) {
         retainedLineIds.add(String(existing.id))
-        await txQuery(client, updateTransactionLineSql, [
-          existing.id,
-          transactionId,
-          line.quantity,
-          line.unitPrice,
-          line.taxCode,
-          line.taxRate,
-        ])
+        if (!lockedFuelByProductId.has(line.productId)) {
+          await txQuery(client, updateTransactionLineSql, [
+            existing.id,
+            transactionId,
+            line.quantity,
+            line.unitPrice,
+            line.taxCode,
+            line.taxRate,
+          ])
+        }
       } else {
         await txQuery(client, insertTransactionLineSql, [
           uuidv4(),
@@ -649,11 +823,14 @@ export async function replaceTransactionLinesRepo(
       }
     }
 
+    const lockedLineIds = new Set(
+      lockedFuelRows.map((row: any) => String(row.id || '')).filter(Boolean),
+    )
     const existingLineIds = existingRows.rows
       .map((row: any) => String(row.id || '').trim())
       .filter(Boolean)
     const removableLineIds = existingLineIds.filter(
-      (lineId) => !retainedLineIds.has(lineId),
+      (lineId) => !retainedLineIds.has(lineId) && !lockedLineIds.has(lineId),
     )
     for (const lineId of removableLineIds) {
       await txQuery(client, deleteDuplicateTransactionLinesSql, [
@@ -679,11 +856,24 @@ export async function replaceTransactionLinesRepo(
       fuelState,
     )
 
+    const stockMovementIds = await reconcileTransactionStockRepo(client, {
+      stationId,
+      transactionId,
+      lines: normalized.map((line) => ({
+        productRecordId: line.productId,
+        quantity: line.quantity,
+      })),
+      action: 'EDIT',
+      effectiveAt: new Date().toISOString(),
+      actor,
+    })
+
     return {
       success: true,
       transactionId,
       totalAmount,
       lineCount: remainingCount,
+      stockMovementIds,
       fuelSelection: fuelState.hasFuel
         ? {
             tankId: fuelState.tankId,
@@ -700,6 +890,7 @@ export async function replaceTransactionLinesRepo(
 export async function createManualTransactionRepo(
   stationId: string,
   input: ManualTransactionInput,
+  actor: TransactionMutationActor,
 ) {
   return await withTransaction(async (client) => {
     const normalizedLines = Array.isArray(input.lines) ? input.lines : []
@@ -799,10 +990,29 @@ export async function createManualTransactionRepo(
       ])
     }
 
+    const effectiveAt = (() => {
+      const parsed = new Date(transactionDateTime)
+      return Number.isNaN(parsed.getTime())
+        ? new Date().toISOString()
+        : parsed.toISOString()
+    })()
+    const stockMovementIds = await reconcileTransactionStockRepo(client, {
+      stationId,
+      transactionId,
+      lines: normalized.map((line) => ({
+        productRecordId: line.productId,
+        quantity: line.quantity,
+      })),
+      action: 'CAPTURE',
+      effectiveAt,
+      actor,
+    })
+
     return {
       transactionId,
       totalAmount,
       lineCount: normalized.length,
+      stockMovementIds,
       fuelSelection: fuelState.hasFuel
         ? {
             tankId: fuelState.tankId,
@@ -830,6 +1040,7 @@ export async function fiscalizeQueuedTransactionRepo(
   stationId: string,
   transactionId: string,
   customer?: any,
+  vehicleDetails?: TransactionVehicleDetailsInput | null,
 ) {
   if (customer?.id) {
     await allocateTransactionRepo(
@@ -837,13 +1048,18 @@ export async function fiscalizeQueuedTransactionRepo(
       transactionId,
       String(customer.id),
       null,
+      vehicleDetails ?? null,
     )
   }
-  return await enqueueTransactionQueueRepo(
-    stationId,
-    transactionId,
-    customer ? { customer } : {},
-  )
+
+  const payload: Record<string, unknown> = customer ? { customer } : {}
+  if (vehicleDetails) {
+    payload.odometer = cleanText(vehicleDetails.odometer)
+    payload.payment_type = cleanText(vehicleDetails.paymentType)
+    payload.vehicle_reg_nr = cleanText(vehicleDetails.vehicleRegNr)
+  }
+
+  return await enqueueTransactionQueueRepo(stationId, transactionId, payload)
 }
 
 export async function fiscalizeTransactionLegacyRepo(
@@ -858,6 +1074,11 @@ export async function fiscalizeTransactionLegacyRepo(
     stationId,
     transactionId,
     payload?.customer ?? null,
+    {
+      odometer: payload?.odometer,
+      paymentType: payload?.paymentType ?? payload?.payment_type,
+      vehicleRegNr: payload?.vehicleRegNr ?? payload?.vehicle_reg_nr,
+    },
   )
 }
 

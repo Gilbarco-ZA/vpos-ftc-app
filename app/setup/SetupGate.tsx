@@ -45,7 +45,11 @@ export default function SetupGate() {
         const payload = (await response.json()) as BootstrapStatusPayload
         if (!response.ok) throw new Error('Unable to load setup status')
 
-        if (payload.isRegistered && Number(payload.userCount || 0) > 0) {
+        if (
+          payload.isRegistered &&
+          Number(payload.userCount || 0) > 0 &&
+          !Boolean(payload.canManageSetup)
+        ) {
           router.replace('/login')
           return
         }
@@ -79,6 +83,8 @@ export default function SetupGate() {
       initialError={state.payload.proxyError}
       isRegistered={state.payload.isRegistered}
       proxyUrl={state.payload.proxyUrl}
+      proxyCountryCode={String(state.payload.proxyCountryCode || '')}
+      stationCountry={String(state.payload.stationCountry || '')}
     />
   )
 }

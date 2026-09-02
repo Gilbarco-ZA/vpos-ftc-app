@@ -27,6 +27,12 @@ export type TransactionCheckpointRow = {
   last_success_at: string | null
   read_payload_json: any | null
   clear_payload_json: any | null
+  normalized_transaction_id: string | null
+  reconciled_at: string | null
+  payload_cleared_at: string | null
+  payload_clear_reason: string | null
+  terminal_at: string | null
+  terminal_outcome: string | null
   last_error: string | null
   updated_at: string
 }
@@ -47,6 +53,12 @@ const selectColumns = `
   last_success_at,
   read_payload_json,
   clear_payload_json,
+  normalized_transaction_id,
+  reconciled_at,
+  payload_cleared_at,
+  payload_clear_reason,
+  terminal_at,
+  terminal_outcome,
   last_error,
   updated_at
 `
@@ -68,6 +80,8 @@ const sql = {
       last_success_at,
       read_payload_json,
       clear_payload_json,
+      terminal_at,
+      terminal_outcome,
       last_error,
       updated_at
     )
@@ -77,7 +91,10 @@ const sql = {
       $6, $7, $8,
       COALESCE($9, 0), COALESCE($10, 0),
       $11::timestamptz, $12::timestamptz,
-      $13::jsonb, $14::jsonb, $15,
+      $13::jsonb, $14::jsonb,
+      CASE WHEN $5 = 'cleared' THEN COALESCE($12::timestamptz, NOW()) ELSE NULL END,
+      CASE WHEN $5 = 'cleared' THEN 'cleared' ELSE NULL END,
+      $15,
       NOW()
     )
     ON CONFLICT (station_id, source_mode, fp_id, trans_seq_no)
@@ -92,6 +109,25 @@ const sql = {
       last_success_at = COALESCE(EXCLUDED.last_success_at, forecourt_jpl_transaction_checkpoints.last_success_at),
       read_payload_json = COALESCE(EXCLUDED.read_payload_json, forecourt_jpl_transaction_checkpoints.read_payload_json),
       clear_payload_json = COALESCE(EXCLUDED.clear_payload_json, forecourt_jpl_transaction_checkpoints.clear_payload_json),
+      terminal_at = CASE
+        WHEN EXCLUDED.lifecycle_stage = 'cleared'
+          THEN COALESCE(forecourt_jpl_transaction_checkpoints.terminal_at, EXCLUDED.last_success_at, NOW())
+        WHEN EXCLUDED.lifecycle_stage IN ('discovered', 'read_locked', 'captured', 'clear_requested', 'failed') THEN NULL
+        ELSE forecourt_jpl_transaction_checkpoints.terminal_at
+      END,
+      terminal_outcome = CASE
+        WHEN EXCLUDED.lifecycle_stage = 'cleared' THEN 'cleared'
+        WHEN EXCLUDED.lifecycle_stage IN ('discovered', 'read_locked', 'captured', 'clear_requested', 'failed') THEN NULL
+        ELSE forecourt_jpl_transaction_checkpoints.terminal_outcome
+      END,
+      payload_cleared_at = CASE
+        WHEN EXCLUDED.read_payload_json IS NOT NULL OR EXCLUDED.clear_payload_json IS NOT NULL THEN NULL
+        ELSE forecourt_jpl_transaction_checkpoints.payload_cleared_at
+      END,
+      payload_clear_reason = CASE
+        WHEN EXCLUDED.read_payload_json IS NOT NULL OR EXCLUDED.clear_payload_json IS NOT NULL THEN NULL
+        ELSE forecourt_jpl_transaction_checkpoints.payload_clear_reason
+      END,
       last_error = EXCLUDED.last_error,
       updated_at = NOW()
   `,

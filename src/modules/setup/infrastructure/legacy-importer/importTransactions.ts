@@ -9,7 +9,6 @@ import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import {
   existsByLegacyFilename,
-  fileHasContent,
   folderHasJsonFiles,
   markSkippedAndMove,
   pathExists,
@@ -23,6 +22,7 @@ import {
   sha256File,
 } from '@/src/modules/setup/infrastructure/legacy-importer/ledger'
 import { moveAside } from '@/src/modules/setup/infrastructure/legacy-importer/moveAside'
+import { persistLegacyImportedTransaction } from '@/src/modules/setup/infrastructure/legacy-importer/persistLegacyTransaction'
 import {
   LEGACY,
   VPOS_CONSOLE_MONOLITH,
@@ -205,30 +205,19 @@ async function importMonolithicTransactionsFile(opts: {
       const fiscalRef = tx.receiptVerificationNo || null
 
       try {
-        await query(
-          `
-        INSERT INTO transactions (
-          id, station_id, customer_id, pump_number, transaction_date_time, total_amount, volume,
-          fuel_type, pos_reference, status, fiscalization_reference, fiscalization_response,
-          legacy_filename, created_at, updated_at
-        )
-        VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
-        `,
-          [
-            uuidv4(),
-            stationId,
-            pumpNumber,
-            transactionDateTime,
-            totalAmount,
-            volume,
-            fuelType,
-            posReference,
-            statusOverride,
-            fiscalRef,
-            vfd,
-            legacyFilename,
-          ],
-        )
+        await persistLegacyImportedTransaction({
+          stationId,
+          pumpNumber,
+          transactionDateTime,
+          totalAmount,
+          volume,
+          fuelType,
+          posReference,
+          status: statusOverride,
+          fiscalizationReference: fiscalRef,
+          responsePayload: vfd,
+          legacyFilename,
+        })
         inserted++
       } catch (e: any) {
         onWarn(
@@ -528,30 +517,19 @@ export async function importTxnFolder(opts: {
 
     const fiscalRef = tx.receiptVerificationNo || null
     try {
-      await query(
-        `
-      INSERT INTO transactions (
-        id, station_id, customer_id, pump_number, transaction_date_time, total_amount, volume,
-        fuel_type, pos_reference, status, fiscalization_reference, fiscalization_response,
-        legacy_filename, created_at, updated_at
-      )
-      VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
-      `,
-        [
-          uuidv4(),
-          stationId,
-          pumpNumber,
-          transactionDateTime,
-          totalAmount,
-          volume,
-          fuelType,
-          posReference,
-          statusOverride,
-          fiscalRef,
-          vfd,
-          filename,
-        ],
-      )
+      await persistLegacyImportedTransaction({
+        stationId,
+        pumpNumber,
+        transactionDateTime,
+        totalAmount,
+        volume,
+        fuelType,
+        posReference,
+        status: statusOverride,
+        fiscalizationReference: fiscalRef,
+        responsePayload: vfd,
+        legacyFilename: filename,
+      })
     } catch (e: any) {
       const moved = await moveAside({
         moveRoot: ctx.moveAsideRoot,

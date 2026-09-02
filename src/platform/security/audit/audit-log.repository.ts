@@ -158,26 +158,6 @@ export const auditCustomerCreated = async (
   })
 }
 
-export const auditCustomerImported = async (
-  stationId: string,
-  userId: string,
-  customerId: string,
-  cloudCustomerId: string,
-  customerData: Record<string, unknown>,
-  ipAddress?: string,
-): Promise<void> => {
-  await createAuditLog({
-    stationId,
-    userId,
-    action: 'CUSTOMER_IMPORTED',
-    entityType: 'customer',
-    entityId: customerId,
-    newValues: customerData,
-    metadata: { cloudCustomerId },
-    ipAddress,
-  })
-}
-
 export const auditTransactionAllocated = async (
   stationId: string,
   userId: string,

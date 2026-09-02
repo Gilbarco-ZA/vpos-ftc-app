@@ -1,5 +1,3 @@
-import { redirect } from 'next/navigation'
-
 import { requireAuth } from '@/src/shared/auth'
 
 import { FiscalizedTransactionsRolePage } from '@/components/transactions/FiscalizedTransactionsRolePage'

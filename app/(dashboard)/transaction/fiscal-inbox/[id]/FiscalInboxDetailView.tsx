@@ -47,6 +47,9 @@ export function FiscalInboxDetailView({
             {formatDate(row.processed_at)}
           </DetailItem>
           <DetailItem label="Dead At">{formatDate(row.dead_at)}</DetailItem>
+          <DetailItem label="Resolved At">
+            {formatDate(row.resolved_at)}
+          </DetailItem>
           <DetailItem label="Error">
             <span className="text-red-700">{row.error_text ?? ''}</span>
           </DetailItem>

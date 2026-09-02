@@ -2,9 +2,9 @@ import type { PumpSettingsPayload } from '@/src/modules/settings/application/pum
 
 import { toBool, toInt } from '@/src/platform/web/api/request'
 import { badRequest } from '@/src/platform/web/api/response'
-import { ensureTankGroup } from '@/src/shared/doms/tankGauge'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import { ensureTankGroup } from '@/src/modules/forecourt/application/tankGauge'
 import {
   createPumpRepo,
   findPumpByCodeRepo,

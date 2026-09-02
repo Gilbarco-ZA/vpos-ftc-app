@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
+import { CollapsibleStatusSection } from '@/components/admin/forecourt/CollapsibleStatusSection'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 
 const statusVariant = (status: unknown) => {
   const normalized = String(status ?? '').toLowerCase()
@@ -44,7 +44,7 @@ export function JplOperationalReadinessPanel() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -62,11 +62,13 @@ export function JplOperationalReadinessPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void load()
-  }, [])
+    queueMicrotask(() => {
+      void load()
+    })
+  }, [load])
 
   const sections = payload?.sections ?? []
   const actionItems = payload?.actionItems ?? []
@@ -74,23 +76,17 @@ export function JplOperationalReadinessPanel() {
   const operatorDecision = payload?.operatorDecision ?? {}
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
+    <CollapsibleStatusSection
+      title="DOMS operational readiness"
+      status={payload?.overallStatus ?? 'unknown'}
+      statusVariant={statusVariant(payload?.overallStatus)}
+    >
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-base font-semibold">
-                DOMS operational readiness
-              </div>
-              <Badge variant={statusVariant(payload?.overallStatus)}>
-                {payload?.overallStatus ?? 'unknown'}
-              </Badge>
-            </div>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Operator-facing health rollup from the typed runtime snapshot,
-              release-gate evidence, and DOMS/PSS status flags.
-            </p>
-          </div>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Operator-facing health rollup from the typed runtime snapshot,
+            release-gate evidence, and DOMS/PSS status flags.
+          </p>
           <Button type="button" onClick={load} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh readiness'}
           </Button>
@@ -293,7 +289,7 @@ export function JplOperationalReadinessPanel() {
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleStatusSection>
   )
 }

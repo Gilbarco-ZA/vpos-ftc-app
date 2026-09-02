@@ -276,7 +276,6 @@ export async function importEwuraFolder(opts: {
     legacyPermDir,
     srcFolder,
     table,
-    queueFileName,
     onInserted,
     onSkipped,
     onMoved,

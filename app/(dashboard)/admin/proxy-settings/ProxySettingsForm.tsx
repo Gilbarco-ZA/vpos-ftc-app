@@ -2,11 +2,11 @@
 
 import type { ToastVariant } from '@/components/ui/toast'
 import type {
+  ProxyQueueModules,
   ProxySettingsConfig,
   ProxySettingsResponse,
 } from '@/src/modules/proxy-settings/application/proxySettings'
 import { useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { Button } from '@/components/ui/button'
@@ -17,22 +17,47 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { FormField } from '@/components/ui/form-field'
 import { Input } from '@/components/ui/input'
 import { ToastItem, ToastViewport } from '@/components/ui/toast'
 
+const DEFAULT_QUEUE_MODULES = [
+  'invoice',
+  'credit-note',
+  'debit-note',
+  'deposit',
+  'product',
+  'stock-in',
+  'stock-out',
+  'inventory',
+  'validate-tin',
+] as const
+
 type ProxySettingsFormProps = {
   initialSettings: ProxySettingsConfig
   runtimeLastUpdated: number | null
+  endpointUrl: string | null
 }
 
 type ToastState = { message: string; variant: ToastVariant } | null
-type FormValues = Record<keyof ProxySettingsConfig, string>
+type BusyAction = 'loading' | 'saving' | null
+
+type ScalarField = Exclude<
+  keyof ProxySettingsConfig,
+  'countryCode' | 'queueModules'
+>
+
+type FormValues = Record<ScalarField, string> & {
+  countryCode: string
+  queueModules: ProxyQueueModules
+}
 
 const toFormValues = (settings: ProxySettingsConfig): FormValues => ({
   cloudApiBase: String(settings.cloudApiBase ?? ''),
   swaggerEndpointCloud: String(settings.swaggerEndpointCloud ?? ''),
   swaggerEndpointInternal: String(settings.swaggerEndpointInternal ?? ''),
+  swaggerEndpointTanzania: String(settings.swaggerEndpointTanzania ?? ''),
   healthEndpoint: String(settings.healthEndpoint ?? ''),
   swaggerCacheTimeout: String(settings.swaggerCacheTimeout ?? ''),
   requestTimeout: String(settings.requestTimeout ?? ''),
@@ -41,25 +66,37 @@ const toFormValues = (settings: ProxySettingsConfig): FormValues => ({
   fiscalNif: String(settings.fiscalNif ?? ''),
   fiscalEmissionLogic: String(settings.fiscalEmissionLogic ?? ''),
   fiscalRepositoryId: String(settings.fiscalRepositoryId ?? ''),
+  countryCode: String(settings.countryCode ?? '').toUpperCase(),
+  queueModules: { ...(settings.queueModules ?? {}) },
 })
 
-const extractErrorMessage = (json: any, fallback: string) => {
-  if (typeof json?.error === 'string') return json.error
-  if (typeof json?.error?.message === 'string') return json.error.message
-  if (typeof json?.message === 'string') return json.message
+const extractErrorMessage = (json: unknown, fallback: string) => {
+  if (!json || typeof json !== 'object') return fallback
+  const payload = json as any
+  if (typeof payload.error === 'string') return payload.error
+  if (typeof payload.error?.message === 'string') return payload.error.message
+  if (typeof payload.message === 'string') return payload.message
   return fallback
 }
 
+const toNumber = (value: string) => Number(value.trim())
+
 export const ProxySettingsForm = ({
   initialSettings,
-  runtimeLastUpdated,
+  runtimeLastUpdated: initialRuntimeLastUpdated,
+  endpointUrl: initialEndpointUrl,
 }: ProxySettingsFormProps) => {
-  const router = useRouter()
   const [csrfToken, setCsrfToken] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<BusyAction>(null)
   const [toast, setToast] = useState<ToastState>(null)
   const [values, setValues] = useState<FormValues>(() =>
     toFormValues(initialSettings),
+  )
+  const [runtimeLastUpdated, setRuntimeLastUpdated] = useState<number | null>(
+    initialRuntimeLastUpdated,
+  )
+  const [endpointUrl, setEndpointUrl] = useState<string | null>(
+    initialEndpointUrl,
   )
   const clearTimer = useRef<number | null>(null)
 
@@ -68,6 +105,17 @@ export const ProxySettingsForm = ({
     return `Runtime config refreshed ${new Date(runtimeLastUpdated).toLocaleString()}.`
   }, [runtimeLastUpdated])
 
+  const queueModuleKeys = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...DEFAULT_QUEUE_MODULES,
+          ...Object.keys(values.queueModules),
+        ]),
+      ),
+    [values.queueModules],
+  )
+
   const showToast = (message: string, variant: ToastVariant) => {
     setToast({ message, variant })
     if (clearTimer.current) window.clearTimeout(clearTimer.current)
@@ -75,8 +123,7 @@ export const ProxySettingsForm = ({
   }
 
   const setField =
-    (field: keyof ProxySettingsConfig) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
+    (field: ScalarField) => (event: React.ChangeEvent<HTMLInputElement>) => {
       setValues((current) => ({
         ...current,
         [field]: event.target.value,
@@ -84,8 +131,49 @@ export const ProxySettingsForm = ({
     }
 
   const applyResponse = (data: ProxySettingsResponse) => {
-    if (data?.settings) {
-      setValues(toFormValues(data.settings))
+    if (data.settings) setValues(toFormValues(data.settings))
+    setRuntimeLastUpdated(data.runtimeLastUpdated ?? null)
+    if (data.endpointUrl) setEndpointUrl(data.endpointUrl)
+  }
+
+  const requestSettings = async (
+    method: 'GET' | 'PATCH',
+    body?: Record<string, unknown>,
+  ) => {
+    const response = await fetch('/api/admin/proxy-settings', {
+      method,
+      cache: 'no-store',
+      headers:
+        method === 'PATCH'
+          ? {
+              'Content-Type': 'application/json',
+              'x-csrf-token': csrfToken,
+            }
+          : { Accept: 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    const json = await response.json().catch(() => ({}))
+    if (!response.ok || json?.ok === false) {
+      throw new Error(
+        extractErrorMessage(
+          json,
+          `Failed to ${method === 'GET' ? 'load' : 'save'} proxy settings`,
+        ),
+      )
+    }
+    return json.data as ProxySettingsResponse
+  }
+
+  const reloadSettings = async () => {
+    if (busy) return
+    setBusy('loading')
+    try {
+      applyResponse(await requestSettings('GET'))
+      showToast('Settings reloaded from vpos-proxy', 'success')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), 'error')
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -93,36 +181,36 @@ export const ProxySettingsForm = ({
     event.preventDefault()
     if (!csrfToken || busy) return
 
-    setBusy(true)
+    setBusy('saving')
     try {
-      const res = await fetch('/api/admin/proxy-settings', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': csrfToken,
-        },
-        body: JSON.stringify({
-          ...values,
-          csrfToken,
-        }),
+      const data = await requestSettings('PATCH', {
+        cloudApiBase: values.cloudApiBase.trim(),
+        swaggerEndpointCloud: values.swaggerEndpointCloud.trim(),
+        swaggerEndpointInternal: values.swaggerEndpointInternal.trim(),
+        swaggerEndpointTanzania: values.swaggerEndpointTanzania.trim(),
+        healthEndpoint: values.healthEndpoint.trim(),
+        swaggerCacheTimeout: toNumber(values.swaggerCacheTimeout),
+        requestTimeout: toNumber(values.requestTimeout),
+        rateLimitWindowMs: toNumber(values.rateLimitWindowMs),
+        rateLimitMaxRequests: toNumber(values.rateLimitMaxRequests),
+        fiscalNif: values.fiscalNif.trim(),
+        fiscalEmissionLogic: toNumber(values.fiscalEmissionLogic),
+        fiscalRepositoryId: values.fiscalRepositoryId.trim(),
+        countryCode: values.countryCode.trim().toUpperCase() || null,
+        queueModules: values.queueModules,
+        csrfToken,
       })
 
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(
-          extractErrorMessage(json, 'Failed to save proxy settings'),
-        )
-      }
-
-      applyResponse(json.data)
-      showToast('Proxy settings saved', 'success')
-      router.refresh()
-    } catch (err: any) {
-      showToast(err?.message ?? String(err), 'error')
+      applyResponse(data)
+      showToast('Settings updated in vpos-proxy', 'success')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), 'error')
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
+
+  const disabled = busy !== null
 
   return (
     <>
@@ -137,8 +225,29 @@ export const ProxySettingsForm = ({
       <form onSubmit={onSubmit} className="space-y-4">
         <Card>
           <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <CardTitle>VPOS proxy connection</CardTitle>
+                <CardDescription>{runtimeLabel}</CardDescription>
+                <p className="break-all text-xs text-[var(--text-muted)]">
+                  {endpointUrl ?? 'Proxy endpoint unavailable'}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={reloadSettings}
+                disabled={disabled}
+              >
+                {busy === 'loading' ? 'Reloading…' : 'Reload from vpos-proxy'}
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>VPOS Cloud API Configuration</CardTitle>
-            <CardDescription>{runtimeLabel}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 lg:grid-cols-2">
             <FormField
@@ -149,8 +258,7 @@ export const ProxySettingsForm = ({
               <Input
                 value={values.cloudApiBase}
                 onChange={setField('cloudApiBase')}
-                placeholder="http://ec2-13-246-19-190.af-south-1.compute.amazonaws.com"
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
@@ -162,8 +270,7 @@ export const ProxySettingsForm = ({
               <Input
                 value={values.swaggerEndpointCloud}
                 onChange={setField('swaggerEndpointCloud')}
-                placeholder="/swagger/ppx/swagger.json"
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
@@ -175,8 +282,19 @@ export const ProxySettingsForm = ({
               <Input
                 value={values.swaggerEndpointInternal}
                 onChange={setField('swaggerEndpointInternal')}
-                placeholder="/swagger/internal/swagger.json"
-                disabled={busy}
+                disabled={disabled}
+                required
+              />
+            </FormField>
+            <FormField
+              label="Tanzania swagger endpoint"
+              helpText="Default: /swagger/tanzania/swagger.json. Fetched from the configured Cloud API base URL."
+              required
+            >
+              <Input
+                value={values.swaggerEndpointTanzania}
+                onChange={setField('swaggerEndpointTanzania')}
+                disabled={disabled}
                 required
               />
             </FormField>
@@ -188,8 +306,7 @@ export const ProxySettingsForm = ({
               <Input
                 value={values.healthEndpoint}
                 onChange={setField('healthEndpoint')}
-                placeholder="/api/ping"
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
@@ -198,9 +315,9 @@ export const ProxySettingsForm = ({
 
         <Card>
           <CardHeader>
-            <CardTitle>Timeouts</CardTitle>
+            <CardTitle>Timeouts and rate limiting</CardTitle>
             <CardDescription>
-              Values are stored in milliseconds in the vpos-proxy database.
+              Values are persisted by vpos-proxy in milliseconds.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 lg:grid-cols-2">
@@ -215,7 +332,7 @@ export const ProxySettingsForm = ({
                 step={1}
                 value={values.swaggerCacheTimeout}
                 onChange={setField('swaggerCacheTimeout')}
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
@@ -230,24 +347,13 @@ export const ProxySettingsForm = ({
                 step={1}
                 value={values.requestTimeout}
                 onChange={setField('requestTimeout')}
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Rate Limiting</CardTitle>
-            <CardDescription>
-              Configure the proxy request window and maximum request count.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-2">
             <FormField
               label="Rate limit window"
-              helpText="Default: 900000 ms (15 minutes). Set 0 only when the proxy should disable the window."
+              helpText="Default: 900000 ms (15 minutes). Use 0 to disable."
               required
             >
               <Input
@@ -256,13 +362,13 @@ export const ProxySettingsForm = ({
                 step={1}
                 value={values.rateLimitWindowMs}
                 onChange={setField('rateLimitWindowMs')}
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
             <FormField
               label="Max requests"
-              helpText="Default: 1000 requests per window."
+              helpText="Default: 1000 requests per window. Use 0 to disable."
               required
             >
               <Input
@@ -271,7 +377,7 @@ export const ProxySettingsForm = ({
                 step={1}
                 value={values.rateLimitMaxRequests}
                 onChange={setField('rateLimitMaxRequests')}
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
@@ -280,15 +386,32 @@ export const ProxySettingsForm = ({
 
         <Card>
           <CardHeader>
-            <CardTitle>IUD Configuration</CardTitle>
+            <CardTitle>Fiscal configuration</CardTitle>
             <CardDescription>
-              Configure fiscal identifier generation values used by vpos-proxy.
+              Country and IUD values applied by vpos-proxy.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-3">
+          <CardContent className="grid gap-4 lg:grid-cols-4">
+            <FormField
+              label="Country code"
+              helpText="Proxy country code, for example KE or TZ."
+            >
+              <Input
+                value={values.countryCode}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    countryCode: event.target.value.toUpperCase(),
+                  }))
+                }
+                maxLength={3}
+                placeholder="KE"
+                disabled={disabled}
+              />
+            </FormField>
             <FormField
               label="Fiscal NIF"
-              helpText="One to nine digits. Default: 282948309."
+              helpText="One to nine digits."
               required
             >
               <Input
@@ -297,13 +420,13 @@ export const ProxySettingsForm = ({
                 inputMode="numeric"
                 pattern="[0-9]{1,9}"
                 maxLength={9}
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
             <FormField
               label="Fiscal emission logic"
-              helpText="Integer from 0 to 99999. Default: 24."
+              helpText="Integer from 0 to 99999."
               required
             >
               <Input
@@ -313,31 +436,73 @@ export const ProxySettingsForm = ({
                 step={1}
                 value={values.fiscalEmissionLogic}
                 onChange={setField('fiscalEmissionLogic')}
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
             <FormField
               label="Fiscal repository ID"
-              helpText="Exactly one digit. Default: 1."
+              helpText="Proxy fiscal repository identifier."
               required
             >
               <Input
                 value={values.fiscalRepositoryId}
                 onChange={setField('fiscalRepositoryId')}
                 inputMode="numeric"
-                pattern="[0-9]"
-                maxLength={1}
-                disabled={busy}
+                disabled={disabled}
                 required
               />
             </FormField>
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
-          <Button type="submit" variant="primary" disabled={busy || !csrfToken}>
-            {busy ? 'Saving...' : 'Save proxy settings'}
+        <Card>
+          <CardHeader>
+            <CardTitle>Queue modules</CardTitle>
+            <CardDescription>
+              Enable or disable each vpos-proxy document queue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {queueModuleKeys.map((moduleName) => (
+              <label
+                key={moduleName}
+                className="flex items-center gap-3 rounded-md border border-[var(--border-default)] p-3 text-sm"
+              >
+                <Checkbox
+                  checked={values.queueModules[moduleName] === true}
+                  onChange={(event) =>
+                    setValues((current) => ({
+                      ...current,
+                      queueModules: {
+                        ...current.queueModules,
+                        [moduleName]: event.target.checked,
+                      },
+                    }))
+                  }
+                  disabled={disabled}
+                />
+                <span>{moduleName}</span>
+              </label>
+            ))}
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={reloadSettings}
+            disabled={disabled}
+          >
+            Reload
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={disabled || !csrfToken}
+          >
+            {busy === 'saving' ? 'Saving…' : 'Save to vpos-proxy'}
           </Button>
         </div>
       </form>

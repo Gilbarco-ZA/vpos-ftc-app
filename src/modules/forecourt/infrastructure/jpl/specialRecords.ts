@@ -49,7 +49,9 @@ export const normalizeDomsServiceMessageRecord = (args: {
   message: unknown
   payload?: Record<string, unknown> | null
 }): DomsServiceMessageRecord => {
-  const seqNo = args.seqNo != null ? String(args.seqNo).trim() : undefined
+  const normalizedSeqNo =
+    args.seqNo != null ? String(args.seqNo).trim() : undefined
+  const seqNo = normalizedSeqNo || undefined
   const message =
     args.message != null ? String(args.message).trimEnd() : undefined
   const payloadJson = args.payload ?? null

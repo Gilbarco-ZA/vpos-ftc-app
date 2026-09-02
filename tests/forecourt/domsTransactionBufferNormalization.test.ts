@@ -28,6 +28,9 @@ describe('DOMS transaction buffer normalization', () => {
         transLockId: 2,
         transInfoMask: 223,
         fcGradeId: null,
+        fpGradeOptionNo: null,
+        finishDate: null,
+        finishTime: null,
         moneyDue: 1234,
         volume: 567,
         sourceMode: 'supervised',
@@ -97,4 +100,28 @@ describe('DOMS transaction buffer normalization', () => {
 
     assert.deepEqual(result.transactions, [])
   })
+
+  it('normalizes supervised transaction parameters nested under TransPars', () => {
+    const result = normalizeForecourtEvent('FpSupTrans_resp_00H', {
+      FpId: '01',
+      TransSeqNo: '0001',
+      TransPars: {
+        FcGradeId: '04',
+        FpGradeOptionNo: '01',
+        Price_e: '020690',
+        Vol_e: '0000002600',
+        Money_e: '0000537940',
+        FinishDate: '20260811',
+        FinishTime: '100459',
+      },
+    })
+
+    assert.equal(result.transactions?.[0]?.fcGradeId, 4)
+    assert.equal(result.transactions?.[0]?.fpGradeOptionNo, 1)
+    assert.equal(result.transactions?.[0]?.finishDate, '20260811')
+    assert.equal(result.transactions?.[0]?.finishTime, '100459')
+    assert.equal(result.transactions?.[0]?.volume, 2600)
+    assert.equal(result.transactions?.[0]?.moneyDue, 537940)
+  })
+
 })

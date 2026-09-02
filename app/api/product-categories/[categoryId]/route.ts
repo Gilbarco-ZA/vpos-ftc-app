@@ -10,11 +10,11 @@ import { parseInput, readBody } from '@/src/platform/web/api/validation'
 import { requireAuth } from '@/src/shared/auth'
 import { requireCsrfFromParts } from '@/src/shared/security/csrf'
 
+import { isProductCategoryImageFile } from '@/src/modules/products/application/categoryAssets'
 import { deleteProductCategory } from '@/src/modules/products/application/commands/delete-product-category'
 import { updateProductCategory } from '@/src/modules/products/application/commands/update-product-category'
+import { updateProductCategorySchema } from '@/src/modules/products/application/productSchemas'
 import { getProductCategoryById } from '@/src/modules/products/application/queries/get-product-category-by-id'
-import { isProductCategoryImageFile } from '@/src/modules/products/infrastructure/storage/product-category-image.storage'
-import { updateProductCategorySchema } from '@/src/modules/products/infrastructure/validators/product.schemas'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

@@ -15,6 +15,29 @@ const PUMP_LAST_SEEN_BUCKET_MS = 15_000
 const ADAPTER_PERSIST_DEBOUNCE_MS = 750
 const PUMP_PERSIST_DEBOUNCE_MS = 1_000
 
+export type SharedForecourtAdapterState = Pick<
+  JplTcpAdapterState,
+  | 'connected'
+  | 'loggedOn'
+  | 'secureMode'
+  | 'reconnectAttempts'
+  | 'lastMessageAt'
+  | 'lastConnectAt'
+  | 'lastRequestAt'
+  | 'lastHeartbeatSentAt'
+  | 'lastHeartbeatAt'
+  | 'heartbeatIntervalMs'
+  | 'deadConnectionTimeoutMs'
+  | 'welcomeVersion'
+  | 'lastCorrelationId'
+  | 'lastReject'
+  | 'lastError'
+  | 'posId'
+  | 'nextReconnectAt'
+  | 'lastDisconnectReason'
+  | 'lastLifecycleEventAt'
+>
+
 type PersistMemoEntry = {
   fingerprint: string
   persistedAt: number
@@ -50,7 +73,33 @@ function normalizeStationId(value: string) {
   return String(value ?? '').trim()
 }
 
-function fingerprintAdapterState(state: JplTcpAdapterState) {
+export function compactForecourtAdapterStateForPersistence(
+  state: JplTcpAdapterState,
+): SharedForecourtAdapterState {
+  return {
+    connected: Boolean(state.connected),
+    loggedOn: state.loggedOn,
+    secureMode: state.secureMode,
+    reconnectAttempts: Number(state.reconnectAttempts ?? 0),
+    lastMessageAt: state.lastMessageAt,
+    lastConnectAt: state.lastConnectAt,
+    lastRequestAt: state.lastRequestAt,
+    lastHeartbeatSentAt: state.lastHeartbeatSentAt,
+    lastHeartbeatAt: state.lastHeartbeatAt,
+    heartbeatIntervalMs: state.heartbeatIntervalMs,
+    deadConnectionTimeoutMs: state.deadConnectionTimeoutMs,
+    welcomeVersion: state.welcomeVersion,
+    lastCorrelationId: state.lastCorrelationId,
+    lastReject: state.lastReject,
+    lastError: state.lastError,
+    posId: state.posId,
+    nextReconnectAt: state.nextReconnectAt,
+    lastDisconnectReason: state.lastDisconnectReason,
+    lastLifecycleEventAt: state.lastLifecycleEventAt,
+  }
+}
+
+function fingerprintAdapterState(state: SharedForecourtAdapterState) {
   const lastMessageAt =
     state.lastMessageAt != null
       ? Math.floor(Number(state.lastMessageAt) / ADAPTER_LAST_MESSAGE_BUCKET_MS)
@@ -58,11 +107,13 @@ function fingerprintAdapterState(state: JplTcpAdapterState) {
 
   return JSON.stringify({
     connected: Boolean(state.connected),
+    loggedOn: state.loggedOn ?? null,
     reconnectAttempts: Number(state.reconnectAttempts ?? 0),
     lastMessageAt,
     lastConnectAt:
       state.lastConnectAt != null ? Number(state.lastConnectAt) : null,
     lastError: state.lastError ?? null,
+    lastDisconnectReason: state.lastDisconnectReason ?? null,
   })
 }
 
@@ -190,21 +241,24 @@ export async function persistAdapterState(
   const resolvedStationId = await resolveStationId(stationId)
   if (!resolvedStationId) return
 
-  await persistIfChanged<JplTcpAdapterState>({
+  const compactState = compactForecourtAdapterStateForPersistence(state)
+
+  await persistIfChanged<SharedForecourtAdapterState>({
     stationId: resolvedStationId,
     key: FORECOURT_KV_KEYS.ADAPTER_STATE,
-    value: state,
-    fingerprint: fingerprintAdapterState(state),
+    value: compactState,
+    fingerprint: fingerprintAdapterState(compactState),
     debounceMs: ADAPTER_PERSIST_DEBOUNCE_MS,
   })
 }
 
 export async function readAdapterState(stationId: string) {
   try {
-    return await kvGet<JplTcpAdapterState>(
+    const stored = await kvGet<JplTcpAdapterState>(
       normalizeStationId(stationId),
       FORECOURT_KV_KEYS.ADAPTER_STATE,
     )
+    return stored ? compactForecourtAdapterStateForPersistence(stored) : null
   } catch (error) {
     logger.warn('forecourt-shared-state', {
       msg: 'failed to read adapter state',

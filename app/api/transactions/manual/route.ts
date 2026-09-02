@@ -55,23 +55,30 @@ const parseFuelSelection = (value: FuelSelectionPayload | null | undefined) => {
 export const POST = defineMutationRoute<ManualTransactionBody>({
   roles: ['tenant', 'manager', 'administrator'],
   handler: async (_req, { user, body }) => {
-    const result = await createManualTransaction(user.stationId, {
-      pumpNumber: Number(body?.pumpNumber ?? 0),
-      posReference: String(body?.posReference || '').trim() || null,
-      transactionDateTime:
-        String(body?.transactionDateTime || '').trim() || null,
-      lines: Array.isArray(body?.lines)
-        ? body.lines.map((line) => ({
-            productId: String(line?.productId || '').trim(),
-            quantity: Number(line?.quantity ?? 0),
-            unitPrice:
-              line?.unitPrice == null || line.unitPrice === ''
-                ? null
-                : Number(line.unitPrice),
-          }))
-        : [],
-      fuelSelection: parseFuelSelection(body?.fuelSelection),
-    })
+    const result = await createManualTransaction(
+      user.stationId,
+      {
+        pumpNumber: Number(body?.pumpNumber ?? 0),
+        posReference: String(body?.posReference || '').trim() || null,
+        transactionDateTime:
+          String(body?.transactionDateTime || '').trim() || null,
+        lines: Array.isArray(body?.lines)
+          ? body.lines.map((line) => ({
+              productId: String(line?.productId || '').trim(),
+              quantity: Number(line?.quantity ?? 0),
+              unitPrice:
+                line?.unitPrice == null || line.unitPrice === ''
+                  ? null
+                  : Number(line.unitPrice),
+            }))
+          : [],
+        fuelSelection: parseFuelSelection(body?.fuelSelection),
+      },
+      {
+        userId: user.id,
+        name: user.fullName || user.name || user.username || user.email,
+      },
+    )
     return ok(result)
   },
 })

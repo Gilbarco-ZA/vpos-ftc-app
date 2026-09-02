@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
 
@@ -50,7 +50,7 @@ export default function DiagnosticsPage() {
     [selected],
   )
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true)
     setErr('')
     try {
@@ -64,69 +64,72 @@ export default function DiagnosticsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const loadLogs = async (type: 'live' | 'archive' | 'restart') => {
-    setErr('')
-    try {
-      const url =
-        type === 'archive'
-          ? '/api/admin/logs/archive'
-          : `/api/admin/logs?type=${type}`
-      const res = await api<any[]>(url, { cache: 'no-store' })
-      if (!res.success) throw new Error(res.error || 'Failed to load logs')
-      const nextLogs = Array.isArray(res.data) ? res.data : []
-      setLogs(nextLogs)
-      setSelected({})
-      const preferred = nextLogs.find((entry: any) =>
-        ['doms-jpl.log', 'application.log'].includes(
-          String(entry?.filename || ''),
-        ),
-      )
-      const firstFilename = String(
-        preferred?.filename || nextLogs?.[0]?.filename || '',
-      )
-      setSelectedLogName(firstFilename)
-      if (firstFilename) {
-        await loadLogContent(type, firstFilename)
-      } else {
+  const loadLogContent = useCallback(
+    async (type: 'live' | 'archive' | 'restart', filename: string) => {
+      if (!filename) {
+        setSelectedLogName('')
         setSelectedLogContent('')
+        return
       }
-    } catch (e: any) {
-      setErr(String(e?.message || e))
-    }
-  }
 
-  const loadLogContent = async (
-    type: 'live' | 'archive' | 'restart',
-    filename: string,
-  ) => {
-    if (!filename) {
-      setSelectedLogName('')
-      setSelectedLogContent('')
-      return
-    }
+      setErr('')
+      try {
+        const params = new URLSearchParams({
+          type,
+          filename,
+          lines: '1000',
+        })
+        const res = await api<any>(`/api/logs/content?${params.toString()}`, {
+          cache: 'no-store',
+        })
+        if (!res.success)
+          throw new Error(res.error || 'Failed to load log content')
+        setSelectedLogName(filename)
+        setSelectedLogContent(String(res.data?.content || ''))
+      } catch (e: any) {
+        setErr(String(e?.message || e))
+      }
+    },
+    [],
+  )
 
-    setErr('')
-    try {
-      const params = new URLSearchParams({
-        type,
-        filename,
-        lines: '1000',
-      })
-      const res = await api<any>(`/api/logs/content?${params.toString()}`, {
-        cache: 'no-store',
-      })
-      if (!res.success)
-        throw new Error(res.error || 'Failed to load log content')
-      setSelectedLogName(filename)
-      setSelectedLogContent(String(res.data?.content || ''))
-    } catch (e: any) {
-      setErr(String(e?.message || e))
-    }
-  }
+  const loadLogs = useCallback(
+    async (type: 'live' | 'archive' | 'restart') => {
+      setErr('')
+      try {
+        const url =
+          type === 'archive'
+            ? '/api/admin/logs/archive'
+            : `/api/admin/logs?type=${type}`
+        const res = await api<any[]>(url, { cache: 'no-store' })
+        if (!res.success) throw new Error(res.error || 'Failed to load logs')
+        const nextLogs = Array.isArray(res.data) ? res.data : []
+        setLogs(nextLogs)
+        setSelected({})
+        const preferred = nextLogs.find((entry: any) =>
+          ['doms-jpl.log', 'application.log'].includes(
+            String(entry?.filename || ''),
+          ),
+        )
+        const firstFilename = String(
+          preferred?.filename || nextLogs?.[0]?.filename || '',
+        )
+        setSelectedLogName(firstFilename)
+        if (firstFilename) {
+          await loadLogContent(type, firstFilename)
+        } else {
+          setSelectedLogContent('')
+        }
+      } catch (e: any) {
+        setErr(String(e?.message || e))
+      }
+    },
+    [loadLogContent],
+  )
 
-  const loadRestartLog = async () => {
+  const loadRestartLog = useCallback(async () => {
     setErr('')
     try {
       const res = await api<any>('/api/vpos/restart-log-content', {
@@ -145,7 +148,7 @@ export default function DiagnosticsPage() {
     } catch (e: any) {
       setErr(String(e?.message || e))
     }
-  }
+  }, [])
 
   const downloadSelectedLogs = async () => {
     if (!selectedNames.length) return
@@ -217,14 +220,22 @@ export default function DiagnosticsPage() {
   }
 
   useEffect(() => {
-    loadAll()
-    loadLogs('live')
-    loadRestartLog()
-  }, [])
+    queueMicrotask(() => {
+      loadAll()
+    })
+    queueMicrotask(() => {
+      loadLogs('live')
+    })
+    queueMicrotask(() => {
+      loadRestartLog()
+    })
+  }, [loadAll, loadLogs, loadRestartLog])
 
   useEffect(() => {
-    loadLogs(logType)
-  }, [logType])
+    queueMicrotask(() => {
+      loadLogs(logType)
+    })
+  }, [logType, loadLogs])
 
   return (
     <div className="space-y-4 p-4">

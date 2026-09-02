@@ -1,4 +1,4 @@
-import { getPendingAttendantAuthRequests } from '@/src/shared/pos/events'
+import { getPendingAttendantAuthRequests } from '@/src/modules/pos/application/legacy/events'
 
 export async function listPendingAttendantAuth(args: { stationId: string }) {
   if (!args.stationId) {

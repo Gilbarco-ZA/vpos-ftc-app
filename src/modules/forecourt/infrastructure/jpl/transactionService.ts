@@ -1,8 +1,8 @@
 import * as DomsPosJpl from '@gilbarcoafs/doms-pos-jpl'
 
-import { padId2 } from '@/src/shared/forecourt/adapters/jplTcpAdapter.helpers'
 import { getJplBufferHealth } from '@/src/shared/forecourt/jplState'
 
+import { padId2 } from '@/src/modules/forecourt/infrastructure/adapters/jplTcpAdapter.helpers'
 import { validateJplOutboundMessage } from '@/src/modules/forecourt/infrastructure/jpl/protocol/schema'
 import {
   normalizeJplDec4,
@@ -39,7 +39,15 @@ const buildUnlockFpSupTransEnvelope = (DomsPosJpl as any)
   | ((input: { fpId: string; posId: string; transSeqNo: string }) => any)
   | undefined
 
-export const DEFAULT_TRANSACTION_PAR_IDS = ['51', '64', '65', '66'] as const
+export const DEFAULT_TRANSACTION_PAR_IDS = [
+  '51', // FcGradeId
+  '56', // FpGradeOptionNo - distinguishes multiple nozzles carrying one grade
+  '64', // Price_e
+  '65', // Vol_e
+  '66', // Money_e
+  '73', // FinishDate - transaction incarnation / timestamp evidence
+  '74', // FinishTime
+] as const
 
 const toId2 = (value: unknown, fallback = '00') => {
   const selected = String(value ?? '').trim() || fallback
@@ -195,40 +203,40 @@ export const buildClearSupervisedTransactionRequest = (args: {
   payload?: any
 }) => {
   const extra = extractExtendedClearFields(args.txData ?? args.payload)
-  const paymentParameters = pick(args.payload, [
-    'PaymentParameters',
-    'paymentParameters',
-  ])
-  const useExtended = Boolean(extra.Vol_e || extra.Money_e || paymentParameters)
+  if (!extra.Vol_e || !extra.Money_e) {
+    throw new Error(
+      'clear_FpSupTrans SUBC 04 requires Vol_e and Money_e from the transaction read',
+    )
+  }
+
+  // This PSS/JTM requires PaymentParameters to be present for ETS SUBC 04H.
+  // The master FTC implementation and the vendor JPL schema both support the
+  // payment group with ReferenceNo omitted. Keep the required group present,
+  // but do not encode a zero-length ARRAY[BYTE] at the DPP conversion boundary.
+  const paymentParameters = {}
 
   const request = buildClearFpSupTransEnvelope
     ? buildClearFpSupTransEnvelope({
         fpId: toId2(args.fpId, '00'),
         posId: toId2(args.posId, '00'),
         transSeqNo: toDec4(args.transSeqNo),
-        subCode: useExtended ? '04H' : '00H',
+        subCode: '04H',
         extraData: {
-          ...(extra.Money ? { Money: extra.Money } : {}),
-          ...(extra.Vol_e ? { Vol_e: extra.Vol_e } : {}),
-          ...(extra.Money_e ? { Money_e: extra.Money_e } : {}),
-          ...(paymentParameters && typeof paymentParameters === 'object'
-            ? { PaymentParameters: paymentParameters }
-            : {}),
+          Vol_e: extra.Vol_e,
+          Money_e: extra.Money_e,
+          PaymentParameters: paymentParameters,
         },
       })
     : {
         name: 'clear_FpSupTrans_req',
-        subCode: useExtended ? '04H' : '00H',
+        subCode: '04H',
         data: {
           FpId: toId2(args.fpId, '00'),
           PosId: toId2(args.posId, '00'),
           TransSeqNo: toDec4(args.transSeqNo),
-          ...(extra.Money ? { Money: extra.Money } : {}),
-          ...(extra.Vol_e ? { Vol_e: extra.Vol_e } : {}),
-          ...(extra.Money_e ? { Money_e: extra.Money_e } : {}),
-          ...(paymentParameters && typeof paymentParameters === 'object'
-            ? { PaymentParameters: paymentParameters }
-            : {}),
+          Vol_e: extra.Vol_e,
+          Money_e: extra.Money_e,
+          PaymentParameters: paymentParameters,
         },
       }
 
@@ -376,6 +384,16 @@ export const getReplayStatusSummary = async (stationId: string) => {
       lockId: row.lock_id,
       updatedAt: row.updated_at,
       lastError: row.last_error,
+      hasReadPayload: Boolean(row.read_payload_json),
+      payloadOwner: row.payload_owner ?? 'legacy_replay',
+      payloadClearedAt: row.payload_cleared_at ?? null,
+      payloadClearReason: row.payload_clear_reason ?? null,
+      normalizedTransactionId: row.normalized_transaction_id ?? null,
+      terminalAt: row.terminal_at ?? null,
+      terminalOutcome: row.terminal_outcome ?? null,
+      transactionId: row.transaction_id ?? null,
+      transactionStatus: row.transaction_status ?? null,
+      transactionDeletedAt: row.transaction_deleted_at ?? null,
     })),
     transactionCheckpoints: checkpointRows.map((row) => ({
       sourceMode: row.source_mode,
@@ -387,6 +405,14 @@ export const getReplayStatusSummary = async (stationId: string) => {
       blockedByForeignPos: Boolean(row.blocked_by_foreign_pos),
       readAttempts: Number(row.read_attempts ?? 0),
       clearAttempts: Number(row.clear_attempts ?? 0),
+      normalizedTransactionId: row.normalized_transaction_id ?? null,
+      reconciledAt: row.reconciled_at ?? null,
+      payloadClearedAt: row.payload_cleared_at ?? null,
+      payloadClearReason: row.payload_clear_reason ?? null,
+      terminalAt: row.terminal_at ?? null,
+      terminalOutcome: row.terminal_outcome ?? null,
+      hasReadPayload: Boolean(row.read_payload_json),
+      hasClearPayload: Boolean(row.clear_payload_json),
       updatedAt: row.updated_at,
       lastError: row.last_error,
     })),

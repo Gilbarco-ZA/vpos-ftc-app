@@ -1,5 +1,24 @@
 import type { BufferMode } from '@/src/modules/forecourt/infrastructure/jpl/types'
 
+type ReplayNozzleMapping = {
+  nozzleId?: string | null
+  nozzleNumber?: number | null
+  fuelType?: string | null
+  productCode?: string | null
+  domsGradeOptionId?: number | null
+  domsGradeId?: string | null
+}
+
+type ReplayPumpMapping = {
+  nozzles?: ReplayNozzleMapping[] | null
+}
+
+const toConfiguredNozzleNumber = (value: unknown): number | null => {
+  if (value == null || String(value).trim() === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
 export const JPL_TRANSACTION_BUFFER_SUBCODES = ['03H', '01H', '00H'] as const
 
 export type JplTransactionBufferSubCode =
@@ -109,6 +128,93 @@ export const resolveTransactionReplayAction = (args: {
   if (ownership === 'foreign') return 'block_foreign'
   if (ownership === 'unlocked') return 'read'
   return args.hasDurableClearPayload ? 'resume_clear' : 'unlock_then_read'
+}
+
+export const DEFAULT_RECENT_CLEAR_STALE_GRACE_MS = 30_000
+
+export const shouldSuppressRecentlyClearedOwnedReplay = (args: {
+  lockId: unknown
+  currentPosId: unknown
+  replayStage: unknown
+  clearedAt: unknown
+  nowMs?: number
+  graceMs?: number
+}): boolean => {
+  if (args.replayStage !== 'cleared') return false
+  if (classifyTransactionLockOwnership(args) !== 'owned') return false
+
+  const clearedAtMs = Date.parse(String(args.clearedAt ?? ''))
+  if (!Number.isFinite(clearedAtMs)) return false
+
+  const nowMs = Number(args.nowMs ?? Date.now())
+  if (!Number.isFinite(nowMs)) return false
+
+  const graceMs = Math.max(
+    0,
+    Number.isFinite(Number(args.graceMs))
+      ? Number(args.graceMs)
+      : DEFAULT_RECENT_CLEAR_STALE_GRACE_MS,
+  )
+  const ageMs = nowMs - clearedAtMs
+  return ageMs >= 0 && ageMs <= graceMs
+}
+
+export const isTransactionReplayMappingReady = (
+  mapping: ReplayPumpMapping | null | undefined,
+): boolean => {
+  const nozzles = Array.isArray(mapping?.nozzles) ? mapping.nozzles : []
+  if (!nozzles.length) return false
+
+  return nozzles.every((nozzle) => {
+    const nozzleId = String(nozzle?.nozzleId ?? '').trim()
+    const productCode = String(nozzle?.productCode ?? '').trim()
+    const nozzleNumber = toConfiguredNozzleNumber(nozzle?.nozzleNumber)
+    return Boolean(nozzleId && nozzleNumber != null && productCode)
+  })
+}
+
+export const resolveReplayNozzleMapping = (args: {
+  mapping: ReplayPumpMapping | null | undefined
+  nozzleNumber?: unknown
+  gradeId?: unknown
+  gradeOptionId?: unknown
+}): ReplayNozzleMapping | null => {
+  const nozzles = Array.isArray(args.mapping?.nozzles)
+    ? args.mapping.nozzles
+    : []
+  if (!nozzles.length) return null
+
+  const nozzleNumber = toConfiguredNozzleNumber(args.nozzleNumber)
+  if (nozzleNumber != null) {
+    return (
+      nozzles.find((nozzle) => Number(nozzle?.nozzleNumber) === nozzleNumber) ??
+      null
+    )
+  }
+
+  // FpGradeOptionNo identifies the actual option/nozzle on a multi-product
+  // dispenser and is therefore stronger evidence than FcGradeId. Two nozzles
+  // can legitimately deliver the same grade from different tanks.
+  const gradeOptionId = String(args.gradeOptionId ?? '').trim()
+  if (gradeOptionId) {
+    const byOption = nozzles.filter(
+      (nozzle) =>
+        String(nozzle?.domsGradeOptionId ?? '').trim() === gradeOptionId,
+    )
+    if (byOption.length === 1) return byOption[0]
+    if (byOption.length > 1) return null
+  }
+
+  const gradeId = String(args.gradeId ?? '').trim()
+  if (gradeId) {
+    const byGrade = nozzles.filter(
+      (nozzle) => String(nozzle?.domsGradeId ?? '').trim() === gradeId,
+    )
+    if (byGrade.length === 1) return byGrade[0]
+    if (byGrade.length > 1) return null
+  }
+
+  return nozzles.length === 1 ? nozzles[0] : null
 }
 
 export const describeIdZeroRecoveryPolicy = () => ({

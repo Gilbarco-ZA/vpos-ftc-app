@@ -11,7 +11,6 @@ export const EditProductSheet = ({
   isOpen,
   onOpenChange,
   productId,
-  currencyOptions,
   defaultCurrency,
   taxTypeOptions,
   isDevEnv,
@@ -20,7 +19,6 @@ export const EditProductSheet = ({
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   productId: string | null
-  currencyOptions: string[]
   defaultCurrency: string
   taxTypeOptions: import('./products.types').ConfigOption[]
   isDevEnv: boolean
@@ -131,7 +129,6 @@ export const EditProductSheet = ({
             title="Edit product"
             submitLabel="Save changes"
             onClose={() => onOpenChange(false)}
-            currencyOptions={currencyOptions}
             defaultCurrency={defaultCurrency}
             taxTypeOptions={taxTypeOptions}
             isDevEnv={isDevEnv}

@@ -120,7 +120,7 @@ describe('DOMS operational readiness rollup', () => {
       domainSnapshot: baseSnapshot,
       fieldValidation: {
         releaseGate: { status: 'blocked', passed: false },
-        blockingItems: [{ id: 'local-build-completed' }],
+        blockingItems: [{ id: 'jpl-live-connection-observed' }],
       },
     })
 

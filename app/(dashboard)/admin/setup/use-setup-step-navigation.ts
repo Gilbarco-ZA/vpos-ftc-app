@@ -37,7 +37,7 @@ export function useSetupStepNavigation({
 
   useEffect(() => {
     if (stepIndex >= 0) {
-      setActiveStep(stepIndex)
+      queueMicrotask(() => setActiveStep(stepIndex))
     }
   }, [stepIndex])
 

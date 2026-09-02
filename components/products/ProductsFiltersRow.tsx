@@ -13,12 +13,14 @@ export function ProductsFiltersRow({
   onSearchChange,
   onStatusChange,
   onRefresh,
+  isRefreshing,
 }: {
   search: string
   status: ProductStatus | 'ALL'
   onSearchChange: (value: string) => void
   onStatusChange: (value: ProductStatus | 'ALL') => void
   onRefresh: () => void
+  isRefreshing?: boolean
 }) {
   return (
     <FiltersRow>
@@ -41,8 +43,8 @@ export function ProductsFiltersRow({
           ))}
         </Select>
       </FiltersRow.Slot>
-      <Button variant="secondary" onClick={onRefresh}>
-        Refresh
+      <Button variant="secondary" onClick={onRefresh} disabled={isRefreshing}>
+        {isRefreshing ? 'Refreshing…' : 'Refresh'}
       </Button>
     </FiltersRow>
   )

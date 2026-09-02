@@ -1,6 +1,5 @@
 import type { ForecourtPendingPriceSetStatus } from '@/src/modules/forecourt/infrastructure/pendingPriceSetsRepo'
 
-import { dispatchPosDomsCommand } from '@/src/shared/pos/doms'
 import {
   legacyDomsFailure,
   legacyDomsSuccess,
@@ -15,6 +14,7 @@ import {
   appendWetstockEvent,
   markTankDeliveryCheckpointCleared,
 } from '@/src/modules/forecourt/infrastructure/wetstockLifecycleRepo'
+import { dispatchPosDomsCommand } from '@/src/modules/pos/application/legacy/doms'
 
 import type { PosDomsRouteCommand } from './posDomsTypes'
 

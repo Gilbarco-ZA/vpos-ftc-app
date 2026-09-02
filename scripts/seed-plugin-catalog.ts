@@ -47,7 +47,7 @@ async function main() {
     process.exit(2)
   }
 
-  const res = await scanAndUpsertPluginCatalog(root)
+  await scanAndUpsertPluginCatalog(root)
 }
 
 main().catch((e) => {

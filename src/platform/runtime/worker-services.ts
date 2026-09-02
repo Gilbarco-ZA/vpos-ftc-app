@@ -1,5 +1,6 @@
 import { startPssXmlSyncWorker as startLegacyPssXmlSyncWorker } from '@/src/platform/integrations/pssXml/watcherWorker'
 
+import { startAtgPollingWorker as startCanonicalAtgPollingWorker } from '@/src/modules/forecourt/infrastructure/atgPollingWorker'
 import { startForecourtConfigSyncWorker as startLegacyForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
 import { startPosCommandsWorker as startCanonicalPosCommandsWorker } from '@/src/modules/pos/infrastructure/posCommandsWorker'
 import { startPrintJobsWorker as startLegacyPrintJobsWorker } from '@/src/modules/printing/infrastructure/printJobsWorker'
@@ -7,6 +8,8 @@ import { startReportQueueWorker as startLegacyReportQueueWorker } from '@/src/mo
 import { startInProcessRuntime as startCanonicalInProcessRuntime } from '@/src/modules/runtime/infrastructure/inProcessRuntime'
 import { startSupervisorMonitorWorker as startCanonicalSupervisorMonitorWorker } from '@/src/modules/runtime/infrastructure/supervisorMonitorWorker'
 import { startEwuraRetryWorker as startCanonicalEwuraRetryWorker } from '@/src/modules/tanzania-fiscal/infrastructure/ewuraRetryWorker'
+import { startTanzaniaDailyTotalsWorker as startCanonicalTanzaniaDailyTotalsWorker } from '@/src/modules/tanzania-fiscal/infrastructure/proxyDailyTotalsWorker'
+import { publishLatestTanzaniaTankInventories } from '@/src/modules/tanzania-fiscal/infrastructure/proxyTankInventories'
 import { startProxyFiscalSenderWorker as startLegacyProxyFiscalSenderWorker } from '@/src/modules/transactions/infrastructure/fiscalization/proxySenderWorker'
 import { startTransactionFiscalizationSchedulerWorker as startCanonicalTransactionFiscalizationSchedulerWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionFiscalizationSchedulerWorker'
 import { startTransactionQueueWorker as startCanonicalTransactionQueueWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionQueueWorker'
@@ -23,6 +26,18 @@ export type RuntimeWorkerStopHandle =
   | { stop: () => void | Promise<void> }
   | (() => void | Promise<void>)
   | void
+
+export function startAtgPollingRuntimeWorker(opts: { stationId: string }) {
+  return startCanonicalAtgPollingWorker({
+    ...opts,
+    publishSnapshot: publishLatestTanzaniaTankInventories,
+  })
+}
+
+// Compatibility alias. Prefer startAtgPollingRuntimeWorker.
+export function startAtgHistoryRuntimeWorker(opts: { stationId: string }) {
+  return startAtgPollingRuntimeWorker(opts)
+}
 
 export function startForecourtConfigSyncRuntimeWorker(opts?: {
   pollMs?: number
@@ -89,4 +104,11 @@ export function startInProcessRuntimeServices(
   opts?: { monitorMs?: number },
 ) {
   return startCanonicalInProcessRuntime(stationId, opts)
+}
+
+export function startTanzaniaDailyTotalsRuntimeWorker(opts?: {
+  stationId?: string
+  pollMs?: number
+}) {
+  return startCanonicalTanzaniaDailyTotalsWorker(opts)
 }

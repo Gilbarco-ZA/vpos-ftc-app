@@ -17,6 +17,21 @@ const getInflightPumpMappings = () => {
   return anyGlobal.__jplPumpMappingsInflight as PumpMappingsInflight
 }
 
+export const invalidateJplPumpMappings = (stationId?: string) => {
+  const normalizedStationId = String(stationId ?? '').trim()
+  const cache = globalThis.__jplPumpMappingsCache as
+    | PumpMappingsCache
+    | undefined
+
+  if (!normalizedStationId || cache?.stationId === normalizedStationId) {
+    globalThis.__jplPumpMappingsCache = undefined
+  }
+
+  const inflight = getInflightPumpMappings()
+  if (normalizedStationId) inflight.delete(normalizedStationId)
+  else inflight.clear()
+}
+
 export const getJplPumpMappings = async (
   stationId: string,
 ): Promise<Map<number, PumpMapping>> => {

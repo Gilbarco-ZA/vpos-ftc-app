@@ -2,7 +2,8 @@ import {
   ensurePlainObject,
   requireNonEmptyString,
 } from '@/src/shared/utils/inputs'
-import { captureVposCustomerDetails } from '@/src/shared/vpos/pos'
+
+import { captureVposCustomerDetails } from '@/src/modules/vpos/application/pos'
 
 export async function submitVposCustomerDetails(args: {
   stationId: string

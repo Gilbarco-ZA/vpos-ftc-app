@@ -1,18 +1,11 @@
 'use client'
 
-import { ReactNode, useEffect, useState } from 'react'
+import type { DatePresetKey } from '@/src/shared/crud/dateFilters'
+import { ReactNode, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-
-type PresetKey =
-  | 'today'
-  | 'yesterday'
-  | 'last7'
-  | 'last30'
-  | 'thisMonth'
-  | 'custom'
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
@@ -22,11 +15,15 @@ function toYmd(d: Date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-function presetToRange(preset: PresetKey): {
+function presetToRange(
+  preset: DatePresetKey,
+  currentDate?: string,
+): {
   startDate: string
   endDate: string
 } {
-  const now = new Date()
+  if (preset === 'all') return { startDate: '', endDate: '' }
+  const now = currentDate ? new Date(`${currentDate}T00:00:00`) : new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const end = new Date(today)
   const start = new Date(today)
@@ -62,8 +59,9 @@ export function ListToolbar(props: {
     q?: string
     startDate?: string
     endDate?: string
-    preset?: PresetKey
+    preset?: DatePresetKey
   }
+  currentDate?: string
   facets?: FacetFilter[]
   rightSlot?: ReactNode
 }) {
@@ -76,24 +74,32 @@ export function ListToolbar(props: {
     searchPlaceholder = 'ID / ref / customer / …',
   } = props
 
-  const [preset, setPreset] = useState<PresetKey>(initial?.preset ?? 'last7')
+  const [preset, setPreset] = useState<DatePresetKey>(
+    initial?.preset ?? 'last7',
+  )
   const [q, setQ] = useState(initial?.q ?? '')
   const [startDate, setStartDate] = useState(initial?.startDate ?? '')
   const [endDate, setEndDate] = useState(initial?.endDate ?? '')
+  const [formAction, baseQuery = ''] = baseActionPath.split('?', 2)
+  const baseQueryEntries = Array.from(new URLSearchParams(baseQuery).entries())
 
-  useEffect(() => {
-    if (preset === 'custom') return
-    const r = presetToRange(preset)
-    setStartDate(r.startDate)
-    setEndDate(r.endDate)
-  }, [preset])
+  const handlePresetChange = (nextPreset: DatePresetKey) => {
+    setPreset(nextPreset)
+    if (nextPreset === 'custom') return
+    const range = presetToRange(nextPreset, props.currentDate)
+    setStartDate(range.startDate)
+    setEndDate(range.endDate)
+  }
 
   return (
     <form
       method="get"
-      action={baseActionPath}
+      action={formAction}
       className="flex flex-col gap-3 rounded-card border border-border bg-surface-card p-4 sm:flex-row sm:items-end sm:justify-between"
     >
+      {baseQueryEntries.map(([key, value]) => (
+        <input key={key} type="hidden" name={key} value={value} />
+      ))}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <div className="flex flex-col">
           <label className="text-xs text-[var(--text-secondary)]">Search</label>
@@ -113,10 +119,13 @@ export function ListToolbar(props: {
           <Select
             name="preset"
             value={preset}
-            onChange={(e) => setPreset(e.target.value as PresetKey)}
+            onChange={(e) =>
+              handlePresetChange(e.target.value as DatePresetKey)
+            }
             className="w-40"
           >
             <option value="today">Today</option>
+            <option value="all">All dates</option>
             <option value="yesterday">Yesterday</option>
             <option value="last7">Last 7 days</option>
             <option value="last30">Last 30 days</option>

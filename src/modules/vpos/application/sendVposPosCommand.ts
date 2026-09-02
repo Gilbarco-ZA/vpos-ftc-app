@@ -1,9 +1,9 @@
-import type { PosCommandRequest } from '@/src/shared/vpos/commands'
+import type { PosCommandRequest } from '@/src/modules/pos/contracts/commands'
 
 import {
   dispatchVposPosCommand,
   isValidVposPosCommandType,
-} from '@/src/shared/vpos/pos'
+} from '@/src/modules/vpos/application/pos'
 
 export function prepareVposPosCommand(body: Record<string, unknown>) {
   const type = body?.type

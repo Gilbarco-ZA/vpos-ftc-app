@@ -2,11 +2,48 @@ import { queryOne } from '@/src/platform/db/postgres'
 import { requireNonEmptyString } from '@/src/shared/utils/inputs'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import {
+  buildReferencePrintJobPayload,
+  CANONICAL_PRINT_JOB_TYPES,
+  normalizePrintJobType,
+} from '@/src/modules/printing/domain/printJobPayload'
+
 export type EnqueuePrintJobOptions = {
   idempotencyKey?: string
   sourceTransactionId?: string
   sourceReportId?: string
   scheduledAt?: Date
+  payloadMode?: 'embedded' | 'reference'
+}
+
+function preparePayload(
+  jobType: string,
+  payload: unknown,
+  options: EnqueuePrintJobOptions,
+) {
+  if (options.payloadMode !== 'reference') return payload ?? {}
+
+  if (
+    jobType === CANONICAL_PRINT_JOB_TYPES.receipt &&
+    !options.sourceTransactionId
+  ) {
+    throw new Error(
+      'Reference-based receipt print jobs require sourceTransactionId',
+    )
+  }
+  if (jobType === CANONICAL_PRINT_JOB_TYPES.report && !options.sourceReportId) {
+    throw new Error('Reference-based report print jobs require sourceReportId')
+  }
+  if (
+    jobType !== CANONICAL_PRINT_JOB_TYPES.receipt &&
+    jobType !== CANONICAL_PRINT_JOB_TYPES.report
+  ) {
+    throw new Error(
+      `Reference-based payloads are not supported for print job type: ${jobType}`,
+    )
+  }
+
+  return buildReferencePrintJobPayload(payload)
 }
 
 export async function enqueuePrintJob(
@@ -17,9 +54,12 @@ export async function enqueuePrintJob(
   options: EnqueuePrintJobOptions = {},
 ) {
   const normalizedStationId = requireNonEmptyString(stationId, 'stationId')
-  const normalizedJobType = requireNonEmptyString(jobType, 'jobType')
+  const normalizedJobType = normalizePrintJobType(
+    requireNonEmptyString(jobType, 'jobType'),
+  )
   const { idempotencyKey, sourceTransactionId, sourceReportId, scheduledAt } =
     options
+  const storedPayload = preparePayload(normalizedJobType, payload, options)
 
   if (!idempotencyKey) {
     const jobId = uuidv4()
@@ -33,7 +73,7 @@ export async function enqueuePrintJob(
         jobId,
         normalizedStationId,
         normalizedJobType,
-        JSON.stringify(payload ?? {}),
+        JSON.stringify(storedPayload),
         priority,
         sourceTransactionId ?? null,
         sourceReportId ?? null,
@@ -62,7 +102,7 @@ export async function enqueuePrintJob(
       uuidv4(),
       normalizedStationId,
       normalizedJobType,
-      JSON.stringify(payload ?? {}),
+      JSON.stringify(storedPayload),
       priority,
       idempotencyKey,
       sourceTransactionId ?? null,

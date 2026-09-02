@@ -35,8 +35,6 @@ function patchConnect(mod, fnName) {
         null;
 
       const h = (opts && (opts.host || opts.hostname)) || "127.0.0.1";
-      const p = opts && (opts.port || opts.path);
-
       // Only spam when it's localhost-ish
       if (h === "127.0.0.1" || h === "localhost" || h === "::1") {
         console.error(`[trace-net] ${fnName} raw args=`, args);

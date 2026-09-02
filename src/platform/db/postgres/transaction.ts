@@ -1,5 +1,3 @@
-import type { PoolClient, QueryResult, QueryResultRow } from 'pg'
-
 import { txQuery, withTransaction } from '@/src/platform/db/postgres/core'
 
 export type { PoolClient, QueryResult, QueryResultRow } from 'pg'

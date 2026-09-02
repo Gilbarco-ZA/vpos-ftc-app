@@ -13,7 +13,7 @@ const item = (
   status: DomsFieldValidationChecklistItem['status'] = 'pending',
 ): DomsFieldValidationChecklistItem => ({
   id,
-  area: 'build',
+  area: 'operations',
   status,
   title: id,
   description: id,
@@ -40,28 +40,21 @@ const checkpoint = (
 })
 
 describe('DOMS field validation release gate helpers', () => {
-  it('derives build/test checkpoints from a local evidence import', () => {
-    const checkpoints = deriveDomsFieldValidationEvidenceCheckpoints({
-      evidenceType: 'build-test-run',
-      evidenceReference: 'local-terminal-001',
-      results: {
-        buildPassed: true,
-        testsPassed: true,
-        secretToken: 'must-not-persist',
-      },
-    })
-
-    assert.equal(checkpoints.length, 2)
-    assert.deepEqual(
-      checkpoints.map((entry) => [entry.checklistItemId, entry.status]),
-      [
-        ['local-build-completed', 'passed'],
-        ['test-suite-completed', 'passed'],
-      ],
+  it('does not accept packaging build evidence as a field-readiness checkpoint', () => {
+    assert.throws(
+      () =>
+        deriveDomsFieldValidationEvidenceCheckpoints({
+          evidenceType: 'build-test-run',
+          evidenceReference: 'local-terminal-001',
+          results: {
+            buildPassed: true,
+            testsPassed: true,
+          },
+        }),
+      /checkpoints are required/i,
     )
-    assert.equal(checkpoints[0]?.evidence.secretToken, '[redacted]')
-    assert.equal(checkpoints[0]?.evidenceReference, 'local-terminal-001')
   })
+
 
   it('derives live-controller evidence across connection, install status, reconciliation, and workflow checks', () => {
     const checkpoints = deriveDomsFieldValidationEvidenceCheckpoints({
@@ -180,10 +173,10 @@ describe('DOMS field validation release gate helpers', () => {
   })
 
   it('applies only the newest checkpoint to each checklist item', () => {
-    const checklist = [item('local-build-completed')]
+    const checklist = [item('jpl-live-connection-observed')]
     const applied = applyDomsFieldValidationCheckpoints(checklist, [
-      checkpoint('local-build-completed', 'blocked', '2026-07-09T08:00:00.000Z'),
-      checkpoint('local-build-completed', 'passed', '2026-07-09T09:00:00.000Z'),
+      checkpoint('jpl-live-connection-observed', 'blocked', '2026-07-09T08:00:00.000Z'),
+      checkpoint('jpl-live-connection-observed', 'passed', '2026-07-09T09:00:00.000Z'),
     ])
 
     assert.equal(applied[0]?.status, 'passed')

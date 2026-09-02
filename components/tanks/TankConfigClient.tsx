@@ -3,6 +3,7 @@
 import type { TankConfig } from '@/src/shared/setup/tanksConfig'
 import type { ActionStatus } from '@/src/shared/status/ui'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 
 import { toNumberStrict as toNumberOrNull } from '@/src/shared/numbers'
 import {
@@ -13,6 +14,10 @@ import {
 import { ACTION_STATUS, STATUS_VARIANT } from '@/src/shared/status/ui'
 
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
+import {
+  DeliveryDataSummary,
+  TankGaugeDataSummary,
+} from '@/components/tanks/LiveTankDataPanel'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -36,6 +41,9 @@ const TankConfigClient = ({ mode }: { mode: Mode }) => {
   const [status, setStatus] = useState<StatusMessage | null>(null)
   const [deliveryData, setDeliveryData] = useState<any>(null)
   const [tgData, setTgData] = useState<any>(null)
+  const [liveDataLoading, setLiveDataLoading] = useState<
+    'delivery' | 'tg' | null
+  >(null)
 
   const isAdmin = mode === 'admin'
   const canEdit = mode === 'admin'
@@ -62,7 +70,9 @@ const TankConfigClient = ({ mode }: { mode: Mode }) => {
   }, [])
 
   useEffect(() => {
-    loadConfig()
+    queueMicrotask(() => {
+      loadConfig()
+    })
   }, [loadConfig])
 
   useEffect(() => {
@@ -194,23 +204,61 @@ const TankConfigClient = ({ mode }: { mode: Mode }) => {
 
   const fetchLiveData = async (type: 'delivery' | 'tg') => {
     setStatus(null)
+    setLiveDataLoading(type)
     try {
-      const url =
-        type === 'delivery'
-          ? '/api/pos/doms/getAllTankDeliveryData'
-          : '/api/pos/doms/getAllTgData'
-      const res = await fetch(url, { cache: 'no-store' })
+      if (type === 'tg') {
+        const res = await fetch('/api/settings/tanks/sync-volumes', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-csrf-token': csrfToken,
+          },
+          body: JSON.stringify({
+            csrf_token: csrfToken,
+            publishTanzaniaInventory: true,
+          }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          const message = body?.error?.message || 'Failed to fetch tank data'
+          setStatus({ type: ACTION_STATUS.ERROR, message })
+          return
+        }
+
+        const data = body?.data ?? {}
+        if (data.config) {
+          setConfig(normalizeTankConfig(data.config))
+        }
+        setTgData({ success: true, data: data.liveData ?? {} })
+
+        const synced = Number(data?.synced?.count ?? 0)
+        const levels = Number(data?.synced?.tankLevelUpdates ?? 0)
+        const published = Number(data?.publication?.tankCount ?? 0)
+        setStatus({
+          type: ACTION_STATUS.SUCCESS,
+          message:
+            data?.publication?.ok === true
+              ? `Refreshed ${synced} tank gauge(s), updated ${levels} tank level(s), and sent ${published} tank inventory record(s) to vpos-proxy.`
+              : `Refreshed ${synced} tank gauge(s) and updated ${levels} tank level(s).`,
+        })
+        return
+      }
+
+      const res = await fetch('/api/pos/doms/getAllTankDeliveryData', {
+        cache: 'no-store',
+      })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
         const message = body?.error?.message || 'Failed to fetch tank data'
         setStatus({ type: ACTION_STATUS.ERROR, message })
         return
       }
-      if (type === 'delivery') setDeliveryData(body)
-      else setTgData(body)
+      setDeliveryData(body)
     } catch (err: any) {
       const message = err?.message || 'Failed to fetch tank data'
       setStatus({ type: ACTION_STATUS.ERROR, message })
+    } finally {
+      setLiveDataLoading(null)
     }
   }
 
@@ -559,34 +607,49 @@ const TankConfigClient = ({ mode }: { mode: Mode }) => {
                 variant="secondary"
                 size="sm"
                 onClick={() => fetchLiveData('delivery')}
+                disabled={liveDataLoading !== null}
+                className="gap-2"
               >
-                Refresh Delivery Data
+                {liveDataLoading === 'delivery' ? (
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {liveDataLoading === 'delivery'
+                  ? 'Refreshing…'
+                  : 'Refresh Delivery Data'}
               </Button>
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
                 onClick={() => fetchLiveData('tg')}
+                disabled={liveDataLoading !== null}
+                className="gap-2"
               >
-                Refresh Tank Gauge Data
+                {liveDataLoading === 'tg' ? (
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {liveDataLoading === 'tg'
+                  ? 'Refreshing…'
+                  : 'Refresh Tank Gauge Data'}
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
             <div className="rounded border bg-[var(--surface-muted)] p-3">
-              <div className="mb-2 text-sm font-semibold">
-                Tank Delivery Data
-              </div>
-              <pre className="max-h-80 overflow-auto text-xs">
-                {JSON.stringify(deliveryData, null, 2)}
-              </pre>
+              <DeliveryDataSummary data={deliveryData} />
             </div>
             <div className="rounded border bg-[var(--surface-muted)] p-3">
-              <div className="mb-2 text-sm font-semibold">Tank Gauge Data</div>
-              <pre className="max-h-80 overflow-auto text-xs">
-                {JSON.stringify(tgData, null, 2)}
-              </pre>
+              <TankGaugeDataSummary
+                data={tgData}
+                configuredGrades={config.tanks}
+              />
             </div>
           </div>
         </div>

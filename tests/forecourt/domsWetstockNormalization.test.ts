@@ -77,13 +77,61 @@ describe('DOMS/JPL wetstock normalization', () => {
     assert.equal(normalized?.tankId, '03')
     assert.equal(normalized?.productCode, '2')
     assert.equal(normalized?.groupId, '4')
-    assert.equal(normalized?.productLevel, 1234)
-    assert.equal(normalized?.grossObservedVolume, 9800)
+    assert.equal(normalized?.productLevel, 123.4)
+    assert.equal(normalized?.grossObservedVolume, 98)
     assert.equal(normalized?.averageTemperatureC, 22.5)
     assert.equal(normalized?.densityProbeTemperatureC, 22.7)
-    assert.equal(normalized?.deliveredVolume, 3500)
-    assert.equal(normalized?.pressure, 12)
+    assert.equal(normalized?.deliveredVolume, 35)
+    assert.equal(normalized?.pressure, 1.2)
     assert.equal(normalized?.lastUpdatedAt, '2026-07-09T10:10:30.000Z')
+  })
+
+  it('applies DOMS tank fixed-point scales and station-local controller time', () => {
+    const normalized = normalizeJplTankGaugeData(
+      {
+        TgId: '01',
+        TgSubStates: {
+          value: 129,
+          bits: {
+            TankGaugeOnline: 1,
+            AllAvailableInventoryDataReady: 128,
+          },
+        },
+        TankDataItems: {
+          TankProductLevel: '002238',
+          TankWaterLevel: '000132',
+          TankTotalObservedVol: '000000135000',
+          TankWaterVol: '000000002000',
+          TankGrossObservedVol: '000000133000',
+          TankGrossStdVol: '000000137700',
+          TankAvailableRoom: '000002064100',
+          TankAverageTemp: {
+            FcSign: { value: '00H' },
+            Temperature: '0150',
+          },
+          TankDataLastUpdateDateAndTime: '20260811132558',
+          TankMaxSafeFillCapacity: '000002199100',
+          TankProductMass: '000000009902',
+          TankProductDensity: '000000000712',
+        },
+      },
+      { timeZone: 'Africa/Dar_es_Salaam' },
+    )
+
+    assert.equal(normalized?.productLevel, 223.8)
+    assert.equal(normalized?.waterLevel, 13.2)
+    assert.equal(normalized?.totalObservedVolume, 1350)
+    assert.equal(normalized?.waterVolume, 20)
+    assert.equal(normalized?.grossObservedVolume, 1330)
+    assert.equal(normalized?.grossStandardVolume, 1377)
+    assert.equal(normalized?.availableRoom, 20641)
+    assert.equal(normalized?.averageTemperatureC, 15)
+    assert.equal(normalized?.maxSafeFillCapacity, 21991)
+    assert.equal(normalized?.productMass, 990.2)
+    assert.equal(normalized?.productDensity, 712)
+    assert.equal(normalized?.lastUpdatedAt, '2026-08-11T10:25:58.000Z')
+    assert.equal(normalized?.flags.online, true)
+    assert.equal(normalized?.flags.allInventoryDataReady, true)
   })
 
   it('normalizes delivery status into clear candidates', () => {

@@ -1,531 +1,193 @@
 # Architecture
 
-## Purpose
+**Type:** authoritative
 
-This document describes the current architecture of the VPOS FTC app as implemented in this repository.
+## System shape
 
-The codebase is in a **hybrid state**:
-
-- parts of the system already follow a clearer module/application/infrastructure split
-- some runtime and integration flows still preserve legacy behavior for compatibility
-- several files explicitly note that migration/extraction is ongoing
-
-That means the architecture is best understood as **a modular monolith with embedded worker runtimes and external integration adapters**.
-
-## High-level view
-
-```mermaid
-flowchart LR
-  U[Browser / PWA Client] --> N[Next.js App Router UI]
-  U --> API[Next.js Route Handlers app/api/**]
-  API --> MOD[Module Application Services]
-  MOD --> PG[(PostgreSQL)]
-  MOD --> AZ[(Azure SQL - selected paths)]
-  MOD --> FS[Filesystem / legacy perm directories]
-  MOD --> INT[External integrations]
-
-  SRV[Bundled Node server] --> WS[Socket.IO forecourt websocket]
-  SRV --> RT[In-process runtime workers]
-  WK[Dedicated worker process] --> RT
-  RT --> PG
-  RT --> INT
-  WS --> PG
-  WS --> INT
-```
-
-## Architectural style
-
-### 1) Modular monolith
-
-The main app is shipped as one deployable codebase and usually one primary web-server process, but internally it is organized into domain-oriented modules under `src/modules/`.
-
-Examples:
-
-- `transactions`
-- `forecourt`
-- `products`
-- `customers`
-- `setup`
-- `reports`
-- `printing`
-- `runtime`
-- `supervisor`
-
-This keeps deployment simple while still giving the code a strong domain boundary structure.
-
-### 2) Platform vs module split
-
-A useful mental model is:
-
-- **`src/platform/`** = infrastructure/platform concerns the whole app depends on
-- **`src/modules/`** = business capabilities
-- **`src/shared/`** = cross-cutting facades, helpers, utility layers, and compatibility surfaces
-
-#### Platform layer responsibilities
-
-`src/platform/` owns concerns such as:
-
-- DB connectivity and query helpers
-- runtime composition roots
-- bootstrap and first-boot behavior
-- configuration loading and defaults
-- auth/session implementation
-- observability/metrics/health
-- generic web-route helpers
-- security/rate limiting
-
-#### Module layer responsibilities
-
-`src/modules/` owns use-case logic such as:
-
-- fiscalizing a queued transaction
-- listing products
-- syncing forecourt configuration
-- creating customers
-- generating reports
-- handling setup workflows
-
-### 3) Embedded worker architecture
-
-This is not only a request/response web app.
-
-The system also contains long-lived background loops for:
-
-- POS command polling
-- forecourt config synchronization
-- transaction queue scheduling
-- print jobs
-- report jobs
-- proxy fiscal sending
-- supervisor/heartbeat monitoring
-- optional PSS XML watch/sync behavior
-
-These workers can run:
-
-- in the main server process
-- in a dedicated omnibus worker process
-- as standalone worker entrypoints
-
-## Code organization
-
-### Top-level layout
+VPOS FTC is a modular monolith with multiple process entrypoints. The Next.js application, custom server, embedded runtime, and optional dedicated workers share the same modules and PostgreSQL persistence model.
 
 ```text
-app/                  UI routes + HTTP API endpoints
-src/modules/          Domain/business modules
-src/platform/         Platform/runtime/infrastructure
-src/shared/           Cross-cutting facades and compatibility helpers
-server/               websocket + legacy server support
-workers/              thin worker entrypoints
-scripts/              operational scripts, migrations, diagnostics
+Browser
+  -> Next.js pages and route handlers
+  -> module application services
+  -> domain policies and contracts
+  -> repositories, integrations, runtime services
+  -> PostgreSQL / DOMS-JPL / vpos-proxy / filesystem compatibility inputs
 ```
 
-### Internal module shape
+## Boundaries
 
-Many modules use a layered folder structure like:
+- `app/` owns routing and HTTP adaptation.
+- `components/` owns reusable presentation.
+- `src/modules/` owns feature behavior.
+- `src/platform/` owns generic infrastructure.
+- `src/shared/` owns dependency-light utilities and integration contracts. It must not import feature modules.
+
+New API routes must not import `src/platform/db/**` or feature `infrastructure/**` directly. During migration, existing exceptions should be removed through application commands and queries rather than copied.
+
+Domain code must not depend on Next.js, React, database clients, the filesystem, or process environment. Infrastructure implements domain/application contracts.
+
+## Runtime entrypoints
+
+- `server.ts`: custom web server, startup bootstrap, legacy import, forecourt attachment, and local runtime startup
+- `start.cjs`: production wrapper and diagnostics
+- `scripts/worker.ts`: omnibus worker runtime
+- `server/index.ts`: focused forecourt server entrypoint
+- `workers/**`: focused process entrypoints
+
+The production build generates `vpos-server.cjs`; it is a package artifact, not source.
+
+## Persistence
+
+PostgreSQL is the primary datastore for station configuration, operational records, transactions, fiscalization state, receipts, queue state, heartbeats, and diagnostics. The application has no direct cloud-database connection. All cloud-bound transaction, fiscalization, product, stock, and tank traffic crosses the local `vpos-proxy` boundary. Filesystem inputs remain compatibility surfaces and must not become competing canonical stores.
+
+## Reliability principles
+
+- Make fiscalization and queue processing idempotent.
+- Use leases or advisory locks for singleton work.
+- Persist retry and failure state where recovery must survive process restarts.
+- Expose liveness separately from readiness and startup progress.
+- Keep startup migration/bootstrap work bounded and observable.
+- Redact secrets and customer data from logs and support bundles.
+
+## Multi-country and `vpos-proxy` evolution
+
+The modular-monolith boundary is established and architecture checks protect the most important route, shared, and domain dependency rules. Tanzania fiscalization, DOMS/JPL integration, database-backed country datasets, transaction delivery, and operational workers are substantial implementations rather than prototypes. The next architecture milestone is to make country behavior and `vpos-proxy` transport independently extensible so that adding countries does not add conditionals and endpoint knowledge throughout transaction, stock, setup, and worker code.
+
+### Current progress
+
+- **Modular structure:** `app -> modules -> platform/shared` is the intended dependency direction and is enforced for the current tracked rules.
+- **Country catalog:** country data is database-backed and can support additional country datasets without hard-coding UI choices.
+- **Tanzania:** Tanzania fiscalization and proxy registration are advanced and have dedicated contracts, workers, tests, and operational controls.
+- **Country behavior:** behavioral extensibility is behind catalog extensibility. Country normalization and Tanzania-specific decisions still appear in multiple orchestration and configuration paths.
+- **`vpos-proxy` integration:** proxy delivery is functional, but URL resolution, transport behavior, endpoint ownership, DTO ownership, and response handling are distributed across multiple feature implementations.
+- **Migration debt:** some large orchestration units and cross-feature dependencies remain. These should be reduced before several additional countries are introduced.
+
+### North-star boundary
+
+FTC decides **which business operation** must happen and supplies validated, country-aware business data. The local `vpos-proxy` decides **how that operation reaches cloud/external services**, including cloud destination selection, offline/retry behavior, identity, and country-specific upstream endpoint routing.
+
+For country-neutral operations, FTC should call stable local proxy operations such as invoice, credit-note, product, and stock submission without selecting a country cloud URL. Country-specific operations such as Tanzania TRA/EWURA registration, daily totals, or tank inventories may have explicit local proxy operations, but those paths should still be declared in one proxy endpoint registry instead of being assembled throughout feature code.
+
+The target dependency shape is:
 
 ```text
-application/
-domain/
-infrastructure/
-presentation/
+Transactions ─┐
+Stock ────────┤
+Products ─────┤
+Setup ────────┼──> CountryRegistry / CountryProfile
+Country fiscal┤                │
+modules ──────┘                └──> payload/capability policy
+        │
+        └──────────────────────────> VposProxyGateway
+                                      │
+                                      ├── ProxyTargetResolver
+                                      ├── ProxyTransport
+                                      ├── EndpointRegistry
+                                      ├── response/error normalization
+                                      ├── idempotency
+                                      └── observability
+                                               │
+                                               v
+                                           vpos-proxy
 ```
 
-That typically maps to:
+### Country capability model
 
-- **application** — use cases, commands, queries, orchestration
-- **domain** — domain models/rules when explicitly modeled
-- **infrastructure** — DB repos, adapters, worker implementations, storage
-- **presentation** — presenters/view-models for API or UI consumption
+Country codes should be canonical values and normalized once at an application boundary. Country-specific behavior should be selected through an explicit profile/capability registry rather than central `if country === ...` branches.
 
-Not every module has every layer yet.
+Conceptually:
 
-## Runtime topology
-
-```mermaid
-flowchart TD
-  A[start.cjs] --> B[vpos-server.cjs / server.ts]
-  B --> C[Next.js request handling]
-  B --> D[Socket.IO forecourt websocket]
-  B --> E[startLocalServerRuntime]
-  E --> E1[posCommandsWorker]
-  E --> E2[printJobsWorker]
-  E --> E3[reportQueueWorker]
-  E --> E4[transactionFiscalizationScheduler]
-  E --> E5[forecourtConfigSyncWorker]
-  E --> E6[proxy sender worker if enabled]
-  E --> E7[runtime bus listeners]
-
-  W[scripts/worker.ts] --> X[startDedicatedWorkerProcess]
-  X --> X1[posCommandsRuntimeWorker]
-  X --> X2[forecourtConfigSyncRuntimeWorker]
-  X --> X3[transactionFiscalizationSchedulerRuntimeWorker]
-  X --> X4[proxyFiscalSenderRuntimeWorker]
-  X --> X5[supervisorMonitorRuntimeWorker]
-  X --> X6[pssXmlSyncRuntimeWorker]
+```ts
+interface CountryProfile {
+  code: string
+  capabilities: ReadonlySet<ProxyOperation>
+  invoiceMapper: ProxyInvoiceMapper
+  creditNoteMapper?: ProxyCreditNoteMapper
+  validateConfiguration(configuration: StationConfiguration): ValidationResult
+}
 ```
 
-## Entrypoints
+Adding a country should primarily add a country profile, its mappings/validators, and contract tests. It should not require editing proxy transport, URL selection, generic transaction workers, or unrelated country modules.
 
-### Web server
+Country **data** such as currency, timezone, tax catalogues, units, product classifications, aliases, and feature enablement may remain database/configuration driven. Country **behavior** such as regulatory payload transformation, signatures, validation algorithms, response interpretation, and reconciliation should remain version-controlled code.
 
-Primary files:
+### `vpos-proxy` ownership rules
 
-- `start.cjs`
-- `server.ts`
-- `server/forecourtWs.ts`
+- One `VposProxyGateway` should own outbound local-proxy HTTP behavior.
+- One `ProxyTargetResolver` should own target precedence and base-path resolution for every feature.
+- One endpoint registry should map logical operations to local proxy method/path contracts.
+- Feature modules should not independently construct proxy base URLs or cloud destinations.
+- Country modules may own country-specific payloads and operation capabilities, but they should depend on the generic proxy gateway rather than importing transport from another feature module.
+- Transaction infrastructure must not become the shared owner of Tanzania, stock, product, or future-country proxy contracts.
+- Proxy response/error normalization and idempotency behavior should be uniform across features.
 
-Behavior:
+### Migration checklist
 
-1. load env files
-2. install process diagnostics
-3. acquire process guard / lock for DOMS process coordination
-4. run bootstrap and migrations
-5. import legacy data if present
-6. load forecourt runtime config
-7. start selected runtime workers
-8. prepare the Next.js app
-9. bind HTTP/HTTPS server
-10. attach websocket support
+Use this checklist when planning multi-country and proxy-related changes. Keep completed items checked in the same pull request that establishes the corresponding invariant.
 
-### Dedicated worker process
+#### Phase 1 - Unify proxy transport without behavior changes
 
-Primary file:
+- [ ] Introduce a single `VposProxyGateway` for all FTC-to-`vpos-proxy` requests.
+- [ ] Introduce a single `ProxyTargetResolver` and document target precedence.
+- [ ] Centralize proxy timeout, headers, error parsing, response normalization, and base-path handling.
+- [ ] Define a typed endpoint registry using logical operation names rather than scattered URL literals.
+- [ ] Migrate transactions, stock, products, setup, and Tanzania fiscal operations to the gateway incrementally.
+- [ ] Add contract tests proving endpoint method/path compatibility before removing legacy clients.
 
-- `scripts/worker.ts`
+#### Phase 2 - Make country behavior explicit
 
-Composition is defined in:
+- [ ] Introduce canonical `CountryCode` parsing/normalization and remove duplicate country alias logic.
+- [ ] Introduce `CountryRegistry` / `CountryProfile` with explicit capabilities.
+- [ ] Move Tanzania invoice/credit-note enrichment behind Tanzania-owned mappers.
+- [ ] Give existing non-Tanzania behavior an explicitly named generic/legacy profile during migration.
+- [ ] Implement Kenya through the same profile contracts before marking Kenya fiscalization supported.
+- [ ] Add table-driven country x proxy-operation capability tests.
+- [ ] Verify adding a new country does not require edits to generic proxy transport or worker scheduling code.
 
-- `src/platform/runtime/composition-root.ts`
+#### Phase 3 - Correct module ownership and dependency direction
 
-This process is intended for long-lived polling work that should not depend on request traffic.
+- [ ] Remove proxy DTO/transport ownership from `transactions` where the contract is shared or country-owned.
+- [ ] Break mutual `tanzania-fiscal <-> transactions` integration dependencies through platform/application contracts.
+- [ ] Audit and remove other avoidable mutual feature-module dependencies.
+- [ ] Add architecture rules that reject new feature-level dependency cycles.
+- [ ] Add architecture rules preventing application-layer code from owning Next.js/HTTP response concerns.
+- [ ] Continue reducing `src/shared` compatibility imports where platform ownership is more appropriate.
 
-### Standalone workers
+#### Phase 4 - Decompose large delivery orchestration
 
-Primary files:
+- [ ] Reduce `proxySenderWorker` to queue claiming/scheduling and delegation.
+- [ ] Extract invoice and credit-note delivery services.
+- [ ] Extract response interpretation and delivery reconciliation.
+- [ ] Extract delivery persistence and retry policy.
+- [ ] Keep country-specific enrichment behind country profiles rather than worker branches.
+- [ ] Preserve idempotency, lease/claim semantics, and restart recovery with focused tests during decomposition.
 
-- `workers/fiscalize-transaction.worker.ts`
-- `workers/receipt-print.worker.ts`
-- `workers/proxy-sender.worker.ts`
+#### Phase 5 - Retire transitional fiscalization paths
 
-These are thin wrappers over platform runtime services.
+- [ ] Confirm field/external validation for the proxy-first Tanzania path with production-like TRA/EWURA credentials and failure scenarios.
+- [ ] Prove retired local Tanzania fiscalization cannot be selected by normal production configuration.
+- [ ] Quarantine remaining local fiscalization compatibility code while cutover evidence is incomplete.
+- [ ] Remove retired local Tanzania workers, flags, queue paths, and duplicated route selection once cutover acceptance is complete.
+- [ ] Update runbooks and migration documentation in the same change that removes compatibility behavior.
 
-## Request architecture
+#### Phase 6 - Definition of done for each additional country
 
-HTTP requests are primarily implemented through Next route handlers in `app/api/**`.
+- [ ] Country exists in the canonical country dataset/catalog with aliases and required metadata.
+- [ ] Country profile declares supported proxy operations explicitly.
+- [ ] Payload mappers and validation are version-controlled and covered by contract tests.
+- [ ] No country cloud URL is introduced into FTC for an operation owned by `vpos-proxy`.
+- [ ] Proxy endpoint contract tests pass for every operation the country enables.
+- [ ] Transaction, stock, product, setup, and fiscal workflows use the shared proxy gateway.
+- [ ] Unsupported operations fail explicitly instead of falling back to another country's behavior.
+- [ ] Secrets/certificates are never persisted in plain station configuration or rendered back to the browser.
+- [ ] Operational retry, idempotency, reconciliation, and observability behavior is verified.
+- [ ] Architecture, documentation, typecheck, and relevant domain/integration tests pass before merge.
 
-A common request path is:
+### First implementation milestone
 
-```mermaid
-sequenceDiagram
-  participant Client
-  participant Route as app/api route
-  participant Guard as defineRoute/withAuth
-  participant UseCase as module application command/query
-  participant Repo as infrastructure repo / db helper
-  participant DB as PostgreSQL
+The lowest-risk first milestone is: **all calls to `vpos-proxy` use one transport and one target resolver with no functional payload or endpoint changes**. Establish that invariant before introducing additional country profiles. Once transport ownership is stable, country capability extraction can proceed without simultaneously changing network behavior.
 
-  Client->>Route: HTTP request
-  Route->>Guard: auth + role + CSRF + body parsing
-  Guard->>UseCase: validated call context
-  UseCase->>Repo: persistence/integration work
-  Repo->>DB: query/update
-  DB-->>Repo: result
-  Repo-->>UseCase: domain/application result
-  UseCase-->>Route: response payload
-  Route-->>Client: JSON/HTTP response
-```
+## Known migration boundaries
 
-Representative examples in the repo:
-
-- `app/api/transactions/[id]/fiscalize/route.ts`
-- `app/api/products/route.ts`
-- `app/api/control/registry/route.ts`
-
-## Transaction and fiscalization pipeline
-
-The transaction path is one of the most important flows in the system.
-
-### Observed pipeline
-
-1. transactions are created and stored in Postgres
-2. eligible transactions are claimed by the **transaction fiscalization scheduler**
-3. queue rows are inserted for downstream fiscalization work
-4. fiscalization execution is handled by dedicated queue/worker logic or an external service path
-5. completion/failure updates transaction status and related records
-6. proxy sending and fiscal inbox flows provide additional delivery/retry handling
-
-### Important nuance
-
-The server-side in-process runtime explicitly states that **actual fiscalization execution is not fully handled in-process** in the default local runtime, because an external service may read from Postgres. The scheduler still runs locally to claim/enqueue eligible work.
-
-### Transaction flow diagram
-
-```mermaid
-flowchart LR
-  T[Transactions table] --> S[transactionFiscalizationSchedulerWorker]
-  S --> Q[transaction_queue rows]
-  Q --> F[transactionQueueWorker / external fiscal service]
-  F --> R[runFiscalization]
-  R --> C[completeTransactionFiscalization]
-  R --> E[failTransactionFiscalization]
-  C --> PG[(Postgres)]
-  E --> PG
-  F --> I[Fiscal inbox / proxy / retry paths]
-```
-
-## Forecourt architecture
-
-Forecourt support spans several layers:
-
-- configuration sync worker
-- adapter state management
-- websocket transport to clients
-- pump/tank status queries and commands
-- persistence of forecourt events/state in Postgres
-
-### Key pieces
-
-- `src/modules/forecourt/**`
-- `server/forecourtWs.ts`
-- shared forecourt adapters/runtime state under `src/shared/forecourt/**`
-
-### Behavior
-
-The websocket server:
-
-- attaches to the Node HTTP server
-- tracks connected clients
-- reads local adapter state and persisted shared state
-- computes a derived forecourt status (`online`, `degraded`, `offline`)
-- validates commands and nozzle context
-- publishes state/ack messages back to clients
-
-### Forecourt flow diagram
-
-```mermaid
-flowchart TD
-  C[Admin/ops client] --> WS[Socket.IO forecourt websocket]
-  WS --> AD[Forecourt adapter state]
-  WS --> DB[(Postgres forecourt events/state)]
-  WS --> Q[Forecourt command queue]
-  Q --> GW[Gateway / adapter]
-  GW --> Pump[Pump and nozzle hardware/integration]
-  Pump --> GW
-  GW --> DB
-  DB --> WS
-```
-
-## Runtime bus
-
-The app includes an in-process pub/sub bus in `src/shared/runtime/bus.ts`.
-
-This bus is used for decoupled internal events, including:
-
-- POS events
-- fiscal request/response coordination
-- archive capture
-- pending attendant auth tracking
-
-The archive bus listener also stores best-effort records of runtime events.
-
-This gives the monolith an internal event-driven spine without requiring an external broker.
-
-## Persistence architecture
-
-### PostgreSQL: primary datastore
-
-Postgres is the main system of record.
-
-Migration names indicate it stores:
-
-- core entities and stations
-- transactions and fiscalization events
-- receipts and credit notes
-- products and categories
-- customers
-- pump/tank/nozzle and forecourt state
-- sync jobs and queues
-- process heartbeats
-- station KV/config/version history
-- logs, archive exports, and secure artifacts
-- fiscal inbox and retry/dead-letter support
-
-### Azure SQL: secondary/integration datastore
-
-The repo also includes `src/platform/db/azure-sql.ts` and Azure SQL migrations.
-
-This appears to be a secondary or compatibility datastore rather than the primary runtime data backbone.
-
-### Filesystem-backed legacy inputs
-
-The system still interacts with filesystem directories for:
-
-- legacy imports
-- permanent/station data directories
-- PSS XML integration
-- local certificates
-
-This is an important compatibility concern in deployments that still ingest legacy outputs.
-
-## Bootstrap and configuration architecture
-
-Bootstrap begins in platform runtime/server startup and includes:
-
-- Postgres migrations
-- advisory locking to prevent duplicate first-boot execution
-- station creation or reconciliation
-- station settings seeding
-- legacy import if available
-- station config bootstrap
-- bootstrap completion markers in station KV
-
-Configuration can originate from:
-
-- env vars
-- station KV
-- DB-stored `station_config`
-- imported JSON config
-- platform defaults
-
-The config loader merges/minimizes these sources and validates them against schema.
-
-## Authentication and security
-
-### Authentication model
-
-- session-cookie based auth
-- login route issues server-side sessions
-- session cookie name: `tin_capture_session`
-- role-aware route guards around most API handlers
-
-### CSRF model
-
-Mutation helpers validate CSRF by default using headers and/or body tokens.
-
-### Authorization model
-
-Role checks are centralized through shared auth/platform policy helpers. Observed roles include:
-
-- tenant
-- manager
-- administrator
-
-### Other security-related concerns
-
-The repo also contains:
-
-- rate-limit helpers
-- secure-artifact support
-- password hashing and session cleanup logic
-- request/body validation wrappers
-
-## Reliability mechanisms
-
-The architecture includes several resilience features:
-
-### 1) Process guard
-
-`server.ts` uses a DOMS process guard to avoid problematic duplicate process startup behavior in some deployment modes.
-
-### 2) Advisory locks
-
-First-boot initialization uses Postgres advisory locks to serialize bootstrap work.
-
-### 3) Worker heartbeats
-
-Workers upsert heartbeat records, allowing stale-worker detection and restart logic.
-
-### 4) In-process monitoring
-
-`startInProcessRuntime` monitors worker heartbeat freshness and can restart stale workers with exponential backoff.
-
-### 5) Production diagnostics wrapper
-
-`start.cjs` adds diagnostics for:
-
-- uncaught exceptions
-- unhandled rejections
-- process lifecycle events
-- optional heartbeat file emission
-- optional redacted env dumps
-
-### 6) Health and readiness endpoints
-
-- `/api/healthz`
-- `/api/readyz`
-- `/api/metrics`
-
-## Deployment shape
-
-### Build
-
-```text
-next build
-+ esbuild bundle of server.ts -> vpos-server.cjs
-```
-
-### Runtime
-
-- Next standalone output is enabled in `next.config.mjs`
-- `start.cjs` is the production-friendly wrapper
-- the server can run in HTTP or HTTPS mode
-- websocket support is attached in the same process
-
-### Operational implication
-
-This is best deployed as a **small set of cooperating Node processes**:
-
-- 1 web process
-- optionally 1 omnibus worker process
-- optionally additional dedicated workers for queue isolation
-
-## Key architectural strengths
-
-- strong domain/module decomposition for a single-repo system
-- centralized route/auth/error-handling helpers
-- practical runtime supervision and heartbeat support
-- explicit first-boot and migration flow
-- flexible worker deployment model
-- clear separation between platform concerns and business modules
-
-## Current architectural trade-offs
-
-### 1) Hybrid legacy/canonical structure
-
-Some files are clearly marked as compatibility or migration-era paths. This is workable, but it increases the cognitive load for maintainers.
-
-### 2) Runtime divergence
-
-The local server runtime, omnibus worker runtime, and standalone worker entrypoints do not all start exactly the same set of services. That is intentional today, but must stay documented or operators will make incorrect assumptions.
-
-### 3) Mixed persistence story
-
-The system is operationally Postgres-first, but still carries Azure SQL and filesystem compatibility paths. That adds flexibility at the cost of complexity.
-
-### 4) Large route surface
-
-The API surface is broad and operationally rich. That is useful for the product, but it raises the importance of consistent route conventions, integration testing, and endpoint ownership.
-
-## Extension guidance
-
-When adding new functionality, follow this pattern where possible:
-
-1. create or extend a business module under `src/modules/<capability>`
-2. put use-case logic in `application/`
-3. isolate persistence/adapters in `infrastructure/`
-4. expose HTTP behavior through `app/api/**`
-5. use platform route helpers for auth/CSRF/error handling
-6. prefer platform/shared facades instead of reaching directly across unrelated modules
-7. add heartbeat/observability if the feature introduces background processing
-
-## Suggested future cleanup
-
-To make the architecture easier to operate and document, the next improvements would be:
-
-- standardize which runtime responsibilities belong to web vs omnibus vs standalone workers
-- add explicit runbooks for each runtime mode
-- publish an `.env.example`
-- publish a DB schema map for the top 20 tables
-- add a formal test runner and CI command
-- continue collapsing legacy compatibility paths behind platform/module facades
+Direct API-route imports of database and feature infrastructure have been removed. Feature-owned behavior has also been moved out of `src/shared`, so the `apiRouteToInfrastructure`, `sharedToFeature`, and `domainToInfrastructure` baselines are all zero. Remaining migration debt includes import cycles and large orchestration files. New work must preserve the zero baselines and reduce the remaining debt incrementally with tests at each boundary.

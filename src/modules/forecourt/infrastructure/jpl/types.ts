@@ -1,3 +1,9 @@
+import type {
+  BufferHealthState,
+  BufferMode,
+  PumpBufferHealth,
+} from '@/src/shared/forecourt/bufferHealthTypes'
+
 export type AdapterState = {
   connected: boolean
   loggedOn?: boolean
@@ -72,23 +78,11 @@ export type AdapterState = {
   }>
 }
 
-export type BufferMode = 'supervised' | 'unsupervised'
-
-export type PumpBufferHealth = {
-  pumpId: number
-  depth: number
-  lastSeqNo: number | null
-  lastStatusAt: number | null
-  lastReadAt: number | null
-  lastClearAt: number | null
-  lastError?: string
-}
-
-export type BufferHealthState = {
-  updatedAt: number
-  supervised: Record<string, PumpBufferHealth>
-  unsupervised: Record<string, PumpBufferHealth>
-}
+export type {
+  BufferHealthState,
+  BufferMode,
+  PumpBufferHealth,
+} from '@/src/shared/forecourt/bufferHealthTypes'
 
 export type NozzleMapping = {
   nozzleId: string
@@ -146,10 +140,19 @@ export type SupervisedReplayRow = {
   lock_id: string | null
   read_payload_json: any | null
   clear_fields_json: any | null
+  payload_owner: 'checkpoint' | 'legacy_replay' | 'cleared'
+  normalized_transaction_id: string | null
+  payload_cleared_at: string | null
+  payload_clear_reason: string | null
+  terminal_at: string | null
+  terminal_outcome: string | null
   captured_at: string | null
   cleared_at: string | null
   last_error: string | null
   updated_at: string
+  transaction_id?: string | null
+  transaction_status?: string | null
+  transaction_deleted_at?: string | null
 }
 
 export type ReplayRejectKind =

@@ -1,4 +1,3 @@
-import { queryOne } from '@/src/platform/db/postgres'
 import { ok } from '@/src/platform/web/api/response'
 import {
   defineGetRoute,
@@ -9,17 +8,21 @@ import {
   DatasetType,
   listCountryDatasetRows,
   listCountryDatasetSummaries,
+  resetCountryDatasetToBundledDefaults,
   setCountryDatasetActive,
   upsertCountryDataset,
   upsertCountryDatasetRow,
 } from '@/src/shared/server/config/countryDatasets'
-import { seedCountryConfig } from '@/src/shared/server/config/seedCountryConfig'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type Body = {
-  action?: 'import-country-dataset' | 'upsert-row' | 'set-country-active'
+  action?:
+    | 'import-country-dataset'
+    | 'upsert-row'
+    | 'set-country-active'
+    | 'reset-to-bundled-defaults'
   csrf_token?: string
   csrfToken?: string
   countryCode?: string
@@ -39,19 +42,6 @@ type Body = {
   description?: string | null
   rate?: number | null
   sortOrder?: number
-}
-
-const refreshSeededConfigIfCurrent = async (countryCode: string) => {
-  const normalized = String(countryCode || '')
-    .trim()
-    .toUpperCase()
-  if (!normalized) return
-  const seeded = await queryOne<{ value: string }>(
-    `SELECT value FROM app_settings WHERE key = 'CONFIG_SEEDED_COUNTRY'`,
-  )
-  if (String(seeded?.value || '').toUpperCase() === normalized) {
-    await seedCountryConfig(normalized, { force: true })
-  }
 }
 
 const parseDatasetType = (value: string | null): DatasetType => {
@@ -93,6 +83,13 @@ export const POST = defineMutationRoute<Body>({
       })
     }
 
+    if (body.action === 'reset-to-bundled-defaults') {
+      const country = await resetCountryDatasetToBundledDefaults(
+        String(body.countryCode || ''),
+      )
+      return ok({ country, countries: await listCountryDatasetSummaries() })
+    }
+
     if (body.action === 'upsert-row') {
       const targetCountryCode = String(body.countryCode || '')
       const rows = await upsertCountryDatasetRow({
@@ -106,7 +103,6 @@ export const POST = defineMutationRoute<Body>({
         isActive: body.isActive ?? true,
         sortOrder: Number(body.sortOrder ?? 0),
       })
-      await refreshSeededConfigIfCurrent(targetCountryCode)
       return ok({ rows })
     }
 
@@ -124,7 +120,6 @@ export const POST = defineMutationRoute<Body>({
       dataset: body.dataset,
     })
 
-    await refreshSeededConfigIfCurrent(targetCountryCode)
     return ok({ country, countries: await listCountryDatasetSummaries() })
   },
 })

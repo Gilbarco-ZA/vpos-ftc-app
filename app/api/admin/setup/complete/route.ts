@@ -7,7 +7,7 @@ import { completeAdminSetup } from '@/src/modules/setup/application/completeAdmi
 export const POST = defineMutationRoute<Record<string, unknown>>({
   roles: ['administrator'],
   csrf: false,
-  handler: async (_req, { user, body }) => {
+  handler: async (_req, { user }) => {
     const result = await completeAdminSetup(user.stationId)
     if (!(result as any)?.success) {
       return NextResponse.json(

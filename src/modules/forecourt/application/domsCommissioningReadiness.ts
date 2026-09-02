@@ -1,11 +1,11 @@
-import { getForecourtSettings } from '@/src/shared/forecourt/settings'
+import { getForecourtSettings } from '@/src/modules/forecourt/application/forecourtSettings'
 
 import type {
   DomsCommissioningReadiness,
   DomsCommissioningStatus,
 } from './domsCommissioningReadiness.helpers'
+import { getDomsCommissioningChecklist } from './domsCommissioningChecklist'
 import {
-  buildDomsFirstSiteCommissioningChecklist,
   buildDomsLegacyToJplRunbook,
   validateDomsLiveConnectionSettings,
 } from './domsCommissioningReadiness.helpers'
@@ -44,13 +44,19 @@ const deriveConnected = (diagnostics: any) => {
 export async function getDomsCommissioningReadiness(
   stationId: string,
 ): Promise<DomsCommissioningReadiness> {
-  const [settings, diagnostics, reconciliation, fieldValidation] =
-    await Promise.all([
-      getForecourtSettings(stationId),
-      getAdminForecourtDiagnostics(stationId).catch(() => null),
-      getDomsConfigurationReconciliation(stationId).catch(() => null),
-      getDomsFieldValidationReadiness(stationId).catch(() => null),
-    ])
+  const [
+    settings,
+    diagnostics,
+    reconciliation,
+    fieldValidation,
+    commissioningChecklist,
+  ] = await Promise.all([
+    getForecourtSettings(stationId),
+    getAdminForecourtDiagnostics(stationId).catch(() => null),
+    getDomsConfigurationReconciliation(stationId).catch(() => null),
+    getDomsFieldValidationReadiness(stationId).catch(() => null),
+    getDomsCommissioningChecklist(stationId),
+  ])
 
   const settingsValidation = validateDomsLiveConnectionSettings(settings)
   const connected = deriveConnected(diagnostics)
@@ -79,7 +85,8 @@ export async function getDomsCommissioningReadiness(
     status,
     generatedAt: new Date().toISOString(),
     settingsValidation,
-    commissioningChecklist: buildDomsFirstSiteCommissioningChecklist(),
+    commissioningChecklist: commissioningChecklist.steps,
+    commissioningChecklistSummary: commissioningChecklist.summary,
     legacyToJplRunbook: buildDomsLegacyToJplRunbook(),
     liveReadiness: {
       connected,

@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import type { Json } from '@/src/modules/admin-config/presentation/config-editor'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 
@@ -24,7 +24,6 @@ import { StationConfigSection } from './StationConfigSection'
 
 export default function AdminConfigPage() {
   const [csrf, setCsrf] = useState('')
-  const [stationConfig, setStationConfig] = useState<Json>(null)
   const [plugins, setPlugins] = useState<any[]>([])
   const [devices, setDevices] = useState<any[]>([])
   const [effective, setEffective] = useState<Json>(null)
@@ -87,7 +86,7 @@ export default function AdminConfigPage() {
     }
   }, [stationConfigText])
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setError(null)
     setNotice(null)
     setIsLoading(true)
@@ -118,7 +117,6 @@ export default function AdminConfigPage() {
       )
       const effJson = await safeAsync(effRes.json(), 'configPage.effJson')
 
-      setStationConfig(stationJson)
       setPlugins(
         Array.isArray(pluginsJson) ? pluginsJson : (pluginsJson?.data ?? []),
       )
@@ -137,16 +135,17 @@ export default function AdminConfigPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  useEffect(() => {
-    safeAsync(loadAll(), 'configPage.loadAll')
   }, [])
 
   useEffect(() => {
-    if (mode === 'basic') {
-      setShowAdvancedJson(false)
-    }
+    queueMicrotask(() => {
+      safeAsync(loadAll(), 'configPage.loadAll')
+    })
+  }, [loadAll])
+
+  useEffect(() => {
+    if (mode !== 'basic') return
+    queueMicrotask(() => setShowAdvancedJson(false))
   }, [mode])
 
   const saveStation = async () => {

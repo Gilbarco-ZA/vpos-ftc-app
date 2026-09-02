@@ -1,21 +1,26 @@
 import type { TransactionQueueRow } from '@/src/modules/transactions/infrastructure/transactionQueueRepo'
 
-import { queryAll, queryOne } from '@/src/platform/db/postgres'
+import {
+  getPostgresPoolDiagnostics,
+  queryAll,
+  queryOne,
+} from '@/src/platform/db/postgres'
 import { calculateExponentialBackoffSeconds } from '@/src/platform/queue/retry-policy'
 import { advisoryUnlock, tryAdvisoryLock } from '@/src/shared/db/locks'
 import { toNumberOr } from '@/src/shared/numbers'
 import { getRuntimeBus } from '@/src/shared/runtime/bus'
-import {
-  enqueueFiscalInboxMessage,
-  enqueueFiscalInboxReviewFailure,
-} from '@/src/shared/runtime/fiscalInbox'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { listSetupCountryOptions } from '@/src/shared/server/config/countryDatasets'
 import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
+import { serializeError } from '@/src/shared/utils/serializeError'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import { customersRepo } from '@/src/modules/customers/infrastructure/customersRepo'
+import {
+  enqueueFiscalInboxMessage,
+  enqueueFiscalInboxReviewFailure,
+} from '@/src/modules/fiscal-inbox/application/fiscalInbox'
 import { fuelStationsRepo } from '@/src/modules/forecourt/infrastructure/repositories/fuelStationsRepo'
 import { completeTransactionFiscalization } from '@/src/modules/transactions/application/commands/complete-transaction-fiscalization'
 import { failTransactionFiscalization } from '@/src/modules/transactions/application/commands/fail-transaction-fiscalization'
@@ -34,6 +39,8 @@ let stopRequested = false
 let loopTimer: NodeJS.Timeout | null = null
 let heartbeatTimer: NodeJS.Timeout | null = null
 let controller: { stop: () => void } | null = null
+let loopInFlight = false
+let heartbeatInFlight = false
 
 async function claimNextBatch(limit = 5): Promise<TransactionQueueRow[]> {
   return await transactionQueueRepo.claimNextBatch(limit)
@@ -371,7 +378,7 @@ async function processCreditNote(row: TransactionQueueRow) {
       }).catch((err) => {
         logger.error('[vpos-transactions]', {
           msg: 'Failed to enqueue credit note fiscalized notification',
-          error: err,
+          error: serializeError(err),
         })
       })
       await markDone(row.id, row.station_id, { transactionId, creditNoteId })
@@ -410,7 +417,7 @@ async function processCreditNote(row: TransactionQueueRow) {
     }).catch((err) => {
       logger.error('[vpos-transactions]', {
         msg: 'Failed to enqueue credit note fiscal inbox review item',
-        error: err,
+        error: serializeError(err),
         queueId: row.id,
       })
     })
@@ -517,7 +524,7 @@ async function processOne(row: TransactionQueueRow) {
       }).catch((err) => {
         logger.error('[vpos-transactions]', {
           msg: 'Failed to enqueue fiscalized notification',
-          error: err,
+          error: serializeError(err),
         })
       })
     } else {
@@ -535,7 +542,7 @@ async function processOne(row: TransactionQueueRow) {
       }).catch((err) => {
         logger.error('[vpos-transactions]', {
           msg: 'Failed to enqueue failure notification',
-          error: err,
+          error: serializeError(err),
         })
       })
     }
@@ -577,7 +584,7 @@ async function processOne(row: TransactionQueueRow) {
     }).catch((err) => {
       logger.error('[vpos-transactions]', {
         msg: 'Failed to enqueue fiscal inbox review item',
-        error: err,
+        error: serializeError(err),
         queueId: row.id,
       })
     })
@@ -619,6 +626,15 @@ async function heartbeatAllStations() {
   )
 }
 
+const shouldYieldToForegroundDatabaseWork = () => {
+  const pool = getPostgresPoolDiagnostics()
+  if (pool.totalCount === 0) return false
+  return (
+    pool.waitingCount > 0 ||
+    (pool.idleCount === 0 && pool.totalCount >= pool.max)
+  )
+}
+
 async function workerLoop() {
   if (!(await tryAdvisoryLock(`worker:${WORKER_NAME}`))) return
   try {
@@ -636,6 +652,45 @@ async function workerLoop() {
   }
 }
 
+async function runWorkerLoop() {
+  if (stopRequested || loopInFlight || shouldYieldToForegroundDatabaseWork())
+    return
+  loopInFlight = true
+  try {
+    await workerLoop()
+  } catch (error) {
+    logger.error(`[${WORKER_NAME}]`, {
+      msg: 'loop error',
+      error: serializeError(error),
+      pool: getPostgresPoolDiagnostics(),
+    })
+  } finally {
+    loopInFlight = false
+  }
+}
+
+async function runHeartbeat() {
+  if (
+    stopRequested ||
+    heartbeatInFlight ||
+    shouldYieldToForegroundDatabaseWork()
+  ) {
+    return
+  }
+  heartbeatInFlight = true
+  try {
+    await heartbeatAllStations()
+  } catch (error) {
+    logger.error(`[${WORKER_NAME}]`, {
+      msg: 'heartbeat error',
+      error: serializeError(error),
+      pool: getPostgresPoolDiagnostics(),
+    })
+  } finally {
+    heartbeatInFlight = false
+  }
+}
+
 export function startTransactionQueueWorker(opts?: { pollMs?: number }) {
   // Idempotent: return existing controller if already started
   if (started && controller) return controller
@@ -644,26 +699,17 @@ export function startTransactionQueueWorker(opts?: { pollMs?: number }) {
 
   const pollMs = Math.max(200, opts?.pollMs ?? DEFAULT_POLL_MS)
 
-  // kick immediately
-  workerLoop().catch((e) =>
-    logger.error(`[${WORKER_NAME}]`, { msg: 'loop error', error: e }),
-  )
-  heartbeatAllStations().catch((e) =>
-    logger.error(`[${WORKER_NAME}]`, { msg: 'heartbeat error', error: e }),
-  )
+  // kick immediately. Both loops are process-local single-flight so a slow
+  // database acquisition cannot accumulate one Promise per interval tick.
+  void runWorkerLoop()
+  void runHeartbeat()
 
   loopTimer = setInterval(() => {
-    if (stopRequested) return
-    workerLoop().catch((e) =>
-      logger.error(`[${WORKER_NAME}]`, { msg: 'loop error', error: e }),
-    )
+    void runWorkerLoop()
   }, pollMs)
 
   heartbeatTimer = setInterval(() => {
-    if (stopRequested) return
-    heartbeatAllStations().catch((e) =>
-      logger.error(`[${WORKER_NAME}]`, { msg: 'heartbeat error', error: e }),
-    )
+    void runHeartbeat()
   }, HEARTBEAT_MS)
 
   controller = {
@@ -675,6 +721,8 @@ export function startTransactionQueueWorker(opts?: { pollMs?: number }) {
       loopTimer = null
       heartbeatTimer = null
       controller = null
+      // Do not clear in-flight flags here: an async iteration may still be
+      // unwinding. A replacement worker waits for that iteration to finish.
     },
   }
   return controller

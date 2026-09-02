@@ -1,24 +1,15 @@
-import type { SessionUser } from '@/src/shared/types'
-
-import { queryOne as pgOne } from '@/src/platform/db/postgres'
-import { ok, serverError } from '@/src/platform/web/api/response'
-import { requireAuth } from '@/src/shared/auth'
+import { ok } from '@/src/platform/web/api/response'
+import { defineGetRoute } from '@/src/shared/http/defineRoute'
 
 export const dynamic = 'force-dynamic'
 
-export const GET = async () => {
-  let user: SessionUser | null = null
-  try {
-    user = await requireAuth(['administrator'])
-    if (!user) {
-      return await serverError('User not found')
-    }
-    const row = await pgOne<any>(
-      `SELECT * FROM sync_state WHERE station_id = $1`,
-      [user.stationId],
-    )
-    return ok(row)
-  } catch (err) {
-    return await serverError(err, { stationId: user?.stationId })
-  }
-}
+export const GET = defineGetRoute({
+  roles: ['administrator'],
+  handler: async () =>
+    ok({
+      retired: true,
+      owner: 'vpos-proxy',
+      message:
+        'Legacy Azure SQL station synchronization is retired. Cloud-bound operational data is delivered through vpos-proxy.',
+    }),
+})

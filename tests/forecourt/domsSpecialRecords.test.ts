@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  hashDomsSpecialRecord,
   isEmptyDomsBackOfficeRecord,
   normalizeDomsBackOfficeRecord,
   normalizeDomsServiceMessageRecord,
@@ -25,6 +26,23 @@ describe('DOMS/JPL special record normalization', () => {
     assert.equal(first.seqNo, '07')
     assert.equal(first.message, '19990911 235959 04 02')
     assert.equal(first.sourceHash, second.sourceHash)
+  })
+
+  it('hashes nested arrays and primitives deterministically', () => {
+    const first = hashDomsSpecialRecord('record', [1, { b: 2, a: 1 }])
+    const second = hashDomsSpecialRecord('record', [1, { a: 1, b: 2 }])
+
+    assert.equal(first, second)
+  })
+
+  it('normalizes blank service-message sequence numbers as absent', () => {
+    const record = normalizeDomsServiceMessageRecord({
+      stationId: '00000000-0000-0000-0000-000000000001',
+      seqNo: '   ',
+      message: 'ready',
+    })
+
+    assert.equal(record.seqNo, undefined)
   })
 
   it('detects empty back office records per supported subcode', () => {

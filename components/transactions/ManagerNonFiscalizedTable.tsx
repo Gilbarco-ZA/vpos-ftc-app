@@ -4,9 +4,14 @@ import type { TransactionBuilderProduct } from '@/components/transactions/Transa
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Pencil } from 'lucide-react'
+import { LockKeyhole, Pencil } from 'lucide-react'
 
 import { formatNumber } from '@/src/shared/utils/format'
+
+import {
+  getTransactionItemEditability,
+  isTransactionItemStatusEditable,
+} from '@/src/modules/transactions/domain/transaction-editability'
 
 import { CsrfHiddenInput } from '@/components/security/CsrfHiddenInput'
 import { AllocateTransactionModalForm } from '@/components/transactions/allocate/AllocateTransactionModalForm'
@@ -38,10 +43,9 @@ import {
 
 type TxnRow = any
 
-const canEditItems = (status: string) =>
-  ['OPEN', 'ALLOCATED', 'FAILED', 'PENDING'].includes(
-    String(status || '').toUpperCase(),
-  )
+const canEditItems = (transaction: TxnRow) =>
+  isTransactionItemStatusEditable(transaction?.status) &&
+  getTransactionItemEditability(transaction).editable
 
 export function ManagerNonFiscalizedTable(props: {
   rows: TxnRow[]
@@ -55,7 +59,7 @@ export function ManagerNonFiscalizedTable(props: {
   const [tableRows, setTableRows] = useState<TxnRow[]>(props.rows || [])
 
   useEffect(() => {
-    setTableRows(props.rows || [])
+    queueMicrotask(() => setTableRows(props.rows || []))
   }, [props.rows])
   const [allocateTxn, setAllocateTxn] = useState<TxnRow | null>(null)
   const [detailsTxn, setDetailsTxn] = useState<TxnRow | null>(null)
@@ -70,7 +74,12 @@ export function ManagerNonFiscalizedTable(props: {
   const mapped = useMemo(() => {
     return (tableRows || []).map((t) => {
       const dt = t.transaction_date_time ? String(t.transaction_date_time) : ''
-      const customerName = t.customer_trade_name || t.customer_id || ''
+      const customerName =
+        t.customer_buyer_name ||
+        t.customer_trade_name ||
+        t.buyer_name ||
+        t.customer_id ||
+        ''
       const customerTin = t.customer_tin || ''
       const unassigned = !customerName && !customerTin
       return {
@@ -109,9 +118,13 @@ export function ManagerNonFiscalizedTable(props: {
         <TableBody>
           {mapped.map((t) => {
             const normalizedStatus = String(t.status || '').toUpperCase()
-            const canQueue = ['ALLOCATED', 'OPEN', 'FAILED'].includes(
-              normalizedStatus,
-            )
+            const canQueueStatus = [
+              'ALLOCATED',
+              'OPEN',
+              'FAILED',
+              'PENDING',
+            ].includes(normalizedStatus)
+            const canQueue = canQueueStatus && !t._unassigned
             return (
               <TableRow key={t.id} className="align-top">
                 <TableCell className="whitespace-nowrap">
@@ -190,12 +203,20 @@ export function ManagerNonFiscalizedTable(props: {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {canEditItems(t.status) ? (
+                      {canEditItems(t) ? (
                         <DropdownMenuItem onSelect={() => setEditingTxn(t)}>
                           <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
                           Edit items
                         </DropdownMenuItem>
-                      ) : null}
+                      ) : getTransactionItemEditability(t).editable ? null : (
+                        <DropdownMenuItem disabled>
+                          <LockKeyhole
+                            className="mr-2 h-4 w-4"
+                            aria-hidden="true"
+                          />
+                          Pump fuel items are read-only
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         disabled={!canQueue}
                         onSelect={(event) => {
@@ -206,7 +227,9 @@ export function ManagerNonFiscalizedTable(props: {
                           submitFiscalize(String(t.id))
                         }}
                       >
-                        Send to fiscalization
+                        {t._unassigned
+                          ? 'Link customer before fiscalization'
+                          : 'Send to fiscalization'}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() =>
@@ -285,6 +308,7 @@ export function ManagerNonFiscalizedTable(props: {
                 transactionId={allocateTxn.id}
                 initialQuery={
                   allocateTxn.customer_tin ||
+                  allocateTxn.customer_buyer_name ||
                   allocateTxn.customer_trade_name ||
                   ''
                 }

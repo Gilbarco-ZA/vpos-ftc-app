@@ -1,60 +1,73 @@
-import type { ReactNode } from 'react'
-
 import { DeviceStatusPanel } from '@/components/admin/device/DeviceStatusPanel'
 import { DashboardSummary } from '@/components/dashboard/DashboardSummary'
-import { PageHeader } from '@/components/layout/page-header'
+import { DashboardHero } from '@/components/hero/dashboard-hero'
 
 export type DashboardRole = 'tenant' | 'manager' | 'administrator'
 
 type RoleConfig = {
-  title: string
-  description: string
+  tagline: string
   summaryTitle: string
-  eyebrow?: string
-  actions?: ReactNode
+  roleLabel: string
 }
 
 const getRoleConfig = (role: DashboardRole): RoleConfig => {
   if (role === 'tenant') {
     return {
-      title: 'Dashboard',
-      description: 'Overview of your station activity and device status.',
+      tagline:
+        'Fast access to station activity, receipts, and forecourt status.',
       summaryTitle: 'Activity Summary',
-      eyebrow: 'Overview',
+      roleLabel: 'Operator workspace',
     }
   }
 
   if (role === 'manager') {
     return {
-      title: 'Dashboard',
-      description: 'Monitor transactions, devices, and station performance.',
+      tagline: 'Monitor transactions, devices, and station performance.',
       summaryTitle: 'Activity Summary',
-      eyebrow: 'Manager View',
+      roleLabel: 'Manager workspace',
     }
   }
 
   return {
-    title: 'Dashboard',
-    description: 'Complete overview of station operations and system status.',
+    tagline: 'Complete operational, fiscal, and forecourt oversight.',
     summaryTitle: 'Activity Summary',
-    eyebrow: 'Administrator',
+    roleLabel: 'Administrator workspace',
   }
 }
 
-export const RoleDashboardHome = ({ role }: { role: DashboardRole }) => {
+export const RoleDashboardHome = ({
+  role,
+  stationName,
+  stationCode,
+  logoPath,
+}: {
+  role: DashboardRole
+  stationName: string
+  stationCode?: string | null
+  logoPath?: string | null
+}) => {
   const config = getRoleConfig(role)
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title={config.title}
-        description={config.description}
-        eyebrow={config.eyebrow}
-        actions={config.actions}
+      <DashboardHero
+        stationName={stationName}
+        stationCode={stationCode}
+        logoPath={logoPath}
+        tagline={config.tagline}
+        roleLabel={config.roleLabel}
+        statuses={[
+          { label: 'Workspace', value: 'Ready', tone: 'success' },
+          { label: 'Data range', value: 'Today', tone: 'primary' },
+        ]}
       />
 
-      <DashboardSummary title={config.summaryTitle} initialPreset="today" />
-      <DeviceStatusPanel />
+      <div className="glass-panel rounded-2xl p-1 shadow-card">
+        <DashboardSummary title={config.summaryTitle} initialPreset="today" />
+      </div>
+      <div className="glass-panel rounded-2xl p-1 shadow-card">
+        <DeviceStatusPanel />
+      </div>
     </div>
   )
 }

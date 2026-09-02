@@ -1,11 +1,15 @@
-import type { PumpStateSnapshot } from '@/src/shared/pumps/store'
+import type { PumpStateSnapshot } from '@/src/modules/pumps/infrastructure/pumpStore'
 
 import { readPumpSnapshot } from '@/src/shared/forecourt/sharedState'
-import { getPumpState, startPumpBusListener } from '@/src/shared/pumps/store'
 import { getPumpsConfigFromDb } from '@/src/shared/setup/forecourtSync'
 import { KV_KEYS } from '@/src/shared/setup/keys'
 import { kvGet } from '@/src/shared/storage/stationKv'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
+
+import {
+  getPumpState,
+  startPumpBusListener,
+} from '@/src/modules/pumps/infrastructure/pumpStore'
 
 export type PumpStatePayload = {
   config: any

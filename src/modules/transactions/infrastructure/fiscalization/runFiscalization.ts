@@ -6,7 +6,10 @@ import {
   getStationCountryCode,
   isTanzaniaCountry,
 } from '@/src/modules/tanzania-fiscal/infrastructure/country'
-import { assertLocalTanzaniaFiscalizationRoute } from '@/src/modules/tanzania-fiscal/infrastructure/route'
+import {
+  assertLocalTanzaniaFiscalizationRoute,
+  resolveFiscalizationDefaults,
+} from '@/src/modules/tanzania-fiscal/infrastructure/route'
 import { getFiscalAdapter } from '@/src/modules/transactions/infrastructure/fiscalization/adapters'
 
 export type { FiscalRunResult }
@@ -31,13 +34,18 @@ export const runFiscalization = async (params: {
     [params.stationId],
   )
 
-  const engine = String(settings?.fiscalization_engine || 'mock')
+  const country = await getStationCountryCode(params.stationId)
+  const defaults = resolveFiscalizationDefaults({
+    country,
+    fiscalizationEngine: settings?.fiscalization_engine ?? null,
+    fiscalizationTransport: settings?.fiscalization_transport ?? null,
+  })
+  const engine = defaults.fiscalizationEngine
   const normalizedEngine = engine.toUpperCase()
 
   if (normalizedEngine === 'TZ') {
     await assertLocalTanzaniaFiscalizationRoute(params.stationId)
   } else {
-    const country = await getStationCountryCode(params.stationId)
     if (isTanzaniaCountry(country)) {
       throw new Error(
         `Tanzania stations must use fiscalization_engine TZ for local fiscalization. Current engine: ${engine}.`,

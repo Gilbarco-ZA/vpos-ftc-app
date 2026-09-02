@@ -1,4 +1,4 @@
-import { listForecourtLiveEvents } from '@/src/shared/forecourt/admin'
+import { listForecourtLiveEvents } from '@/src/modules/forecourt/application/forecourtAdmin'
 
 import { listForecourtEvents } from '../infrastructure/adminRepo'
 
@@ -7,8 +7,8 @@ export async function listAdminForecourtEvents(
   searchParams: URLSearchParams,
 ) {
   const limit = Math.min(
-    500,
-    Math.max(1, Number(searchParams.get('limit') || 100)),
+    200,
+    Math.max(1, Number(searchParams.get('limit') || 50)),
   )
   const since = searchParams.get('since')
   const until = searchParams.get('until')

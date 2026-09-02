@@ -187,6 +187,7 @@ export async function getNozzleByPumpGradeOption(params: {
       WHERE station_id = $1
         AND pump_id = $2
         AND doms_grade_option_id = $3
+        AND is_active = TRUE
         AND ($4::uuid IS NULL OR id <> $4::uuid)
       LIMIT 1`,
     [

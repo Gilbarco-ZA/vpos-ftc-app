@@ -2,9 +2,18 @@
 
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { useEffect, useMemo, useState } from 'react'
-import { Minus, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react'
+import {
+  LockKeyhole,
+  Minus,
+  Plus,
+  Search,
+  ShoppingBag,
+  Trash2,
+} from 'lucide-react'
 
 import { formatNumber } from '@/src/shared/utils/format'
+
+import { isFuelLikeProduct } from '@/src/modules/transactions/domain/product-classification'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -51,6 +60,8 @@ export type TransactionBuilderLine = {
   quantity: number
   unitPrice: number
   currency?: string | null
+  categoryName?: string | null
+  isFuel?: boolean
 }
 
 export type TransactionFuelSelection = {
@@ -101,10 +112,10 @@ type TransactionProductEditorProps = {
   resetKey?: string | number
   catalogDisplay?: 'inline' | 'picker'
   allowFuelSelectionEditing?: boolean
+  lockedProductIds?: string[]
+  excludeFuelProductsFromCatalog?: boolean
 }
 
-const FUEL_PRODUCT_PATTERN =
-  /(fuel|petrol|diesel|gasoline|gasolina|kerosene|super|unleaded|octane|lpg|cng|ago|pms)/i
 const EMPTY_INITIAL_LINES: TransactionBuilderLine[] = []
 
 const clampQty = (value: number) => {
@@ -116,23 +127,6 @@ const clampQty = (value: number) => {
 const cleanText = (value: unknown) => {
   const text = String(value ?? '').trim()
   return text.length > 0 ? text : null
-}
-
-const isFuelLikeProduct = (product: TransactionBuilderProduct | undefined) => {
-  if (!product) return false
-
-  const category = String(product.categoryName || '')
-    .trim()
-    .toUpperCase()
-  if (category === 'FUEL') {
-    return true
-  }
-
-  return FUEL_PRODUCT_PATTERN.test(
-    [product.productName, product.productCode, product.categoryName]
-      .filter(Boolean)
-      .join(' '),
-  )
 }
 
 const uniqueBy = <T,>(items: T[], getKey: (item: T) => string) => {
@@ -168,6 +162,8 @@ export default function TransactionProductEditor({
   resetKey,
   catalogDisplay = 'inline',
   allowFuelSelectionEditing = true,
+  lockedProductIds = [],
+  excludeFuelProductsFromCatalog = false,
 }: TransactionProductEditorProps) {
   const [search, setSearch] = useState('')
   const [lines, setLines] = useState<TransactionBuilderLine[]>(initialLines)
@@ -185,23 +181,32 @@ export default function TransactionProductEditor({
   const [fuelOptionsLoading, setFuelOptionsLoading] = useState(false)
   const [fuelOptionsError, setFuelOptionsError] = useState<string | null>(null)
 
+  const lockedProductIdSet = useMemo(
+    () => new Set(lockedProductIds.map((value) => String(value))),
+    [lockedProductIds],
+  )
+
   useEffect(() => {
-    setLines(initialLines)
+    queueMicrotask(() => setLines(initialLines))
   }, [initialLines])
 
   useEffect(() => {
-    setFuelSelection(initialFuelSelection ?? emptyFuelSelection())
+    queueMicrotask(() =>
+      setFuelSelection(initialFuelSelection ?? emptyFuelSelection()),
+    )
   }, [initialFuelSelection])
 
   useEffect(() => {
-    setPumpNumber(String(initialPumpNumber))
-    setPosReference(initialPosReference)
-    setSearch('')
-    setError(null)
-    setSubmitting(false)
-    setPickerOpen(false)
-    setLines(initialLines)
-    setFuelSelection(initialFuelSelection ?? emptyFuelSelection())
+    queueMicrotask(() => {
+      setPumpNumber(String(initialPumpNumber))
+      setPosReference(initialPosReference)
+      setSearch('')
+      setError(null)
+      setSubmitting(false)
+      setPickerOpen(false)
+      setLines(initialLines)
+      setFuelSelection(initialFuelSelection ?? emptyFuelSelection())
+    })
   }, [
     initialPumpNumber,
     initialPosReference,
@@ -258,6 +263,9 @@ export default function TransactionProductEditor({
     if (!shouldShowCatalogResults) return []
     return products
       .filter((product) => {
+        if (excludeFuelProductsFromCatalog && isFuelLikeProduct(product)) {
+          return false
+        }
         if (!searchTerm) return true
         const haystack = [
           product.productName,
@@ -271,7 +279,12 @@ export default function TransactionProductEditor({
         return haystack.includes(searchTerm)
       })
       .slice(0, 16)
-  }, [products, searchTerm, shouldShowCatalogResults])
+  }, [
+    excludeFuelProductsFromCatalog,
+    products,
+    searchTerm,
+    shouldShowCatalogResults,
+  ])
 
   const totalAmount = useMemo(
     () => lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0),
@@ -289,8 +302,17 @@ export default function TransactionProductEditor({
   const fuelProductIds = useMemo(
     () =>
       lines
-        .map((line) => String(line.productId))
-        .filter((productId) => isFuelLikeProduct(productById.get(productId))),
+        .filter((line) => {
+          const product = productById.get(String(line.productId))
+          return Boolean(
+            line.isFuel ||
+            isFuelLikeProduct({
+              ...product,
+              categoryName: line.categoryName ?? product?.categoryName ?? null,
+            }),
+          )
+        })
+        .map((line) => String(line.productId)),
     [lines, productById],
   )
   const hasFuelLine = fuelProductIds.length > 0
@@ -356,7 +378,7 @@ export default function TransactionProductEditor({
 
   useEffect(() => {
     if (!hasFuelLine) {
-      setFuelSelection(emptyFuelSelection())
+      queueMicrotask(() => setFuelSelection(emptyFuelSelection()))
       return
     }
 
@@ -382,15 +404,17 @@ export default function TransactionProductEditor({
       return
     }
 
-    setFuelSelection((current) => ({
-      ...current,
-      gradeId: gradeValid ? current.gradeId : null,
-      gradeName: gradeValid ? current.gradeName : null,
-      nozzleId: nozzleValid ? current.nozzleId : null,
-      nozzleNumber: nozzleValid ? current.nozzleNumber : null,
-      tankId: tankValid ? current.tankId : null,
-      pumpId: nozzleValid ? current.pumpId : null,
-    }))
+    queueMicrotask(() =>
+      setFuelSelection((current) => ({
+        ...current,
+        gradeId: gradeValid ? current.gradeId : null,
+        gradeName: gradeValid ? current.gradeName : null,
+        nozzleId: nozzleValid ? current.nozzleId : null,
+        nozzleNumber: nozzleValid ? current.nozzleNumber : null,
+        tankId: tankValid ? current.tankId : null,
+        pumpId: nozzleValid ? current.pumpId : null,
+      })),
+    )
   }, [
     hasFuelLine,
     fuelSelection.gradeId,
@@ -403,6 +427,9 @@ export default function TransactionProductEditor({
   ])
 
   const addProduct = (product: TransactionBuilderProduct) => {
+    if (lockedProductIdSet.has(String(product.id))) return
+    if (excludeFuelProductsFromCatalog && isFuelLikeProduct(product)) return
+
     setLines((current) => {
       const existing = current.find((line) => line.productId === product.id)
       if (existing) {
@@ -424,6 +451,8 @@ export default function TransactionProductEditor({
           quantity: 1,
           unitPrice: Number(product.unitPrice ?? 0),
           currency: product.currency ?? null,
+          categoryName: product.categoryName ?? null,
+          isFuel: isFuelLikeProduct(product),
         },
       ]
     })
@@ -435,6 +464,7 @@ export default function TransactionProductEditor({
   }
 
   const updateQuantity = (productId: string, nextValue: number) => {
+    if (lockedProductIdSet.has(productId)) return
     setLines((current) =>
       current
         .map((line) =>
@@ -450,6 +480,7 @@ export default function TransactionProductEditor({
   }
 
   const removeLine = (productId: string) => {
+    if (lockedProductIdSet.has(productId)) return
     setLines((current) =>
       current.filter((line) => line.productId !== productId),
     )
@@ -656,7 +687,11 @@ export default function TransactionProductEditor({
         posReference: posReference.trim(),
         removedProductIds: initialLines
           .map((line) => line.productId)
-          .filter((productId) => !currentProductIds.has(productId)),
+          .filter(
+            (productId) =>
+              !currentProductIds.has(productId) &&
+              !lockedProductIdSet.has(productId),
+          ),
         lines: lines.map((line) => ({
           productId: line.productId,
           quantity: line.quantity,
@@ -815,6 +850,9 @@ export default function TransactionProductEditor({
                 <CardDescription>
                   Search by product name, code, or external product ID, then add
                   items to the transaction.
+                  {excludeFuelProductsFromCatalog
+                    ? ' Fuel products are excluded because the pump-recorded fuel line is fixed.'
+                    : ''}
                 </CardDescription>
               </div>
               {renderCatalogContent()}
@@ -828,8 +866,9 @@ export default function TransactionProductEditor({
               <div className="space-y-1">
                 <CardTitle>Transaction items</CardTitle>
                 <CardDescription>
-                  Adjust quantities here. Totals update immediately before you
-                  save.
+                  {lockedProductIds.length > 0
+                    ? 'Adjust non-fuel quantities here. Pump-recorded fuel items stay locked while totals update immediately.'
+                    : 'Adjust quantities or remove products while totals update immediately.'}
                 </CardDescription>
               </div>
               {catalogDisplay === 'picker' ? (
@@ -874,49 +913,62 @@ export default function TransactionProductEditor({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="h-full px-0"
-                              onClick={() =>
-                                updateQuantity(
-                                  line.productId,
-                                  line.quantity - 1,
-                                )
-                              }
-                            >
-                              <Minus aria-hidden="true" />
-                            </Button>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.001"
-                              value={String(line.quantity)}
-                              onChange={(event) =>
-                                updateQuantity(
-                                  line.productId,
-                                  Number(event.target.value || 0),
-                                )
-                              }
-                              className="h-9 w-24"
-                            />
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="h-full px-0"
-                              onClick={() =>
-                                updateQuantity(
-                                  line.productId,
-                                  line.quantity + 1,
-                                )
-                              }
-                            >
-                              <Plus aria-hidden="true" />
-                            </Button>
-                          </div>
+                          {lockedProductIdSet.has(line.productId) ? (
+                            <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                              <LockKeyhole
+                                className="h-4 w-4"
+                                aria-hidden="true"
+                              />
+                              <span>{formatQty(line.quantity)}</span>
+                              <span className="text-xs text-[var(--text-muted)]">
+                                Pump recorded
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-full px-0"
+                                onClick={() =>
+                                  updateQuantity(
+                                    line.productId,
+                                    line.quantity - 1,
+                                  )
+                                }
+                              >
+                                <Minus aria-hidden="true" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                value={String(line.quantity)}
+                                onChange={(event) =>
+                                  updateQuantity(
+                                    line.productId,
+                                    Number(event.target.value || 0),
+                                  )
+                                }
+                                className="h-9 w-24"
+                              />
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-full px-0"
+                                onClick={() =>
+                                  updateQuantity(
+                                    line.productId,
+                                    line.quantity + 1,
+                                  )
+                                }
+                              >
+                                <Plus aria-hidden="true" />
+                              </Button>
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-[var(--text-secondary)]">
                           {formatMoney(line.unitPrice)}
@@ -925,14 +977,24 @@ export default function TransactionProductEditor({
                           {formatMoney(line.quantity * line.unitPrice)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeLine(line.productId)}
-                          >
-                            <Trash2 className="h-4 w-4" aria-hidden="true" />
-                          </Button>
+                          {lockedProductIdSet.has(line.productId) ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                              <LockKeyhole
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                              />
+                              Locked
+                            </span>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeLine(line.productId)}
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -983,6 +1045,9 @@ export default function TransactionProductEditor({
                     <SheetDescription>
                       Search for a product by name, code, or external product
                       ID.
+                      {excludeFuelProductsFromCatalog
+                        ? ' Fuel products are unavailable because the pump-recorded fuel line is fixed.'
+                        : ''}
                     </SheetDescription>
                   </SheetHeader>
                   <div className="mt-4">{renderCatalogContent()}</div>

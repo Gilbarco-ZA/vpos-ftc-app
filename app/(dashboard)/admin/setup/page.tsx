@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
@@ -46,13 +46,19 @@ export default function SetupWizardPage() {
 
   useEffect(() => {
     const initialToast = searchParams?.get('toast')
-    if (initialToast) setToast(initialToast)
-  }, [])
+    if (initialToast) queueMicrotask(() => setToast(initialToast))
+  }, [searchParams])
 
   const [current, setCurrent] = useState<SetupCurrent | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [pumpSnapshot, setPumpSnapshot] = useState<PumpSnapshot | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [dbTanks, setDbTanks] = useState<DbTank[]>([])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 5_000)
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   const [siteName, setSiteName] = useState('')
   const [taxNumber, setTaxNumber] = useState('')
@@ -66,7 +72,7 @@ export default function SetupWizardPage() {
     Record<string, Record<string, string>>
   >({})
 
-  const loadCountryOptions = async () => {
+  const loadCountryOptions = useCallback(async () => {
     const r = await api<{ options: SetupCountryOption[] }>(
       '/api/config/setup-countries',
     )
@@ -82,7 +88,7 @@ export default function SetupWizardPage() {
     }
     setToast(r.error || 'Failed to load country datasets')
     return []
-  }
+  }, [country])
 
   const applyCountrySelection = (value: string) => {
     setCountry(value)
@@ -91,7 +97,7 @@ export default function SetupWizardPage() {
     if (option?.timezone) setTimezone(option.timezone)
   }
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const r = await api<SetupCurrent>('/api/admin/setup/current')
     if (r.success && r.data) {
       setCurrent(r.data)
@@ -124,34 +130,50 @@ export default function SetupWizardPage() {
     } else {
       setToast(r.error || 'Failed to load setup state')
     }
-  }
+  }, [])
 
-  const refreshProducts = async () => {
+  const refreshProducts = useCallback(async () => {
     const r = await api<Product[]>('/api/products')
     if (r.success && r.data) setProducts(r.data)
-  }
+  }, [])
 
-  const refreshPumps = async () => {
+  const refreshPumps = useCallback(async () => {
     const r = await api<{ config: any; liveState: PumpSnapshot }>(
       '/api/pumps/state',
     )
     if (r.success && r.data?.liveState) {
       setPumpSnapshot(r.data.liveState)
     }
-  }
+  }, [])
 
-  const refreshDbTanks = async () => {
+  const refreshDbTanks = useCallback(async () => {
     const r = await api<{ tanks: DbTank[] }>('/api/settings/tanks')
     if (r.success && (r.data as any)?.tanks) setDbTanks((r.data as any).tanks)
-  }
+  }, [])
 
   useEffect(() => {
-    void loadCountryOptions()
-    refresh()
-    refreshProducts()
-    refreshPumps()
-    refreshDbTanks()
-  }, [])
+    queueMicrotask(() => {
+      void loadCountryOptions()
+    })
+    queueMicrotask(() => {
+      refresh()
+    })
+    queueMicrotask(() => {
+      refreshProducts()
+    })
+    queueMicrotask(() => {
+      refreshPumps()
+    })
+    queueMicrotask(() => {
+      refreshDbTanks()
+    })
+  }, [
+    loadCountryOptions,
+    refresh,
+    refreshDbTanks,
+    refreshProducts,
+    refreshPumps,
+  ])
 
   const canFinalize = useMemo(() => {
     const hasSite = Boolean(current?.siteProfile)
@@ -329,9 +351,9 @@ export default function SetupWizardPage() {
       0,
     )
     const ts = pumpSnapshot?.updatedAt || 0
-    const ageMs = ts ? Date.now() - ts : null
+    const ageMs = ts ? nowMs - ts : null
     return { pumps: pumps.length, nozzles: nozzleCount, updatedAt: ts, ageMs }
-  }, [pumpSnapshot])
+  }, [nowMs, pumpSnapshot])
 
   const pumpFreshness = useMemo(() => {
     if (!pumpDiag.updatedAt) return 'unknown'
@@ -352,17 +374,6 @@ export default function SetupWizardPage() {
     handleNext,
     handleBack,
   } = useSetupStepNavigation({ current, pumpAgeMs: pumpDiag.ageMs })
-
-  const goToNextStepByKey = (fromKey: (typeof setupSteps)[number]['key']) => {
-    const currentIndex = setupSteps.findIndex((s) => s.key === fromKey)
-    if (currentIndex === -1) return
-    const target = Math.min(
-      currentIndex + 1,
-      maxUnlockedStepIndex,
-      setupSteps.length - 1,
-    )
-    goToStep(target)
-  }
 
   return (
     <div className="space-y-4">
@@ -692,7 +703,7 @@ export default function SetupWizardPage() {
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button asChild variant="secondary" size="sm">
-              <Link href="/admin/config">Configure printer</Link>
+              <Link href="/admin/config/printers">Configure printer</Link>
             </Button>
             <Button
               variant="secondary"

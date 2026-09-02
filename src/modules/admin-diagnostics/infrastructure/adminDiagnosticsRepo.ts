@@ -92,12 +92,6 @@ export async function countPendingCustomerTransactions(stationId: string) {
   )
 }
 
-export async function getSyncState(stationId: string) {
-  return await queryOne<any>(`SELECT * FROM sync_state WHERE station_id = $1`, [
-    stationId,
-  ])
-}
-
 export async function listRecentControlEvents(stationId: string) {
   return await query<any>(
     `

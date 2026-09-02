@@ -1,5 +1,6 @@
-import { listForecourtLiveEvents } from '@/src/shared/forecourt/admin'
 import { requireNonEmptyString, toPositiveInt } from '@/src/shared/utils/inputs'
+
+import { listForecourtLiveEvents } from '@/src/modules/forecourt/application/forecourtAdmin'
 
 export async function listAdminForecourtLiveEvents(
   stationId: string,

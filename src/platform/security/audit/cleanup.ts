@@ -1,13 +1,24 @@
-import { query } from '@/src/platform/db/postgres'
+import { runStorageRetention } from '@/src/platform/retention/storageRetention'
+import { getStorageRetentionPolicy } from '@/src/platform/retention/storageRetentionPolicy'
+import { getStationId } from '@/src/shared/utils/getStationId'
 
 export async function cleanupAuditAndExpiredSessions() {
-  const logs = await query(
-    `DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '30 days'`,
-  )
-  const sessions = await query(`DELETE FROM sessions WHERE expires_at <= NOW()`)
+  const result = await runStorageRetention({
+    stationId: getStationId(),
+    policy: {
+      ...getStorageRetentionPolicy(),
+      enabled: true,
+      dryRun: false,
+    },
+    targetKeys: ['audit_logs', 'expired_sessions'],
+  })
 
   return {
-    deletedAuditLogs: logs.rowCount || 0,
-    deletedSessions: sessions.rowCount || 0,
+    deletedAuditLogs:
+      result.targets.find((target) => target.key === 'audit_logs')?.deleted ??
+      0,
+    deletedSessions:
+      result.targets.find((target) => target.key === 'expired_sessions')
+        ?.deleted ?? 0,
   }
 }

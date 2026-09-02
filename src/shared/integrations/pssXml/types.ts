@@ -18,12 +18,26 @@ export type PssXmlProduct = {
 export type PssXmlTank = {
   id: string
   productId?: string | null
+  tankGroupId?: string | null
+}
+
+export type PssXmlTankGauge = {
+  id: string
+  tankId?: string | null
+  pssPortNo?: number | null
+  physicalSubAddress?: number | null
 }
 
 export type PssXmlGradeOption = {
+  /** DOMS GradeOption ID used by FpGradeOptionNo / TransPars. */
   id: string
+  /** Physical nozzle/hose identifier from <NozzleId>. */
+  nozzleId?: string | null
   gradeId?: string | null
+  /** Compatibility primary tank: first <Part TankID=...> entry. */
   tankId?: string | null
+  /** Complete set of PSS tanks feeding this grade option/nozzle. */
+  tankIds?: string[]
   parts?: string | null
 }
 
@@ -34,7 +48,9 @@ export type PssXmlFuellingPoint = {
   /** TCP/IP endpoint used to reach the dispenser controller. Transport only; do not use as pump identity. */
   ipAddress?: string | null
   tcpUdpPortNo?: number | null
-  /** Stable per-controller sub-address used by DOMS to differentiate fuelling points sharing an IP. */
+  /** Physical controller address. Required to disambiguate repeated sub-addresses on one PSS port. */
+  physicalAddress?: number | null
+  /** Sub-address within the physical controller address. */
   deviceSubAddress?: number | null
   /** grade options correspond to hoses/nozzles on the fuelling point */
   gradeOptions: PssXmlGradeOption[]
@@ -45,6 +61,7 @@ export type PssXmlConfig = {
   priceGroups: PssXmlPriceGroup[]
   products: PssXmlProduct[]
   tanks: PssXmlTank[]
+  tankGauges: PssXmlTankGauge[]
   fuellingPoints: PssXmlFuellingPoint[]
 }
 
@@ -69,4 +86,26 @@ export type PssXmlIdMap = {
 
   /** PSS FuellingPoint ID + GradeOption ID -> nozzles.id (uuid) */
   nozzleDbIdByFpIdGradeOptionId?: Record<string, string>
+}
+
+export type PssXmlImportSummary = {
+  version: 1
+  sourceChecksum: string
+  sourcePath: string | null
+  importedAt: string
+  sourceBytes: number
+  parsedCounts: {
+    grades: number
+    priceGroups: number
+    products: number
+    tanks: number
+    tankGauges: number
+    fuellingPoints: number
+    gradeOptions: number
+  }
+  normalizedCounts: {
+    products: number
+    tanks: number
+    pumps: number
+  }
 }

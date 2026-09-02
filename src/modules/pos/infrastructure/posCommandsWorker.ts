@@ -3,11 +3,16 @@ import type {
   PosCommandResult,
 } from '@/src/platform/integrations/jpl/types'
 
-import { query, queryAll } from '@/src/platform/db/postgres'
+import {
+  getPostgresPoolDiagnostics,
+  query,
+  queryAll,
+} from '@/src/platform/db/postgres'
 import { sendPosCommand } from '@/src/platform/integrations/posGateway'
 import { advisoryUnlock, tryAdvisoryLock } from '@/src/shared/db/locks'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { logger } from '@/src/shared/utils/logger'
+import { serializeError } from '@/src/shared/utils/serializeError'
 
 const WORKER_NAME = 'posCommandsWorker'
 const DEFAULT_POLL_MS = 500
@@ -18,6 +23,8 @@ let stopRequested = false
 let loopTimer: NodeJS.Timeout | null = null
 let heartbeatTimer: NodeJS.Timeout | null = null
 let controller: { stop: () => void } | null = null
+let loopInFlight = false
+let heartbeatInFlight = false
 
 type PosCommandRow = {
   id: string
@@ -117,6 +124,15 @@ async function heartbeatAllStations() {
   )
 }
 
+const shouldYieldToForegroundDatabaseWork = () => {
+  const pool = getPostgresPoolDiagnostics()
+  if (pool.totalCount === 0) return false
+  return (
+    pool.waitingCount > 0 ||
+    (pool.idleCount === 0 && pool.totalCount >= pool.max)
+  )
+}
+
 async function workerLoop() {
   // Ensure only one loop per DB cluster (best effort). If lock cannot be acquired, do nothing.
   if (!(await tryAdvisoryLock(`worker:${WORKER_NAME}`))) return
@@ -128,6 +144,45 @@ async function workerLoop() {
     }
   } finally {
     await advisoryUnlock(`worker:${WORKER_NAME}`)
+  }
+}
+
+async function runWorkerLoop() {
+  if (stopRequested || loopInFlight || shouldYieldToForegroundDatabaseWork())
+    return
+  loopInFlight = true
+  try {
+    await workerLoop()
+  } catch (error) {
+    logger.error(`[${WORKER_NAME}]`, {
+      msg: 'loop error',
+      error: serializeError(error),
+      pool: getPostgresPoolDiagnostics(),
+    })
+  } finally {
+    loopInFlight = false
+  }
+}
+
+async function runHeartbeat() {
+  if (
+    stopRequested ||
+    heartbeatInFlight ||
+    shouldYieldToForegroundDatabaseWork()
+  ) {
+    return
+  }
+  heartbeatInFlight = true
+  try {
+    await heartbeatAllStations()
+  } catch (error) {
+    logger.error(`[${WORKER_NAME}]`, {
+      msg: 'heartbeat error',
+      error: serializeError(error),
+      pool: getPostgresPoolDiagnostics(),
+    })
+  } finally {
+    heartbeatInFlight = false
   }
 }
 
@@ -146,26 +201,17 @@ export function startPosCommandsWorker(opts?: { pollMs?: number }) {
 
   const pollMs = Math.max(200, opts?.pollMs ?? DEFAULT_POLL_MS)
 
-  // kick immediately
-  workerLoop().catch((e) =>
-    logger.error(`[${WORKER_NAME}]`, { msg: 'loop error', error: e }),
-  )
-  heartbeatAllStations().catch((e) =>
-    logger.error(`[${WORKER_NAME}]`, { msg: 'heartbeat error', error: e }),
-  )
+  // kick immediately. Both loops are process-local single-flight so a slow
+  // database acquisition cannot accumulate one Promise per interval tick.
+  void runWorkerLoop()
+  void runHeartbeat()
 
   loopTimer = setInterval(() => {
-    if (stopRequested) return
-    workerLoop().catch((e) =>
-      logger.error(`[${WORKER_NAME}]`, { msg: 'loop error', error: e }),
-    )
+    void runWorkerLoop()
   }, pollMs)
 
   heartbeatTimer = setInterval(() => {
-    if (stopRequested) return
-    heartbeatAllStations().catch((e) =>
-      logger.error(`[${WORKER_NAME}]`, { msg: 'heartbeat error', error: e }),
-    )
+    void runHeartbeat()
   }, HEARTBEAT_MS)
 
   controller = {
@@ -177,6 +223,8 @@ export function startPosCommandsWorker(opts?: { pollMs?: number }) {
       loopTimer = null
       heartbeatTimer = null
       controller = null
+      // Do not clear in-flight flags here: an async iteration may still be
+      // unwinding. A replacement worker waits for that iteration to finish.
     },
   }
   return controller

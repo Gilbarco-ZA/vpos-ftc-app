@@ -8,6 +8,17 @@ export const serializeError = (err: unknown) => {
 
   if (err instanceof Error) {
     const anyErr = err as any
+    const rejectDetails = anyErr?.details
+      ? {
+          kind: anyErr.details.kind,
+          rejectCode: anyErr.details.rejectCode,
+          rejectInfo: anyErr.details.rejectInfo,
+          rejectInfoText: anyErr.details.rejectInfoText,
+          rejectedExtendedMsgCode: anyErr.details.rejectedName,
+          rejectedMsgSubc: anyErr.details.rejectedSubCode,
+          correlationId: anyErr.details.raw?.correlationId,
+        }
+      : undefined
     return {
       name: err.name,
       message: err.message,
@@ -18,6 +29,7 @@ export const serializeError = (err: unknown) => {
       address: anyErr.address,
       port: anyErr.port,
       cause: anyErr.cause ? String(anyErr.cause) : undefined,
+      rejectDetails,
     }
   }
 

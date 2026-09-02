@@ -43,7 +43,6 @@ import type {
   NozzleFormState,
   NozzleItem,
   NozzleResponse,
-  PumpDetail,
   PumpDetailClientProps,
   SimPump,
   SimSnapshot,
@@ -118,8 +117,12 @@ export default function PumpDetailClient({
   }, [])
 
   useEffect(() => {
-    loadNozzles()
-    loadTanks()
+    queueMicrotask(() => {
+      loadNozzles()
+    })
+    queueMicrotask(() => {
+      loadTanks()
+    })
   }, [loadNozzles, loadTanks])
 
   useEffect(() => {

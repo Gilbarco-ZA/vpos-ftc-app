@@ -2,16 +2,14 @@ import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 
 import { getCurrentUser } from '@/src/shared/auth'
-import {
-  getBrandingSettings,
-  resolveBrandForegroundColor,
-} from '@/src/shared/branding/settings'
+import { getBrandingSettings } from '@/src/shared/branding/settings'
 
 import { MobileNav } from '@/components/layout/mobile-nav'
 import { RuntimeNotifications } from '@/components/layout/RuntimeNotifications'
 import { Sidebar } from '@/components/layout/sidebar'
 import { StationConfigGuard } from '@/components/layout/StationConfigGuard'
 import { Topbar } from '@/components/layout/topbar'
+import { RuntimeImage } from '@/components/ui/runtime-image'
 
 const hexToRgb = (value?: string | null) => {
   const hex = String(value ?? '')
@@ -47,6 +45,11 @@ const buildBrandStyle = (
     style['--brand-primary'] = primary
     style['--brand-primary-foreground'] = foregroundForHex(primary)
     style['--brand-accent'] = primary
+    style['--neon-cyan'] = primary
+    style['--neon-primary-foreground'] = foregroundForHex(primary)
+    style['--border-neon-cyan'] = rgbaForHex(primary, 0.38) || primary
+    style['--shadow-glow-cyan'] =
+      `0 0 24px ${rgbaForHex(primary, 0.28) || primary}`
     style['--auth-accent-top'] = primary
     const focus = rgbaForHex(primary, 0.35)
     if (focus) style['--border-focus'] = focus
@@ -54,6 +57,10 @@ const buildBrandStyle = (
   if (secondary) {
     style['--brand-secondary'] = secondary
     style['--brand-secondary-foreground'] = foregroundForHex(secondary)
+    style['--neon-magenta'] = secondary
+    style['--border-neon-magenta'] = rgbaForHex(secondary, 0.38) || secondary
+    style['--shadow-glow-magenta'] =
+      `0 0 24px ${rgbaForHex(secondary, 0.28) || secondary}`
     style['--auth-accent-bottom'] = secondary
   }
   return style
@@ -80,6 +87,7 @@ const DashboardLayout = async ({ children }: { children: ReactNode }) => {
         <div className="no-print hidden xl:block">
           <Sidebar
             role={user.role}
+            stationCountry={user.station.country}
             branding={{
               stationDisplayName: stationDisplayName || user.station.name,
               logoPath: brandLogoPath,
@@ -92,6 +100,7 @@ const DashboardLayout = async ({ children }: { children: ReactNode }) => {
             leading={
               <MobileNav
                 role={user.role}
+                stationCountry={user.station.country}
                 branding={{
                   stationDisplayName: stationDisplayName || user.station.name,
                   logoPath: brandLogoPath,
@@ -103,7 +112,7 @@ const DashboardLayout = async ({ children }: { children: ReactNode }) => {
                 <div className="flex items-center gap-3">
                   {brandLogoPath ? (
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--surface-muted)]">
-                      <img
+                      <RuntimeImage
                         src={brandLogoPath}
                         alt={`${stationDisplayName || user.station.name} logo`}
                         className="h-5 w-5 object-contain"

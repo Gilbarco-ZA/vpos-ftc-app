@@ -1,9 +1,11 @@
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import type { TransactionListItem } from '@/src/shared/types/transactions'
-import { Copy, FileText, RotateCcw, Send } from 'lucide-react'
+import { Copy, FileText, RotateCcw, Send, UserRound } from 'lucide-react'
 
 import { formatDate } from '@/src/shared/utils/dates'
 import { formatNumber } from '@/src/shared/utils/format'
+
+import { requiresCustomerForFiscalizationRetry } from '@/src/modules/transactions/domain/fiscalization-retry-policy'
 
 import StatusBadge from '@/components/transactions/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -22,6 +24,7 @@ type NonFiscalizedDetailsSheetProps = {
   onCopy: (label: string, value: string) => void
   onRetry: (transaction: TransactionListItem) => void
   onSendNow: (transaction: TransactionListItem) => void
+  onFiscalize: (transaction: TransactionListItem) => void
   onCopySupportBundle: (transaction: TransactionListItem) => void
   decimals: DecimalSettings
 }
@@ -30,10 +33,24 @@ const canRetryFiscalization = (status: string) =>
   String(status || '').toUpperCase() === 'FAILED'
 
 const canSendNow = (status: string) =>
-  ['OPEN', 'ALLOCATED', 'FAILED'].includes(String(status || '').toUpperCase())
+  ['OPEN', 'ALLOCATED', 'FAILED', 'PENDING'].includes(
+    String(status || '').toUpperCase(),
+  )
 
 const canFiscalize = (status: string) =>
-  ['OPEN', 'ALLOCATED', 'FAILED'].includes(String(status || '').toUpperCase())
+  ['OPEN', 'ALLOCATED', 'FAILED', 'PENDING'].includes(
+    String(status || '').toUpperCase(),
+  )
+
+const hasLinkedCustomer = (transaction: TransactionListItem) =>
+  Boolean(String(transaction.customerId || '').trim())
+
+const canRetryTransaction = (transaction: TransactionListItem) =>
+  canRetryFiscalization(transaction.status) &&
+  !requiresCustomerForFiscalizationRetry({
+    customerId: transaction.customerId,
+    domsSourceSystem: transaction.domsSourceSystem,
+  })
 
 const NonFiscalizedDetailsSheet = ({
   transaction,
@@ -42,6 +59,7 @@ const NonFiscalizedDetailsSheet = ({
   onCopy,
   onRetry,
   onSendNow,
+  onFiscalize,
   onCopySupportBundle,
   decimals,
 }: NonFiscalizedDetailsSheetProps) => (
@@ -152,6 +170,19 @@ const NonFiscalizedDetailsSheet = ({
                 </div>
               </div>
               <div>
+                <div className="text-xs text-[var(--text-muted)]">Customer</div>
+                <div className="text-[var(--text-secondary)]">
+                  {transaction.customerName ||
+                    transaction.customerTin ||
+                    'Not linked'}
+                </div>
+                {transaction.customerName && transaction.customerTin ? (
+                  <div className="text-xs text-[var(--text-muted)]">
+                    {transaction.customerTin}
+                  </div>
+                ) : null}
+              </div>
+              <div>
                 <div className="text-xs text-[var(--text-muted)]">
                   Queue enqueued
                 </div>
@@ -190,7 +221,7 @@ const NonFiscalizedDetailsSheet = ({
       </div>
       <div className="border-t bg-[var(--surface-card)] px-6 py-4">
         <SheetFooter>
-          {transaction && canRetryFiscalization(transaction.status) ? (
+          {transaction && canRetryTransaction(transaction) ? (
             <Button
               variant="secondary"
               onClick={() => onRetry(transaction)}
@@ -200,7 +231,21 @@ const NonFiscalizedDetailsSheet = ({
               Retry fiscalization
             </Button>
           ) : null}
-          {transaction && canSendNow(transaction.status) ? (
+          {transaction && canFiscalize(transaction.status) ? (
+            <Button
+              variant="primary"
+              onClick={() => onFiscalize(transaction)}
+              className="gap-2"
+            >
+              <UserRound className="h-4 w-4" aria-hidden="true" />
+              {hasLinkedCustomer(transaction)
+                ? 'Review customer & fiscalize'
+                : 'Link customer & fiscalize'}
+            </Button>
+          ) : null}
+          {transaction &&
+          canSendNow(transaction.status) &&
+          hasLinkedCustomer(transaction) ? (
             <Button
               variant="secondary"
               onClick={() => onSendNow(transaction)}

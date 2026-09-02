@@ -2,7 +2,9 @@ import type {
   ProductListItemRecord,
   ProductRecord,
 } from '@/src/modules/products/infrastructure/persistence/product.mapper'
+import type { PoolClient } from 'pg'
 
+import { txQuery } from '@/src/platform/db/postgres'
 import { queryAll, queryOne } from '@/src/platform/db/postgres/query'
 
 import {
@@ -82,50 +84,68 @@ export async function getProductByIdRepo(
   return row ? mapProductRow(row) : null
 }
 
+const buildUpsertProductParams = (args: UpsertProductRecordParams) => [
+  args.id,
+  args.stationId,
+  args.productId,
+  args.productCode,
+  args.productName,
+  args.productClassCode,
+  args.productTypeCode,
+  args.sku ?? null,
+  args.barcode ?? null,
+  args.unitPrice,
+  args.unitCost,
+  args.currency,
+  args.taxRate,
+  args.categoryId ?? null,
+  args.category ?? null,
+  args.unitOfMeasure ?? null,
+  args.unitOfPackaging ?? null,
+  args.extProductId ?? args.productId,
+  args.extProductCode ?? args.productCode,
+  args.extProductClassCode ?? args.productClassCode ?? null,
+  args.extProductTypeCode ?? args.productTypeCode ?? null,
+  args.extDescription ?? args.productName,
+  args.extUnitOfMeasure ?? args.unitOfMeasure ?? null,
+  args.extUnitOfPackaging ?? args.unitOfPackaging ?? null,
+  args.extUnitPrice ?? args.unitPrice,
+  args.extCurrency ?? args.currency,
+  args.extTaxCode ?? args.taxCode ?? null,
+  args.extHazardousIndicator ?? args.hazardousIndicator ?? true,
+  args.packSize ?? null,
+  args.taxCode ?? null,
+  args.commodityCode ?? null,
+  args.hazardousIndicator ?? false,
+  args.createdByName,
+  args.isOnline,
+  args.devFlowOverride ?? null,
+  args.lastSyncStatus ?? 'PENDING',
+  args.lastSyncAt ?? null,
+  args.lastSyncMessage ?? null,
+]
+
 export async function upsertProductRepo(
   args: UpsertProductRecordParams,
 ): Promise<ProductRecord | null> {
-  const row = await queryOne<Record<string, unknown>>(UPSERT_PRODUCT_SQL, [
-    args.id,
-    args.stationId,
-    args.productId,
-    args.productCode,
-    args.productName,
-    args.productClassCode,
-    args.productTypeCode,
-    args.sku ?? null,
-    args.barcode ?? null,
-    args.unitPrice,
-    args.unitCost,
-    args.currency,
-    args.taxRate,
-    args.categoryId ?? null,
-    args.category ?? null,
-    args.unitOfMeasure ?? null,
-    args.unitOfPackaging ?? null,
-    args.extProductId ?? args.productId,
-    args.extProductCode ?? args.productCode,
-    args.extProductClassCode ?? args.productClassCode ?? null,
-    args.extProductTypeCode ?? args.productTypeCode ?? null,
-    args.extDescription ?? args.productName,
-    args.extUnitOfMeasure ?? args.unitOfMeasure ?? null,
-    args.extUnitOfPackaging ?? args.unitOfPackaging ?? null,
-    args.extUnitPrice ?? args.unitPrice,
-    args.extCurrency ?? args.currency,
-    args.extTaxCode ?? args.taxCode ?? null,
-    args.extHazardousIndicator ?? args.hazardousIndicator ?? true,
-    args.packSize ?? null,
-    args.taxCode ?? null,
-    args.commodityCode ?? null,
-    args.hazardousIndicator ?? false,
-    args.createdByName,
-    args.isOnline,
-    args.devFlowOverride ?? null,
-    args.lastSyncStatus ?? 'PENDING',
-    args.lastSyncAt ?? null,
-    args.lastSyncMessage ?? null,
-  ])
+  const row = await queryOne<Record<string, unknown>>(
+    UPSERT_PRODUCT_SQL,
+    buildUpsertProductParams(args),
+  )
 
+  return row ? mapProductRow(row) : null
+}
+
+export async function upsertProductWithClientRepo(
+  client: PoolClient,
+  args: UpsertProductRecordParams,
+): Promise<ProductRecord | null> {
+  const result = await txQuery<Record<string, unknown>>(
+    client,
+    UPSERT_PRODUCT_SQL,
+    buildUpsertProductParams(args),
+  )
+  const row = result.rows[0]
   return row ? mapProductRow(row) : null
 }
 

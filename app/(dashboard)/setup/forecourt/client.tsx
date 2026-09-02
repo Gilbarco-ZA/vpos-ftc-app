@@ -59,7 +59,9 @@ export default function ForecourtSetupClient() {
   }, [])
 
   useEffect(() => {
-    loadCounts()
+    queueMicrotask(() => {
+      loadCounts()
+    })
   }, [loadCounts])
 
   const steps: Step[] = useMemo(

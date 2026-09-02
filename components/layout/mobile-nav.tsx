@@ -16,9 +16,11 @@ import {
 
 export const MobileNav = ({
   role,
+  stationCountry,
   branding,
 }: {
   role: UserRole
+  stationCountry?: string | null
   branding?: SidebarBranding
 }) => {
   const [open, setOpen] = useState(false)
@@ -30,7 +32,7 @@ export const MobileNav = ({
           type="button"
           variant="secondary"
           size="md"
-          className="h-10 w-10 rounded-lg px-0 xl:hidden border border-[var(--neon-cyan)] text-[var(--neon-cyan)] hover:bg-[var(--surface-muted)] hover:shadow-[0_0_12px_rgba(0,245,255,0.3)] transition-all duration-200"
+          className="h-10 w-10 rounded-lg border border-[var(--neon-cyan)] px-0 text-[var(--neon-cyan)] transition-all duration-200 hover:bg-[var(--surface-muted)] hover:shadow-[0_0_12px_rgba(0,245,255,0.3)] xl:hidden"
           aria-label="Open navigation menu"
         >
           <Menu className="h-5 w-5" />
@@ -39,7 +41,7 @@ export const MobileNav = ({
 
       <SheetContent
         side="left"
-        className="w-full max-w-[85vw] border-r-2 border-[var(--border-neon-cyan)] p-0 text-[var(--text-primary)] sm:max-w-xs shadow-[0_0_30px_rgba(0,245,255,0.1)]"
+        className="w-full max-w-[85vw] border-r-2 p-0 text-[var(--text-primary)] shadow-[0_0_30px_rgba(0,245,255,0.1)] sm:max-w-xs"
         style={{
           background: 'var(--surface-page)',
         }}
@@ -50,6 +52,7 @@ export const MobileNav = ({
 
         <SidebarContent
           role={role}
+          stationCountry={stationCountry}
           branding={branding}
           collapsed={false}
           showCollapseToggle={false}

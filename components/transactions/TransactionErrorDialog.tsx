@@ -37,7 +37,7 @@ export const TransactionErrorDialog = ({
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    if (!open) setCopied(false)
+    if (!open) queueMicrotask(() => setCopied(false))
   }, [open])
 
   const snippet = useMemo(() => safeSnippet(errorText), [errorText])

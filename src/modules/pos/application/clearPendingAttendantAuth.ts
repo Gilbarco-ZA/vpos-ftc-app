@@ -1,5 +1,6 @@
 import { badRequest } from '@/src/platform/web/api/response'
-import { removePendingAttendantAuthRequest } from '@/src/shared/pos/events'
+
+import { removePendingAttendantAuthRequest } from '@/src/modules/pos/application/legacy/events'
 
 import type { PosPendingAttendantAuthClearInput } from './posEventTypes'
 

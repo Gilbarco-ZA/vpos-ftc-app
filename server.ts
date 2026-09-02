@@ -12,7 +12,6 @@
 import fs from 'fs'
 import http from 'http'
 import https from 'https'
-import path from 'path'
 import next from 'next'
 
 import { createDomsProcessGuard } from '@/src/platform/bootstrap/doms-process-guard'
@@ -26,6 +25,7 @@ import {
   getLegacyArchiveDir,
   getLegacyPermDir,
 } from '@/src/platform/config/app-config'
+import { getPostgresPoolDiagnostics } from '@/src/platform/db/postgres'
 import {
   installConsoleCapture,
   updateConsoleCaptureStation,
@@ -34,13 +34,18 @@ import {
   bootstrapRuntimeEnvironment,
   startLocalServerRuntime,
 } from '@/src/platform/runtime'
-import { getJplTcpAdapterState } from '@/src/shared/forecourt/adapters'
+import { getStationId } from '@/src/shared/utils/getStationId'
+import { logger } from '@/src/shared/utils/logger'
+import { serializeError } from '@/src/shared/utils/serializeError'
+
+import { getJplTcpAdapterStateSummary } from '@/src/modules/forecourt/application/forecourtAdapters'
 import {
   loadForecourtRuntimeConfigFromDb,
   startForecourtRuntimeConfigWatcher,
-} from '@/src/shared/forecourt/runtime'
-import { getStationId } from '@/src/shared/utils/getStationId'
-import { logger } from '@/src/shared/utils/logger'
+} from '@/src/modules/forecourt/application/forecourtRuntime'
+import { getJplEventProcessingQueueDiagnostics } from '@/src/modules/forecourt/infrastructure/jpl/events'
+import { getJplPersistenceQueueDiagnostics } from '@/src/modules/forecourt/infrastructure/jpl/persistence'
+import { getForecourtMaterializationQueueDiagnostics } from '@/src/modules/forecourt/infrastructure/persistence'
 
 import { attachForecourtWs } from './server/forecourtWs'
 
@@ -76,6 +81,13 @@ async function runStartupImport(stationId: string) {
       logger.info(
         `[startup-import] done. inserted=${JSON.stringify(res.inserted)} moved=${JSON.stringify(res.moved)} warnings=${res.warnings.length}`,
       )
+      if (res.warnings.length) {
+        logger.info('[startup-import] import warnings recorded', {
+          count: res.warnings.length,
+          warnings: res.warnings.slice(0, 20),
+          truncated: res.warnings.length > 20,
+        })
+      }
       updateStartupStatus({
         phase: 'forecourt-starting',
         message: 'Legacy import completed',
@@ -100,7 +112,7 @@ async function runStartupImport(stationId: string) {
       })
     }
   } catch (e: any) {
-    logger.error('[startup-import] failed:', { error: e?.stack || e })
+    logger.error('[startup-import] failed:', { error: serializeError(e) })
     updateStartupStatus({
       phase: 'forecourt-starting',
       message: 'Legacy import completed with errors',
@@ -115,20 +127,19 @@ function maybeHttpsServer(handler: http.RequestListener) {
     String(process.env.VPOS_USE_HTTPS || '0').toLowerCase() === '1'
   if (!useHttps) return http.createServer(handler)
 
-  const keyPath =
-    process.env.VPOS_HTTPS_KEY_PATH ||
-    path.join(process.cwd(), 'public/certs/localhost+2-key.pem')
-  const certPath =
-    process.env.VPOS_HTTPS_CERT_PATH ||
-    path.join(process.cwd(), 'public/certs/localhost+2.pem')
-  try {
-    return https.createServer(
-      { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) },
-      handler,
+  const keyPath = process.env.VPOS_HTTPS_KEY_PATH?.trim()
+  const certPath = process.env.VPOS_HTTPS_CERT_PATH?.trim()
+
+  if (!keyPath || !certPath) {
+    throw new Error(
+      'VPOS_USE_HTTPS=1 requires VPOS_HTTPS_KEY_PATH and VPOS_HTTPS_CERT_PATH',
     )
-  } catch {
-    return http.createServer(handler)
   }
+
+  return https.createServer(
+    { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) },
+    handler,
+  )
 }
 
 function sendJson(res: http.ServerResponse, statusCode: number, body: unknown) {
@@ -187,7 +198,7 @@ async function main() {
   })
 
   server.on('error', (err: any) => {
-    logger.error('[server] listen error:', { error: err?.stack || err })
+    logger.error('[server] listen error:', { error: serializeError(err) })
     releaseProcessLock?.()
     process.exit(1)
   })
@@ -206,6 +217,35 @@ async function main() {
 
   let runtime: ReturnType<typeof startLocalServerRuntime> | null = null
   let stopForecourtConfigWatcher: (() => void) | null = null
+  const configuredRuntimeDiagnosticsMs = Number(
+    process.env.VPOS_RUNTIME_DIAGNOSTICS_MS,
+  )
+  const runtimeDiagnosticsMs = Math.max(
+    10_000,
+    Math.min(
+      5 * 60_000,
+      Number.isFinite(configuredRuntimeDiagnosticsMs)
+        ? configuredRuntimeDiagnosticsMs
+        : 30_000,
+    ),
+  )
+  const runtimeDiagnosticTimer = setInterval(() => {
+    const memory = process.memoryUsage()
+    logger.info('[diag] runtime health', {
+      pid: process.pid,
+      uptimeSeconds: Math.round(process.uptime()),
+      memoryMb: {
+        rss: Math.round(memory.rss / (1024 * 1024)),
+        heapUsed: Math.round(memory.heapUsed / (1024 * 1024)),
+        heapTotal: Math.round(memory.heapTotal / (1024 * 1024)),
+      },
+      postgres: getPostgresPoolDiagnostics(),
+      jplPersistence: getJplPersistenceQueueDiagnostics(),
+      jplEventProcessing: getJplEventProcessingQueueDiagnostics(),
+      forecourtMaterialization: getForecourtMaterializationQueueDiagnostics(),
+    })
+  }, runtimeDiagnosticsMs)
+  runtimeDiagnosticTimer.unref?.()
 
   void (async () => {
     // Legacy import is intentionally exclusive. Do not attach the forecourt
@@ -227,7 +267,7 @@ async function main() {
     })
     await loadForecourtRuntimeConfigFromDb(stationId).catch((e) =>
       logger.error('[forecourt] failed to load runtime config from DB', {
-        error: e?.stack || e,
+        error: serializeError(e),
       }),
     )
     stopForecourtConfigWatcher = startForecourtRuntimeConfigWatcher(stationId)
@@ -242,13 +282,13 @@ async function main() {
     setTimeout(
       () =>
         logger.info('[FORECOURT] JPL TCP adapter state on startup:', {
-          state: getJplTcpAdapterState(),
+          state: getJplTcpAdapterStateSummary(),
         }),
       2000,
     )
   })().catch((e: any) => {
     logger.error('[server] post-start initialization failed:', {
-      error: e?.stack || e,
+      error: serializeError(e),
     })
     updateStartupStatus({
       phase: 'degraded',
@@ -260,7 +300,14 @@ async function main() {
   })
 
   const shutdown = (signal: string) => {
-    logger.info(`[server] received ${signal}. shutting down...`)
+    clearInterval(runtimeDiagnosticTimer)
+    logger.info(`[server] received ${signal}. shutting down...`, {
+      pid: process.pid,
+      postgres: getPostgresPoolDiagnostics(),
+      jplPersistence: getJplPersistenceQueueDiagnostics(),
+      jplEventProcessing: getJplEventProcessingQueueDiagnostics(),
+      forecourtMaterialization: getForecourtMaterializationQueueDiagnostics(),
+    })
     void (runtime?.stop() ?? Promise.resolve()).finally(() => {
       try {
         stopForecourtConfigWatcher?.()
@@ -276,6 +323,6 @@ async function main() {
 
 main().catch((e) => {
   releaseProcessLock?.()
-  logger.error('[server] fatal:', { error: e?.stack || e })
+  logger.error('[server] fatal:', { error: serializeError(e) })
   process.exit(1)
 })

@@ -8,6 +8,10 @@ import QRCode from 'qrcode'
 import { KE_DATASET } from '@/src/shared/config/datasets/KE'
 import { TZ_DATASET } from '@/src/shared/config/datasets/TZ'
 
+import { RuntimeImage } from '@/components/ui/runtime-image'
+
+import TanzaniaReceipt80mm from './TanzaniaReceipt80mm'
+
 export type Receipt80mmProps = {
   receipt: NormalizedReceipt
 }
@@ -88,7 +92,7 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
   useEffect(() => {
     const payload = receipt.footer.fiscalQrCodeData
     if (!payload) {
-      setQrDataUrl(null)
+      queueMicrotask(() => setQrDataUrl(null))
       return
     }
 
@@ -105,6 +109,10 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
       active = false
     }
   }, [receipt.footer.fiscalQrCodeData])
+
+  if (receiptCountry === 'TZ') {
+    return <TanzaniaReceipt80mm receipt={receipt} />
+  }
 
   const receiptHeaderLines = (receipt.branding?.receiptHeaderText || '')
     .split(/\r?\n/)
@@ -149,7 +157,7 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
       <div className="mx-auto text-center" style={{ width: 300 }}>
         {receipt.branding?.logoPath ? (
           <div className="mb-3 flex justify-center">
-            <img
+            <RuntimeImage
               src={receipt.branding.logoPath}
               alt="Station logo"
               className="max-h-16 max-w-[140px] object-contain"
@@ -402,7 +410,11 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
 
         {qrDataUrl && (
           <div className="mt-4 flex flex-col items-center gap-2">
-            <img src={qrDataUrl} alt="Receipt QR" className="h-32 w-32" />
+            <RuntimeImage
+              src={qrDataUrl}
+              alt="Receipt QR"
+              className="h-32 w-32"
+            />
             <div className="text-xs text-black/70">Scan to verify</div>
           </div>
         )}

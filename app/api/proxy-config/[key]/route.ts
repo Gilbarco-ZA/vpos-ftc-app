@@ -1,11 +1,11 @@
 import type { SessionUser } from '@/src/shared/types'
 import { NextResponse } from 'next/server'
 
-import { query, queryOne } from '@/src/platform/db/postgres'
 import { readBody } from '@/src/platform/web/api/request'
 import { serverError } from '@/src/platform/web/api/response'
 import { requireAuth } from '@/src/shared/auth'
 import { requireCsrfFromParts } from '@/src/shared/security/csrf'
+import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -23,11 +23,8 @@ export const GET = async (
     if (!user) {
       return await serverError('User not found')
     }
-    const row = await queryOne<any>(
-      `SELECT value FROM station_kv WHERE station_id = $1 AND key = $2`,
-      [user.stationId, `${PREFIX}${params.key}`],
-    )
-    return NextResponse.json(row?.value ?? null)
+    const value = await kvGet<any>(user.stationId, `${PREFIX}${params.key}`)
+    return NextResponse.json(value)
   } catch (err) {
     return await serverError(err, { req, stationId: user?.stationId })
   }
@@ -50,15 +47,7 @@ export const PATCH = async (
       bodyToken: body.csrf_token,
     })
 
-    await query(
-      `
-      INSERT INTO station_kv (station_id, key, value)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (station_id, key)
-      DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-      `,
-      [user.stationId, `${PREFIX}${params.key}`, body?.value ?? body],
-    )
+    await kvSet(user.stationId, `${PREFIX}${params.key}`, body?.value ?? body)
 
     return NextResponse.json({ success: true })
   } catch (err) {

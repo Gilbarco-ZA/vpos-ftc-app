@@ -1,0 +1,242 @@
+'use strict'
+
+/**
+ * Built-in application defaults.
+ *
+ * Production packages do not rely on a shipped .env file. Environment
+ * variables remain optional deployment overrides, while missing values are
+ * populated here before the application runtime starts.
+ *
+ * Sensitive or site-specific values intentionally default to an empty string.
+ * An empty default keeps the related feature disabled until it is configured
+ * through station data, setup, or a deployment override.
+ */
+const ENV_DEFAULTS = Object.freeze({
+  // HTTP/runtime
+  PORT: '3080',
+  HOST: '0.0.0.0',
+  BASE_URL: 'http://127.0.0.1:3080',
+  NEXT_PUBLIC_BASE_URL: 'http://127.0.0.1:3080',
+  LOG_LEVEL: 'info',
+  DEBUG_ERRORS: 'false',
+  RUN_BOOTSTRAP: 'true',
+  CSRF_DISABLED: 'false',
+  VPOS_USE_HTTPS: '0',
+  VPOS_HTTPS_KEY_PATH: '',
+  VPOS_HTTPS_CERT_PATH: '',
+  VPOS_DEBUG: '0',
+  VPOS_DUMP_ENV: '0',
+  VPOS_TRACE_NET: '0',
+  VPOS_KEEPALIVE: '0',
+  VPOS_HEARTBEAT_FILE: '',
+  VPOS_HEARTBEAT_MS: '30000',
+  VPOS_HEARTBEAT_STALE_MS: '15000',
+  VPOS_READY_HEARTBEAT_MAX_AGE_MS: '30000',
+  VPOS_HEALTH_PATH: '/',
+  VPOS_HEALTH_TIMEOUT_MS: '3000',
+  VPOS_PRINTER_READY_TIMEOUT_MS: '5000',
+  VPOS_MANAGED_BY_START_SH: '0',
+  VPOS_APPLICATION_ROOT: '/opt/fccapps/vposftc',
+
+  // Database
+  POSTGRES_URL: '',
+  POSTGRES_HOST: '127.0.0.1',
+  POSTGRES_PORT: '5432',
+  POSTGRES_DATABASE: 'vpos_ftc',
+  POSTGRES_USER: 'postgres',
+  POSTGRES_PASSWORD: 'postgres',
+  POSTGRES_POOL_MAX: '20',
+  POSTGRES_POOL_IDLE_TIMEOUT_MS: '30000',
+  POSTGRES_POOL_CONNECTION_TIMEOUT_MS: '10000',
+  PG_DUMP_BIN: 'pg_dump',
+  ALLOW_REMOTE_DATABASE_RESET: 'false',
+  DB_DEBUG: 'false',
+  DB_DEBUG_ONLY_SLOW: 'false',
+  DB_DEBUG_PARAMS: 'false',
+  DB_DEBUG_ROWS: 'false',
+  DB_SLOW_MS: '500',
+  VPOS_DB_SLOW_QUERY_MS: '500',
+
+  // Station/bootstrap
+  VPOS_STATION_ID: '',
+  STATION_ID: '',
+  STATION_CODE: '',
+  COUNTRY_CODE: 'UN',
+  DEFAULT_STATION_NAME: 'Default Station',
+  DEFAULT_STATION_TIMEZONE: 'Africa/Johannesburg',
+  DEFAULT_LINKING_WINDOW_SECONDS: '300',
+  DEFAULT_ADMIN_USERNAME: 'admin',
+  DEFAULT_ADMIN_EMAIL: 'admin@example.com',
+  DEFAULT_ADMIN_FULL_NAME: 'Station Administrator',
+  DEFAULT_ADMIN_PASSWORD: '',
+  DEFAULT_ADMIN_STATION_ID: '',
+  DEFAULT_CURRENCY: 'USD',
+  CURRENCY_OPTIONS: 'USD,ZAR,TZS,KES',
+
+  // Persistent paths and legacy import
+  PERM_DIR: '/opt/fccapps/vpos-perm/vposftc',
+  VPOS_DATA_DIR: '/opt/fccapps/vpos-perm/vposftc',
+  VPOS_CONFIG_DIR: '/opt/fccapps/vpos-perm/vposftc',
+  VPOS_CONFIG_PATH: '',
+  LEGACY_PERM_DIR: '/opt/fccapps/vpos-perm/vposfiscal',
+  LEGACY_IMPORT_DIR: '/opt/fccapps/vpos-perm/vposftc/legacy-archive',
+  EDITOR_ROOT_DIR: '/opt/fccapps/vpos-perm/vposftc',
+  ENABLE_CONSOLE_EDITOR: '0',
+  ENABLE_CONSOLE_TERMINAL: '0',
+  PLUGIN_ROOT: '',
+
+  // API and fiscalization routing
+  VPOS_API_HOST: '127.0.0.1',
+  VPOS_API_PORT: '4101',
+  VPOS_FISCAL_FLOW: 'proxy',
+  VPOS_PROXY_URL: 'http://127.0.0.1:5555',
+  VPOS_FISCALIZATION_URL: 'http://127.0.0.1:5555',
+  VPOS_PROXY_BASE_PATH: '/',
+  RUN_PROXY_WORKER: 'true',
+  VPOS_DISABLE_INTERNAL_FISCALIZATION_WORKERS: 'false',
+  VPOS_ALLOW_INTERNAL_FISCALIZATION: 'false',
+  VPOS_FISCAL_ENGINES: 'TZ,KE,mock',
+  VPOS_FISCAL_ENGINES_JSON: '',
+  VPOS_VAT_RATE_TZ: '0.18',
+  VPOS_VAT_RATE_KE: '16',
+  VPOS_VAT_RATE_DEFAULT: '0',
+
+  // Worker and retry policy
+  VPOS_WORKER_POLL_MS: '1000',
+  VPOS_TX_WORKER_POLL_MS: '1000',
+  VPOS_PRINT_WORKER_POLL_MS: '1000',
+  VPOS_REPORT_WORKER_POLL_MS: '1000',
+  VPOS_PROXY_SENDER_POLL_MS: '1000',
+  FORECOURT_SYNC_POLL_MS: '600000',
+  VPOS_EWURA_RETRY_POLL_MS: '5000',
+  VPOS_TANZANIA_DAILY_TOTALS_POLL_MS: '60000',
+  VPOS_TX_MAX_RETRIES: '5',
+  VPOS_REPORT_MAX_RETRIES: '5',
+  VPOS_PROXY_SENDER_MAX_IN_FLIGHT: '4',
+  VPOS_PROXY_RECONCILE_POLL_MS: '5000',
+  VPOS_PROXY_RECONCILE_PENDING_LIMIT: '50',
+  VPOS_PROXY_RECONCILE_RESULTS_LIMIT: '200',
+
+  // Forecourt/JPL
+  FORECOURT_MODE: 'disabled',
+  LEGACY_FORECOURT_MODE: '',
+  FORECOURT_TCP_HOST: '127.0.0.1',
+  FORECOURT_TCP_PORT: '10000',
+  JPL_TCP_HOST: '',
+  JPL_TCP_PORT: '8888',
+  JPL_APP_ID: 'POS',
+  JPL_POS_ID: '01',
+  JPL_FP_OPERATION_MODE_NO: '1',
+  JPL_FC_ACCESS_CODE: 'POS',
+  JPL_COUNTRY_CODE: '1',
+  JPL_POS_VERSION_ID: '470-02-1.08',
+  JPL_TIMEOUT_MS: '10000',
+  JPL_OPERATION_MODE: 'supervised',
+  JPL_UNSOLICITED_DR_SECONDS: '5',
+  JPL_HEARTBEAT_INTERVAL_MS: '15000',
+  JPL_DEAD_CONNECTION_TIMEOUT_MS: '30000',
+  JPL_EXPECTED_MIN_VERSION: '470-02-1.07',
+  JPL_UNSOLICITED_FLAGS:
+    'UNSO_INSTSTA_1,UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1,UNSO_PRISTA_1',
+  JPL_UNSOLICITED_MFDR_FLAGS: 'UNSO_FPSTA_3',
+  JPL_STATUS_UPDATE_CODE: '3',
+  JPL_BOOTSTRAP_SNAPSHOT_ENABLED: 'true',
+  JPL_REQUEST_DISPATCH_POLICY: 'auto',
+  JPL_INTEGRATION_SCOPE: 'dispense_wetstock_first_release',
+  JPL_BACK_OFFICE_RECORD_SUBCODE: '02H',
+  JPL_TLS_REQUIRED: 'false',
+  JPL_TLS_REJECT_UNAUTHORIZED: 'true',
+  JPL_TLS_SERVERNAME: '',
+  JPL_TLS_CA_PATH: '',
+  JPL_TLS_CLIENT_CERT_PATH: '',
+  JPL_TLS_CLIENT_KEY_PATH: '',
+  JPL_TLS_MIN_VERSION: 'TLSv1.2',
+  JPL_OPTIONAL_PROTOCOL_FAMILIES: '',
+  BUFFER_WARN_DEPTH_SUP: '2',
+  BUFFER_CRIT_DEPTH_SUP: '5',
+  BUFFER_WARN_AGE_MIN_SUP: '5',
+  BUFFER_CRIT_AGE_MIN_SUP: '15',
+  BUFFER_WARN_DEPTH_UNSUP: '1',
+  BUFFER_CRIT_DEPTH_UNSUP: '3',
+  BUFFER_WARN_AGE_MIN_UNSUP: '2',
+  BUFFER_CRIT_AGE_MIN_UNSUP: '10',
+
+  // PSS XML integration is opt-in in a clean production installation.
+  PSS_XML_SYNC_ENABLED: 'false',
+  PSS_XML_POLL_MS: '5000',
+  PSS_XML_IN_PATH: '/opt/fccapps/vpos-perm/vposftc/pss/in/config.xml',
+  PSS_XML_OUT_PATH: '/opt/fccapps/vpos-perm/vposftc/pss/out/config.xml',
+
+  // Push and encrypted artifacts. Empty secrets disable the feature safely.
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: '',
+  VAPID_PRIVATE_KEY: '',
+  VAPID_CONTACT_EMAIL: 'support@vpos-ftc.local',
+  SECURE_ARTIFACTS_MASTER_KEY: '',
+
+  // Runtime archive containment
+  VPOS_RUNTIME_ARCHIVE_MODE: 'off',
+  VPOS_RUNTIME_ARCHIVE_ALLOWLIST: '',
+  VPOS_RUNTIME_ARCHIVE_RETENTION_DAYS: '30',
+  VPOS_RUNTIME_ARCHIVE_CLEANUP_INTERVAL_MS: '21600000',
+  VPOS_RUNTIME_ARCHIVE_CLEANUP_BATCH_SIZE: '1000',
+  VPOS_RUNTIME_ARCHIVE_CLEANUP_MAX_BATCHES: '10',
+
+  // Retention and payload compaction
+  VPOS_RETENTION_ENABLED: 'false',
+  VPOS_RETENTION_DRY_RUN: 'true',
+  VPOS_RETENTION_CLEANUP_INTERVAL_MS: '21600000',
+  VPOS_RETENTION_BATCH_SIZE: '500',
+  VPOS_RETENTION_MAX_BATCHES: '10',
+  VPOS_RETENTION_PRINT_DONE_DAYS: '7',
+  VPOS_RETENTION_PRINT_FAILED_DAYS: '30',
+  VPOS_RETENTION_TRANSACTION_QUEUE_DONE_DAYS: '7',
+  VPOS_RETENTION_TRANSACTION_QUEUE_FAILED_DAYS: '90',
+  VPOS_RETENTION_REPORT_QUEUE_DONE_DAYS: '14',
+  VPOS_RETENTION_REPORT_QUEUE_FAILED_DAYS: '30',
+  VPOS_RETENTION_FISCAL_INBOX_PROCESSED_DAYS: '30',
+  VPOS_RETENTION_FISCAL_INBOX_RESOLVED_DEAD_DAYS: '90',
+  VPOS_RETENTION_AUDIT_LOG_DAYS: '30',
+  VPOS_RETENTION_VPOS_LOG_DAYS: '30',
+  VPOS_RETENTION_FORECOURT_ROUTINE_DAYS: '7',
+  VPOS_RETENTION_FORECOURT_ERROR_DAYS: '30',
+  VPOS_RETENTION_FORECOURT_MAINTENANCE_SECURITY_DAYS: '90',
+  VPOS_RETENTION_FORECOURT_FIELD_EVIDENCE_DAYS: '180',
+  VPOS_RETENTION_JPL_REPLAY_CLEARED_DAYS: '14',
+  VPOS_RETENTION_JPL_CHECKPOINT_CLEARED_DAYS: '30',
+  VPOS_RETENTION_CONFIG_VERSION_LIMIT: '20',
+  VPOS_RETENTION_CONFIG_VERSION_MIN_AGE_DAYS: '7',
+  VPOS_RETENTION_PSS_PARSED_COMPATIBILITY_DAYS: '30',
+  VPOS_FORECOURT_PAYLOAD_COMPACTION_ENABLED: 'false',
+  VPOS_FORECOURT_PAYLOAD_COMPACTION_DRY_RUN: 'true',
+  VPOS_FORECOURT_PAYLOAD_GRACE_DAYS: '7',
+  VPOS_STATION_KV_POLICY_MODE: 'compatibility',
+  VPOS_LOG_RETENTION_DAYS: '30',
+  VPOS_MAX_LIVE_LOG_CHARS: '200000',
+
+  // Developer/test helpers. These remain harmless in production.
+  DRY_RUN: 'false',
+  FISCAL_STUB_FAIL_RATE: '0',
+  FISCAL_STUB_POLL_MS: '1000',
+  FISCAL_STUB_RESPOND_AFTER_MS: '500',
+  VPOS_TEST_CONCURRENCY: '4',
+  VPOS_TEST_TIMEOUT_MS: '30000',
+})
+
+/**
+ * Apply defaults to an environment-like object.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {Record<string, string | undefined>}
+ */
+function applyEnvironmentDefaults(env) {
+  const target = env ?? process.env
+  for (const [name, defaultValue] of Object.entries(ENV_DEFAULTS)) {
+    if (target[name] === undefined) target[name] = defaultValue
+  }
+  return target
+}
+
+module.exports = {
+  ENV_DEFAULTS,
+  applyEnvironmentDefaults,
+}

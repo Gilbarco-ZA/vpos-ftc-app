@@ -272,7 +272,7 @@ async function signedEfdmsXml(args: {
     const privateKeyPem = await readSigningKeyPem(args.stationId)
     if (!privateKeyPem) {
       throw new Error(
-        'Tanzania TRA z-report signing key is not configured in DB secure artifacts. Store a PEM private key as cert/private-key.pem or enable TZ_FISCAL_SKIP_SIGNING only for developer debugging.',
+        'Tanzania TRA z-report signing key is not configured in DB secure artifacts. Store a PEM private key as cert/private-key.pem or enable the Skip TRA/EWURA signing setting only for developer debugging.',
       )
     }
     signature = signSha1Base64(args.payloadString, privateKeyPem)

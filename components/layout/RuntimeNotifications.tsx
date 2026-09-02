@@ -1,7 +1,7 @@
 'use client'
 
 import type { ToastMessage, ToastVariant } from '@/components/ui/toast'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
@@ -57,26 +57,29 @@ export const RuntimeNotifications = () => {
   const readyRef = useRef(false)
   const timersRef = useRef<Record<string, number>>({})
 
-  const removeToast = (id: string) => {
+  const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((item) => item.id !== id))
     const timer = timersRef.current[id]
     if (timer) {
       window.clearTimeout(timer)
       delete timersRef.current[id]
     }
-  }
+  }, [])
 
-  const showToast = (variant: ToastVariant, message: string) => {
-    const id = `${Date.now()}-${Math.random()}`
-    setToasts((prev) => [...prev, { id, variant, message }])
-    if (typeof window !== 'undefined') {
-      timersRef.current[id] = window.setTimeout(() => {
-        removeToast(id)
-      }, 10_000)
-    }
-  }
+  const showToast = useCallback(
+    (variant: ToastVariant, message: string) => {
+      const id = `${Date.now()}-${Math.random()}`
+      setToasts((prev) => [...prev, { id, variant, message }])
+      if (typeof window !== 'undefined') {
+        timersRef.current[id] = window.setTimeout(() => {
+          removeToast(id)
+        }, 10_000)
+      }
+    },
+    [removeToast],
+  )
 
-  const poll = async (sinceId: number) => {
+  const poll = useCallback(async (sinceId: number) => {
     const res = await fetch(
       `/api/notifications/transactions?sinceId=${sinceId}&limit=20`,
       { cache: 'no-store' },
@@ -85,13 +88,13 @@ export const RuntimeNotifications = () => {
     const data = await res.json()
     const items: NotificationItem[] = data?.data?.items ?? data?.items ?? []
     return items
-  }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const stored = window.localStorage.getItem(STORAGE_KEY)
     const parsed = stored ? Number.parseInt(stored, 10) : null
-    setLastId(Number.isFinite(parsed) ? parsed : 0)
+    queueMicrotask(() => setLastId(Number.isFinite(parsed) ? parsed : 0))
   }, [])
 
   useEffect(() => {
@@ -136,7 +139,7 @@ export const RuntimeNotifications = () => {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [lastId])
+  }, [lastId, poll, showToast])
 
   useEffect(() => {
     return () => {

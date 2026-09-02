@@ -1,7 +1,8 @@
 import { queryOne } from '@/src/platform/db/postgres'
-import { getJplTcpAdapterState } from '@/src/shared/forecourt/adapters'
 import { readAdapterState } from '@/src/shared/forecourt/sharedState'
 import { requireNonEmptyString } from '@/src/shared/utils/inputs'
+
+import { getJplTcpAdapterState } from '@/src/modules/forecourt/application/forecourtAdapters'
 
 import type { ForecourtConnectionPayload } from '../types'
 

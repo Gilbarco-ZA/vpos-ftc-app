@@ -41,6 +41,8 @@ function remainingSeconds(
 export default function TenantTransactionsClient(props: {
   initial: Txn[]
   decimals: DecimalSettings
+  startDate?: string
+  endDate?: string
 }) {
   const [csrfToken, setCsrfToken] = useState('')
   const [txns, setTxns] = useState<Txn[]>(props.initial || [])
@@ -54,7 +56,10 @@ export default function TenantTransactionsClient(props: {
 
   const refreshTxns = async () => {
     try {
-      const res = await fetch('/api/transactions?status=OPEN', {
+      const params = new URLSearchParams({ status: 'OPEN' })
+      if (props.startDate) params.set('startDate', props.startDate)
+      if (props.endDate) params.set('endDate', props.endDate)
+      const res = await fetch(`/api/transactions?${params.toString()}`, {
         cache: 'no-store',
       })
       const data = await res.json().catch(() => ({}))
@@ -69,11 +74,11 @@ export default function TenantTransactionsClient(props: {
 
   useEffect(() => {
     const term = q.trim()
-    if (!term) {
-      setCustomers([])
-      return
-    }
     const t = setTimeout(async () => {
+      if (!term) {
+        setCustomers([])
+        return
+      }
       setLoadingCustomers(true)
       try {
         const res = await fetch(

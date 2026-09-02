@@ -117,6 +117,8 @@ export type JplTcpAdapterState = {
     at: number
   }>
   lastServiceMessages?: Array<{ seqNo?: string; message?: string; at: number }>
+  lastWireDiagnostic?: any
+  wireDiagnostics?: any[]
 
   lastPpStatuses?: Array<{
     ppId?: string
@@ -237,6 +239,82 @@ export function setJplAdapterState(next: Partial<JplTcpAdapterState>) {
 
 export function getJplAdapterState(): JplTcpAdapterState {
   return ensureGlobals().adapterState
+}
+
+const takeRecent = <T>(items: T[] | undefined, limit: number): T[] => {
+  if (!Array.isArray(items) || items.length === 0) return []
+  return items.slice(Math.max(0, items.length - limit))
+}
+
+/**
+ * Build the bounded adapter snapshot used by admin/readiness endpoints and
+ * routine logs. The live adapter keeps richer controller payloads in-process,
+ * but serialising that entire object on every admin page load can temporarily
+ * duplicate tens of kilobytes of nested pump/tank payloads and block the event
+ * loop while JSON is produced.
+ */
+export function summarizeJplAdapterState(
+  state: JplTcpAdapterState = getJplAdapterState(),
+) {
+  const dynamicState = state as JplTcpAdapterState & Record<string, unknown>
+
+  return {
+    connected: Boolean(state.connected),
+    loggedOn: state.loggedOn ?? null,
+    secureMode: state.secureMode ?? null,
+    reconnectAttempts: Number(state.reconnectAttempts ?? 0),
+    lastMessageAt: state.lastMessageAt ?? null,
+    lastConnectAt: state.lastConnectAt ?? null,
+    lastRequestAt: state.lastRequestAt ?? null,
+    lastHeartbeatSentAt: state.lastHeartbeatSentAt ?? null,
+    lastHeartbeatAt: state.lastHeartbeatAt ?? null,
+    heartbeatIntervalMs: state.heartbeatIntervalMs ?? null,
+    deadConnectionTimeoutMs: state.deadConnectionTimeoutMs ?? null,
+    welcomeVersion: state.welcomeVersion ?? null,
+    protocolVersion: dynamicState.protocolVersion ?? null,
+    correlationSupport: dynamicState.correlationSupport ?? null,
+    correlationCapability: dynamicState.correlationCapability ?? null,
+    requestDispatchPolicy: dynamicState.requestDispatchPolicy ?? null,
+    requestDispatchMode: dynamicState.requestDispatchMode ?? null,
+    requestMode: dynamicState.requestMode ?? null,
+    lastCorrelationId: state.lastCorrelationId ?? null,
+    lastReject: state.lastReject ?? null,
+    lastError: state.lastError ?? null,
+    posId: state.posId ?? null,
+    nextReconnectAt: state.nextReconnectAt ?? null,
+    lastDisconnectReason: state.lastDisconnectReason ?? null,
+    lastLifecycleEventAt: state.lastLifecycleEventAt ?? null,
+    status: dynamicState.status ?? null,
+    connectionStatus: dynamicState.connectionStatus ?? null,
+    protocol: dynamicState.protocol ?? null,
+    protocolHealth: dynamicState.protocolHealth ?? null,
+    controllerFlags: dynamicState.controllerFlags ?? null,
+    lastFrameDiagnostic: state.lastFrameDiagnostic ?? null,
+    frameDiagnostics: takeRecent(state.frameDiagnostics, 10),
+    lastWireDiagnostic: state.lastWireDiagnostic ?? null,
+    wireDiagnostics: takeRecent(state.wireDiagnostics, 10),
+    runtimeCounts: {
+      fpStatuses: state.lastFpStatuses?.length ?? 0,
+      fpInfo: state.lastFpInfo?.length ?? 0,
+      fpFuellingData: state.lastFpFuellingData?.length ?? 0,
+      fpErrors: state.lastFpErrors?.length ?? 0,
+      tankStatuses: state.lastTgStatuses?.length ?? 0,
+      tankData: state.lastTgData?.length ?? 0,
+      tankDeliveries: state.lastTankDeliveryData?.length ?? 0,
+      serviceMessages: state.lastServiceMessages?.length ?? 0,
+      backOfficeRecords: state.lastBackOfficeRecords?.length ?? 0,
+      paymentStatuses: state.lastPpStatuses?.length ?? 0,
+      paymentErrors: state.lastPpErrors?.length ?? 0,
+      washStatuses: state.lastWashStatuses?.length ?? 0,
+      washErrors: state.lastWashErrors?.length ?? 0,
+      washTransactions: state.lastWashTransactions?.length ?? 0,
+      digitalIoStatuses: state.lastDigitalIoStatuses?.length ?? 0,
+      sensorStatuses: state.lastSensorStatuses?.length ?? 0,
+      vendingStatuses: state.lastVendingStatuses?.length ?? 0,
+      vendingErrors: state.lastVendingErrors?.length ?? 0,
+      vendingTotals: state.lastVendingTotals?.length ?? 0,
+    },
+  }
 }
 
 export function setJplBufferHealth(next: Partial<JplTcpBufferHealth>) {

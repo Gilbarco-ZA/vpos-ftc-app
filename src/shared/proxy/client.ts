@@ -8,6 +8,42 @@ export type ProxyRequestResult = {
   url: string
 }
 
+export const extractProxyCountryCode = (value: unknown): string | null => {
+  const payload =
+    value && typeof value === 'object' ? ((value as any)?.data ?? value) : null
+  const identity =
+    payload?.identity && typeof payload.identity === 'object'
+      ? payload.identity
+      : {}
+  const registrationStatus =
+    payload?.registrationStatus &&
+    typeof payload.registrationStatus === 'object'
+      ? payload.registrationStatus
+      : {}
+  const registrationIdentity =
+    registrationStatus?.identity &&
+    typeof registrationStatus.identity === 'object'
+      ? registrationStatus.identity
+      : {}
+  const raw =
+    payload?.countryCode ??
+    payload?.countryId ??
+    payload?.country_code ??
+    payload?.country_id ??
+    identity?.countryCode ??
+    identity?.countryId ??
+    identity?.country_code ??
+    registrationStatus?.countryCode ??
+    registrationStatus?.countryId ??
+    registrationIdentity?.countryCode ??
+    registrationIdentity?.countryId ??
+    null
+  const normalized = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+  return normalized || null
+}
+
 type ProxyRequestOptions = {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   path: string
@@ -16,6 +52,7 @@ type ProxyRequestOptions = {
   body?: any
   headers?: Record<string, string | undefined>
   timeoutMs?: number
+  baseUrl?: string
 }
 
 const normalizeBasePath = (raw: string) => {
@@ -137,7 +174,9 @@ export const proxyRequest = async (
   stationId: string | undefined,
   opts: ProxyRequestOptions,
 ): Promise<ProxyRequestResult> => {
-  const baseUrl = await resolveProxyBaseUrl(stationId)
+  const baseUrl = opts.baseUrl
+    ? String(opts.baseUrl).trim().replace(/\/+$/, '')
+    : await resolveProxyBaseUrl(stationId)
   const basePathValue = stationId
     ? (await getEnvValue(stationId, 'VPOS_PROXY_BASE_PATH', '/')) || '/'
     : (process.env.VPOS_PROXY_BASE_PATH ?? '/')
@@ -185,6 +224,28 @@ export const getRegistrationStatusViaProxy = async (
     method: 'GET',
     path: '/api/registration/status',
     fallbackPath: '/api/registration/status',
+  })
+}
+
+export const getRegistrationCountryViaProxy = async (
+  stationId: string | undefined,
+) => {
+  return proxyRequest(stationId, {
+    method: 'GET',
+    path: '/api/registration/country',
+    fallbackPath: '/api/registration/country',
+  })
+}
+
+export const updateRegistrationCountryViaProxy = async (
+  stationId: string | undefined,
+  countryCode: string,
+) => {
+  return proxyRequest(stationId, {
+    method: 'PATCH',
+    path: '/api/registration/country',
+    fallbackPath: '/api/registration/country',
+    body: { countryCode },
   })
 }
 
@@ -323,6 +384,7 @@ export const checkProxyDeviceStatus = async (
   proxyReachable: boolean
   proxyUrl: string
   deviceSettings?: any
+  proxyCountryCode?: string | null
   error?: string
 }> => {
   let proxyUrl = ''
@@ -366,6 +428,7 @@ export const checkProxyDeviceStatus = async (
       proxyReachable: true,
       proxyUrl,
       deviceSettings: data?.deviceSettings || null,
+      proxyCountryCode: extractProxyCountryCode(data),
     }
   } catch {
     // fall through to health check
@@ -387,7 +450,7 @@ export const checkProxyDeviceStatus = async (
       proxyUrl,
       error: 'Could not determine registration status',
     }
-  } catch (e) {
+  } catch {
     return {
       ok: false,
       isRegistered: false,
@@ -484,6 +547,68 @@ export const getSiteConfigurationPublic = async () => {
     status: 502,
     data: { error: 'Failed to reach proxy configuration endpoint' },
   }
+}
+
+export const getTanzaniaFiscalRegistrationViaProxy = async (
+  stationId: string | undefined,
+) => {
+  return proxyRequest(stationId, {
+    method: 'GET',
+    path: '/api/fiscalization/tanzania/registration',
+    fallbackPath: '/api/fiscalization/tanzania/registration',
+  })
+}
+
+export const saveTanzaniaFiscalRegistrationViaProxy = async (
+  stationId: string | undefined,
+  payload: any,
+) => {
+  return proxyRequest(stationId, {
+    method: 'PUT',
+    path: '/api/fiscalization/tanzania/registration',
+    fallbackPath: '/api/fiscalization/tanzania/registration',
+    body: payload,
+    timeoutMs: 15_000,
+  })
+}
+
+export const submitTanzaniaFiscalRegistrationViaProxy = async (
+  stationId: string | undefined,
+  payload: any,
+) => {
+  return proxyRequest(stationId, {
+    method: 'POST',
+    path: '/api/fiscalization/tanzania/registration',
+    fallbackPath: '/api/fiscalization/tanzania/registration',
+    body: payload,
+    timeoutMs: 30_000,
+  })
+}
+
+export const submitTanzaniaTraRegistrationViaProxy = async (
+  stationId: string | undefined,
+  payload: any,
+) => {
+  return proxyRequest(stationId, {
+    method: 'POST',
+    path: '/api/tanzania/registrations/tra',
+    fallbackPath: '/api/tanzania/registrations/tra',
+    body: payload,
+    timeoutMs: 30_000,
+  })
+}
+
+export const submitTanzaniaEwuraRegistrationViaProxy = async (
+  stationId: string | undefined,
+  payload: any,
+) => {
+  return proxyRequest(stationId, {
+    method: 'POST',
+    path: '/api/tanzania/registrations/ewura',
+    fallbackPath: '/api/tanzania/registrations/ewura',
+    body: payload,
+    timeoutMs: 30_000,
+  })
 }
 
 export const deregisterDeviceViaProxy = async (

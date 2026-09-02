@@ -1,11 +1,7 @@
 import type { CommandQueueRecord } from '@/src/modules/forecourt/infrastructure/queue/commandQueue'
-import type {
-  ForecourtCommand,
-  ForecourtCommandResult,
-} from '@/src/shared/forecourt/types'
+import type { ForecourtCommandResult } from '@/src/shared/forecourt/types'
 
-import { sendForecourtCommand } from '@/src/shared/forecourt/gateway'
-
+import { sendForecourtCommand } from '@/src/modules/forecourt/infrastructure/gateway'
 import {
   loadPending,
   markDead,
@@ -33,7 +29,6 @@ const inflightLocks = new Set<string>()
 const resultListeners = new Set<(result: ForecourtCommandResult) => void>()
 
 let processorStarted = false
-let processorTimer: NodeJS.Timeout | null = null
 let runInProgress = false
 
 const normalizeAction = (action: string) => action.trim().toUpperCase()
@@ -176,7 +171,7 @@ export const startForecourtCommandProcessor = () => {
   processorStarted = true
   void runOnce()
 
-  processorTimer = setInterval(() => {
+  setInterval(() => {
     void runOnce()
   }, TICK_MS)
 }

@@ -44,8 +44,10 @@ export const GET = defineGetRoute({
         searchParams.get('pumpNumber') || searchParams.get('pump'),
       ),
       search: searchParams.get('search') || searchParams.get('q'),
-      from: searchParams.get('from') || searchParams.get('startDate'),
-      to: searchParams.get('to') || searchParams.get('endDate'),
+      from: searchParams.get('from'),
+      to: searchParams.get('to'),
+      startDate: searchParams.get('startDate'),
+      endDate: searchParams.get('endDate'),
     })
     return ok(rows)
   },

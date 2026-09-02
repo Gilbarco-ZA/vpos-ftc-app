@@ -3,7 +3,7 @@
   Production entrypoint / debug-friendly wrapper.
 
   Goals:
-  - Load .env if present (optional; not shipped)
+  - Load developer .env overrides only outside production
   - Add robust process-level diagnostics (exit causes, unhandled errors)
   - Emit enough context to debug "silent" exits on minimal/busybox systems
 
@@ -22,6 +22,8 @@ const path = require('path');
 const os = require('os');
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
+const { applyEnvironmentDefaults } = require('./src/platform/runtime/env-defaults.cjs');
 
 function nowIso() {
   return new Date().toISOString();
@@ -160,7 +162,8 @@ function installProcessDiagnostics() {
   for (const sig of sigs) {
     try {
       process.on(sig, () => {
-        warn(`[diag] received  (pid=)`);
+        const mem = process.memoryUsage();
+        warn(`[diag] received ${sig} (pid=${process.pid} rss_mb=${Math.round(mem.rss / (1024 * 1024))} heap_used_mb=${Math.round(mem.heapUsed / (1024 * 1024))})`);
       });
     } catch {
     }
@@ -171,6 +174,7 @@ function installProcessDiagnostics() {
 installProcessDiagnostics();
 
 const { loaded, envPath, skipped } = loadDevelopmentEnvOptional();
+applyEnvironmentDefaults(process.env);
 log('[start] ts=', nowIso());
 log('[start] node=', process.version, 'platform=', process.platform, 'arch=', process.arch);
 log('[start] pid=', process.pid, 'ppid=', process.ppid);

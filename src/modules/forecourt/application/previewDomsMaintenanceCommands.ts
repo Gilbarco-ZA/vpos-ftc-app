@@ -83,18 +83,6 @@ const normalizeId2 = (value: unknown) => {
   return String(parsed).padStart(2, '0')
 }
 
-const normalizeCode2 = (value: unknown) => {
-  const text = String(value ?? '')
-    .trim()
-    .toUpperCase()
-  if (/^[0-9A-F]{4}H$/.test(text)) return text
-  const parsed = Number.parseInt(text, 10)
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 0xffff) {
-    throw new Error(`CODE2 value ${text || '(empty)'} is invalid`)
-  }
-  return `${parsed.toString(16).toUpperCase().padStart(4, '0')}H`
-}
-
 const safeId = (value: unknown, fallback: string) => {
   const text = String(value ?? '').trim()
   if (!text) return fallback

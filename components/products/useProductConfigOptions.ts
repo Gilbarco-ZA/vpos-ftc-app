@@ -76,6 +76,32 @@ export const useProductConfigOptions = (): ProductConfigOptionsState => {
     }
   }, [])
 
+  useEffect(() => {
+    let active = true
+
+    const refreshCategories = async () => {
+      try {
+        const response = await fetch(
+          '/api/product-categories?includeInactive=true',
+          { cache: 'no-store' },
+        )
+        if (!response.ok) return
+        const body = await response.json().catch(() => ({}))
+        if (active && Array.isArray(body?.data)) {
+          setCategoryOptions(body.data as ConfigOption[])
+        }
+      } catch {
+        // Keep the last known category list when the background refresh fails.
+      }
+    }
+
+    window.addEventListener('focus', refreshCategories)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refreshCategories)
+    }
+  }, [])
+
   return {
     configLoading,
     configError,

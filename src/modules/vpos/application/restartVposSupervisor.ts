@@ -1,7 +1,7 @@
 import {
   reloadVposRestartManagerConfig,
   requestVposRestartManagerRestart,
-} from '@/src/shared/vpos/supervisor'
+} from '@/src/modules/supervisor/application/vposSupervisor'
 
 export async function restartVposSupervisor(args: { stationId: string }) {
   if (!args.stationId) throw new Error('stationId is required')

@@ -2,7 +2,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { NextResponse } from 'next/server'
 
-import { resolveProductCategoryAssetsDir } from '@/src/modules/products/infrastructure/storage/product-category-image.storage'
+import { resolveProductCategoryAssetsDir } from '@/src/modules/products/application/categoryAssets'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

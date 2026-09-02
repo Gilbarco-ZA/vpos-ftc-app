@@ -19,6 +19,7 @@ export type FiscalInboxRow = {
   createdAt: string | null
   processedAt: string | null
   deadAt: string | null
+  resolvedAt: string | null
   errorText: string | null
   relatedTransactionId: string | null
   relatedTransactionStatus: string | null
@@ -36,6 +37,7 @@ export function mapFiscalInboxListItem(row: any): FiscalInboxListItem {
     receivedAt: row.received_at ? String(row.received_at) : null,
     processedAt: row.processed_at ? String(row.processed_at) : null,
     deadAt: row.dead_at ? String(row.dead_at) : null,
+    resolvedAt: row.resolved_at ? String(row.resolved_at) : null,
     errorText: row.error_text ? String(row.error_text) : null,
     relatedTransactionId: row.related_transaction_id
       ? String(row.related_transaction_id)
@@ -64,6 +66,7 @@ export function normalizeFiscalInboxRows(items: any[]): FiscalInboxRow[] {
       null,
     processedAt: item?.processedAt ?? item?.processed_at ?? null,
     deadAt: item?.deadAt ?? item?.dead_at ?? null,
+    resolvedAt: item?.resolvedAt ?? item?.resolved_at ?? null,
     errorText: item?.errorText ?? item?.error_text ?? null,
     relatedTransactionId:
       item?.relatedTransactionId ?? item?.related_transaction_id ?? null,
@@ -117,6 +120,12 @@ export function normalizeFiscalInboxItem(row: any) {
         ? String(row.dead_at)
         : row.deadAt != null
           ? String(row.deadAt)
+          : null,
+    resolvedAt:
+      row.resolved_at != null
+        ? String(row.resolved_at)
+        : row.resolvedAt != null
+          ? String(row.resolvedAt)
           : null,
     errorText:
       row.error_text != null

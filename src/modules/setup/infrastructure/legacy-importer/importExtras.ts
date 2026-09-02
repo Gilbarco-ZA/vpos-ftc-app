@@ -3,9 +3,9 @@ import path from 'path'
 import type { ImportContext } from '@/src/modules/setup/infrastructure/legacy-importer/types'
 
 import { upsertSecureArtifact } from '@/src/platform/security/secure-artifacts'
-import { enqueuePrintJob } from '@/src/shared/print/queue'
 import { kvSet } from '@/src/shared/storage/stationKv'
 
+import { enqueuePrintJob } from '@/src/modules/printing/application/enqueuePrintJob'
 import {
   fileHasContent,
   importSingleJsonFile,

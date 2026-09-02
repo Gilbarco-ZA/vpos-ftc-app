@@ -3,21 +3,13 @@
 import type {
   BufferThresholds,
   ForecourtBufferPayload,
-  ForecourtConnectionPayload,
   PumpBufferHealth,
-  SimPump,
-  SimSnapshot,
 } from '@/components/pumps/pumpStatusTypes'
-import type { BadgeProps } from '@/components/ui/badge'
 import type { PumpStateSnapshot } from '@/src/shared/pumps/types'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
-import {
-  FORECOURT_CONNECTION_STATUS,
-  STATUS_VARIANT,
-} from '@/src/shared/status/ui'
-import { logger } from '@/src/shared/utils/logger'
+import { FORECOURT_CONNECTION_STATUS } from '@/src/shared/status/ui'
 
 import {
   forecourtBadge,
@@ -32,7 +24,6 @@ import {
   healthVariant,
   sevVariant,
   statusVariant,
-  upsertSimPump,
 } from '@/components/pumps/pumpStatusHelpers'
 import { Badge } from '@/components/ui/badge'
 
@@ -43,8 +34,7 @@ type PumpStatusClientProps = {
 const PumpStatusClient = ({ stationId }: PumpStatusClientProps) => {
   const [snapshot, setSnapshot] = useState<PumpStateSnapshot | null>(null)
   const forecourtConn = useForecourtConnection(stationId)
-  const [bufferHealth, setBufferHealth] =
-    useState<ForecourtBufferPayload | null>(null)
+  const [bufferHealth] = useState<ForecourtBufferPayload | null>(null)
 
   const thresholds: BufferThresholds = useMemo(
     () => ({

@@ -1,4 +1,4 @@
-import type { PumpBufferHealth } from '@/src/modules/forecourt/infrastructure/jpl/types'
+import type { PumpBufferHealth } from '@/src/shared/forecourt/bufferHealthTypes'
 import type { BufferSeverity } from '@/src/shared/status/ui'
 
 import { BUFFER_SEVERITY } from '@/src/shared/status/ui'

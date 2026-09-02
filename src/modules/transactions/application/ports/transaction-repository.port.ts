@@ -24,6 +24,7 @@ export type PersistTransactionStatusInput = {
   fiscalizationReference?: string | null
   fiscalizationResponse?: unknown
   fiscalDocumentId?: string | null
+  latestFiscalEventId?: string | null
   touchFiscalizedAt?: boolean
   lastError?: string | null
   clearLastError?: boolean

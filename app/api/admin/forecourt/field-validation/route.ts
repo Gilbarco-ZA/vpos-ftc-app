@@ -1,5 +1,6 @@
 import type {
   RecordDomsFieldValidationCheckpointInput,
+  RecordDomsFieldValidationCommandResultInput,
   RecordDomsFieldValidationEvidenceImportInput,
 } from '@/src/modules/forecourt/application/getDomsFieldValidationReadiness'
 import { NextResponse } from 'next/server'
@@ -12,11 +13,17 @@ import {
 import {
   getDomsFieldValidationReadiness,
   recordDomsFieldValidationCheckpoint,
+  recordDomsFieldValidationCommandResult,
   recordDomsFieldValidationEvidenceImport,
 } from '@/src/modules/forecourt/application/getDomsFieldValidationReadiness'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+const isCommandResult = (body: Record<string, any>) =>
+  String(body?.action ?? '')
+    .trim()
+    .toLowerCase() === 'record-command-result'
 
 const isEvidenceImport = (body: Record<string, any>) => {
   const action = String(body?.action ?? '')
@@ -42,19 +49,26 @@ export const GET = defineGetRoute({
 
 export const POST = defineMutationRoute<
   | RecordDomsFieldValidationCheckpointInput
+  | RecordDomsFieldValidationCommandResultInput
   | RecordDomsFieldValidationEvidenceImportInput
 >({
   roles: ['administrator'],
   handler: async (_req, { user, body }) => {
-    const result = isEvidenceImport(body as Record<string, any>)
-      ? await recordDomsFieldValidationEvidenceImport(
-          body as RecordDomsFieldValidationEvidenceImportInput,
+    const bodyRecord = body as Record<string, any>
+    const result = isCommandResult(bodyRecord)
+      ? await recordDomsFieldValidationCommandResult(
+          body as RecordDomsFieldValidationCommandResultInput,
           user,
         )
-      : await recordDomsFieldValidationCheckpoint(
-          body as RecordDomsFieldValidationCheckpointInput,
-          user,
-        )
+      : isEvidenceImport(bodyRecord)
+        ? await recordDomsFieldValidationEvidenceImport(
+            body as RecordDomsFieldValidationEvidenceImportInput,
+            user,
+          )
+        : await recordDomsFieldValidationCheckpoint(
+            body as RecordDomsFieldValidationCheckpointInput,
+            user,
+          )
     return NextResponse.json({ success: true, data: result })
   },
 })

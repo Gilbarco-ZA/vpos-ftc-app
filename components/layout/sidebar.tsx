@@ -6,13 +6,17 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 
+import { isTanzaniaCountry } from '@/src/shared/config/country'
+
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import { CsrfHiddenInput } from '@/components/security/CsrfHiddenInput'
 import { Button } from '@/components/ui/button'
+import { RuntimeImage } from '@/components/ui/runtime-image'
 
 type NavItem = {
   label: string
   href: string
+  exact?: boolean
 }
 
 type NavSection = {
@@ -25,7 +29,10 @@ export type SidebarBranding = {
   logoPath?: string | null
 }
 
-export const getNavSections = (role: UserRole): NavSection[] => {
+export const getNavSections = (
+  role: UserRole,
+  stationCountry?: string | null,
+): NavSection[] => {
   const dashboard: NavSection = {
     items: [{ label: 'Dashboard', href: '/dashboard' }],
   }
@@ -37,7 +44,16 @@ export const getNavSections = (role: UserRole): NavSection[] => {
       { label: 'Transactions', href: '/transactions' },
       { label: 'Receipts', href: '/receipts' },
       { label: 'Reports', href: '/reports' },
+      ...(isTanzaniaCountry(stationCountry)
+        ? [
+            {
+              label: 'Daily Totals',
+              href: '/tanzania/daily-totals',
+            },
+          ]
+        : []),
       { label: 'Customers', href: '/customers' },
+      { label: 'Product Stock', href: '/stock' },
     ],
   }
 
@@ -128,8 +144,9 @@ export const getNavSections = (role: UserRole): NavSection[] => {
     {
       label: 'Fiscal Services',
       items: [
-        { label: 'EWURA', href: '/admin/ewura' },
-        { label: 'Tanzania Fiscal', href: '/admin/tanzania-fiscal' },
+        ...(isTanzaniaCountry(stationCountry)
+          ? [{ label: 'Tanzania Fiscal', href: '/admin/tanzania-fiscal' }]
+          : []),
         { label: 'Proxy Settings', href: '/admin/proxy-settings' },
       ],
     },
@@ -137,8 +154,8 @@ export const getNavSections = (role: UserRole): NavSection[] => {
       label: 'Administration',
       items: [
         { label: 'Users', href: '/admin/users' },
-        { label: 'Control', href: '/admin/control' },
-        { label: 'Sync', href: '/admin/sync' },
+        { label: 'Runtime Control', href: '/admin/control' },
+        { label: 'Maintenance', href: '/admin/maintenance' },
       ],
     },
     {
@@ -147,7 +164,8 @@ export const getNavSections = (role: UserRole): NavSection[] => {
         { label: 'Setup Wizard', href: '/admin/setup' },
         { label: 'Forecourt Setup', href: '/setup/forecourt' },
         { label: 'Forecourt Pricing', href: '/setup/forecourt/pricing' },
-        { label: 'Products', href: '/admin/products' },
+        { label: 'Products', href: '/admin/products', exact: true },
+        { label: 'Product Categories', href: '/admin/products/categories' },
         { label: 'Pump Settings', href: '/settings/pumps' },
         { label: 'Pump Mode', href: '/admin/settings/pump-mode' },
         { label: 'Tank Settings', href: '/settings/tanks' },
@@ -165,11 +183,13 @@ export const getNavSections = (role: UserRole): NavSection[] => {
 
 export type SidebarProps = {
   role: UserRole
+  stationCountry?: string | null
   branding?: SidebarBranding
 }
 
 type SidebarContentProps = {
   role: UserRole
+  stationCountry?: string | null
   branding?: SidebarBranding
   collapsed: boolean
   showCollapseToggle?: boolean
@@ -182,11 +202,12 @@ const isActiveRoute = (
   pathname: string,
   currentSearchParams: URLSearchParams,
   href: string,
+  exact = false,
 ) => {
   const [targetPath, targetQuery = ''] = href.split('?')
   const pathMatches =
-    targetPath === '/dashboard'
-      ? pathname === '/dashboard'
+    exact || targetPath === '/dashboard'
+      ? pathname === targetPath
       : pathname === targetPath || pathname.startsWith(`${targetPath}/`)
 
   if (!pathMatches) return false
@@ -201,6 +222,7 @@ const isActiveRoute = (
 
 export const SidebarContent = ({
   role,
+  stationCountry,
   branding,
   collapsed,
   showCollapseToggle = true,
@@ -210,7 +232,10 @@ export const SidebarContent = ({
 }: SidebarContentProps) => {
   const pathname = usePathname() ?? '/'
   const searchParams = useSearchParams()
-  const sections = useMemo(() => getNavSections(role), [role])
+  const sections = useMemo(
+    () => getNavSections(role, stationCountry),
+    [role, stationCountry],
+  )
   const currentSearchParams = useMemo(
     () => new URLSearchParams(searchParams?.toString() || ''),
     [searchParams],
@@ -243,13 +268,13 @@ export const SidebarContent = ({
   return (
     <div className={className}>
       {/* Header with branding */}
-      <div className="border-b border-[var(--border-neon-cyan)] px-4 py-5 bg-gradient-to-r from-[var(--surface-page)] via-[var(--surface-page)]/95 to-[var(--surface-page)] shadow-[0_0_20px_rgba(0,245,255,0.05)]">
+      <div className="bg-[var(--surface-page)]/90 flex min-h-20 items-center border-b border-[var(--border-default)] px-4 shadow-[var(--shadow-glow-cyan)] backdrop-blur-xl">
         <div className="flex items-start justify-between gap-3">
           <div className={collapsed ? 'sr-only' : 'animate-fade-in'}>
             <div className="flex items-center gap-3">
               <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border-2 border-[var(--neon-cyan)] bg-[var(--surface-muted)] transition-all duration-300 hover:border-[var(--neon-magenta)] hover:shadow-[0_0_16px_rgba(0,245,255,0.3)]">
                 {branding?.logoPath ? (
-                  <img
+                  <RuntimeImage
                     src={branding.logoPath}
                     alt={`${branding.stationDisplayName || 'Station'} logo`}
                     className="h-full w-full object-contain p-1.5"
@@ -317,7 +342,7 @@ export const SidebarContent = ({
         {sections.map((section, index) => {
           const sectionKey = section.label ?? `primary-${index}`
           const hasActiveItem = section.items.some((item) =>
-            isActiveRoute(pathname, currentSearchParams, item.href),
+            isActiveRoute(pathname, currentSearchParams, item.href, item.exact),
           )
           const expanded =
             !section.label ||
@@ -373,6 +398,7 @@ export const SidebarContent = ({
                       pathname,
                       currentSearchParams,
                       item.href,
+                      item.exact,
                     )
                     return (
                       <Link
@@ -380,16 +406,16 @@ export const SidebarContent = ({
                         href={item.href}
                         onClick={onNavigate}
                         className={
-                          'group relative flex items-center rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200 ' +
+                          'group relative flex items-center rounded-lg border px-3 py-2 text-[13px] font-medium transition-all duration-200 ' +
                           (active
-                            ? 'bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-sm'
-                            : 'text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]') +
+                            ? 'border-[var(--border-neon-cyan)] bg-[color-mix(in_srgb,var(--neon-cyan)_10%,transparent)] text-[var(--neon-cyan)] shadow-[var(--shadow-glow-cyan)]'
+                            : 'border-transparent text-[var(--text-muted)] hover:border-[var(--border-neon-magenta)] hover:bg-[color-mix(in_srgb,var(--neon-magenta)_10%,transparent)] hover:text-[var(--neon-magenta)] hover:shadow-[var(--shadow-glow-magenta)]') +
                           (collapsed ? ' justify-center px-2' : '')
                         }
                         title={collapsed ? item.label : undefined}
                       >
                         {active ? (
-                          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--neon-green)] transition-all duration-300 shadow-[0_0_12px_rgba(57,255,20,0.6)]" />
+                          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--neon-cyan)] shadow-[var(--shadow-glow-cyan)] transition-all duration-300" />
                         ) : null}
                         <span className={collapsed ? 'sr-only' : ''}>
                           {item.label}
@@ -452,18 +478,19 @@ export const SidebarContent = ({
   )
 }
 
-export const Sidebar = ({ role, branding }: SidebarProps) => {
+export const Sidebar = ({ role, stationCountry, branding }: SidebarProps) => {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
     <aside
       className={
-        'sticky top-0 flex h-screen flex-col border-r-2 border-[var(--border-neon-cyan)] bg-[var(--surface-page)] shadow-[0_0_30px_rgba(0,245,255,0.1)] transition-all duration-300 ease-out ' +
+        'sticky top-0 flex h-screen flex-col border-r border-[var(--border-default)] bg-[var(--surface-page)] shadow-[var(--shadow-glow-cyan)] transition-all duration-300 ease-out ' +
         (collapsed ? 'w-[72px]' : 'w-64')
       }
     >
       <SidebarContent
         role={role}
+        stationCountry={stationCountry}
         branding={branding}
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed((prev) => !prev)}

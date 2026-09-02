@@ -25,6 +25,14 @@ export type EditableTransactionLine = {
   productCode: string | null
   productName: string | null
   currency: string | null
+  categoryName: string | null
+  isFuel: boolean
+}
+
+export type TransactionVehicleDetailsInput = {
+  odometer?: string | null
+  paymentType?: string | null
+  vehicleRegNr?: string | null
 }
 
 export type FuelSelectionInput = {
@@ -40,6 +48,11 @@ export type UpsertTransactionLineInput = {
   productId: string
   quantity: number
   unitPrice?: number | null
+}
+
+export type TransactionMutationActor = {
+  userId: string
+  name: string
 }
 
 export type ManualTransactionInput = {

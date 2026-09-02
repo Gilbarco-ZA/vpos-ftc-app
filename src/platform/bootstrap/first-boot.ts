@@ -5,11 +5,10 @@ import {
   getLegacyPermDir,
 } from '@/src/platform/config/app-config'
 import { bootstrapStationConfig } from '@/src/platform/config/loader'
+import { prepareStationKvWrite } from '@/src/platform/config/station-kv-policy'
 import { getPool } from '@/src/platform/db/postgres'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
-
-let firstBootPromise: Promise<FirstBootResult> | null = null
 
 export type FirstBootResult = {
   didCreateStation: boolean
@@ -17,6 +16,12 @@ export type FirstBootResult = {
   didImportLegacy: boolean
   stationId: string | null
 }
+
+type FirstBootGlobals = typeof globalThis & {
+  __vposFirstBootPromise?: Promise<FirstBootResult>
+}
+
+const firstBootGlobals = () => globalThis as FirstBootGlobals
 
 export const ensureFirstBoot = async (
   runtimeStationId?: string,
@@ -42,8 +47,18 @@ export const ensureFirstBoot = async (
     }
   }
 
-  if (!firstBootPromise) firstBootPromise = runFirstBoot(runtimeStationId)
-  return firstBootPromise
+  const globals = firstBootGlobals()
+  if (!globals.__vposFirstBootPromise) {
+    let promise: Promise<FirstBootResult>
+    promise = runFirstBoot(runtimeStationId).catch((error) => {
+      if (globals.__vposFirstBootPromise === promise) {
+        globals.__vposFirstBootPromise = undefined
+      }
+      throw error
+    })
+    globals.__vposFirstBootPromise = promise
+  }
+  return globals.__vposFirstBootPromise
 }
 
 const runFirstBoot = async (
@@ -122,7 +137,6 @@ const runFirstBoot = async (
       const linkingWindowSeconds = Number(
         process.env.DEFAULT_LINKING_WINDOW_SECONDS || 30,
       )
-      const settingsKey = `default:${stationId}`
       const id = uuidv4()
 
       await client.query(
@@ -141,10 +155,10 @@ const runFirstBoot = async (
            WHERE id IN (SELECT id FROM target)
            RETURNING id
          )
-         INSERT INTO station_settings (id, station_id, linking_window_seconds, key)
-         SELECT $3, $1, $2, $4
+         INSERT INTO station_settings (id, station_id, linking_window_seconds)
+         SELECT $3, $1, $2
          WHERE NOT EXISTS (SELECT 1 FROM updated)`,
-        [stationId, linkingWindowSeconds, id, settingsKey],
+        [stationId, linkingWindowSeconds, id],
       )
     }
 
@@ -181,12 +195,16 @@ const runFirstBoot = async (
     }
 
     if (stationId) {
+      const bootstrapCompleted = prepareStationKvWrite(
+        'bootstrap.completed_at',
+        new Date().toISOString(),
+      )
       await client.query(
         `INSERT INTO station_kv (station_id, key, value)
-         VALUES ($1, 'bootstrap.completed_at', to_jsonb(NOW()::timestamptz))
+         VALUES ($1, $2, $3::jsonb)
          ON CONFLICT (station_id, key)
          DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [stationId],
+        [stationId, bootstrapCompleted.key, bootstrapCompleted.payload],
       )
     }
 

@@ -61,6 +61,7 @@ export type FiscalInboxRow = {
   createdAt: string | null
   processedAt: string | null
   deadAt: string | null
+  resolvedAt: string | null
   errorText: string | null
   relatedTransactionId: string | null
   relatedTransactionStatus: string | null
@@ -119,6 +120,7 @@ const normalizeRow = (row: any): FiscalInboxRow => ({
     null,
   processedAt: row?.processed_at ?? row?.processedAt ?? null,
   deadAt: row?.dead_at ?? row?.deadAt ?? null,
+  resolvedAt: row?.resolved_at ?? row?.resolvedAt ?? null,
   errorText: row?.error_text ?? row?.errorText ?? null,
   relatedTransactionId:
     row?.related_transaction_id ?? row?.relatedTransactionId ?? null,
@@ -270,10 +272,11 @@ const FiscalInboxPageClient = ({
   }, [endDate, filter, startDate, status])
 
   useEffect(() => {
-    void refresh()
+    queueMicrotask(() => {
+      void refresh()
+    })
     // Initial API hydration only. Filter changes remain explicit via Refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [refresh])
 
   const filtered = useMemo(() => {
     if (!filter) return rows
@@ -340,6 +343,9 @@ const FiscalInboxPageClient = ({
               </DetailItem>
               <DetailItem label="Dead At">
                 {formatDate(detailsRow.deadAt)}
+              </DetailItem>
+              <DetailItem label="Resolved At">
+                {formatDate(detailsRow.resolvedAt)}
               </DetailItem>
             </DetailList>
 

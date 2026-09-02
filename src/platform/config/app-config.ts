@@ -53,13 +53,36 @@ export const getPostgresDatabaseName = (): string => {
   return readEnvOrDefault('POSTGRES_DATABASE', DEFAULT_POSTGRES_DATABASE)
 }
 
+const boundedIntegerEnv = (
+  name: string,
+  defaultValue: number,
+  min: number,
+  max: number,
+): number => {
+  const value = Math.trunc(readNumberEnv(name, defaultValue))
+  return Math.max(min, Math.min(max, value))
+}
+
 export const getPostgresPoolConfig = (): PoolConfig => {
   const connectionString = readTrimmedEnv('POSTGRES_URL')
 
   const common: PoolConfig = {
-    max: 20,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
+    // Keep master's proven default capacity, but make it bounded and tunable.
+    // The pool itself is process-global so this limit is no longer multiplied
+    // by separate Next.js server module graphs.
+    max: boundedIntegerEnv('POSTGRES_POOL_MAX', 20, 2, 50),
+    idleTimeoutMillis: boundedIntegerEnv(
+      'POSTGRES_POOL_IDLE_TIMEOUT_MS',
+      30_000,
+      1_000,
+      300_000,
+    ),
+    connectionTimeoutMillis: boundedIntegerEnv(
+      'POSTGRES_POOL_CONNECTION_TIMEOUT_MS',
+      10_000,
+      1_000,
+      60_000,
+    ),
   }
 
   if (connectionString) {
