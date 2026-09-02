@@ -121,3 +121,37 @@ export type ProductDevFlowOverride =
   | 'dual-write'
   | 'offline'
   | 'timeout'
+
+export type Product = {
+  id: string
+  stationId: string
+  productId: string
+  productCode: string
+  productName: string
+  productClassCode: string
+  productTypeCode: string
+  sku?: string
+  barcode?: string
+  unitPrice: number
+  unitCost: number
+  currency: string
+  taxRate: number
+  category?: string
+  categoryId?: string
+  categoryIcon?: string | null
+  categoryImagePath?: string | null
+  unitOfMeasure?: string
+  unitOfPackaging?: string
+  packSize?: string
+  taxCode?: string
+  commodityCode?: string
+  hazardousIndicator?: boolean
+  devFlowOverride?: ProductDevFlowOverride | null
+  lastSyncStatus?: ProductSyncStatus
+  lastSyncAt?: string | null
+}
+
+export type SelectOption = {
+  label: string
+  value: string
+}
