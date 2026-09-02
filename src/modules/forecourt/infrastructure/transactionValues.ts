@@ -30,6 +30,15 @@ const RAW_MONEY_KEYS = [
   'Sum',
 ]
 
+const RAW_UNIT_PRICE_KEYS = [
+  'Price_e',
+  'PriceE',
+  'Price',
+  'UnitPrice',
+  'UnitPrice_e',
+  'PricePerLiter',
+]
+
 const normalizeKey = (value: string) =>
   value.replace(/[^a-z0-9]/gi, '').toLowerCase()
 
@@ -157,4 +166,25 @@ export const resolveTransactionAmount = (
     if (scaled != null) return scaled
   }
   return null
+}
+
+/**
+ * DOMS exposes the dispenser price on a transaction as Price_e/Price. This is
+ * intentionally kept separate from amount/volume derivation so country policy
+ * can decide when the controller price is authoritative (currently Tanzania).
+ */
+export const resolveTransactionUnitPrice = (
+  tx: TxLike | null | undefined,
+  unitPriceDecimals?: number,
+): number | null => {
+  const raw = extractRawTransactionField(tx, RAW_UNIT_PRICE_KEYS)
+  if (raw === undefined) return null
+
+  if (isValidDecimalSetting(unitPriceDecimals)) {
+    const scaled = scaleByDecimals(raw, unitPriceDecimals)
+    if (scaled != null) return scaled
+  }
+
+  const numeric = Number(unwrapValue(raw))
+  return Number.isFinite(numeric) ? numeric : null
 }
