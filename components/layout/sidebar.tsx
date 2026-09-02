@@ -138,6 +138,7 @@ export const getNavSections = (
         { label: 'Tank Levels', href: '/tank-levels' },
         { label: 'Forecourt Monitor', href: '/admin/forecourt' },
         { label: 'Device Status', href: '/admin/device-setup' },
+        { label: 'Print Jobs', href: '/admin/print-jobs' },
         { label: 'Diagnostics', href: '/admin/diagnostics' },
       ],
     },
