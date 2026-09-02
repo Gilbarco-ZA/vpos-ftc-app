@@ -22,7 +22,25 @@ export const printJobsSql = {
             r.branding_snapshot,
             fs.country AS station_country,
             fs.name AS station_name,
-            '' AS station_tin
+            COALESCE(
+              NULLIF(BTRIM(CAST(r.fiscal_data->'receipt'->>'companyTin' AS text)), ''),
+              NULLIF(BTRIM(CAST(r.fiscal_data->'model'->'station'->>'taxId' AS text)), ''),
+              NULLIF(BTRIM(CAST((
+                SELECT sk.value->>'tin'
+                  FROM station_kv sk
+                 WHERE sk.station_id = r.station_id
+                   AND sk.key = 'tax_pin'
+                 LIMIT 1
+              ) AS text)), ''),
+              NULLIF(BTRIM(CAST((
+                SELECT sk.value->>'tax_pin'
+                  FROM station_kv sk
+                 WHERE sk.station_id = r.station_id
+                   AND sk.key = 'tax_pin'
+                 LIMIT 1
+              ) AS text)), ''),
+              ''
+            ) AS station_tin
      FROM receipts r
      JOIN fuel_stations fs ON fs.id = r.station_id
      WHERE r.station_id = $1
@@ -36,6 +54,11 @@ export const printJobsSql = {
          END
        )
      ORDER BY r.generated_at DESC, r.created_at DESC
+     LIMIT 1`,
+  selectPrintJobStatus: `SELECT id, station_id, status, last_error, completed_at
+     FROM print_jobs
+     WHERE station_id = $1
+       AND id = $2::uuid
      LIMIT 1`,
   selectReportPrintSource: `SELECT id, report_type, report_date_time, payload
      FROM reports
