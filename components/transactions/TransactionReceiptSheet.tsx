@@ -4,6 +4,7 @@ import type { NormalizedReceipt } from '@/src/shared/receipts/normalizeReceipt'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 
+import { printReceiptAndWait } from '@/src/shared/receipts/printReceiptClient'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 import { safeCopy } from '@/src/shared/utils/clipboard'
 
@@ -57,6 +58,7 @@ export const TransactionReceiptSheet = ({
   const [copied, setCopied] = useState<string | null>(null)
   const [printing, setPrinting] = useState(false)
   const [printError, setPrintError] = useState<any>(null)
+  const [printSuccess, setPrintSuccess] = useState(false)
   const autoPrintStartedFor = useRef<string | null>(null)
 
   const canFetch = Boolean(open && transactionId)
@@ -104,29 +106,25 @@ export const TransactionReceiptSheet = ({
     if (!transactionId) return false
     if (!csrfToken) {
       setPrintError({ message: 'Security token not ready' })
+      setPrintSuccess(false)
       return false
     }
 
     setPrinting(true)
     setPrintError(null)
+    setPrintSuccess(false)
     try {
-      const res = await fetch('/api/receipts/print', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-csrf-token': csrfToken,
-        },
-        body: JSON.stringify({
-          csrf_token: csrfToken,
-          transactionId,
-          isReprint: true,
-        }),
+      const result = await printReceiptAndWait({
+        csrfToken,
+        transactionId,
+        isReprint: true,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok || body?.ok === false) {
-        setPrintError(res.ok ? body : { status: res.status, body })
+      if (!result.success) {
+        setPrintError(result.error ?? { message: 'Receipt print failed' })
         return false
       }
+      setPrintSuccess(true)
+      window.setTimeout(() => setPrintSuccess(false), 3000)
       return true
     } catch (err: unknown) {
       setPrintError(err)
@@ -233,14 +231,22 @@ export const TransactionReceiptSheet = ({
                   restored.
                 </Alert>
               ) : null}
-              {printError && (
+              {printSuccess ? (
+                <Alert
+                  variant={STATUS_VARIANT.SUCCESS}
+                  title="Receipt printed successfully"
+                >
+                  The printer confirmed the receipt print job completed.
+                </Alert>
+              ) : null}
+              {printError ? (
                 <Alert
                   variant={STATUS_VARIANT.ERROR}
                   title="Receipt print failed"
                 >
-                  JPL did not accept the receipt print request.
+                  The receipt print job did not complete successfully.
                 </Alert>
-              )}
+              ) : null}
               <div className="rounded-card border border-border bg-surface-card p-4">
                 <div className="no-print mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs text-[var(--text-muted)]">

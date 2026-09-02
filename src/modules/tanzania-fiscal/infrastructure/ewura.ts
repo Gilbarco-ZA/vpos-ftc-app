@@ -1,5 +1,6 @@
 import { queryAll } from '@/src/platform/db/postgres'
 
+import { getTanzaniaDomsUnitPrice } from '../domain/domsUnitPrice'
 import {
   resolveTanzaniaSigningBundle,
   signXmlSha1Base64,
@@ -341,9 +342,6 @@ export async function sendEwuraRegistrationFromConfig(args: {
       baseUrl: cfg.ewura.baseUrl,
       endpoint: EWURA_ENDPOINTS.registration,
       xml,
-      // EWURA returns 7203 when the station already exists. The production
-      // integration treats that as a valid registered state rather than a
-      // failed registration attempt.
       acceptedCodes: ['200', '7203'],
     })
     if (result.ok) {
@@ -389,6 +387,13 @@ function buildSalesTransaction(args: {
   )
   const volume = num(transaction.volume, 0) || 1
   const amount = num(transaction.total_amount ?? transaction.totalAmount, 0)
+  const domsUnitPrice = getTanzaniaDomsUnitPrice(transaction)
+  const unitPrice =
+    domsUnitPrice != null
+      ? (amount < 0 ? -1 : 1) * Math.abs(domsUnitPrice)
+      : volume > 0
+        ? amount / volume
+        : amount
   const buyerName = String(
     args.customer?.buyer_name ??
       args.customer?.buyerName ??
@@ -417,7 +422,7 @@ function buildSalesTransaction(args: {
     ProductName: normalizeFuelName(
       transaction.fuel_type ?? transaction.grade_name,
     ),
-    UnitPrice: volume > 0 ? amount / volume : amount,
+    UnitPrice: unitPrice,
     Volume: volume,
     Amount: amount,
     DiscountAmount: 0,

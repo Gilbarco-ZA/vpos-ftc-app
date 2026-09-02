@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
+import { printReceiptAndWait } from '@/src/shared/receipts/printReceiptClient'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 import { formatDate } from '@/src/shared/utils/dates'
 import { formatNumber } from '@/src/shared/utils/format'
@@ -90,6 +91,7 @@ const ReceiptViewerClient = ({
   const [csrfToken, setCsrfToken] = useState('')
   const [printing, setPrinting] = useState(false)
   const [printError, setPrintError] = useState<unknown>(null)
+  const [printSuccess, setPrintSuccess] = useState(false)
   const autoPrintStartedFor = useRef<string | null>(null)
   const [voided, setVoided] = useState(false)
 
@@ -170,29 +172,25 @@ const ReceiptViewerClient = ({
     async (transactionId: string, isReprint = true) => {
       if (!csrfToken) {
         setPrintError({ message: 'Security token not ready' })
+        setPrintSuccess(false)
         return false
       }
 
       setPrinting(true)
       setPrintError(null)
+      setPrintSuccess(false)
       try {
-        const res = await fetch('/api/receipts/print', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-csrf-token': csrfToken,
-          },
-          body: JSON.stringify({
-            csrf_token: csrfToken,
-            transactionId,
-            isReprint,
-          }),
+        const result = await printReceiptAndWait({
+          csrfToken,
+          transactionId,
+          isReprint,
         })
-        const body = await res.json().catch(() => ({}))
-        if (!res.ok || body?.ok === false) {
-          setPrintError(res.ok ? body : { status: res.status, body })
+        if (!result.success) {
+          setPrintError(result.error ?? { message: 'Receipt print failed' })
           return false
         }
+        setPrintSuccess(true)
+        window.setTimeout(() => setPrintSuccess(false), 3000)
         return true
       } catch (err: unknown) {
         setPrintError(err)
@@ -317,7 +315,6 @@ const ReceiptViewerClient = ({
       ) : shouldShowResultsList ? (
         <div className="relative">
           {loading ? <LoadingOverlay label="Searching receipts…" /> : null}
-
           <div className="overflow-hidden rounded-card border border-border bg-surface-card">
             <Table>
               <TableHeader>
@@ -377,12 +374,19 @@ const ReceiptViewerClient = ({
             </Button>
           </div>
 
+          {printSuccess ? (
+            <Alert
+              variant={STATUS_VARIANT.SUCCESS}
+              title="Receipt printed successfully"
+            >
+              The printer confirmed the receipt print job completed.
+            </Alert>
+          ) : null}
+
           {printError ? (
             <Alert variant={STATUS_VARIANT.ERROR} title="Receipt print failed">
-              JPL did not accept the receipt print request. Review the
-              <Link href="/admin/config/printers">
-                station integration settings
-              </Link>{' '}
+              The receipt print job did not complete successfully. Review the{' '}
+              <Link href="/admin/config/printers">station printer settings</Link>{' '}
               and the print runtime.
             </Alert>
           ) : null}

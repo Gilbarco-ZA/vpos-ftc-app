@@ -47,9 +47,13 @@ async function pruneSuccessfulPrinterTestJobs(
   return { examined: deleted, deleted }
 }
 
-export async function runStationStorageRetention(stationId: string) {
+export async function runStationStorageRetention(
+  stationId: string,
+  options: { force?: boolean } = {},
+) {
   const policy = await getStationStorageRetentionPolicy(stationId)
-  if (!policy.enabled) {
+  if (!policy.enabled && !options.force) {
+
     return {
       enabled: false,
       dryRun: policy.dryRun,
@@ -65,7 +69,13 @@ export async function runStationStorageRetention(stationId: string) {
     policy.printTestDoneDays,
     policy.dryRun,
   )
-  return { enabled: true, dryRun: policy.dryRun, policy, retention, printTestJobs }
+  return {
+    enabled: policy.enabled,
+    dryRun: policy.dryRun,
+    policy,
+    retention,
+    printTestJobs,
+  }
 }
 
 let started = false

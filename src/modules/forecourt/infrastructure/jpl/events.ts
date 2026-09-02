@@ -43,6 +43,7 @@ import { normalizeForecourtEvent } from '@/src/modules/forecourt/infrastructure/
 import { getForecourtRuntimeConfig } from '@/src/modules/forecourt/infrastructure/runtimeConfig'
 import {
   resolveTransactionAmount,
+  resolveTransactionUnitPrice,
   resolveTransactionVolume,
 } from '@/src/modules/forecourt/infrastructure/transactionValues'
 
@@ -167,6 +168,10 @@ export const handleNormalizedTransactions = async (
         cfg.jplCountryCode,
         stationDecimals.money,
       )
+      const resolvedUnitPrice = resolveTransactionUnitPrice(
+        tx,
+        stationDecimals.unitPrice,
+      )
 
       if (!mapping || !isTransactionReplayMappingReady(mapping)) {
         logger.warn('[JPL]', {
@@ -256,6 +261,9 @@ export const handleNormalizedTransactions = async (
           volume: Number.isFinite(resolvedVolume ?? NaN)
             ? resolvedVolume
             : null,
+          unitPrice: Number.isFinite(resolvedUnitPrice ?? NaN)
+            ? resolvedUnitPrice
+            : null,
           occurredAt: controllerFinishAt,
           transactionIdentity,
           requireExistingSessionMatch: true,
@@ -310,6 +318,7 @@ export const handleNormalizedTransactions = async (
 
       const volume = resolvedVolume
       const amount = resolvedAmount
+      const unitPrice = resolvedUnitPrice
 
       logger.info('[JPL]', {
         msg: 'ingest tx',
@@ -322,6 +331,7 @@ export const handleNormalizedTransactions = async (
         nozzleNumber: nozzle.nozzleNumber,
         amount,
         volume,
+        unitPrice,
       })
 
       const persistedId = await ingestFn({
@@ -336,6 +346,7 @@ export const handleNormalizedTransactions = async (
         fuelType: nozzle.fuelType ?? null,
         amount: Number.isFinite(amount ?? NaN) ? amount : null,
         volume: Number.isFinite(volume ?? NaN) ? volume : null,
+        unitPrice: Number.isFinite(unitPrice ?? NaN) ? unitPrice : null,
         occurredAt: controllerFinishAt,
         transactionIdentity,
       })
