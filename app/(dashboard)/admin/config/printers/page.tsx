@@ -17,7 +17,6 @@ import {
   normalizePrinterConfig,
 } from '@/src/modules/admin-config/presentation/printers'
 
-import { RetentionSettingsCard } from '@/components/admin/printing/RetentionSettingsCard'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -323,7 +322,7 @@ export default function PrinterConfigPage() {
     <div className="space-y-4">
       <PageHeader
         title="Printer configuration"
-        description="Set up reusable printer profiles, assign them to pumps, test receipt printing, and manage print/storage retention without production environment access."
+        description="Set up reusable printer profiles, assign them to pumps, and test receipt printing."
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -406,8 +405,6 @@ export default function PrinterConfigPage() {
           onConfigJsonChange={setConfigJsonText}
         />
       </div>
-
-      <RetentionSettingsCard />
     </div>
   )
 }
