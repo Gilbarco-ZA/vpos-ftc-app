@@ -1,4 +1,4 @@
-import { startStorageRetentionWorker } from '@/src/platform/retention/storageRetention'
+import { startStationStorageRetentionWorker } from '@/src/platform/retention/stationStorageRetention'
 import { getRuntimeUptimeSeconds } from '@/src/platform/runtime/nodeProcess'
 import { getSystemConfiguration } from '@/src/shared/config/loader'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
@@ -41,7 +41,7 @@ export function startSupervisorMonitorWorker(
   startPosBusListener()
   startFiscalBusListener()
   startArchiveBusListener()
-  retentionHandle = startStorageRetentionWorker(stationId)
+  retentionHandle = startStationStorageRetentionWorker(stationId)
 
   const supervisor = new SupervisorRuntime(stationId)
 
