@@ -64,6 +64,7 @@ export const printJobsRepo = {
       status: string
       last_error: string | null
       completed_at: string | Date | null
+      source_transaction_id: string | null
     }>(printJobsSql.selectPrintJobStatus, [stationId, jobId])
   },
 
