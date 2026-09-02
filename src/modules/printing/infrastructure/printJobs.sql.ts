@@ -55,7 +55,8 @@ export const printJobsSql = {
        )
      ORDER BY r.generated_at DESC, r.created_at DESC
      LIMIT 1`,
-  selectPrintJobStatus: `SELECT id, station_id, status, last_error, completed_at
+  selectPrintJobStatus: `SELECT id, station_id, status, last_error, completed_at,
+            source_transaction_id
      FROM print_jobs
      WHERE station_id = $1
        AND id = $2::uuid
