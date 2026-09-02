@@ -86,10 +86,13 @@ const normalize = (value?: string) => {
   return trimmed.length ? trimmed : undefined
 }
 
-const isKenyaStation = (country?: string | null) =>
+const stationCountryCode = (country?: string | null) =>
   String(country || '')
     .trim()
-    .toUpperCase() === 'KE'
+    .toUpperCase()
+
+const isKenyaStation = (country?: string | null) => stationCountryCode(country) === 'KE'
+const isTanzaniaStation = (country?: string | null) => stationCountryCode(country) === 'TZ'
 
 const customerSchema = z
   .object({
@@ -108,6 +111,8 @@ export const CustomerDrawer = ({
   onOpenChange,
   onSaved,
 }: CustomerDrawerProps) => {
+  const isTanzania = isTanzaniaStation(stationCountry)
+
   const {
     form,
     setField,
@@ -121,32 +126,44 @@ export const CustomerDrawer = ({
     initial: emptyForm,
     schema: customerSchema,
     onSubmit: async (data, csrf) => {
-      const payload = {
-        csrf_token: csrf,
-        buyerName: normalize(data.buyerName),
-        tin: normalize(data.tin)?.toUpperCase(),
-        buyerType: normalize(data.buyerType),
-        pin: normalize(data.pin),
-        passportNumber: normalize(data.passportNumber),
-        businessName: normalize(data.businessName),
-        taxNinbrn: normalize(data.taxNinbrn),
-        contactPerson: normalize(data.contactPerson),
-        contactPhone: normalize(data.contactPhone),
-        contactMobile: normalize(data.contactMobile),
-        contactFax: normalize(data.contactFax),
-        contactEmail: normalize(data.contactEmail),
-        contactWebsite: normalize(data.contactWebsite),
-        addressStreet: normalize(data.addressStreet),
-        addressCity: normalize(data.addressCity),
-        addressState: normalize(data.addressState),
-        addressProvince: normalize(data.addressProvince),
-        addressPostalCode: normalize(data.addressPostalCode),
-        addressCountryCode: normalize(data.addressCountryCode),
-        country: normalize(data.country),
-        odometer: normalize(data.odometer),
-        vehicleRegNr: normalize(data.vehicleRegNr),
-        paymentType: normalize(data.paymentType),
-      }
+      const normalizedTin = normalize(data.tin)?.toUpperCase()
+      const countryCode = stationCountryCode(stationCountry)
+      const payload = isTanzania
+        ? {
+            csrf_token: csrf,
+            buyerName: normalize(data.buyerName),
+            tin: normalizedTin,
+            pin: normalizedTin,
+            country: countryCode || 'TZ',
+            addressCountryCode: countryCode || 'TZ',
+            paymentType: 'CASH' as const,
+          }
+        : {
+            csrf_token: csrf,
+            buyerName: normalize(data.buyerName),
+            tin: normalizedTin,
+            buyerType: normalize(data.buyerType),
+            pin: normalize(data.pin),
+            passportNumber: normalize(data.passportNumber),
+            businessName: normalize(data.businessName),
+            taxNinbrn: normalize(data.taxNinbrn),
+            contactPerson: normalize(data.contactPerson),
+            contactPhone: normalize(data.contactPhone),
+            contactMobile: normalize(data.contactMobile),
+            contactFax: normalize(data.contactFax),
+            contactEmail: normalize(data.contactEmail),
+            contactWebsite: normalize(data.contactWebsite),
+            addressStreet: normalize(data.addressStreet),
+            addressCity: normalize(data.addressCity),
+            addressState: normalize(data.addressState),
+            addressProvince: normalize(data.addressProvince),
+            addressPostalCode: normalize(data.addressPostalCode),
+            addressCountryCode: normalize(data.addressCountryCode),
+            country: normalize(data.country),
+            odometer: normalize(data.odometer),
+            vehicleRegNr: normalize(data.vehicleRegNr),
+            paymentType: normalize(data.paymentType),
+          }
 
       const res = await fetch(
         mode === 'create' ? '/api/customers' : `/api/customers/${customer?.id}`,
@@ -197,229 +214,250 @@ export const CustomerDrawer = ({
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <FormField
-                  label="Buyer name"
+                  label={isTanzania ? 'Name' : 'Buyer name'}
                   required
                   error={fieldErrors.buyerName}
                 >
                   <Input
                     value={form.buyerName}
                     onChange={(e) => setField('buyerName', e.target.value)}
-                    placeholder="Buyer name"
+                    placeholder={isTanzania ? 'Customer name' : 'Buyer name'}
                   />
                 </FormField>
-                <FormField label="TIN" required error={fieldErrors.tin}>
+                <FormField
+                  label={isTanzania ? 'PIN/TIN' : 'TIN'}
+                  required
+                  error={fieldErrors.tin}
+                >
                   <Input
                     value={form.tin}
                     onChange={(e) => {
                       const nextTin = e.target.value.toUpperCase()
                       setField('tin', nextTin)
-                      if (mode === 'create' && isKenyaStation(stationCountry)) {
+                      if (
+                        isTanzania ||
+                        (mode === 'create' && isKenyaStation(stationCountry))
+                      ) {
                         setField('pin', nextTin)
                       }
                     }}
-                    placeholder="Tax identification number"
+                    placeholder={
+                      isTanzania ? 'Customer PIN/TIN' : 'Tax identification number'
+                    }
                   />
                 </FormField>
-                <FormField label="Buyer type">
-                  <Select
-                    value={form.buyerType || ''}
-                    onChange={(e) => setField('buyerType', e.target.value)}
-                  >
-                    <option value="">Select buyer type</option>
-                    <option value="B2C">B2C</option>
-                    <option value="B2B">B2B</option>
-                    <option value="GOV">Government</option>
-                    <option value="OTHER">Other</option>
-                  </Select>
-                </FormField>
-                <FormField label="Business name">
-                  <Input
-                    value={form.businessName}
-                    onChange={(e) => setField('businessName', e.target.value)}
-                    placeholder="Business name"
-                  />
-                </FormField>
-                <FormField label="PIN">
-                  <Input
-                    value={form.pin}
-                    onChange={(e) => setField('pin', e.target.value)}
-                    placeholder="PIN"
-                  />
-                </FormField>
-                <FormField label="Passport number">
-                  <Input
-                    value={form.passportNumber}
-                    onChange={(e) => setField('passportNumber', e.target.value)}
-                    placeholder="Passport number"
-                  />
-                </FormField>
-                <FormField label="Tax NIN/BRN">
-                  <Input
-                    value={form.taxNinbrn}
-                    onChange={(e) => setField('taxNinbrn', e.target.value)}
-                    placeholder="Tax NIN/BRN"
-                  />
-                </FormField>
+
+                {!isTanzania ? (
+                  <>
+                    <FormField label="Buyer type">
+                      <Select
+                        value={form.buyerType || ''}
+                        onChange={(e) => setField('buyerType', e.target.value)}
+                      >
+                        <option value="">Select buyer type</option>
+                        <option value="B2C">B2C</option>
+                        <option value="B2B">B2B</option>
+                        <option value="GOV">Government</option>
+                        <option value="OTHER">Other</option>
+                      </Select>
+                    </FormField>
+                    <FormField label="Business name">
+                      <Input
+                        value={form.businessName}
+                        onChange={(e) => setField('businessName', e.target.value)}
+                        placeholder="Business name"
+                      />
+                    </FormField>
+                    <FormField label="PIN">
+                      <Input
+                        value={form.pin}
+                        onChange={(e) => setField('pin', e.target.value)}
+                        placeholder="PIN"
+                      />
+                    </FormField>
+                    <FormField label="Passport number">
+                      <Input
+                        value={form.passportNumber}
+                        onChange={(e) => setField('passportNumber', e.target.value)}
+                        placeholder="Passport number"
+                      />
+                    </FormField>
+                    <FormField label="Tax NIN/BRN">
+                      <Input
+                        value={form.taxNinbrn}
+                        onChange={(e) => setField('taxNinbrn', e.target.value)}
+                        placeholder="Tax NIN/BRN"
+                      />
+                    </FormField>
+                  </>
+                ) : null}
               </div>
             </section>
 
-            <section className="space-y-3">
-              <div className="text-xs font-semibold uppercase text-[var(--text-muted)]">
-                Vehicle & payment defaults
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <FormField label="Odometer">
-                  <Input
-                    value={form.odometer || ''}
-                    onChange={(e) => setField('odometer', e.target.value)}
-                    placeholder="50000"
-                  />
-                </FormField>
-                <FormField label="Vehicle reg no.">
-                  <Input
-                    value={form.vehicleRegNr || ''}
-                    onChange={(e) => setField('vehicleRegNr', e.target.value)}
-                    placeholder="T123 ABC"
-                  />
-                </FormField>
-                <FormField label="Payment type">
-                  <Select
-                    value={form.paymentType || 'CASH'}
-                    onChange={(e) =>
-                      setField('paymentType', e.target.value as 'CASH' | 'CARD')
-                    }
-                  >
-                    <option value="CASH">Cash</option>
-                    <option value="CARD">Card</option>
-                  </Select>
-                </FormField>
-              </div>
-            </section>
+            {!isTanzania ? (
+              <>
+                <section className="space-y-3">
+                  <div className="text-xs font-semibold uppercase text-[var(--text-muted)]">
+                    Vehicle & payment defaults
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <FormField label="Odometer">
+                      <Input
+                        value={form.odometer || ''}
+                        onChange={(e) => setField('odometer', e.target.value)}
+                        placeholder="50000"
+                      />
+                    </FormField>
+                    <FormField label="Vehicle reg no.">
+                      <Input
+                        value={form.vehicleRegNr || ''}
+                        onChange={(e) => setField('vehicleRegNr', e.target.value)}
+                        placeholder="T123 ABC"
+                      />
+                    </FormField>
+                    <FormField label="Payment type">
+                      <Select
+                        value={form.paymentType || 'CASH'}
+                        onChange={(e) =>
+                          setField(
+                            'paymentType',
+                            e.target.value as 'CASH' | 'CARD',
+                          )
+                        }
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="CARD">Card</option>
+                      </Select>
+                    </FormField>
+                  </div>
+                </section>
 
-            <section className="space-y-3">
-              <div className="text-xs font-semibold uppercase text-[var(--text-muted)]">
-                Contact
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <FormField label="Contact person">
-                  <Input
-                    value={form.contactPerson}
-                    onChange={(e) => setField('contactPerson', e.target.value)}
-                    placeholder="Contact person"
-                  />
-                </FormField>
-                <FormField label="Contact phone">
-                  <Input
-                    value={form.contactPhone}
-                    onChange={(e) => setField('contactPhone', e.target.value)}
-                    placeholder="Contact phone"
-                  />
-                </FormField>
-                <FormField label="Mobile">
-                  <Input
-                    value={form.contactMobile}
-                    onChange={(e) => setField('contactMobile', e.target.value)}
-                    placeholder="Mobile"
-                  />
-                </FormField>
-                <FormField label="Fax">
-                  <Input
-                    value={form.contactFax}
-                    onChange={(e) => setField('contactFax', e.target.value)}
-                    placeholder="Fax"
-                  />
-                </FormField>
-                <FormField label="Email">
-                  <Input
-                    value={form.contactEmail}
-                    onChange={(e) => setField('contactEmail', e.target.value)}
-                    placeholder="Email"
-                  />
-                </FormField>
-                <FormField label="Website">
-                  <Input
-                    value={form.contactWebsite}
-                    onChange={(e) => setField('contactWebsite', e.target.value)}
-                    placeholder="Website"
-                  />
-                </FormField>
-              </div>
-            </section>
+                <section className="space-y-3">
+                  <div className="text-xs font-semibold uppercase text-[var(--text-muted)]">
+                    Contact
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <FormField label="Contact person">
+                      <Input
+                        value={form.contactPerson}
+                        onChange={(e) => setField('contactPerson', e.target.value)}
+                        placeholder="Contact person"
+                      />
+                    </FormField>
+                    <FormField label="Contact phone">
+                      <Input
+                        value={form.contactPhone}
+                        onChange={(e) => setField('contactPhone', e.target.value)}
+                        placeholder="Contact phone"
+                      />
+                    </FormField>
+                    <FormField label="Mobile">
+                      <Input
+                        value={form.contactMobile}
+                        onChange={(e) => setField('contactMobile', e.target.value)}
+                        placeholder="Mobile"
+                      />
+                    </FormField>
+                    <FormField label="Fax">
+                      <Input
+                        value={form.contactFax}
+                        onChange={(e) => setField('contactFax', e.target.value)}
+                        placeholder="Fax"
+                      />
+                    </FormField>
+                    <FormField label="Email">
+                      <Input
+                        value={form.contactEmail}
+                        onChange={(e) => setField('contactEmail', e.target.value)}
+                        placeholder="Email"
+                      />
+                    </FormField>
+                    <FormField label="Website">
+                      <Input
+                        value={form.contactWebsite}
+                        onChange={(e) => setField('contactWebsite', e.target.value)}
+                        placeholder="Website"
+                      />
+                    </FormField>
+                  </div>
+                </section>
 
-            <section className="space-y-3">
-              <div className="text-xs font-semibold uppercase text-[var(--text-muted)]">
-                Address
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <FormField label="Street" className="sm:col-span-2">
-                  <Textarea
-                    rows={2}
-                    value={form.addressStreet}
-                    onChange={(e) => setField('addressStreet', e.target.value)}
-                    placeholder="Street"
-                  />
-                </FormField>
-                <FormField label="City">
-                  <Input
-                    value={form.addressCity}
-                    onChange={(e) => setField('addressCity', e.target.value)}
-                    placeholder="City"
-                  />
-                </FormField>
-                <FormField label="State">
-                  <Input
-                    value={form.addressState}
-                    onChange={(e) => setField('addressState', e.target.value)}
-                    placeholder="State"
-                  />
-                </FormField>
-                <FormField label="Province">
-                  <Input
-                    value={form.addressProvince}
-                    onChange={(e) =>
-                      setField('addressProvince', e.target.value)
-                    }
-                    placeholder="Province"
-                  />
-                </FormField>
-                <FormField label="Postal code">
-                  <Input
-                    value={form.addressPostalCode}
-                    onChange={(e) =>
-                      setField('addressPostalCode', e.target.value)
-                    }
-                    placeholder="Postal code"
-                  />
-                </FormField>
-                <FormField
-                  label="Country code"
-                  error={fieldErrors.addressCountryCode}
-                  helpText="Leave blank to use the station country code."
-                >
-                  <Input
-                    value={form.addressCountryCode}
-                    onChange={(e) =>
-                      setField(
-                        'addressCountryCode',
-                        e.target.value.toUpperCase(),
-                      )
-                    }
-                    placeholder="Country code"
-                  />
-                </FormField>
-                <FormField
-                  label="Country"
-                  error={fieldErrors.country}
-                  helpText="Leave blank to use the station country."
-                >
-                  <Input
-                    value={form.country}
-                    onChange={(e) => setField('country', e.target.value)}
-                    placeholder="Country"
-                  />
-                </FormField>
-              </div>
-            </section>
+                <section className="space-y-3">
+                  <div className="text-xs font-semibold uppercase text-[var(--text-muted)]">
+                    Address
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <FormField label="Street" className="sm:col-span-2">
+                      <Textarea
+                        rows={2}
+                        value={form.addressStreet}
+                        onChange={(e) => setField('addressStreet', e.target.value)}
+                        placeholder="Street"
+                      />
+                    </FormField>
+                    <FormField label="City">
+                      <Input
+                        value={form.addressCity}
+                        onChange={(e) => setField('addressCity', e.target.value)}
+                        placeholder="City"
+                      />
+                    </FormField>
+                    <FormField label="State">
+                      <Input
+                        value={form.addressState}
+                        onChange={(e) => setField('addressState', e.target.value)}
+                        placeholder="State"
+                      />
+                    </FormField>
+                    <FormField label="Province">
+                      <Input
+                        value={form.addressProvince}
+                        onChange={(e) =>
+                          setField('addressProvince', e.target.value)
+                        }
+                        placeholder="Province"
+                      />
+                    </FormField>
+                    <FormField label="Postal code">
+                      <Input
+                        value={form.addressPostalCode}
+                        onChange={(e) =>
+                          setField('addressPostalCode', e.target.value)
+                        }
+                        placeholder="Postal code"
+                      />
+                    </FormField>
+                    <FormField
+                      label="Country code"
+                      error={fieldErrors.addressCountryCode}
+                      helpText="Leave blank to use the station country code."
+                    >
+                      <Input
+                        value={form.addressCountryCode}
+                        onChange={(e) =>
+                          setField(
+                            'addressCountryCode',
+                            e.target.value.toUpperCase(),
+                          )
+                        }
+                        placeholder="Country code"
+                      />
+                    </FormField>
+                    <FormField
+                      label="Country"
+                      error={fieldErrors.country}
+                      helpText="Leave blank to use the station country."
+                    >
+                      <Input
+                        value={form.country}
+                        onChange={(e) => setField('country', e.target.value)}
+                        placeholder="Country"
+                      />
+                    </FormField>
+                  </div>
+                </section>
+              </>
+            ) : null}
           </div>
 
           <SheetFooter className="mt-4 border-t border-gray-100 pt-4">
