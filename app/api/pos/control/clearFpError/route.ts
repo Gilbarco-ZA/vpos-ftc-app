@@ -9,10 +9,11 @@ export const POST = defineMutationRoute({
   roles: ['tenant', 'manager', 'administrator'],
   csrf: false,
   handler: async (_req, { user, body }) => {
-    return await runPosControlCommand({
+    const result = await runPosControlCommand({
       stationId: user.stationId,
       command: 'clearFpError',
       body,
     })
+    return result instanceof Response ? result : Response.json(result)
   },
 })
