@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 
 import PosIntegrationSettings from '@/components/admin/integrations/PosIntegrationSettings'
+import { RetentionSettingsCard } from '@/components/admin/printing/RetentionSettingsCard'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorDetails } from '@/components/ui/error-details'
@@ -97,7 +98,7 @@ export default function AdminSettingsClient() {
     <div className="space-y-4">
       <PageHeader
         title="Station settings"
-        description="Configure station behavior and integrations."
+        description="Configure station behavior, storage retention, and integrations."
       />
 
       {loadError ? (
@@ -147,6 +148,8 @@ export default function AdminSettingsClient() {
           />
         </CardContent>
       </Card>
+
+      <RetentionSettingsCard />
 
       <PosIntegrationSettings />
     </div>
