@@ -194,13 +194,31 @@ export async function getReceiptRoutePayload(input: {
   const tanzaniaDomsUnitPrice = isTanzania
     ? getTanzaniaDomsUnitPrice(transaction)
     : null
+  const tanzaniaReceiptSourceLines =
+    isTanzania && tanzaniaDomsUnitPrice != null && transactionLines.length === 0
+      ? [
+          {
+            quantity: transaction.volume,
+            unit_price: tanzaniaDomsUnitPrice,
+            line_total: transaction.total_amount,
+            product_name: transaction.grade_name ?? transaction.fuel_type,
+            product_code:
+              fallbackProduct?.product_code ??
+              transaction.product_code ??
+              transaction.grade_id,
+            sku: fallbackProduct?.sku ?? transaction.sku,
+            tax_code: fallbackProduct?.tax_code ?? transaction.tax_code,
+            tax_rate: fallbackProduct?.tax_rate ?? transaction.tax_rate,
+          },
+        ]
+      : transactionLines
   const receiptTransactionLines =
     isTanzania && tanzaniaDomsUnitPrice != null
-      ? transactionLines.map((line, index) => ({
+      ? tanzaniaReceiptSourceLines.map((line, index) => ({
           ...line,
           unit_price: tanzaniaDomsUnitPrice,
           line_total:
-            transactionLines.length === 1
+            tanzaniaReceiptSourceLines.length === 1
               ? transaction.total_amount
               : Number(line.quantity || 0) * tanzaniaDomsUnitPrice,
           doms_unit_price: tanzaniaDomsUnitPrice,
