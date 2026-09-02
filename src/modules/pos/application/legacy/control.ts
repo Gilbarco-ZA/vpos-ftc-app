@@ -30,8 +30,7 @@ export async function executePosControlCommand(
   body: Record<string, unknown>,
 ) {
   if (command === 'print') {
-    await enqueuePosPrintJob(stationId, body)
-    return legacyPosAck('print')
+    return await enqueuePosPrintJob(stationId, body)
   }
 
   const result = await sendPosCommand(stationId, {
