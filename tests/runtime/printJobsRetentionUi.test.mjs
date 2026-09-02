@@ -42,13 +42,15 @@ test('print jobs are visible and manageable under forecourt operations', () => {
   const sidebar = read('components/layout/sidebar.tsx')
   const page = read('app/(dashboard)/admin/print-jobs/page.tsx')
   const api = read('app/api/admin/print-jobs/route.ts')
+  const application = read('src/modules/printing/application/adminPrintJobs.ts')
   assert.match(sidebar, /label: 'Print Jobs', href: '\/admin\/print-jobs'/)
   assert.match(page, /title="Print Jobs"/)
   assert.match(page, /Retry/)
   assert.match(page, /Clear/)
-  assert.match(api, /Only failed print jobs can be retried/)
-  assert.match(api, /Only terminal print jobs can be cleared/)
-  assert.match(api, /enqueuePrintJob/)
+  assert.match(api, /runAdminPrintJobAction/)
+  assert.match(application, /Only failed print jobs can be retried/)
+  assert.match(application, /Only terminal print jobs can be cleared/)
+  assert.match(application, /enqueuePrintJob/)
 })
 
 test('printer setup tests do not report failed jobs as success', () => {
