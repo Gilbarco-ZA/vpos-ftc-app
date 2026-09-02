@@ -9,7 +9,9 @@ export const dynamic = 'force-dynamic'
 export const POST = defineMutationRoute<Record<string, never>>({
   roles: ['administrator'],
   handler: async (_req, { user }) => {
-    const result = await runStationStorageRetention(user.stationId)
+    const result = await runStationStorageRetention(user.stationId, {
+      force: true,
+    })
     await createAuditLog({
       stationId: user.stationId,
       userId: user.id,
