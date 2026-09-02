@@ -20,6 +20,7 @@ import { mapFiscalReceipt } from '@/src/shared/receipts/mapFiscalReceipt'
 import { formatDateTime } from '@/src/shared/utils/dates'
 
 import { resolveTanzaniaCustomerIdentity } from '@/src/modules/tanzania-fiscal/domain/customerIdentity'
+import { getTanzaniaDomsUnitPrice } from '@/src/modules/tanzania-fiscal/domain/domsUnitPrice'
 import { extractTanzaniaProxyReceiptMetadata } from '@/src/modules/tanzania-fiscal/domain/proxyReceiptMetadata'
 import { buildTanzaniaReceiptVerificationUrl } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
 import { resolveCanonicalFiscalizationPayload } from '@/src/modules/transactions/infrastructure/fiscalization/fiscalization-read-compat'
@@ -794,7 +795,7 @@ export const buildFiscalReceipt = async (params: {
     ),
   }
 
-  const items = extractItems(
+  const baseItems = extractItems(
     queuePayload?.payload,
     stationCountry === 'TZ' && tanzaniaRequest ? tanzaniaRequest : fiscalSource,
     {
@@ -806,6 +807,15 @@ export const buildFiscalReceipt = async (params: {
     },
     transactionLines?.lines,
   )
+  const tanzaniaDomsUnitPrice =
+    stationCountry === 'TZ' ? getTanzaniaDomsUnitPrice(txn) : null
+  const items =
+    stationCountry === 'TZ' && tanzaniaDomsUnitPrice != null
+      ? baseItems.map((item) => ({
+          ...item,
+          unitPrice: tanzaniaDomsUnitPrice,
+        }))
+      : baseItems
   const tanzaniaVatTotals = Array.isArray(tanzaniaRequest?.vatTotals)
     ? tanzaniaRequest.vatTotals
     : []
