@@ -29,6 +29,22 @@ async function enqueueAndProcess(
 
   try {
     const processed = await processNextPrintJob(normalizedStationId)
+    if (!processed.processed) {
+      return {
+        success: false,
+        jobId,
+        processed,
+        error: 'Print job was queued but not processed',
+      }
+    }
+    if (processed.status === 'FAILED') {
+      return {
+        success: false,
+        jobId,
+        processed,
+        error: 'Printer rejected or failed the test print job',
+      }
+    }
     return { success: true, jobId, processed }
   } catch (e: any) {
     return {
