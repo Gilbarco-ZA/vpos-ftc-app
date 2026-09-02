@@ -68,6 +68,40 @@ export const printJobsRepo = {
     }>(printJobsSql.selectPrintJobStatus, [stationId, jobId])
   },
 
+  async listAdminPrintJobs(
+    stationId: string,
+    status: string | null,
+    type: string,
+    search: string,
+    limit: number,
+  ) {
+    return await queryAll<any>(printJobsSql.selectAdminPrintJobs, [
+      stationId,
+      status,
+      type,
+      search,
+      limit,
+    ])
+  },
+
+  async listAdminPrintJobStatusCounts(stationId: string) {
+    return await queryAll<{ status: string; count: string }>(
+      printJobsSql.selectAdminPrintJobStatusCounts,
+      [stationId],
+    )
+  },
+
+  async getAdminPrintJob(stationId: string, jobId: string) {
+    return await queryOne<any>(printJobsSql.selectAdminPrintJob, [
+      stationId,
+      jobId,
+    ])
+  },
+
+  async clearTerminalAdminPrintJob(stationId: string, jobId: string) {
+    await query(printJobsSql.clearTerminalAdminPrintJob, [stationId, jobId])
+  },
+
   async getReportPrintSource(stationId: string, reportId: string) {
     return await queryOne<{
       id: string
