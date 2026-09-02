@@ -61,6 +61,38 @@ export const printJobsSql = {
      WHERE station_id = $1
        AND id = $2::uuid
      LIMIT 1`,
+  selectAdminPrintJobs: `SELECT id, job_type, status, priority, attempts, max_attempts,
+            scheduled_at, started_at, completed_at, last_error,
+            source_transaction_id, source_report_id, created_at, updated_at,
+            payload->>'printerKey' AS printer_key
+     FROM print_jobs
+     WHERE station_id = $1::uuid
+       AND ($2::text IS NULL OR status = $2)
+       AND ($3::text = '' OR job_type = $3)
+       AND (
+         $4::text = ''
+         OR id::text ILIKE '%' || $4 || '%'
+         OR job_type ILIKE '%' || $4 || '%'
+         OR COALESCE(source_transaction_id::text, '') ILIKE '%' || $4 || '%'
+         OR COALESCE(source_report_id::text, '') ILIKE '%' || $4 || '%'
+         OR COALESCE(last_error, '') ILIKE '%' || $4 || '%'
+       )
+     ORDER BY created_at DESC
+     LIMIT $5`,
+  selectAdminPrintJobStatusCounts: `SELECT status, COUNT(*)::text AS count
+     FROM print_jobs
+     WHERE station_id = $1::uuid
+     GROUP BY status`,
+  selectAdminPrintJob: `SELECT id, job_type, payload, status, priority,
+            source_transaction_id, source_report_id
+     FROM print_jobs
+     WHERE station_id = $1::uuid
+       AND id = $2::uuid
+     LIMIT 1`,
+  clearTerminalAdminPrintJob: `DELETE FROM print_jobs
+     WHERE station_id = $1::uuid
+       AND id = $2::uuid
+       AND status IN ('DONE', 'FAILED')`,
   selectReportPrintSource: `SELECT id, report_type, report_date_time, payload
      FROM reports
      WHERE station_id = $1
