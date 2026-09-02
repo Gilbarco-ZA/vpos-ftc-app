@@ -57,6 +57,16 @@ export const printJobsRepo = {
     ])
   },
 
+  async getPrintJobStatus(stationId: string, jobId: string) {
+    return await queryOne<{
+      id: string
+      station_id: string
+      status: string
+      last_error: string | null
+      completed_at: string | Date | null
+    }>(printJobsSql.selectPrintJobStatus, [stationId, jobId])
+  },
+
   async getReportPrintSource(stationId: string, reportId: string) {
     return await queryOne<{
       id: string
