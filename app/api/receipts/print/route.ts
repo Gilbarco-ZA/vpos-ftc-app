@@ -7,8 +7,8 @@ import { requireCsrfFromParts } from '@/src/shared/security/csrf'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import { runPosControlCommand } from '@/src/modules/pos/application/runPosControlCommand'
+import { getPrintJobStatus } from '@/src/modules/printing/application/getPrintJobStatus'
 import { resolveReceiptPrinter } from '@/src/modules/printing/application/resolveReceiptPrinter'
-import { printJobsRepo } from '@/src/modules/printing/infrastructure/printJobsRepo'
 import { markTransactionReceiptPrinted } from '@/src/modules/transactions/application/commands'
 import {
   getOrCreateLatestTransactionReceipt,
@@ -30,7 +30,7 @@ export const GET = async (req: Request) => {
     if (!jobId) return fail('jobId is required', 400)
     if (!transactionId) return fail('transactionId is required', 400)
 
-    const job = await printJobsRepo.getPrintJobStatus(user.stationId, jobId)
+    const job = await getPrintJobStatus(user.stationId, jobId)
     if (!job || String(job.source_transaction_id || '') !== transactionId) {
       return fail('Print job not found', 404)
     }
