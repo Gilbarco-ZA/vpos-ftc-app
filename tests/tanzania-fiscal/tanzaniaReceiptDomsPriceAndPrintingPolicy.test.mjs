@@ -27,6 +27,11 @@ test('DOMS transaction price is captured separately and only consumed by Tanzani
   assert.match(helper, /getTanzaniaDomsUnitPrice/)
   assert.match(builder, /stationCountry === 'TZ' \? getTanzaniaDomsUnitPrice\(txn\) : null/)
   assert.match(route, /isTanzania\s*\? getTanzaniaDomsUnitPrice\(transaction\)/)
+  assert.match(route, /transactionLines\.length === 0/)
+  assert.match(route, /quantity: transaction\.volume/)
+  assert.match(route, /unit_price: tanzaniaDomsUnitPrice/)
+  assert.match(route, /line_total: transaction\.total_amount/)
+  assert.match(route, /transactionLines: receiptTransactionLines/)
   assert.doesNotMatch(kenya, /getTanzaniaDomsUnitPrice|domsUnitPrice/)
 })
 
