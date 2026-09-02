@@ -13,6 +13,7 @@ import { KV_KEYS } from '@/src/shared/setup/keys'
 import { kvGet } from '@/src/shared/storage/stationKv'
 
 import { resolveTanzaniaCustomerIdentity } from '@/src/modules/tanzania-fiscal/domain/customerIdentity'
+import { getTanzaniaDomsUnitPrice } from '@/src/modules/tanzania-fiscal/domain/domsUnitPrice'
 import { extractTanzaniaProxyReceiptMetadata } from '@/src/modules/tanzania-fiscal/domain/proxyReceiptMetadata'
 import { buildTanzaniaReceiptVerificationUrl } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
 
@@ -190,6 +191,23 @@ export async function getReceiptRoutePayload(input: {
       .trim()
       .toUpperCase(),
   )
+  const tanzaniaDomsUnitPrice = isTanzania
+    ? getTanzaniaDomsUnitPrice(transaction)
+    : null
+  const receiptTransactionLines =
+    isTanzania && tanzaniaDomsUnitPrice != null
+      ? transactionLines.map((line, index) => ({
+          ...line,
+          unit_price: tanzaniaDomsUnitPrice,
+          line_total:
+            transactionLines.length === 1
+              ? transaction.total_amount
+              : Number(line.quantity || 0) * tanzaniaDomsUnitPrice,
+          doms_unit_price: tanzaniaDomsUnitPrice,
+          doms_price_authoritative: true,
+          line_index: index,
+        }))
+      : transactionLines
   const canonicalFiscalization = resolveCanonicalFiscalizationPayload({
     eventResponsePayload: latestFiscalEvent?.response_payload,
     legacyTransactionResponse: transaction?.fiscalization_response,
@@ -238,7 +256,7 @@ export async function getReceiptRoutePayload(input: {
     station,
     stationTaxNumber,
     stationPin,
-    transactionLines,
+    transactionLines: receiptTransactionLines,
     raw: rawResponse,
     attendantName: input.attendantName,
     decimalOverrides: {
