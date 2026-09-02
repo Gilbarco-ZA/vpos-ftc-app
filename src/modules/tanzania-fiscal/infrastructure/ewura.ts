@@ -156,24 +156,15 @@ export async function buildSignedEwuraNpgisXml(args: {
   }
 
   return {
-    ...buildSignedNpgisPayloadXmlCompat({
+    ...buildEwuraNpgisPayloadXml({
       type: args.type,
       apiSourceId: args.apiSourceId,
-      data,
+      data: args.data,
       signature,
     }),
     signature,
     signingWarnings,
   }
-}
-
-function buildSignedNpgisPayloadXmlCompat(args: {
-  type: EwuraPayloadType
-  apiSourceId: string
-  data: Record<string, any>
-  signature?: string | null
-}) {
-  return buildEwuraNpgisPayloadXml(args)
 }
 
 async function buildSignedNpgisXml(args: {
