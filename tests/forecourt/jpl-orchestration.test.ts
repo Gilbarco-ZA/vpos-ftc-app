@@ -147,7 +147,7 @@ describe('JPL command orchestration', () => {
       result: {
         ok: false,
         accepted: false,
-        error: 'APC1 client not available after gateway recovery',
+        error: 'APC1 client not available',
       },
     })
   })

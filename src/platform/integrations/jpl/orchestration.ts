@@ -86,7 +86,7 @@ export async function prepareJplCommandExecution(
       result: {
         ok: false,
         accepted: false,
-        error: 'APC1 client not available after gateway recovery',
+        error: 'APC1 client not available',
       },
     }
   }
