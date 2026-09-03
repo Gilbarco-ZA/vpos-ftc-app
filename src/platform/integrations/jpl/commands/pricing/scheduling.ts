@@ -2,7 +2,7 @@ import type { JplCommandContext } from '@/src/platform/integrations/jpl/commands
 
 import { logger } from '@/src/shared/utils/logger'
 
-import type { PriceBank, ResolvedPricingCommandDeps } from './contracts'
+import type { ResolvedPricingCommandDeps } from './contracts'
 import {
   extractEntries,
   extractExplicitPriceBank,
@@ -13,18 +13,7 @@ import {
   toPriceBank,
   ZERO_FC_DATE_TIME,
 } from './mapping'
-
-const priceBanksMatch = (expected: PriceBank, actual: PriceBank | null) => {
-  if (!actual) return false
-  return (
-    expected.fcPriceSetId === actual.fcPriceSetId &&
-    JSON.stringify(expected.fcPriceGroupIds) ===
-      JSON.stringify(actual.fcPriceGroupIds) &&
-    JSON.stringify(expected.fcGradeIds) === JSON.stringify(actual.fcGradeIds) &&
-    JSON.stringify(expected.fcPriceGroups) ===
-      JSON.stringify(actual.fcPriceGroups)
-  )
-}
+import { verifyImmediatePriceChange } from './verification'
 
 export async function handleClearPendingPriceSet(
   context: JplCommandContext,
@@ -75,11 +64,7 @@ export async function handleChangeGradePrices(
   const payload = ((cmd as any).payload ?? {}) as Record<string, unknown>
   const entries = extractEntries(payload)
   if (!entries.length) {
-    return {
-      ok: false,
-      accepted: false,
-      error: 'No price entries were provided',
-    }
+    return { ok: false, accepted: false, error: 'No price entries were provided' }
   }
 
   const requestedActivation =
@@ -108,19 +93,14 @@ export async function handleChangeGradePrices(
   let currentResponse: any = null
   let currentPriceSetSubCode: string | undefined
   try {
-    const currentPriceSetResult = await deps.readCurrentPriceSet(
-      client,
-      timeoutMs,
-    )
+    const currentPriceSetResult = await deps.readCurrentPriceSet(client, timeoutMs)
     currentResponse = currentPriceSetResult.response
     currentPriceSetSubCode = currentPriceSetResult.usedSubCode
   } catch {
     currentResponse = null
   }
 
-  const currentBank = toPriceBank(currentResponse)
-  const explicitBank = extractExplicitPriceBank(payload)
-  const baseBank = currentBank ?? explicitBank
+  const baseBank = toPriceBank(currentResponse) ?? extractExplicitPriceBank(payload)
   if (!baseBank) {
     return {
       ok: false,
@@ -163,9 +143,7 @@ export async function handleChangeGradePrices(
       fcPriceGroups: mergedBank.fcPriceGroups,
       activationAt,
     },
-    {
-      requirePreservePendingQueue: pendingBefore.length > 0,
-    },
+    { requirePreservePendingQueue: pendingBefore.length > 0 },
   )
   if (!responseResult.preservesPendingQueue) {
     warnings.push(
@@ -177,27 +155,14 @@ export async function handleChangeGradePrices(
   const statusAfter = statusAfterResult.response
 
   if (applyNow) {
-    let activePriceSet: any = null
-    let activePriceSetSubCode: string | undefined
-    let activeBank: PriceBank | null = null
-    try {
-      const activeResult = await deps.readCurrentPriceSet(client, timeoutMs)
-      activePriceSet = activeResult.response
-      activePriceSetSubCode = activeResult.usedSubCode
-      activeBank = toPriceBank(activePriceSet)
-    } catch {
-      activePriceSet = null
-    }
-
-    const verifiedOnController = priceBanksMatch(mergedBank, activeBank)
-    if (!verifiedOnController) {
-      logger.warn('[jpl]', {
-        msg: 'immediate price change accepted without active-bank verification',
-        fcPriceSetId: mergedBank.fcPriceSetId,
-        changePriceSetSubCode: responseResult.usedSubCode,
-        activePriceSetSubCode,
-      })
-    }
+    const verification = await verifyImmediatePriceChange({
+      client,
+      timeoutMs,
+      deps,
+      expectedBank: mergedBank,
+      changePriceSetSubCode: responseResult.usedSubCode,
+      fallbackCurrentPriceSetSubCode: currentPriceSetSubCode,
+    })
 
     return {
       ok: true,
@@ -208,18 +173,18 @@ export async function handleChangeGradePrices(
         applyNow: true,
         scheduled: null,
         controllerAccepted: true,
-        verifiedOnController,
+        verifiedOnController: verification.verifiedOnController,
         response: responseResult.response,
         responseSubCode: responseResult.usedSubCode,
         statusBefore,
         statusAfter,
-        activePriceSet,
+        activePriceSet: verification.activePriceSet,
         priceBank: mergedBank,
         warnings,
         capabilities: {
           priceSetStatusSubCode: statusBeforeResult.usedSubCode,
           supportsPendingQueue: statusBeforeResult.supportsPendingQueue,
-          currentPriceSetSubCode: activePriceSetSubCode ?? currentPriceSetSubCode,
+          currentPriceSetSubCode: verification.currentPriceSetSubCode,
           changePriceSetSubCode: responseResult.usedSubCode,
         },
       },
