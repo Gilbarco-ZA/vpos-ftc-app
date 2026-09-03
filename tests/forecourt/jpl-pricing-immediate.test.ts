@@ -109,7 +109,40 @@ describe('DOMS immediate price changes', () => {
     assert.equal((result as any).data.applyNow, true)
     assert.equal((result as any).data.scheduled, null)
     assert.equal((result as any).data.verifiedOnController, true)
+    assert.equal((result as any).data.verificationAttempts, 1)
     assert.equal(currentReads, 2)
+  })
+
+  it('retries when DOMS initially returns the previous active price bank', async () => {
+    let currentReads = 0
+    const result = await handleChangeGradePrices(
+      context({
+        applyNow: true,
+        entries: [{ gradeId: 2, price: '20.01' }],
+      }),
+      deps({
+        readCurrentPriceSet: async () => {
+          currentReads += 1
+          return {
+            response: {
+              data:
+                currentReads < 3
+                  ? bank
+                  : {
+                      ...bank,
+                      FcPriceGroups: [['1000', '2001']],
+                    },
+            },
+            usedSubCode: '04H',
+            usedName: 'FcPriceSet_req',
+          }
+        },
+      }),
+    )
+
+    assert.equal((result as any).data.verifiedOnController, true)
+    assert.equal((result as any).data.verificationAttempts, 2)
+    assert.equal(currentReads, 3)
   })
 
   it('requires SUBC 04 when existing pending prices must be preserved', async () => {
