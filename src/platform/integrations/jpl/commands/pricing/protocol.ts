@@ -3,7 +3,10 @@ import {
   requestWithSubCodeFallback,
 } from '@/src/platform/integrations/jpl/protocol/runtime'
 
-import type { ChangePriceSetPayload } from './contracts'
+import type {
+  ChangePriceSetOptions,
+  ChangePriceSetPayload,
+} from './contracts'
 
 export async function readPriceSetStatus(client: any, timeoutMs: number) {
   const result = await requestWithSubCodeFallback(client, {
@@ -59,16 +62,24 @@ export async function changePriceSet(
   client: any,
   timeoutMs: number,
   payload: ChangePriceSetPayload,
+  options: ChangePriceSetOptions = {},
 ) {
-  const result = await requestWithSubCodeFallback(client, {
-    name: 'change_FcPriceSet_req',
-    variants: [
-      buildCommandVariant('CHANGE_PRICE_SET', { ...payload, subCode: '04H' }),
+  const variants = [
+    buildCommandVariant('CHANGE_PRICE_SET', { ...payload, subCode: '04H' }),
+  ]
+
+  if (!options.requirePreservePendingQueue) {
+    variants.push(
       buildCommandVariant('CHANGE_PRICE_SET', { ...payload, subCode: '03H' }),
       buildCommandVariant('CHANGE_PRICE_SET', { ...payload, subCode: '02H' }),
-    ],
+    )
+  }
+
+  const result = await requestWithSubCodeFallback(client, {
+    name: 'change_FcPriceSet_req',
+    variants,
     timeoutMs,
-    timeoutMessage: 'Timed out scheduling price set change',
+    timeoutMessage: 'Timed out changing price set',
   })
 
   return {
