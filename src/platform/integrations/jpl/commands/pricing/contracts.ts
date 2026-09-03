@@ -23,6 +23,10 @@ export type ChangePriceSetPayload = {
   activationAt: string
 }
 
+export type ChangePriceSetOptions = {
+  requirePreservePendingQueue?: boolean
+}
+
 export type PriceSetStatusResult = {
   response: any
   usedSubCode?: string
@@ -59,6 +63,7 @@ export type PricingCommandDeps = {
     client: any,
     timeoutMs: number,
     payload: ChangePriceSetPayload,
+    options?: ChangePriceSetOptions,
   ) => Promise<ChangePriceSetResult>
   clearPendingPriceSet?: (
     client: any,
