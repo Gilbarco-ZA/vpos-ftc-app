@@ -131,18 +131,47 @@ describe('JPL command orchestration', () => {
       result: { ok: false, accepted: false, error: 'controller offline' },
     })
 
+    let recoveryStarts = 0
     const missing = await prepareJplCommandExecution(
-      createRuntime({ getClient: () => null }),
+      createRuntime({
+        getClient: () => null,
+        ensureGatewayStarted: async () => {
+          recoveryStarts += 1
+        },
+      }),
       createGatewayStartCoordinator(),
     )
+    assert.equal(recoveryStarts, 1)
     assert.deepEqual(missing, {
       ok: false,
       result: {
         ok: false,
         accepted: false,
-        error: 'APC1 client not available',
+        error: 'APC1 client not available after gateway recovery',
       },
     })
+  })
+
+  it('recovers a missing client even when gateway state still reports started', async () => {
+    const client = { request: async () => ({ ok: true }) }
+    let currentClient: typeof client | null = null
+    let recoveryStarts = 0
+    const runtime = createRuntime({
+      getGatewayState: () => ({ started: true }),
+      getClient: () => currentClient,
+      ensureGatewayStarted: async () => {
+        recoveryStarts += 1
+        currentClient = client
+      },
+    })
+
+    const prepared = await prepareJplCommandExecution(
+      runtime,
+      createGatewayStartCoordinator(),
+    )
+    assert.equal(recoveryStarts, 1)
+    assert.equal(prepared.ok, true)
+    if (prepared.ok) assert.equal(prepared.client, client)
   })
 
   it('returns the client after a successful single-flight start', async () => {

@@ -61,9 +61,13 @@ export async function prepareJplCommandExecution(
   runtime: JplClientRuntimeDeps,
   startCoordinator: JplGatewayStartCoordinator = defaultStartCoordinator,
 ): Promise<PreparedJplCommandExecution> {
-  if (!runtime.getGatewayState().started) {
+  let client = runtime.getClient()
+  const gatewayStarted = Boolean(runtime.getGatewayState().started)
+
+  if (!gatewayStarted || !client) {
     try {
       await startCoordinator.ensureStarted(runtime.ensureGatewayStarted)
+      client = runtime.getClient()
     } catch (error) {
       return {
         ok: false,
@@ -76,14 +80,13 @@ export async function prepareJplCommandExecution(
     }
   }
 
-  const client = runtime.getClient()
   if (!client) {
     return {
       ok: false,
       result: {
         ok: false,
         accepted: false,
-        error: 'APC1 client not available',
+        error: 'APC1 client not available after gateway recovery',
       },
     }
   }

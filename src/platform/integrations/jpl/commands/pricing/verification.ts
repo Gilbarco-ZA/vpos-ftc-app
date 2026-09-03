@@ -3,6 +3,12 @@ import { logger } from '@/src/shared/utils/logger'
 import type { PriceBank, ResolvedPricingCommandDeps } from './contracts'
 import { toPriceBank } from './mapping'
 
+const VERIFY_ATTEMPTS = 3
+const VERIFY_RETRY_DELAY_MS = 150
+
+const wait = async (ms: number) =>
+  await new Promise<void>((resolve) => setTimeout(resolve, ms))
+
 const priceBanksMatch = (expected: PriceBank, actual: PriceBank | null) => {
   if (!actual) return false
   return (
@@ -15,6 +21,9 @@ const priceBanksMatch = (expected: PriceBank, actual: PriceBank | null) => {
   )
 }
 
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error ?? '')
+
 export async function verifyImmediatePriceChange(params: {
   client: any
   timeoutMs: number
@@ -25,33 +34,54 @@ export async function verifyImmediatePriceChange(params: {
 }) {
   let activePriceSet: any = null
   let activePriceSetSubCode: string | undefined
-  let activeBank: PriceBank | null = null
+  let verificationError: string | undefined
+  let verificationAttempts = 0
 
-  try {
-    const activeResult = await params.deps.readCurrentPriceSet(
-      params.client,
-      params.timeoutMs,
-    )
-    activePriceSet = activeResult.response
-    activePriceSetSubCode = activeResult.usedSubCode
-    activeBank = toPriceBank(activePriceSet)
-  } catch {
-    activePriceSet = null
+  for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
+    verificationAttempts = attempt
+    try {
+      const activeResult = await params.deps.readCurrentPriceSet(
+        params.client,
+        params.timeoutMs,
+      )
+      activePriceSet = activeResult.response
+      activePriceSetSubCode = activeResult.usedSubCode
+      verificationError = undefined
+
+      if (priceBanksMatch(params.expectedBank, toPriceBank(activePriceSet))) {
+        return {
+          activePriceSet,
+          verifiedOnController: true,
+          verificationAttempts,
+          verificationError,
+          currentPriceSetSubCode:
+            activePriceSetSubCode ?? params.fallbackCurrentPriceSetSubCode,
+        }
+      }
+    } catch (error) {
+      activePriceSet = null
+      verificationError = errorMessage(error) || 'Unable to read active price bank'
+    }
+
+    if (attempt < VERIFY_ATTEMPTS) {
+      await wait(VERIFY_RETRY_DELAY_MS)
+    }
   }
 
-  const verifiedOnController = priceBanksMatch(params.expectedBank, activeBank)
-  if (!verifiedOnController) {
-    logger.warn('[jpl]', {
-      msg: 'immediate price change accepted without active-bank verification',
-      fcPriceSetId: params.expectedBank.fcPriceSetId,
-      changePriceSetSubCode: params.changePriceSetSubCode,
-      activePriceSetSubCode,
-    })
-  }
+  logger.warn('[jpl]', {
+    msg: 'immediate price change accepted without active-bank verification',
+    fcPriceSetId: params.expectedBank.fcPriceSetId,
+    changePriceSetSubCode: params.changePriceSetSubCode,
+    activePriceSetSubCode,
+    verificationAttempts,
+    verificationError,
+  })
 
   return {
     activePriceSet,
-    verifiedOnController,
+    verifiedOnController: false,
+    verificationAttempts,
+    verificationError,
     currentPriceSetSubCode:
       activePriceSetSubCode ?? params.fallbackCurrentPriceSetSubCode,
   }

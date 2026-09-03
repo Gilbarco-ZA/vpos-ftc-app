@@ -174,6 +174,8 @@ export async function handleChangeGradePrices(
         scheduled: null,
         controllerAccepted: true,
         verifiedOnController: verification.verifiedOnController,
+        verificationAttempts: verification.verificationAttempts,
+        verificationError: verification.verificationError,
         response: responseResult.response,
         responseSubCode: responseResult.usedSubCode,
         statusBefore,
