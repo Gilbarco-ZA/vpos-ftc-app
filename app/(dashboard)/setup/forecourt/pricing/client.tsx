@@ -45,11 +45,7 @@ type PriceSetResponseData = {
   status?: any
   current?: any
   currentError?: string
-  requestedPending?: any
-  requestedPendingError?: string
   warnings?: string[]
-  controllerAccepted?: boolean
-  verifiedOnController?: boolean
   capabilities?: {
     supportsPendingQueue?: boolean
     priceSetStatusSubCode?: string
@@ -58,6 +54,8 @@ type PriceSetResponseData = {
     changePriceSetSubCode?: string
   }
 }
+
+type ApplyMode = 'now' | 'scheduled'
 
 function makeRow(): EntryRow {
   return {
@@ -139,6 +137,7 @@ function getCurrentPriceBank(data?: PriceSetResponseData | null) {
 export default function ForecourtPricingClient() {
   const [products, setProducts] = useState<ProductItem[]>([])
   const [rows, setRows] = useState<EntryRow[]>([makeRow()])
+  const [applyMode, setApplyMode] = useState<ApplyMode>('now')
   const [effectiveAt, setEffectiveAt] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -242,10 +241,9 @@ export default function ForecourtPricingClient() {
     priceState?.capabilities?.supportsPendingQueue !== false
   const hasPendingEntries = pending.length > 0
   const canSubmit = useMemo(() => {
-    if (!effectiveAt) return false
-    const validRows = rows.filter((row) => row.productId && row.price.trim())
-    return validRows.length > 0
-  }, [effectiveAt, rows])
+    if (applyMode === 'scheduled' && !effectiveAt) return false
+    return rows.some((row) => row.productId && row.price.trim())
+  }, [applyMode, effectiveAt, rows])
 
   const handleSubmit = useCallback(async () => {
     setSubmitError(null)
@@ -258,49 +256,53 @@ export default function ForecourtPricingClient() {
         price: row.price.trim(),
       }))
 
-    if (!effectiveAt || !entries.length) {
-      setSubmitError(
-        'Select an effective date and provide at least one product price.',
-      )
+    if (!entries.length) {
+      setSubmitError('Provide at least one product price.')
+      return
+    }
+    if (applyMode === 'scheduled' && !effectiveAt) {
+      setSubmitError('Select an effective date and time for the scheduled update.')
       return
     }
 
     setIsSubmitting(true)
     try {
+      const applyNow = applyMode === 'now'
       const res = await fetch('/api/pos/doms/changeGradePrices', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          effectiveAt,
+          applyNow,
+          ...(applyNow ? {} : { effectiveAt }),
           entries,
-          replaceExistingAtSameActivation: true,
+          replaceExistingAtSameActivation: !applyNow,
         }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || body?.success === false) {
         throw new Error(
-          body?.error?.message ??
-            body?.message ??
-            'Failed to schedule DOMS price update',
+          body?.error?.message ?? body?.message ?? 'Failed to update DOMS prices',
         )
       }
 
-      const activationAtValue = body?.data?.activationAt
-      const scheduled = body?.data?.scheduled
-      const submitWarnings = Array.isArray(body?.data?.warnings)
-        ? body.data.warnings.filter(Boolean)
+      const data = body?.data ?? {}
+      const submitWarnings = Array.isArray(data?.warnings)
+        ? data.warnings.filter(Boolean)
         : []
-      const submitSupportsPendingQueue =
-        body?.data?.capabilities?.supportsPendingQueue !== false
-      const baseMessage = scheduled
-        ? `Queued on DOMS for ${formatActivationAt(scheduled.activationAt)}`
-        : activationAtValue
-          ? body?.data?.controllerAccepted
-            ? submitSupportsPendingQueue
-              ? `Sent to DOMS for ${formatActivationAt(activationAtValue)}. The controller accepted the update, but it did not appear in the pending queue yet.`
-              : `Sent to DOMS for ${formatActivationAt(activationAtValue)}. This controller does not expose the pending queue, so the activation cannot be verified from this page.`
-            : `Prepared a DOMS price update for ${formatActivationAt(activationAtValue)}`
-          : 'Sent to DOMS successfully.'
+      let baseMessage: string
+
+      if (data?.applyNow) {
+        baseMessage = data?.verifiedOnController
+          ? 'Price update is active on DOMS and the active price bank was verified.'
+          : 'DOMS accepted the immediate price update, but the active price bank could not be verified yet.'
+      } else if (data?.scheduled) {
+        baseMessage = `Queued on DOMS for ${formatActivationAt(data.scheduled.activationAt)}`
+      } else if (data?.controllerAccepted) {
+        baseMessage = `DOMS accepted the scheduled update for ${formatActivationAt(data?.activationAt)}.`
+      } else {
+        baseMessage = 'Price update sent to DOMS.'
+      }
+
       setSubmitMessage(
         submitWarnings.length > 0
           ? `${baseMessage} ${submitWarnings.join(' ')}`
@@ -309,20 +311,18 @@ export default function ForecourtPricingClient() {
       await refreshPriceState()
     } catch (err) {
       setSubmitError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to schedule DOMS price update',
+        err instanceof Error ? err.message : 'Failed to update DOMS prices',
       )
     } finally {
       setIsSubmitting(false)
     }
-  }, [effectiveAt, refreshPriceState, rows])
+  }, [applyMode, effectiveAt, refreshPriceState, rows])
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Scheduled Price Updates"
-        description="Queue DOMS JPL/TCP price changes by product and activation time using the active forecourt connection. Prices are submitted as a full DOMS price bank behind the scenes."
+        title="Forecourt Pricing"
+        description="Apply DOMS price changes immediately or schedule a future activation. Price changes are submitted as a complete DOMS price bank."
         actions={
           <>
             <Button asChild variant="secondary">
@@ -350,7 +350,7 @@ export default function ForecourtPricingClient() {
         </Card>
       ) : error ? (
         <ErrorDetails
-          title="Unable to load price scheduling"
+          title="Unable to load forecourt pricing"
           message="Check DOMS connectivity and product setup, then retry."
           error={error}
         />
@@ -364,8 +364,7 @@ export default function ForecourtPricingClient() {
                     DOMS price bank status
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">
-                    Review the active price bank and any pending activations
-                    currently queued on the controller.
+                    Review the active price bank and pending activations on the controller.
                   </p>
                 </div>
                 <Badge
@@ -387,25 +386,19 @@ export default function ForecourtPricingClient() {
 
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-card border border-border bg-surface-card p-3">
-                  <div className="text-xs text-[var(--text-muted)]">
-                    Current price set
-                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">Current price set</div>
                   <div className="text-lg font-semibold">
                     {currentBank?.fcPriceSetId ?? '—'}
                   </div>
                 </div>
                 <div className="rounded-card border border-border bg-surface-card p-3">
-                  <div className="text-xs text-[var(--text-muted)]">
-                    Price groups
-                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">Price groups</div>
                   <div className="text-lg font-semibold">
                     {currentBank?.fcPriceGroupIds.length ?? 0}
                   </div>
                 </div>
                 <div className="rounded-card border border-border bg-surface-card p-3">
-                  <div className="text-xs text-[var(--text-muted)]">
-                    Grades in bank
-                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">Grades in bank</div>
                   <div className="text-lg font-semibold">
                     {currentBank?.fcGradeIds.length ?? 0}
                   </div>
@@ -414,73 +407,57 @@ export default function ForecourtPricingClient() {
 
               {priceStateError ? (
                 <div className="rounded-card border border-rose-300/40 bg-rose-500/10 p-3 text-xs text-rose-100">
-                  Unable to load DOMS price state from the active forecourt
-                  connection: {priceStateError}
+                  Unable to load DOMS price state from the active forecourt connection: {priceStateError}
                 </div>
               ) : priceState?.currentError ? (
                 <div className="rounded-card border border-amber-300/40 bg-amber-500/10 p-3 text-xs text-amber-100">
-                  Unable to load the current active price bank:{' '}
-                  {priceState.currentError}
+                  Unable to load the current active price bank: {priceState.currentError}
                 </div>
               ) : null}
 
-              {warnings.length > 0 ? (
-                <div className="space-y-2">
-                  {warnings.map((warning, index) => (
-                    <div
-                      key={`${warning}-${index}`}
-                      className="rounded-card border border-amber-300/40 bg-amber-500/10 p-3 text-xs text-amber-100"
-                    >
-                      {warning}
-                    </div>
-                  ))}
+              {warnings.map((warning, index) => (
+                <div
+                  key={`${warning}-${index}`}
+                  className="rounded-card border border-amber-300/40 bg-amber-500/10 p-3 text-xs text-amber-100"
+                >
+                  {warning}
                 </div>
-              ) : null}
+              ))}
 
               {hasPendingEntries ? (
                 <div className="space-y-2">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                     Pending activations
                   </div>
-                  <div className="space-y-2">
-                    {pending.map((item) => {
-                      const pendingStatus = describePendingStatus(
-                        item,
-                        supportsPendingQueue,
-                      )
-
-                      return (
-                        <div
-                          key={`${item.fcPriceSetId}-${item.activationAt}`}
-                          className="rounded-card border border-border bg-surface-card p-3"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <div className="text-sm font-semibold text-[var(--text-primary)]">
-                                Price set {item.fcPriceSetId}
-                              </div>
-                              <div className="text-xs text-[var(--text-muted)]">
-                                Activates{' '}
-                                {formatActivationAt(item.activationAt)}
-                              </div>
-                              <div className="text-[11px] text-[var(--text-muted)]">
-                                {pendingStatus.detail}
-                              </div>
-                              {item.lastEventAt ? (
-                                <div className="text-[11px] text-[var(--text-muted)]">
-                                  Last change{' '}
-                                  {new Date(item.lastEventAt).toLocaleString()}
-                                </div>
-                              ) : null}
+                  {pending.map((item) => {
+                    const pendingStatus = describePendingStatus(
+                      item,
+                      supportsPendingQueue,
+                    )
+                    return (
+                      <div
+                        key={`${item.fcPriceSetId}-${item.activationAt}`}
+                        className="rounded-card border border-border bg-surface-card p-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-semibold text-[var(--text-primary)]">
+                              Price set {item.fcPriceSetId}
                             </div>
-                            <Badge variant={pendingStatus.variant}>
-                              {pendingStatus.label}
-                            </Badge>
+                            <div className="text-xs text-[var(--text-muted)]">
+                              Activates {formatActivationAt(item.activationAt)}
+                            </div>
+                            <div className="text-[11px] text-[var(--text-muted)]">
+                              {pendingStatus.detail}
+                            </div>
                           </div>
+                          <Badge variant={pendingStatus.variant}>
+                            {pendingStatus.label}
+                          </Badge>
                         </div>
-                      )
-                    })}
-                  </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : supportsPendingQueue ? (
                 <EmptyState
@@ -490,7 +467,7 @@ export default function ForecourtPricingClient() {
               ) : (
                 <EmptyState
                   title="Pending queue not available"
-                  description="This controller exposes only the active price set status, so queued activations cannot be listed or verified from the pricing page. Submitted changes are still sent to DOMS."
+                  description="This controller exposes only the active price set status. Immediate price changes can still be applied and verified from the active price bank."
                 />
               )}
             </CardContent>
@@ -500,32 +477,49 @@ export default function ForecourtPricingClient() {
             <CardContent className="space-y-4">
               <div>
                 <div className="text-sm font-semibold text-[var(--text-primary)]">
-                  Schedule a price update
+                  Update product prices
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Select products and enter DOMS raw price values, for example
-                  2199 for a price with two decimal places.
+                  Apply now sends DOMS a zero activation timestamp for immediate activation. Schedule keeps the existing future activation workflow.
                 </p>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="space-y-1">
-                  <span className="text-xs font-medium text-[var(--text-primary)]">
-                    Effective date and time
-                  </span>
-                  <Input
-                    type="datetime-local"
-                    value={effectiveAt}
-                    onChange={(e) => setEffectiveAt(e.target.value)}
-                  />
-                </label>
-                <div className="rounded-card border border-border bg-surface-card p-3 text-xs text-[var(--text-muted)]">
-                  DOMS expects activation timestamps in controller time. The
-                  backend now preserves the selected local clock time when
-                  converting to FC_DATE_AND_TIME, instead of shifting it through
-                  a timezone conversion.
-                </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={applyMode === 'now' ? 'primary' : 'secondary'}
+                  onClick={() => setApplyMode('now')}
+                >
+                  Apply now
+                </Button>
+                <Button
+                  variant={applyMode === 'scheduled' ? 'primary' : 'secondary'}
+                  onClick={() => setApplyMode('scheduled')}
+                >
+                  Schedule
+                </Button>
               </div>
+
+              {applyMode === 'scheduled' ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="space-y-1">
+                    <span className="text-xs font-medium text-[var(--text-primary)]">
+                      Effective date and time
+                    </span>
+                    <Input
+                      type="datetime-local"
+                      value={effectiveAt}
+                      onChange={(e) => setEffectiveAt(e.target.value)}
+                    />
+                  </label>
+                  <div className="rounded-card border border-border bg-surface-card p-3 text-xs text-[var(--text-muted)]">
+                    DOMS expects activation timestamps in controller time. The selected local clock time is preserved when converting to FC_DATE_AND_TIME.
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-card border border-border bg-surface-card p-3 text-xs text-[var(--text-muted)]">
+                  The update will be sent with PriceSetActivationDateAndTime = 00000000000000. DOMS may still apply configured device delays to pumps or price poles after the price bank becomes active.
+                </div>
+              )}
 
               <div className="space-y-3">
                 {rows.map((row, index) => (
@@ -549,8 +543,7 @@ export default function ForecourtPricingClient() {
                             key={product.id}
                             value={product.productId || product.id}
                           >
-                            {product.productName} (
-                            {product.productId || product.id})
+                            {product.productName} ({product.productId || product.id})
                           </option>
                         ))}
                       </Select>
@@ -594,7 +587,13 @@ export default function ForecourtPricingClient() {
                   onClick={handleSubmit}
                   disabled={!canSubmit || isSubmitting}
                 >
-                  {isSubmitting ? 'Scheduling…' : 'Schedule on DOMS'}
+                  {isSubmitting
+                    ? applyMode === 'now'
+                      ? 'Applying…'
+                      : 'Scheduling…'
+                    : applyMode === 'now'
+                      ? 'Apply on DOMS'
+                      : 'Schedule on DOMS'}
                 </Button>
               </div>
 
