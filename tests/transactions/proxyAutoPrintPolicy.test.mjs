@@ -20,8 +20,10 @@ test('proxy fiscalization auto-prints immediate and reconciled successes idempot
   assert.match(helper, /settings\?\.auto_print_receipts !== true/)
   assert.match(helper, /getOrCreateLatestTransactionReceiptRepo/)
   assert.match(helper, /'print\.receipt'/)
-  assert.match(helper, /source: 'vpos\.auto-print-receipt'/)
+  assert.match(helper, /'vpos\.auto-print-receipt'/)
+  assert.match(helper, /'vpos\.auto-print-offline-receipt'/)
   assert.match(helper, /`receipt:\$\{input\.transactionId\}:default`/)
+  assert.match(helper, /`receipt:\$\{input\.transactionId\}:offline`/)
   assert.match(helper, /sourceTransactionId: input\.transactionId/)
   assert.match(helper, /payloadMode: 'reference'/)
 

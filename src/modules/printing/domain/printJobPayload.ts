@@ -19,6 +19,7 @@ const REFERENCE_PAYLOAD_KEYS = [
   'correlationId',
   'deviceKey',
   'isReprint',
+  'offlinePrint',
   'port',
   'printerIP',
   'printerIp',

@@ -91,6 +91,7 @@ export function buildReceiptEscposLines(input: {
   siteNames?: Array<string | null | undefined>
   siteTin?: string | null
   includeBrandLogo?: boolean
+  offlinePrint?: boolean
 }): EscposLine[] {
   const source = String(input.plainText ?? '').replace(/\r\n/g, '\n')
   const rows = source.split('\n')
@@ -100,6 +101,7 @@ export function buildReceiptEscposLines(input: {
   const isTanzania = ['TZ', 'TZA', 'TANZANIA'].includes(
     textValue(input.country).toUpperCase(),
   )
+  const offlinePrint = isTanzania && input.offlinePrint === true
   const siteNames = new Set(
     (input.siteNames ?? [])
       .map((value) => textValue(value).toLowerCase())
@@ -150,9 +152,6 @@ export function buildReceiptEscposLines(input: {
     const hasStart = lines.some(
       (line) => line.type === 'image' && line.asset === 'tra-receipt-start',
     )
-    const hasEnd = lines.some(
-      (line) => line.type === 'image' && line.asset === 'tra-receipt-end',
-    )
     const hasLogo = lines.some(
       (line) => line.type === 'image' && line.asset === 'branding-logo',
     )
@@ -181,7 +180,31 @@ export function buildReceiptEscposLines(input: {
         align: 'center',
       })
     }
-    if (!hasEnd) lines.push({ type: 'image', asset: 'tra-receipt-end' })
+
+    let endIndex = lines.findIndex(
+      (line) => line.type === 'image' && line.asset === 'tra-receipt-end',
+    )
+    if (offlinePrint) {
+      const hasOfflineMarker = lines.some(
+        (line) =>
+          line.type === 'text' && line.value.trim().toUpperCase() === 'OFFLINE PRINT',
+      )
+      if (!hasOfflineMarker) {
+        const marker: EscposLine = {
+          type: 'text',
+          value: 'OFFLINE PRINT',
+          align: 'center',
+          bold: true,
+        }
+        if (endIndex >= 0) {
+          lines.splice(endIndex, 0, marker)
+          endIndex += 1
+        } else {
+          lines.push(marker)
+        }
+      }
+    }
+    if (endIndex < 0) lines.push({ type: 'image', asset: 'tra-receipt-end' })
   }
 
   return lines

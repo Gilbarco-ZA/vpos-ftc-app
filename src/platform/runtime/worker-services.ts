@@ -10,6 +10,7 @@ import { startSupervisorMonitorWorker as startCanonicalSupervisorMonitorWorker }
 import { startEwuraRetryWorker as startCanonicalEwuraRetryWorker } from '@/src/modules/tanzania-fiscal/infrastructure/ewuraRetryWorker'
 import { startTanzaniaDailyTotalsWorker as startCanonicalTanzaniaDailyTotalsWorker } from '@/src/modules/tanzania-fiscal/infrastructure/proxyDailyTotalsWorker'
 import { publishLatestTanzaniaTankInventories } from '@/src/modules/tanzania-fiscal/infrastructure/proxyTankInventories'
+import { startOfflineReceiptPrintWorker as startCanonicalOfflineReceiptPrintWorker } from '@/src/modules/transactions/infrastructure/fiscalization/offlineReceiptPrintWorker'
 import { startProxyFiscalSenderWorker as startLegacyProxyFiscalSenderWorker } from '@/src/modules/transactions/infrastructure/fiscalization/proxySenderWorker'
 import { startTransactionFiscalizationSchedulerWorker as startCanonicalTransactionFiscalizationSchedulerWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionFiscalizationSchedulerWorker'
 import { startTransactionQueueWorker as startCanonicalTransactionQueueWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionQueueWorker'
@@ -83,6 +84,13 @@ export function startTransactionFiscalizationRuntimeWorker(opts?: {
   pollMs?: number
 }) {
   return startCanonicalTransactionQueueWorker(opts)
+}
+
+export function startOfflineReceiptPrintRuntimeWorker(opts?: {
+  pollMs?: number
+  batchSize?: number
+}) {
+  return startCanonicalOfflineReceiptPrintWorker(opts)
 }
 
 export function startProxyFiscalSenderRuntimeWorker(opts?: {
