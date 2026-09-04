@@ -103,10 +103,10 @@ const DetailsSheet = ({
               </div>
               <div>
                 <div className="text-xs text-[var(--text-muted)]">
-                  POS reference
+                  Receipt number
                 </div>
                 <div className="text-[var(--text-secondary)]">
-                  {transaction.posReference ?? '—'}
+                  {transaction.receiptNumber ?? '—'}
                 </div>
               </div>
               <div>
@@ -332,12 +332,13 @@ const FiscalizedTransactionsPageClient = ({
       }
       const payload = body?.data ?? body
       const items = Array.isArray(payload?.items) ? payload.items : []
-      const mapped = items.map((item: any) => ({
+      const mapped: FiscalizedTransactionListItem[] = items.map((item: any) => ({
         id: String(item?.id ?? ''),
         fiscalizedAt: item?.fiscalized_at ?? item?.fiscalizedAt ?? null,
         transactionDateTime:
           item?.transaction_date_time ?? item?.transactionDateTime ?? null,
         posReference: item?.pos_reference ?? item?.posReference ?? null,
+        receiptNumber: item?.receipt_number ?? item?.receiptNumber ?? null,
         cloudTransactionId:
           item?.cloud_transaction_id ?? item?.cloudTransactionId ?? null,
         pumpNumber: Number(item?.pump_number ?? item?.pumpNumber ?? 0),
@@ -570,7 +571,7 @@ const FiscalizedTransactionsPageClient = ({
               <TableHeader>
                 <TableRow>
                   <TableHead>Fiscalized time</TableHead>
-                  <TableHead>POS reference</TableHead>
+                  <TableHead>Receipt number</TableHead>
                   <TableHead>Pump</TableHead>
                   <TableHead>Fuel type</TableHead>
                   <TableHead>Volume</TableHead>
@@ -586,7 +587,7 @@ const FiscalizedTransactionsPageClient = ({
                       {formatDate(row.fiscalizedAt)}
                     </TableCell>
                     <TableCell className="text-[var(--text-secondary)]">
-                      {row.posReference ?? '—'}
+                      {row.receiptNumber ?? '—'}
                     </TableCell>
                     <TableCell>{row.pumpNumber}</TableCell>
                     <TableCell className="text-[var(--text-muted)]">
@@ -621,18 +622,18 @@ const FiscalizedTransactionsPageClient = ({
                             <Copy className="h-4 w-4" aria-hidden="true" />
                             Copy transaction ID
                           </DropdownMenuItem>
-                          {row.posReference ? (
+                          {row.receiptNumber ? (
                             <DropdownMenuItem
                               onSelect={() =>
                                 copyValue(
-                                  'POS reference',
-                                  row.posReference ?? '',
+                                  'Receipt number',
+                                  row.receiptNumber ?? '',
                                 )
                               }
                               className="gap-2"
                             >
                               <Copy className="h-4 w-4" aria-hidden="true" />
-                              Copy POS reference
+                              Copy receipt number
                             </DropdownMenuItem>
                           ) : null}
                           <DropdownMenuItem
@@ -674,7 +675,6 @@ const FiscalizedTransactionsPageClient = ({
                           >
                             Re-fetch receipt
                           </DropdownMenuItem>
-
                           <DropdownMenuItem
                             onSelect={() => openCreditNote(row)}
                           >
@@ -762,8 +762,7 @@ const FiscalizedTransactionsPageClient = ({
                   Original transaction
                 </div>
                 <div className="mt-1 font-medium text-[var(--text-primary)]">
-                  {creditNoteTransaction.posReference ||
-                    creditNoteTransaction.id}
+                  {creditNoteTransaction.receiptNumber || creditNoteTransaction.id}
                 </div>
                 <div className="mt-1 text-xs text-[var(--text-secondary)]">
                   Amount {formatMoney(creditNoteTransaction.totalAmount)} · Pump{' '}
