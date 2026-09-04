@@ -72,4 +72,20 @@ describe('offline proxy fiscalization detection', () => {
       false,
     )
   })
+
+  it('treats a reconciled final success as online even without explicit flags', () => {
+    assert.equal(
+      isOfflineProxySubmission({
+        submission: {
+          responseCode: 'OFFLINE_SUCCESS',
+          status: 'OFFLINE_QUEUED',
+        },
+        final: {
+          responseCode: '200',
+          status: 'SUCCESS',
+        },
+      }),
+      false,
+    )
+  })
 })
