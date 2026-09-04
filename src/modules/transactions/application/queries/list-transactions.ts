@@ -2,7 +2,7 @@ import type { ListTransactionsRepoOptions } from '@/src/modules/transactions/inf
 
 import { requireNonEmptyString } from '@/src/shared/utils/inputs'
 
-import { listTransactionsRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction.repository'
+import { listTransactionsWithReceiptNumbersRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction-list-with-receipts.repository'
 
 export type ListTransactionsOptions = ListTransactionsRepoOptions
 
@@ -13,5 +13,8 @@ export async function listTransactions(
   const scopedStationId = requireNonEmptyString(stationId, 'stationId')
   const normalizedOpts =
     typeof opts === 'number' ? { limit: opts } : opts || { limit: 200 }
-  return await listTransactionsRepo(scopedStationId, normalizedOpts)
+  return await listTransactionsWithReceiptNumbersRepo(
+    scopedStationId,
+    normalizedOpts,
+  )
 }
