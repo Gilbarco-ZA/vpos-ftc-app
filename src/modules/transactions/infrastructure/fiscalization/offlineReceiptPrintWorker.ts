@@ -18,6 +18,7 @@ async function loadCandidates(stationId: string, limit: number) {
             fe.response_payload
        FROM transactions t
        JOIN fuel_stations fs ON fs.id = t.station_id
+       JOIN station_settings ss ON ss.station_id = t.station_id
        JOIN LATERAL (
          SELECT event.response_payload
            FROM fiscalization_events event
@@ -31,6 +32,7 @@ async function loadCandidates(stationId: string, limit: number) {
       WHERE t.station_id = $1
         AND t.deleted_at IS NULL
         AND t.status = 'FISCALIZING'
+        AND ss.auto_print_receipts = TRUE
         AND UPPER(BTRIM(COALESCE(fs.country, ''))) IN ('TZ', 'TZA', 'TANZANIA')
         AND NOT EXISTS (
           SELECT 1
