@@ -14,6 +14,7 @@ export type AutoPrintFiscalReceiptResult = {
 export async function enqueueAutoPrintFiscalReceipt(input: {
   stationId: string
   transactionId: string
+  offlinePrint?: boolean
 }): Promise<AutoPrintFiscalReceiptResult> {
   const settings = await queryOne<{ auto_print_receipts: boolean | null }>(
     `SELECT auto_print_receipts
@@ -42,18 +43,24 @@ export async function enqueueAutoPrintFiscalReceipt(input: {
     )
   }
 
+  const offlinePrint = input.offlinePrint === true
   const printJobId = await enqueuePrintJob(
     input.stationId,
     'print.receipt',
     buildReferencePrintJobPayload({
       type: 'receipt',
-      source: 'vpos.auto-print-receipt',
+      source: offlinePrint
+        ? 'vpos.auto-print-offline-receipt'
+        : 'vpos.auto-print-receipt',
+      offlinePrint,
       receiptId: String(receipt.id),
       receiptNumber: String(receipt.receipt_number ?? ''),
     }),
     10,
     {
-      idempotencyKey: `receipt:${input.transactionId}:default`,
+      idempotencyKey: offlinePrint
+        ? `receipt:${input.transactionId}:offline`
+        : `receipt:${input.transactionId}:default`,
       sourceTransactionId: input.transactionId,
       payloadMode: 'reference',
     },
