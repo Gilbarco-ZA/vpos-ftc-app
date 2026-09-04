@@ -92,6 +92,7 @@ const normalizeAdminRows = (items: any[]): TransactionListItem[] => {
     transactionDateTime:
       item?.transaction_date_time ?? item?.transactionDateTime ?? null,
     posReference: item?.pos_reference ?? item?.posReference ?? null,
+    receiptNumber: item?.receipt_number ?? item?.receiptNumber ?? null,
     pumpNumber: Number(item?.pump_number ?? item?.pumpNumber ?? 0),
     fuelType: item?.fuel_type ?? item?.fuelType ?? null,
     volume: item?.volume ?? null,
@@ -272,7 +273,7 @@ const ManagerNonFiscalizedView = async ({
       <ListToolbar
         baseActionPath="/transactions?status=non-fiscalized"
         searchKey="q"
-        searchPlaceholder="Search: ID / POS ref / fiscal ref / customer / pump"
+        searchPlaceholder="Search: receipt number / ID / fiscal ref / customer / pump"
         initial={{
           q,
           startDate,
