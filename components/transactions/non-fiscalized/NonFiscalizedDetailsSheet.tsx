@@ -1,6 +1,6 @@
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import type { TransactionListItem } from '@/src/shared/types/transactions'
-import { Copy, FileText, RotateCcw, Send, UserRound } from 'lucide-react'
+import { Ban, Copy, FileText, RotateCcw, Send, UserRound } from 'lucide-react'
 
 import { formatDate } from '@/src/shared/utils/dates'
 import { formatNumber } from '@/src/shared/utils/format'
@@ -23,6 +23,7 @@ type NonFiscalizedDetailsSheetProps = {
   onViewError: (transaction: TransactionListItem) => void
   onCopy: (label: string, value: string) => void
   onRetry: (transaction: TransactionListItem) => void
+  onCancelFiscalization: (transaction: TransactionListItem) => void
   onSendNow: (transaction: TransactionListItem) => void
   onFiscalize: (transaction: TransactionListItem) => void
   onCopySupportBundle: (transaction: TransactionListItem) => void
@@ -31,6 +32,9 @@ type NonFiscalizedDetailsSheetProps = {
 
 const canRetryFiscalization = (status: string) =>
   String(status || '').toUpperCase() === 'FAILED'
+
+const canCancelFiscalization = (status: string) =>
+  String(status || '').toUpperCase() === 'FISCALIZING'
 
 const canSendNow = (status: string) =>
   ['OPEN', 'ALLOCATED', 'FAILED', 'PENDING'].includes(
@@ -58,6 +62,7 @@ const NonFiscalizedDetailsSheet = ({
   onViewError,
   onCopy,
   onRetry,
+  onCancelFiscalization,
   onSendNow,
   onFiscalize,
   onCopySupportBundle,
@@ -98,23 +103,23 @@ const NonFiscalizedDetailsSheet = ({
               </div>
               <div>
                 <div className="text-xs text-[var(--text-muted)]">
-                  POS reference
+                  Receipt number
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-[var(--text-secondary)]">
-                    {transaction.posReference ?? '—'}
+                    {transaction.receiptNumber ?? '—'}
                   </div>
-                  {transaction.posReference ? (
+                  {transaction.receiptNumber ? (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 px-0"
                       onClick={() =>
-                        onCopy('POS reference', transaction.posReference ?? '')
+                        onCopy('Receipt number', transaction.receiptNumber ?? '')
                       }
-                      aria-label="Copy POS reference"
-                      title="Copy POS reference"
+                      aria-label="Copy receipt number"
+                      title="Copy receipt number"
                     >
                       <Copy className="h-4 w-4" aria-hidden="true" />
                     </Button>
@@ -221,6 +226,16 @@ const NonFiscalizedDetailsSheet = ({
       </div>
       <div className="border-t bg-[var(--surface-card)] px-6 py-4">
         <SheetFooter>
+          {transaction && canCancelFiscalization(transaction.status) ? (
+            <Button
+              variant="secondary"
+              onClick={() => onCancelFiscalization(transaction)}
+              className="gap-2"
+            >
+              <Ban className="h-4 w-4" aria-hidden="true" />
+              Cancel fiscalization attempt
+            </Button>
+          ) : null}
           {transaction && canRetryTransaction(transaction) ? (
             <Button
               variant="secondary"

@@ -38,7 +38,7 @@ import { TableSkeleton } from '@/components/ui/table-skeleton'
 
 type TransactionListItem = {
   id: string
-  posReference: string | null
+  receiptNumber: string | null
   cloudTransactionId: string | null
   fiscalizationReference: string | null
   fiscalizedAt: string | null
@@ -116,7 +116,7 @@ const ReceiptViewerClient = ({
       const items = Array.isArray(payload?.items) ? payload.items : []
       const mapped = items.map((item: any) => ({
         id: String(item?.id ?? ''),
-        posReference: item?.pos_reference ?? item?.posReference ?? null,
+        receiptNumber: item?.receipt_number ?? item?.receiptNumber ?? null,
         cloudTransactionId:
           item?.cloud_transaction_id ?? item?.cloudTransactionId ?? null,
         fiscalizationReference:
@@ -252,7 +252,7 @@ const ReceiptViewerClient = ({
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search POS reference, cloud ID, or fiscal reference"
+            placeholder="Search receipt number, cloud ID, or fiscal reference"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -310,7 +310,7 @@ const ReceiptViewerClient = ({
       ) : results.length === 0 ? (
         <EmptyState
           title="No receipts found"
-          description="Try a different reference or adjust your date range."
+          description="Try a different receipt number or adjust your date range."
         />
       ) : shouldShowResultsList ? (
         <div className="relative">
@@ -320,7 +320,7 @@ const ReceiptViewerClient = ({
               <TableHeader>
                 <TableRow>
                   <TableHead>Fiscalized</TableHead>
-                  <TableHead>POS reference</TableHead>
+                  <TableHead>Receipt number</TableHead>
                   <TableHead>Pump</TableHead>
                   <TableHead>Fuel</TableHead>
                   <TableHead>Amount</TableHead>
@@ -333,7 +333,7 @@ const ReceiptViewerClient = ({
                     <TableCell className="text-[var(--text-muted)]">
                       {formatDate(row.fiscalizedAt)}
                     </TableCell>
-                    <TableCell>{row.posReference ?? '—'}</TableCell>
+                    <TableCell>{row.receiptNumber ?? '—'}</TableCell>
                     <TableCell>{row.pumpNumber}</TableCell>
                     <TableCell>{row.fuelType ?? '—'}</TableCell>
                     <TableCell>{formatNumber(row.amount)}</TableCell>
@@ -419,7 +419,7 @@ const ReceiptViewerClient = ({
               <div className="no-print">
                 <div className="text-sm text-[var(--text-muted)]">
                   Receipt #{receipt.meta.receiptNumber ?? '—'} •{' '}
-                  {selected?.posReference ?? selectedId}
+                  {selected?.receiptNumber ?? selectedId}
                 </div>
               </div>
               <Receipt80mm receipt={receipt} />

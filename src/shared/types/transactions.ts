@@ -61,6 +61,7 @@ export type NonFiscalizedTransactionRow = {
   id: string
   transaction_date_time: string
   pos_reference: string | null
+  receipt_number?: string | null
   pump_number: number
   fuel_type: string | null
   volume: number | null
@@ -83,6 +84,7 @@ export type FiscalizedTransactionRow = {
   fiscalized_at: string | null
   transaction_date_time: string | null
   pos_reference: string | null
+  receipt_number?: string | null
   cloud_transaction_id: string | null
   pump_number: number
   fuel_type: string | null
@@ -102,6 +104,7 @@ export type TransactionListItem = {
   id: string
   transactionDateTime: string | null
   posReference: string | null
+  receiptNumber?: string | null
   pumpNumber: number
   fuelType: string | null
   volume: number | null
@@ -124,6 +127,7 @@ export type FiscalizedTransactionListItem = {
   fiscalizedAt: string | null
   transactionDateTime: string | null
   posReference: string | null
+  receiptNumber?: string | null
   cloudTransactionId: string | null
   pumpNumber: number
   fuelType: string | null

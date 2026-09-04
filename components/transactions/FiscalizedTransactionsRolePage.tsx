@@ -42,7 +42,7 @@ const authHeaders = async () => {
 const loadManagerTransactions = async (opts: {
   page?: number
   pageSize?: number
-  transactionId?: string
+  search?: string
   startDate?: string
   endDate?: string
 }) => {
@@ -51,7 +51,7 @@ const loadManagerTransactions = async (opts: {
   params.set('pageSize', String(opts.pageSize ?? 50))
   params.set('status', 'FISCALIZED')
   params.set('includeCustomer', '1')
-  if (opts.transactionId) params.set('transactionId', opts.transactionId)
+  if (opts.search) params.set('search', opts.search)
   if (opts.startDate) params.set('startDate', opts.startDate)
   if (opts.endDate) params.set('endDate', opts.endDate)
 
@@ -84,6 +84,7 @@ const normalizeAdminRows = (items: any[]): FiscalizedTransactionListItem[] => {
     transactionDateTime:
       item?.transaction_date_time ?? item?.transactionDateTime ?? null,
     posReference: item?.pos_reference ?? item?.posReference ?? null,
+    receiptNumber: item?.receipt_number ?? item?.receiptNumber ?? null,
     cloudTransactionId:
       item?.cloud_transaction_id ?? item?.cloudTransactionId ?? null,
     pumpNumber: Number(item?.pump_number ?? item?.pumpNumber ?? 0),
@@ -188,7 +189,7 @@ const ManagerFiscalizedView = async ({
     redirect('/dashboard')
 
   const page = Number(readParam(searchParams, 'page') || '1') || 1
-  const transactionId = readParam(searchParams, 'transactionId').trim()
+  const q = readParam(searchParams, 'q').trim()
   const requestedStartDate = readParam(searchParams, 'startDate').trim()
   const requestedEndDate = readParam(searchParams, 'endDate').trim()
   const requestedPreset = readParam(searchParams, 'preset').trim()
@@ -206,7 +207,7 @@ const ManagerFiscalizedView = async ({
   const data = await loadManagerTransactions({
     page,
     pageSize: 50,
-    transactionId: transactionId || undefined,
+    search: q || undefined,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
   })
@@ -222,6 +223,7 @@ const ManagerFiscalizedView = async ({
     id: String((t as any)?.id ?? ''),
     fiscalizedAt:
       (t as any)?.fiscalized_at ?? (t as any)?.transaction_date_time ?? null,
+    receiptNumber: (t as any)?.receipt_number ?? null,
     pumpNumber: Number((t as any)?.pump_number ?? 0),
     totalAmount: Number((t as any)?.total_amount ?? 0),
     buyerName: (t as any)?.customer_buyer_name ?? null,
@@ -236,7 +238,7 @@ const ManagerFiscalizedView = async ({
       page: String(targetPage),
       preset,
     })
-    if (transactionId) params.set('transactionId', transactionId)
+    if (q) params.set('q', q)
     if (startDate) params.set('startDate', startDate)
     if (endDate) params.set('endDate', endDate)
     return `/transactions?${params.toString()}`
@@ -254,10 +256,10 @@ const ManagerFiscalizedView = async ({
 
       <ListToolbar
         baseActionPath="/transactions?status=fiscalized"
-        searchKey="transactionId"
-        searchPlaceholder="Transaction ID (optional)"
+        searchKey="q"
+        searchPlaceholder="Receipt number"
         initial={{
-          q: transactionId,
+          q,
           startDate,
           endDate,
           preset,

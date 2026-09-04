@@ -4,7 +4,7 @@ import type { TransactionBuilderProduct } from '@/components/transactions/Transa
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LockKeyhole, Pencil } from 'lucide-react'
+import { Ban, LockKeyhole, Pencil } from 'lucide-react'
 
 import { formatNumber } from '@/src/shared/utils/format'
 
@@ -47,6 +47,13 @@ const canEditItems = (transaction: TxnRow) =>
   isTransactionItemStatusEditable(transaction?.status) &&
   getTransactionItemEditability(transaction).editable
 
+const visibleTransactionDetails = (transaction: TxnRow) =>
+  Object.fromEntries(
+    Object.entries(transaction ?? {}).filter(
+      ([key]) => !['pos_reference', 'posReference'].includes(key),
+    ),
+  )
+
 export function ManagerNonFiscalizedTable(props: {
   rows: TxnRow[]
   products: TransactionBuilderProduct[]
@@ -64,6 +71,7 @@ export function ManagerNonFiscalizedTable(props: {
   const [allocateTxn, setAllocateTxn] = useState<TxnRow | null>(null)
   const [detailsTxn, setDetailsTxn] = useState<TxnRow | null>(null)
   const [editingTxn, setEditingTxn] = useState<TxnRow | null>(null)
+  const [cancelTxn, setCancelTxn] = useState<TxnRow | null>(null)
   const formatMoney = (value: any) =>
     formatNumber(value == null ? null : Number(value), props.decimals.money)
   const formatVolume = (value: any) =>
@@ -106,7 +114,7 @@ export function ManagerNonFiscalizedTable(props: {
           <TableRow>
             <TableHead>Date/Time</TableHead>
             <TableHead>Pump</TableHead>
-            <TableHead>POS Ref</TableHead>
+            <TableHead>Receipt number</TableHead>
             <TableHead>Fuel</TableHead>
             <TableHead>Volume</TableHead>
             <TableHead>Amount</TableHead>
@@ -143,7 +151,7 @@ export function ManagerNonFiscalizedTable(props: {
                   </Button>
                 </TableCell>
                 <TableCell>{t.pump_number ?? ''}</TableCell>
-                <TableCell>{t.pos_reference ?? '-'}</TableCell>
+                <TableCell>{t.receipt_number ?? '-'}</TableCell>
                 <TableCell>{t.fuel_type ?? '-'}</TableCell>
                 <TableCell>
                   {t.volume != null ? formatVolume(t.volume) : '-'}
@@ -217,6 +225,12 @@ export function ManagerNonFiscalizedTable(props: {
                           Pump fuel items are read-only
                         </DropdownMenuItem>
                       )}
+                      {normalizedStatus === 'FISCALIZING' ? (
+                        <DropdownMenuItem onSelect={() => setCancelTxn(t)}>
+                          <Ban className="mr-2 h-4 w-4" aria-hidden="true" />
+                          Cancel fiscalization attempt
+                        </DropdownMenuItem>
+                      ) : null}
                       <DropdownMenuItem
                         disabled={!canQueue}
                         onSelect={(event) => {
@@ -269,6 +283,48 @@ export function ManagerNonFiscalizedTable(props: {
       </Table>
 
       <Dialog
+        open={!!cancelTxn}
+        onOpenChange={(open) => !open && setCancelTxn(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel stuck fiscalization attempt?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+            <p>
+              This does not cancel the sale. It marks the current FISCALIZING
+              attempt as failed and clears its active proxy correlation so the
+              transaction can be manually fiscalized again.
+            </p>
+            {cancelTxn ? (
+              <Card className="bg-[var(--surface-muted)] p-3 text-xs">
+                <div>Transaction: {cancelTxn.id}</div>
+                <div>Receipt: {cancelTxn.receipt_number ?? '-'}</div>
+              </Card>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="secondary" size="sm">
+                Keep fiscalizing
+              </Button>
+            </DialogClose>
+            {cancelTxn ? (
+              <form
+                method="post"
+                action={`/api/transactions/${encodeURIComponent(cancelTxn.id)}/cancel-fiscalization`}
+              >
+                <CsrfHiddenInput token={csrfToken} />
+                <Button type="submit" variant="primary" size="sm">
+                  Cancel attempt
+                </Button>
+              </form>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={!!allocateTxn}
         onOpenChange={(open) => !open && setAllocateTxn(null)}
       >
@@ -296,10 +352,10 @@ export function ManagerNonFiscalizedTable(props: {
                   <span className="font-medium">Amount:</span>{' '}
                   {formatMoney(allocateTxn.total_amount)}
                 </div>
-                {allocateTxn.pos_reference ? (
+                {allocateTxn.receipt_number ? (
                   <div>
-                    <span className="font-medium">POS ref:</span>{' '}
-                    {allocateTxn.pos_reference}
+                    <span className="font-medium">Receipt number:</span>{' '}
+                    {allocateTxn.receipt_number}
                   </div>
                 ) : null}
               </Card>
@@ -345,7 +401,7 @@ export function ManagerNonFiscalizedTable(props: {
 
           {detailsTxn ? (
             <pre className="max-h-[60vh] overflow-auto rounded bg-[var(--surface-muted)] p-3 text-xs">
-              {JSON.stringify(detailsTxn, null, 2)}
+              {JSON.stringify(visibleTransactionDetails(detailsTxn), null, 2)}
             </pre>
           ) : null}
 
