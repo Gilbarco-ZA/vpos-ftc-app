@@ -36,7 +36,7 @@ const NonFiscalizedFiltersRow = ({
     <FiltersRow.Search
       value={search}
       onChange={onSearchChange}
-      placeholder="Search by POS reference or ID"
+      placeholder="Search by receipt number or ID"
     />
     <FiltersRow.Slot>
       <Select
