@@ -55,4 +55,21 @@ describe('offline proxy fiscalization detection', () => {
       false,
     )
   })
+
+  it('prefers a later final online result over an earlier offline submission', () => {
+    assert.equal(
+      isOfflineProxySubmission({
+        submission: {
+          responseCode: 'OFFLINE_SUCCESS',
+          details: { isOnline: false, isFiscalized: false },
+        },
+        final: {
+          responseCode: '200',
+          status: 'SUCCESS',
+          details: { isOnline: true, isFiscalized: true },
+        },
+      }),
+      false,
+    )
+  })
 })
