@@ -43,7 +43,7 @@ const FiscalizedFiltersRow = ({
     <FiltersRow.Search
       value={search}
       onChange={onSearchChange}
-      placeholder="Search POS reference, cloud ID, fiscal ref, or pump"
+      placeholder="Search receipt number, cloud ID, fiscal ref, or pump"
     />
     <FiltersRow.Slot width="min-w-[200px] flex-1">
       <Input
