@@ -48,6 +48,7 @@ import {
 export type ManagerFiscalizedRow = {
   id: string
   fiscalizedAt: string | null
+  receiptNumber: string | null
   pumpNumber: number
   totalAmount: number
   buyerName: string | null
@@ -194,7 +195,7 @@ export default function FiscalizedTransactionsManagerClient(props: {
               <TableHead>Amount</TableHead>
               <TableHead>Buyer</TableHead>
               <TableHead>TIN</TableHead>
-              <TableHead>Reference</TableHead>
+              <TableHead>Receipt number</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -215,7 +216,7 @@ export default function FiscalizedTransactionsManagerClient(props: {
                   {t.tin || '—'}
                 </TableCell>
                 <TableCell className="text-[var(--text-muted)]">
-                  {t.fiscalizationReference || '—'}
+                  {t.receiptNumber || '—'}
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
@@ -245,6 +246,17 @@ export default function FiscalizedTransactionsManagerClient(props: {
                         <Copy className="h-4 w-4" aria-hidden="true" />
                         Copy transaction ID
                       </DropdownMenuItem>
+                      {t.receiptNumber ? (
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            copyValue('Receipt number', t.receiptNumber ?? '')
+                          }
+                          className="gap-2"
+                        >
+                          <Copy className="h-4 w-4" aria-hidden="true" />
+                          Copy receipt number
+                        </DropdownMenuItem>
+                      ) : null}
                       {t.fiscalizationReference ? (
                         <DropdownMenuItem
                           onSelect={() =>
@@ -272,7 +284,7 @@ export default function FiscalizedTransactionsManagerClient(props: {
                 <TableCell colSpan={7} className="py-8">
                   <EmptyState
                     title="No fiscalized transactions"
-                    description="Try a different transaction ID or adjust the page."
+                    description="Try a different receipt number or adjust the page."
                   />
                 </TableCell>
               </TableRow>
@@ -310,7 +322,8 @@ export default function FiscalizedTransactionsManagerClient(props: {
                   Original transaction
                 </div>
                 <div className="mt-1 font-medium text-[var(--text-primary)]">
-                  {creditNoteTransaction.fiscalizationReference ||
+                  {creditNoteTransaction.receiptNumber ||
+                    creditNoteTransaction.fiscalizationReference ||
                     creditNoteTransaction.id}
                 </div>
                 <div className="mt-1 text-xs text-[var(--text-secondary)]">
