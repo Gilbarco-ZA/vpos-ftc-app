@@ -120,7 +120,7 @@ export function buildReceiptEscposLines(input: {
       const serializedQrRow = textValue(rows[index + 1])
       const qrData = qrOverride || serializedQrRow
       if (serializedQrRow) index += 1
-      if (!offlinePrint && qrData) lines.push({ type: 'qr', value: qrData })
+      if (qrData) lines.push({ type: 'qr', value: qrData })
       continue
     }
     if (!row) {
