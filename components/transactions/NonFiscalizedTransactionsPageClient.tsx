@@ -16,6 +16,7 @@ import {
 } from 'react'
 import {
   AlertTriangle,
+  Ban,
   Copy,
   FileText,
   LockKeyhole,
@@ -111,6 +112,7 @@ export const NonFiscalizedTransactionsRefreshButton = () => {
 
 type ConfirmAction =
   | { type: 'retry'; transaction: TransactionListItem }
+  | { type: 'cancel_fiscalization'; transaction: TransactionListItem }
   | { type: 'send_now'; transaction: TransactionListItem }
   | null
 
@@ -123,6 +125,9 @@ const errorPreviewTitle = (message: string) => {
 
 const canRetryFiscalization = (status: string) =>
   String(status || '').toUpperCase() === 'FAILED'
+
+const canCancelFiscalization = (status: string) =>
+  String(status || '').toUpperCase() === 'FISCALIZING'
 
 const canSendNow = (status: string) =>
   ['OPEN', 'ALLOCATED', 'FAILED', 'PENDING'].includes(
@@ -153,6 +158,7 @@ const mapTransactionRow = (item: any): TransactionListItem => ({
   transactionDateTime:
     item?.transaction_date_time ?? item?.transactionDateTime ?? null,
   posReference: item?.pos_reference ?? item?.posReference ?? null,
+  receiptNumber: item?.receipt_number ?? item?.receiptNumber ?? null,
   pumpNumber: Number(item?.pump_number ?? item?.pumpNumber ?? 0),
   fuelType: item?.fuel_type ?? item?.fuelType ?? null,
   volume: item?.volume ?? null,
@@ -314,6 +320,29 @@ const NonFiscalizedTransactionsPageClient = ({
     }
   }
 
+  const runCancelFiscalization = async (transaction: TransactionListItem) => {
+    setConfirmLoading(true)
+    try {
+      await postJson(
+        `/api/transactions/${transaction.id}/cancel-fiscalization`,
+        { csrf_token: csrfToken },
+      )
+      showToast(
+        'success',
+        'Fiscalization attempt cancelled. The transaction can now be retried.',
+      )
+      setConfirmAction(null)
+      await refresh()
+    } catch (err: any) {
+      showToast(
+        'error',
+        String(err?.message || 'Unable to cancel fiscalization attempt'),
+      )
+    } finally {
+      setConfirmLoading(false)
+    }
+  }
+
   const runSendNow = async (transaction: TransactionListItem) => {
     setConfirmLoading(true)
     try {
@@ -438,7 +467,7 @@ const NonFiscalizedTransactionsPageClient = ({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Transaction time</TableHead>
-                    <TableHead>POS reference</TableHead>
+                    <TableHead>Receipt number</TableHead>
                     <TableHead>Pump</TableHead>
                     <TableHead>Fuel type</TableHead>
                     <TableHead>Volume</TableHead>
@@ -455,7 +484,7 @@ const NonFiscalizedTransactionsPageClient = ({
                         {formatDate(row.transactionDateTime)}
                       </TableCell>
                       <TableCell className="text-[var(--text-secondary)]">
-                        {row.posReference ?? '—'}
+                        {row.receiptNumber ?? '—'}
                       </TableCell>
                       <TableCell>{row.pumpNumber}</TableCell>
                       <TableCell className="text-[var(--text-muted)]">
@@ -559,18 +588,18 @@ const NonFiscalizedTransactionsPageClient = ({
                               <Copy className="h-4 w-4" aria-hidden="true" />
                               Copy transaction ID
                             </DropdownMenuItem>
-                            {row.posReference ? (
+                            {row.receiptNumber ? (
                               <DropdownMenuItem
                                 onSelect={() =>
                                   copyValue(
-                                    'POS reference',
-                                    row.posReference ?? '',
+                                    'Receipt number',
+                                    row.receiptNumber ?? '',
                                   )
                                 }
                                 className="gap-2"
                               >
                                 <Copy className="h-4 w-4" aria-hidden="true" />
-                                Copy POS reference
+                                Copy receipt number
                               </DropdownMenuItem>
                             ) : null}
                             <DropdownMenuItem
@@ -588,6 +617,20 @@ const NonFiscalizedTransactionsPageClient = ({
                                 onSelect={() => setErrorTransaction(row)}
                               >
                                 View error
+                              </DropdownMenuItem>
+                            ) : null}
+                            {canCancelFiscalization(row.status) ? (
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  setConfirmAction({
+                                    type: 'cancel_fiscalization',
+                                    transaction: row,
+                                  })
+                                }
+                                className="gap-2"
+                              >
+                                <Ban className="h-4 w-4" aria-hidden="true" />
+                                Cancel fiscalization attempt
                               </DropdownMenuItem>
                             ) : null}
                             {canRetryTransaction(row) ? (
@@ -672,6 +715,9 @@ const NonFiscalizedTransactionsPageClient = ({
         onViewError={(txn) => setErrorTransaction(txn)}
         onCopy={copyValue}
         onRetry={(txn) => setConfirmAction({ type: 'retry', transaction: txn })}
+        onCancelFiscalization={(txn) =>
+          setConfirmAction({ type: 'cancel_fiscalization', transaction: txn })
+        }
         onSendNow={(txn) =>
           setConfirmAction({ type: 'send_now', transaction: txn })
         }
@@ -731,16 +777,26 @@ const NonFiscalizedTransactionsPageClient = ({
         title={
           confirmAction?.type === 'retry'
             ? 'Retry fiscalization?'
-            : 'Send transaction now?'
+            : confirmAction?.type === 'cancel_fiscalization'
+              ? 'Cancel stuck fiscalization attempt?'
+              : 'Send transaction now?'
         }
         description={
           confirmAction?.type === 'retry'
             ? 'This will re-queue the FAILED transaction for fiscalization and clear the last recorded error.'
-            : 'This will push the transaction into the fiscalization flow immediately.'
+            : confirmAction?.type === 'cancel_fiscalization'
+              ? 'This does not cancel the sale. It stops the current stuck fiscalization attempt, marks the transaction FAILED, and makes it available for a manual retry.'
+              : 'This will push the transaction into the fiscalization flow immediately.'
         }
-        confirmText={confirmAction?.type === 'retry' ? 'Retry' : 'Send now'}
+        confirmText={
+          confirmAction?.type === 'retry'
+            ? 'Retry'
+            : confirmAction?.type === 'cancel_fiscalization'
+              ? 'Cancel attempt'
+              : 'Send now'
+        }
         confirmVariant={
-          confirmAction?.type === 'retry' ? 'secondary' : 'primary'
+          confirmAction?.type === 'send_now' ? 'primary' : 'secondary'
         }
         loading={confirmLoading}
         onOpenChange={(open) => !open && setConfirmAction(null)}
@@ -748,6 +804,8 @@ const NonFiscalizedTransactionsPageClient = ({
           if (!confirmAction) return
           if (confirmAction.type === 'retry')
             return runRetry(confirmAction.transaction)
+          if (confirmAction.type === 'cancel_fiscalization')
+            return runCancelFiscalization(confirmAction.transaction)
           return runSendNow(confirmAction.transaction)
         }}
       />
