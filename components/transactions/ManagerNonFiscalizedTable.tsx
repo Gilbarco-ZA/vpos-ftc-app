@@ -47,6 +47,13 @@ const canEditItems = (transaction: TxnRow) =>
   isTransactionItemStatusEditable(transaction?.status) &&
   getTransactionItemEditability(transaction).editable
 
+const visibleTransactionDetails = (transaction: TxnRow) =>
+  Object.fromEntries(
+    Object.entries(transaction ?? {}).filter(
+      ([key]) => !['pos_reference', 'posReference'].includes(key),
+    ),
+  )
+
 export function ManagerNonFiscalizedTable(props: {
   rows: TxnRow[]
   products: TransactionBuilderProduct[]
@@ -394,7 +401,7 @@ export function ManagerNonFiscalizedTable(props: {
 
           {detailsTxn ? (
             <pre className="max-h-[60vh] overflow-auto rounded bg-[var(--surface-muted)] p-3 text-xs">
-              {JSON.stringify(detailsTxn, null, 2)}
+              {JSON.stringify(visibleTransactionDetails(detailsTxn), null, 2)}
             </pre>
           ) : null}
 
