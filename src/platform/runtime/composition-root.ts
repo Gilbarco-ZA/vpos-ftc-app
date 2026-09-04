@@ -15,6 +15,7 @@ import {
   startEwuraRetryRuntimeWorker,
   startForecourtConfigSyncRuntimeWorker,
   startInProcessRuntimeServices,
+  startOfflineReceiptPrintRuntimeWorker,
   startPosCommandsRuntimeWorker,
   startProxyFiscalSenderRuntimeWorker,
   startPssXmlSyncRuntimeWorker,
@@ -121,6 +122,9 @@ export function startDedicatedWorkerProcess() {
       toStopFn(
         startTransactionFiscalizationRuntimeWorker({ pollMs: txPollMs }),
       ),
+    )
+    stopFns.push(
+      toStopFn(startOfflineReceiptPrintRuntimeWorker({ pollMs: txPollMs })),
     )
     stopFns.push(
       toStopFn(startEwuraRetryRuntimeWorker({ pollMs: ewuraRetryPollMs })),
