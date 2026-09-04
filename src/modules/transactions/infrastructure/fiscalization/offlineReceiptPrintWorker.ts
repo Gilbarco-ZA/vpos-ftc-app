@@ -33,7 +33,12 @@ async function loadCandidates(stationId: string, limit: number) {
         AND t.deleted_at IS NULL
         AND t.status = 'FISCALIZING'
         AND ss.auto_print_receipts = TRUE
-        AND UPPER(BTRIM(COALESCE(fs.country, ''))) IN ('TZ', 'TZA', 'TANZANIA')
+        AND UPPER(BTRIM(COALESCE(fs.country, ''))) IN (
+          'TZ',
+          'TZA',
+          'TANZANIA',
+          'UNITED REPUBLIC OF TANZANIA'
+        )
         AND NOT EXISTS (
           SELECT 1
             FROM print_jobs pj
