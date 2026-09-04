@@ -2,13 +2,51 @@ import { queryOne } from '@/src/platform/db/postgres'
 
 import { enqueuePrintJob } from '@/src/modules/printing/application/enqueuePrintJob'
 import { buildReferencePrintJobPayload } from '@/src/modules/printing/domain/printJobPayload'
+import { isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/infrastructure/country'
 import { getOrCreateLatestTransactionReceiptRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction-read.repository'
+import { isOfflineProxySubmission } from './proxyOfflineSubmission'
 
 export type AutoPrintFiscalReceiptResult = {
   enabled: boolean
   enqueued: boolean
   receiptId: string | null
   printJobId: string | null
+}
+
+async function resolveOfflinePrint(input: {
+  stationId: string
+  transactionId: string
+  offlinePrint?: boolean
+}) {
+  if (input.offlinePrint != null) return input.offlinePrint === true
+
+  const context = await queryOne<{
+    country: string | null
+    response_payload: unknown
+  }>(
+    `SELECT fs.country,
+            event.response_payload
+       FROM transactions t
+       JOIN fuel_stations fs ON fs.id = t.station_id
+       LEFT JOIN LATERAL (
+         SELECT fe.response_payload
+           FROM fiscalization_events fe
+          WHERE fe.station_id = t.station_id
+            AND fe.transaction_id = t.id
+            AND fe.transport = 'proxy'
+          ORDER BY fe.occurred_at DESC, fe.created_at DESC
+          LIMIT 1
+       ) event ON TRUE
+      WHERE t.station_id = $1
+        AND t.id = $2::uuid
+      LIMIT 1`,
+    [input.stationId, input.transactionId],
+  )
+
+  return Boolean(
+    isTanzaniaCountry(context?.country) &&
+      isOfflineProxySubmission(context?.response_payload),
+  )
 }
 
 export async function enqueueAutoPrintFiscalReceipt(input: {
@@ -43,7 +81,7 @@ export async function enqueueAutoPrintFiscalReceipt(input: {
     )
   }
 
-  const offlinePrint = input.offlinePrint === true
+  const offlinePrint = await resolveOfflinePrint(input)
   const printJobId = await enqueuePrintJob(
     input.stationId,
     'print.receipt',
