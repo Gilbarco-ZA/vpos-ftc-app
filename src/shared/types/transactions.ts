@@ -104,7 +104,7 @@ export type TransactionListItem = {
   id: string
   transactionDateTime: string | null
   posReference: string | null
-  receiptNumber: string | null
+  receiptNumber?: string | null
   pumpNumber: number
   fuelType: string | null
   volume: number | null
@@ -127,7 +127,7 @@ export type FiscalizedTransactionListItem = {
   fiscalizedAt: string | null
   transactionDateTime: string | null
   posReference: string | null
-  receiptNumber: string | null
+  receiptNumber?: string | null
   cloudTransactionId: string | null
   pumpNumber: number
   fuelType: string | null
