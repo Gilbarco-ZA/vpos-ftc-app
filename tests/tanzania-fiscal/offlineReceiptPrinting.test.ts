@@ -31,7 +31,7 @@ describe('Tanzania offline receipt printing', () => {
     })
   })
 
-  it('suppresses QR output on an offline print', () => {
+  it('preserves receipt QR output on an offline print', () => {
     const lines = buildReceiptEscposLines({
       country: 'TZ',
       plainText: '[QR]\nhttps://verify.example.test/receipt',
@@ -39,7 +39,7 @@ describe('Tanzania offline receipt printing', () => {
       offlinePrint: true,
     })
 
-    assert.equal(lines.some((line) => line.type === 'qr'), false)
+    assert.equal(lines.some((line) => line.type === 'qr'), true)
     assert.equal(
       lines.some(
         (line) => line.type === 'text' && line.value === 'OFFLINE PRINT',
