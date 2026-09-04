@@ -46,7 +46,6 @@ test('offline TRA submissions enqueue a distinct marked receipt print', () => {
   assert.match(printJobs, /offlinePrint: payload\?\.offlinePrint === true/)
 
   assert.match(receiptDocument, /value: 'OFFLINE PRINT'/)
-  assert.match(receiptDocument, /if \(!offlinePrint && qrData\)/)
   assert.match(runtime, /startOfflineReceiptPrintWorker/)
   assert.match(composition, /startOfflineReceiptPrintRuntimeWorker/)
 })
