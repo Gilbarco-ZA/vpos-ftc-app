@@ -28,7 +28,11 @@ const receiptNumberJoinSql = `
           NULLIF(BTRIM(fe.response_payload #>> '{final,details,receipt,receiptNumber}'), ''),
           NULLIF(BTRIM(fe.response_payload #>> '{final,details,receiptNumber}'), ''),
           NULLIF(BTRIM(fe.response_payload #>> '{submission,details,receipt,receiptNumber}'), ''),
-          NULLIF(BTRIM(fe.response_payload #>> '{submission,details,receiptNumber}'), '')
+          NULLIF(BTRIM(fe.response_payload #>> '{submission,details,receiptNumber}'), ''),
+          NULLIF(BTRIM(fe.request_payload #>> '{tra,receiptNo}'), ''),
+          NULLIF(BTRIM(fe.request_payload #>> '{tra,globalCount}'), ''),
+          NULLIF(BTRIM(fe.request_payload #>> '{tanzania,receiptNumber}'), ''),
+          NULLIF(BTRIM(fe.request_payload #>> '{tanzania,globalCounter}'), '')
         )
           FROM fiscalization_events fe
          WHERE fe.station_id = t.station_id
@@ -123,6 +127,7 @@ function buildFilter(
     conditions.push(`(
       t.id::text ILIKE ${token}
       OR COALESCE(receipt_info.receipt_number, '') ILIKE ${token}
+      OR COALESCE(t.cloud_transaction_id::text, '') ILIKE ${token}
       OR COALESCE(t.fiscalization_reference, '') ILIKE ${token}
       OR COALESCE(t.fuel_type, '') ILIKE ${token}
       OR COALESCE(c.buyer_name, '') ILIKE ${token}
