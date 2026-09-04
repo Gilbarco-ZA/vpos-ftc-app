@@ -51,8 +51,9 @@ const FINAL_STATUSES = new Set([
 const isClearlyFinalOnline = (envelope: Record<string, any>) => {
   if (responseCodeOf(envelope) === 'OFFLINE_SUCCESS') return false
   const { isOnline, isFiscalized } = onlineStateOf(envelope)
-  if (isFiscalized === true && isOnline !== false) return true
-  return isOnline === true && FINAL_STATUSES.has(statusOf(envelope))
+  if (isOnline === false && isFiscalized !== true) return false
+  if (isFiscalized === true) return true
+  return FINAL_STATUSES.has(statusOf(envelope))
 }
 
 const candidateEnvelopes = (value: unknown) => {
