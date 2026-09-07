@@ -21,6 +21,7 @@ export type TankOption = {
 export type NozzleItem = {
   id: string
   nozzleNumber: number
+  displayNumber: number
   tankId: string
   tankName: string
   productName: string
@@ -43,6 +44,7 @@ export type TankListResponse = {
 export type NozzleFormState = {
   id?: string
   nozzleNumber: string
+  displayNumber: string
   tankId: string
 }
 
