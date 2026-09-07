@@ -6,13 +6,20 @@ import {
 } from '@/src/platform/db/postgres'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
-import type { TanzaniaReceiptVerificationPrefixMode } from '../domain/receiptVerificationPrefix'
+import type {
+  TanzaniaReceiptVerificationPrefixMode,
+  TanzaniaReceiptVerificationUrlMode,
+} from '../domain/receiptVerificationPrefix'
 import { calculateTanzaniaGrossTotal } from '../domain/grossTotal'
 import {
   DEFAULT_TANZANIA_RECEIPT_VERIFICATION_PREFIX_MODE,
+  DEFAULT_TANZANIA_RECEIPT_VERIFICATION_URL_MODE,
   normalizeTanzaniaReceiptVerificationPrefixOverride,
+  normalizeTanzaniaReceiptVerificationUrlOverride,
   resolveTanzaniaReceiptVerificationPrefix,
+  resolveTanzaniaReceiptVerificationUrlBase,
 } from '../domain/receiptVerificationPrefix'
+import { getRegisteredTanzaniaReceiptCode } from './registeredReceiptCode'
 
 type GrossTotalRow = {
   opening_gross_total: string | number | null
@@ -24,6 +31,8 @@ type GrossTotalRow = {
   device_id_override: string | null
   receipt_verification_prefix_mode: TanzaniaReceiptVerificationPrefixMode | null
   receipt_verification_prefix_override: string | null
+  receipt_verification_url_mode: TanzaniaReceiptVerificationUrlMode | null
+  receipt_verification_url_override: string | null
 }
 
 export type TanzaniaGrossTotalSummary = {
@@ -36,9 +45,13 @@ export type TanzaniaGrossTotalSummary = {
   globalCounter: number
   dailyCounterDate: string | null
   deviceIdOverride: string | null
+  registeredReceiptCode: string | null
   receiptVerificationPrefixMode: TanzaniaReceiptVerificationPrefixMode
   receiptVerificationPrefixOverride: string | null
-  effectiveReceiptVerificationPrefix: string
+  effectiveReceiptVerificationPrefix: string | null
+  receiptVerificationUrlMode: TanzaniaReceiptVerificationUrlMode
+  receiptVerificationUrlOverride: string | null
+  effectiveReceiptVerificationUrlBase: string
 }
 
 export type TanzaniaFiscalOpeningValues = {
@@ -48,6 +61,8 @@ export type TanzaniaFiscalOpeningValues = {
   deviceIdOverride?: string | null
   receiptVerificationPrefixMode?: TanzaniaReceiptVerificationPrefixMode
   receiptVerificationPrefixOverride?: string | null
+  receiptVerificationUrlMode?: TanzaniaReceiptVerificationUrlMode
+  receiptVerificationUrlOverride?: string | null
 }
 
 const money = (value: unknown): number => {
@@ -63,72 +78,42 @@ const counter = (value: unknown): number => {
 export async function getTanzaniaGrossTotalSummary(
   stationId: string,
 ): Promise<TanzaniaGrossTotalSummary> {
-  const row = await queryOne<GrossTotalRow>(
-    `WITH station_context AS (
-       SELECT COALESCE(
-                NULLIF(BTRIM(fs.timezone), ''),
-                'Africa/Dar_es_Salaam'
-              ) AS timezone
-         FROM fuel_stations fs
-        WHERE fs.id = $1::uuid
-     ),
-     counter_context AS (
-       SELECT TO_CHAR(
-                CURRENT_TIMESTAMP AT TIME ZONE sc.timezone,
-                'YYYY-MM-DD'
-              ) AS daily_counter_date,
-              'receipt:' || TO_CHAR(
-                CURRENT_TIMESTAMP AT TIME ZONE sc.timezone,
-                'YYYYMMDD'
-              ) AS daily_counter_key
-         FROM station_context sc
-     )
-     SELECT COALESCE(
-              (SELECT ss.tanzania_gross_total_opening
-                 FROM station_settings ss
-                WHERE ss.station_id = $1::uuid),
-              0
-            ) AS opening_gross_total,
-            (SELECT ss.tanzania_gross_total_opening_captured_at
-               FROM station_settings ss
-              WHERE ss.station_id = $1::uuid) AS opening_gross_total_captured_at,
-            COALESCE(SUM(t.total_amount), 0) AS local_fiscal_turnover,
-            COALESCE(
-              (SELECT tc.counter_value
-                 FROM tanzania_fiscal_counters tc
-                WHERE tc.station_id = $1::uuid
-                  AND tc.counter_key = 'receipt:global'),
-              0
-            ) AS global_counter,
-            COALESCE(
-              (SELECT tc.counter_value
-                 FROM tanzania_fiscal_counters tc
-                WHERE tc.station_id = $1::uuid
-                  AND tc.counter_key = cc.daily_counter_key),
-              0
-            ) AS daily_counter,
-            cc.daily_counter_date,
-            (SELECT NULLIF(BTRIM(ss.tanzania_device_id_override), '')
-               FROM station_settings ss
-              WHERE ss.station_id = $1::uuid) AS device_id_override,
-            (SELECT ss.tanzania_receipt_verification_prefix_mode
-               FROM station_settings ss
-              WHERE ss.station_id = $1::uuid) AS receipt_verification_prefix_mode,
-            (SELECT ss.tanzania_receipt_verification_prefix_override
-               FROM station_settings ss
-              WHERE ss.station_id = $1::uuid) AS receipt_verification_prefix_override
-       FROM counter_context cc
-       LEFT JOIN transactions t
-         ON t.station_id = $1::uuid
-        AND t.deleted_at IS NULL
-        AND t.status IN ('FISCALIZED', 'PRINTED', 'REPRINTED', 'CREDITED')
-      GROUP BY cc.daily_counter_date, cc.daily_counter_key`,
-    [stationId],
-  )
+  const [row, registeredReceiptCode] = await Promise.all([
+    queryOne<GrossTotalRow>(
+      `WITH station_context AS (
+         SELECT COALESCE(NULLIF(BTRIM(fs.timezone), ''), 'Africa/Dar_es_Salaam') AS timezone
+           FROM fuel_stations fs
+          WHERE fs.id = $1::uuid
+       ),
+       counter_context AS (
+         SELECT TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE sc.timezone, 'YYYY-MM-DD') AS daily_counter_date,
+                'receipt:' || TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE sc.timezone, 'YYYYMMDD') AS daily_counter_key
+           FROM station_context sc
+       )
+       SELECT COALESCE((SELECT ss.tanzania_gross_total_opening FROM station_settings ss WHERE ss.station_id = $1::uuid), 0) AS opening_gross_total,
+              (SELECT ss.tanzania_gross_total_opening_captured_at FROM station_settings ss WHERE ss.station_id = $1::uuid) AS opening_gross_total_captured_at,
+              COALESCE(SUM(t.total_amount), 0) AS local_fiscal_turnover,
+              COALESCE((SELECT tc.counter_value FROM tanzania_fiscal_counters tc WHERE tc.station_id = $1::uuid AND tc.counter_key = 'receipt:global'), 0) AS global_counter,
+              COALESCE((SELECT tc.counter_value FROM tanzania_fiscal_counters tc WHERE tc.station_id = $1::uuid AND tc.counter_key = cc.daily_counter_key), 0) AS daily_counter,
+              cc.daily_counter_date,
+              (SELECT NULLIF(BTRIM(ss.tanzania_device_id_override), '') FROM station_settings ss WHERE ss.station_id = $1::uuid) AS device_id_override,
+              (SELECT ss.tanzania_receipt_verification_prefix_mode FROM station_settings ss WHERE ss.station_id = $1::uuid) AS receipt_verification_prefix_mode,
+              (SELECT ss.tanzania_receipt_verification_prefix_override FROM station_settings ss WHERE ss.station_id = $1::uuid) AS receipt_verification_prefix_override,
+              (SELECT ss.tanzania_receipt_verification_url_mode FROM station_settings ss WHERE ss.station_id = $1::uuid) AS receipt_verification_url_mode,
+              (SELECT ss.tanzania_receipt_verification_url_override FROM station_settings ss WHERE ss.station_id = $1::uuid) AS receipt_verification_url_override
+         FROM counter_context cc
+         LEFT JOIN transactions t
+           ON t.station_id = $1::uuid
+          AND t.deleted_at IS NULL
+          AND t.status IN ('FISCALIZED', 'PRINTED', 'REPRINTED', 'CREDITED')
+        GROUP BY cc.daily_counter_date, cc.daily_counter_key`,
+      [stationId],
+    ),
+    getRegisteredTanzaniaReceiptCode(stationId),
+  ])
 
   const openingGrossTotal = money(row?.opening_gross_total)
   const localFiscalTurnover = money(row?.local_fiscal_turnover)
-
   const capturedAt = row?.opening_gross_total_captured_at
     ? new Date(row.opening_gross_total_captured_at).toISOString()
     : null
@@ -137,6 +122,20 @@ export async function getTanzaniaGrossTotalSummary(
     DEFAULT_TANZANIA_RECEIPT_VERIFICATION_PREFIX_MODE
   const receiptVerificationPrefixOverride =
     row?.receipt_verification_prefix_override ?? null
+  const receiptVerificationUrlMode =
+    row?.receipt_verification_url_mode ??
+    DEFAULT_TANZANIA_RECEIPT_VERIFICATION_URL_MODE
+  const receiptVerificationUrlOverride =
+    row?.receipt_verification_url_override ?? null
+
+  let effectiveReceiptVerificationPrefix: string | null = null
+  try {
+    effectiveReceiptVerificationPrefix = resolveTanzaniaReceiptVerificationPrefix({
+      mode: receiptVerificationPrefixMode,
+      registeredReceiptCode,
+      override: receiptVerificationPrefixOverride,
+    })
+  } catch {}
 
   return {
     openingGrossTotal,
@@ -151,13 +150,16 @@ export async function getTanzaniaGrossTotalSummary(
     globalCounter: counter(row?.global_counter),
     dailyCounterDate: row?.daily_counter_date ?? null,
     deviceIdOverride: row?.device_id_override ?? null,
+    registeredReceiptCode,
     receiptVerificationPrefixMode,
     receiptVerificationPrefixOverride,
-    effectiveReceiptVerificationPrefix:
-      resolveTanzaniaReceiptVerificationPrefix({
-        mode: receiptVerificationPrefixMode,
-        override: receiptVerificationPrefixOverride,
-      }),
+    effectiveReceiptVerificationPrefix,
+    receiptVerificationUrlMode,
+    receiptVerificationUrlOverride,
+    effectiveReceiptVerificationUrlBase: resolveTanzaniaReceiptVerificationUrlBase({
+      mode: receiptVerificationUrlMode,
+      override: receiptVerificationUrlOverride,
+    }),
   }
 }
 
@@ -176,7 +178,6 @@ export async function setTanzaniaGrossTotalOpening(
                    updated_at = NOW()`,
     [uuidv4(), stationId, openingGrossTotal],
   )
-
   return await getTanzaniaGrossTotalSummary(stationId)
 }
 
@@ -187,6 +188,10 @@ export async function setTanzaniaFiscalOpeningValues(
   const shouldUpdateReceiptPrefix =
     values.receiptVerificationPrefixMode !== undefined ||
     values.receiptVerificationPrefixOverride !== undefined
+  const shouldUpdateReceiptUrl =
+    values.receiptVerificationUrlMode !== undefined ||
+    values.receiptVerificationUrlOverride !== undefined
+
   if (
     values.receiptVerificationPrefixOverride !== undefined &&
     values.receiptVerificationPrefixMode === undefined
@@ -195,6 +200,15 @@ export async function setTanzaniaFiscalOpeningValues(
       'Receipt verification prefix mode is required when updating the override.',
     )
   }
+  if (
+    values.receiptVerificationUrlOverride !== undefined &&
+    values.receiptVerificationUrlMode === undefined
+  ) {
+    throw new Error(
+      'Receipt verification URL mode is required when updating the manual URL.',
+    )
+  }
+
   const receiptVerificationPrefixMode =
     values.receiptVerificationPrefixMode ??
     DEFAULT_TANZANIA_RECEIPT_VERIFICATION_PREFIX_MODE
@@ -204,10 +218,26 @@ export async function setTanzaniaFiscalOpeningValues(
       : normalizeTanzaniaReceiptVerificationPrefixOverride(
           values.receiptVerificationPrefixOverride,
         )
-  if (shouldUpdateReceiptPrefix) {
+  if (shouldUpdateReceiptPrefix && receiptVerificationPrefixMode === 'manual') {
     resolveTanzaniaReceiptVerificationPrefix({
-      mode: receiptVerificationPrefixMode,
+      mode: 'manual',
       override: receiptVerificationPrefixOverride,
+    })
+  }
+
+  const receiptVerificationUrlMode =
+    values.receiptVerificationUrlMode ??
+    DEFAULT_TANZANIA_RECEIPT_VERIFICATION_URL_MODE
+  const receiptVerificationUrlOverride =
+    values.receiptVerificationUrlOverride === undefined
+      ? null
+      : normalizeTanzaniaReceiptVerificationUrlOverride(
+          values.receiptVerificationUrlOverride,
+        )
+  if (shouldUpdateReceiptUrl) {
+    resolveTanzaniaReceiptVerificationUrlBase({
+      mode: receiptVerificationUrlMode,
+      override: receiptVerificationUrlOverride,
     })
   }
 
@@ -215,10 +245,7 @@ export async function setTanzaniaFiscalOpeningValues(
     const counterContext = await txQuery<{ daily_counter_key: string }>(
       client,
       `SELECT 'receipt:' || TO_CHAR(
-                CURRENT_TIMESTAMP AT TIME ZONE COALESCE(
-                  NULLIF(BTRIM(fs.timezone), ''),
-                  'Africa/Dar_es_Salaam'
-                ),
+                CURRENT_TIMESTAMP AT TIME ZONE COALESCE(NULLIF(BTRIM(fs.timezone), ''), 'Africa/Dar_es_Salaam'),
                 'YYYYMMDD'
               ) AS daily_counter_key
          FROM fuel_stations fs
@@ -227,9 +254,7 @@ export async function setTanzaniaFiscalOpeningValues(
       [stationId],
     )
     const dailyCounterKey = counterContext.rows?.[0]?.daily_counter_key
-    if (!dailyCounterKey) {
-      throw new Error(`Station ${stationId} not found`)
-    }
+    if (!dailyCounterKey) throw new Error(`Station ${stationId} not found`)
 
     await txQuery(
       client,
@@ -247,40 +272,32 @@ export async function setTanzaniaFiscalOpeningValues(
     if (values.globalCounter != null) {
       await txQuery(
         client,
-        `INSERT INTO tanzania_fiscal_counters (
-           station_id, counter_key, counter_value
-         ) VALUES ($1::uuid, 'receipt:global', $2)
+        `INSERT INTO tanzania_fiscal_counters (station_id, counter_key, counter_value)
+         VALUES ($1::uuid, 'receipt:global', $2)
          ON CONFLICT (station_id, counter_key)
-         DO UPDATE SET counter_value = EXCLUDED.counter_value,
-                       updated_at = NOW()`,
+         DO UPDATE SET counter_value = EXCLUDED.counter_value, updated_at = NOW()`,
         [stationId, values.globalCounter],
       )
     }
-
     if (values.dailyCounter != null) {
       await txQuery(
         client,
-        `INSERT INTO tanzania_fiscal_counters (
-           station_id, counter_key, counter_value
-         ) VALUES ($1::uuid, $2, $3)
+        `INSERT INTO tanzania_fiscal_counters (station_id, counter_key, counter_value)
+         VALUES ($1::uuid, $2, $3)
          ON CONFLICT (station_id, counter_key)
-         DO UPDATE SET counter_value = EXCLUDED.counter_value,
-                       updated_at = NOW()`,
+         DO UPDATE SET counter_value = EXCLUDED.counter_value, updated_at = NOW()`,
         [stationId, dailyCounterKey, values.dailyCounter],
       )
     }
-
     if (values.deviceIdOverride !== undefined) {
       await txQuery(
         client,
         `UPDATE station_settings
-            SET tanzania_device_id_override = $2,
-                updated_at = NOW()
+            SET tanzania_device_id_override = $2, updated_at = NOW()
           WHERE station_id = $1::uuid`,
         [stationId, values.deviceIdOverride],
       )
     }
-
     if (shouldUpdateReceiptPrefix) {
       await txQuery(
         client,
@@ -289,11 +306,18 @@ export async function setTanzaniaFiscalOpeningValues(
                 tanzania_receipt_verification_prefix_override = $3,
                 updated_at = NOW()
           WHERE station_id = $1::uuid`,
-        [
-          stationId,
-          receiptVerificationPrefixMode,
-          receiptVerificationPrefixOverride,
-        ],
+        [stationId, receiptVerificationPrefixMode, receiptVerificationPrefixOverride],
+      )
+    }
+    if (shouldUpdateReceiptUrl) {
+      await txQuery(
+        client,
+        `UPDATE station_settings
+            SET tanzania_receipt_verification_url_mode = $2,
+                tanzania_receipt_verification_url_override = $3,
+                updated_at = NOW()
+          WHERE station_id = $1::uuid`,
+        [stationId, receiptVerificationUrlMode, receiptVerificationUrlOverride],
       )
     }
   })
