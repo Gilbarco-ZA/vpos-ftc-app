@@ -9,9 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorDetails } from '@/components/ui/error-details'
 import { Skeleton } from '@/components/ui/skeleton'
 
-import { AutoPrintReceiptsForm } from './AutoPrintReceiptsForm'
 import { DecimalSettingsForm } from './DecimalSettingsForm'
-import { LinkingWindowForm } from './LinkingWindowForm'
 import { WorkflowOrderingForm } from './WorkflowOrderingForm'
 
 type AdminSettings = {
@@ -118,8 +116,8 @@ export default function AdminSettingsClient() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-[var(--text-secondary)]">
-            Choose when receipts print and whether the tenant captures the
-            customer before or after fuel is dispensed.
+            Configure customer/TIN capture timing, the linking window, and
+            automatic receipt printing as one transaction lifecycle policy.
           </p>
           <WorkflowOrderingForm
             printReceiptOrder={
@@ -132,21 +130,9 @@ export default function AdminSettingsClient() {
                 ? 'before_transaction'
                 : 'after_transaction'
             }
+            linkingWindowSeconds={linkingWindowSeconds}
+            autoPrintReceipts={settings?.auto_print_receipts === true}
           />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Linking window</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-[var(--text-secondary)]">
-            When TIN capture is after the pump transaction, the linking window
-            determines how long we wait to allocate a customer before
-            auto-fiscalizing without buyer information.
-          </p>
-          <LinkingWindowForm currentSeconds={linkingWindowSeconds} />
         </CardContent>
       </Card>
 
@@ -160,21 +146,6 @@ export default function AdminSettingsClient() {
             prices, and volumes across printed receipts and previews.
           </p>
           <DecimalSettingsForm currentDecimals={decimalSettings} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Receipt printing</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-[var(--text-secondary)]">
-            Enable automatic receipt printing. The transaction workflow setting
-            above determines whether it occurs before or after fiscalization.
-          </p>
-          <AutoPrintReceiptsForm
-            enabled={settings?.auto_print_receipts === true}
-          />
         </CardContent>
       </Card>
 
