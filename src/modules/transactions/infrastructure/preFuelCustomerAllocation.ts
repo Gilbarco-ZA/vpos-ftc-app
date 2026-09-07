@@ -18,6 +18,19 @@ export type PreFuelCustomerAllocation = {
   tin?: string | null
 }
 
+export async function getTinCaptureOrderRepo(stationId: string) {
+  const row = await queryOne<{ tin_capture_order: string | null }>(
+    `SELECT tin_capture_order
+       FROM station_settings
+      WHERE station_id = $1::uuid
+      LIMIT 1`,
+    [stationId],
+  )
+  return row?.tin_capture_order === 'before_transaction'
+    ? 'before_transaction'
+    : 'after_transaction'
+}
+
 export async function createPreFuelCustomerAllocation(input: {
   stationId: string
   pumpNumber: number
