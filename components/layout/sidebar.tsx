@@ -30,7 +30,7 @@ export const getNavSections = (
     label: 'Daily Operations',
     items: [
       { label: 'POS', href: '/pos' },
-      ...(role === 'tenant' && tinCaptureOrder === 'before_transaction'
+      ...(tinCaptureOrder === 'before_transaction'
         ? [{ label: 'TIN Allocation', href: '/tin-allocation' }]
         : []),
       { label: 'Transactions', href: '/transactions' },
