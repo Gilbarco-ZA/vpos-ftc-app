@@ -6,6 +6,7 @@ export async function listFuelOptions(stationId: string) {
             p.pump_number AS "pumpNumber",
             n.id AS "nozzleId",
             n.nozzle_number AS "nozzleNumber",
+            COALESCE(n.display_number, n.nozzle_number) AS "displayNumber",
             t.id AS "tankId",
             COALESCE(t.name, t.code, 'Tank') AS "tankName",
             pr.id AS "productRowId",
@@ -18,7 +19,7 @@ export async function listFuelOptions(stationId: string) {
        LEFT JOIN products pr ON pr.id = t.product_id AND pr.station_id = t.station_id
       WHERE p.station_id = $1
         AND p.status <> 'INACTIVE'
-      ORDER BY p.pump_number ASC, n.nozzle_number ASC`,
+      ORDER BY p.pump_number ASC, COALESCE(n.display_number, n.nozzle_number) ASC`,
     [stationId],
   )
   return rows.map((row) => ({
@@ -26,6 +27,7 @@ export async function listFuelOptions(stationId: string) {
     pumpNumber: Number(row.pumpNumber ?? 0),
     nozzleId: row.nozzleId ? String(row.nozzleId) : null,
     nozzleNumber: row.nozzleNumber == null ? null : Number(row.nozzleNumber),
+    displayNumber: row.displayNumber == null ? null : Number(row.displayNumber),
     tankId: row.tankId ? String(row.tankId) : null,
     tankName: row.tankName ? String(row.tankName) : null,
     productRowId: row.productRowId ? String(row.productRowId) : null,
