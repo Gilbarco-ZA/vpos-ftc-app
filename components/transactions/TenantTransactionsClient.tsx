@@ -26,6 +26,20 @@ import {
 
 type Txn = Record<string, any>
 type Cust = Record<string, any>
+type FuelOption = {
+  nozzleId?: string | null
+  nozzleNumber: number
+  pumpNumber: number
+  gradeName?: string | null
+  productCode?: string | null
+}
+type PendingAllocation = {
+  id: string
+  pump_number: number
+  nozzle_number: number
+  buyer_name?: string | null
+  tin?: string | null
+}
 
 function remainingSeconds(
   expiresAt: string | null | undefined,
@@ -37,6 +51,25 @@ function remainingSeconds(
   const diff = Math.ceil((t - nowMs) / 1000)
   return diff > 0 ? diff : 0
 }
+
+const customerRows = (data: any): Cust[] => {
+  const payload = data?.data ?? data
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.rows)) return payload.rows
+  return []
+}
+
+const customerName = (customer: Cust) =>
+  String(
+    customer?.buyerName ??
+      customer?.buyer_name ??
+      customer?.trade_name ??
+      customer?.businessName ??
+      customer?.business_name ??
+      customer?.tin ??
+      customer?.id ??
+      '',
+  )
 
 export default function TenantTransactionsClient(props: {
   initial: Txn[]
@@ -51,6 +84,16 @@ export default function TenantTransactionsClient(props: {
   const [customers, setCustomers] = useState<Cust[]>([])
   const [loadingCustomers, setLoadingCustomers] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [captureOrder, setCaptureOrder] = useState<
+    'before_transaction' | 'after_transaction' | null
+  >(null)
+  const [fuelOptions, setFuelOptions] = useState<FuelOption[]>([])
+  const [pending, setPending] = useState<PendingAllocation[]>([])
+  const [selectedFuel, setSelectedFuel] = useState('')
+  const [selectedCustomer, setSelectedCustomer] = useState('')
+  const [authorizing, setAuthorizing] = useState(false)
+
   const formatMoney = (value: any) =>
     formatNumber(value == null ? null : Number(value), props.decimals.money)
 
@@ -63,9 +106,32 @@ export default function TenantTransactionsClient(props: {
         cache: 'no-store',
       })
       const data = await res.json().catch(() => ({}))
-      setTxns(data?.data || data || [])
+      const payload = data?.data ?? data
+      setTxns(Array.isArray(payload?.items) ? payload.items : payload || [])
     } catch {}
   }
+
+  const refreshPreFuelState = async () => {
+    const [stateResponse, fuelResponse] = await Promise.all([
+      fetch('/api/transactions/pre-fuel-customer', { cache: 'no-store' }),
+      fetch('/api/transactions/fuel-options', { cache: 'no-store' }),
+    ])
+    const stateBody = await stateResponse.json().catch(() => ({}))
+    const fuelBody = await fuelResponse.json().catch(() => ({}))
+    const state = stateBody?.data ?? stateBody
+    const fuels = fuelBody?.data ?? fuelBody
+    setCaptureOrder(
+      state?.captureOrder === 'before_transaction'
+        ? 'before_transaction'
+        : 'after_transaction',
+    )
+    setPending(Array.isArray(state?.allocations) ? state.allocations : [])
+    setFuelOptions(Array.isArray(fuels?.options) ? fuels.options : [])
+  }
+
+  useEffect(() => {
+    void refreshPreFuelState().catch(() => setCaptureOrder('after_transaction'))
+  }, [])
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000)
@@ -83,12 +149,10 @@ export default function TenantTransactionsClient(props: {
       try {
         const res = await fetch(
           `/api/customers?q=${encodeURIComponent(term)}`,
-          {
-            cache: 'no-store',
-          },
+          { cache: 'no-store' },
         )
         const data = await res.json().catch(() => [])
-        setCustomers(Array.isArray(data?.data) ? data.data : data)
+        setCustomers(customerRows(data))
       } catch {
         setCustomers([])
       } finally {
@@ -104,6 +168,203 @@ export default function TenantTransactionsClient(props: {
       remaining: remainingSeconds(t.linking_window_expires_at, nowMs),
     }))
   }, [txns, nowMs])
+
+  const authorizePreFuel = async () => {
+    if (!csrfToken || !selectedFuel || !selectedCustomer || authorizing) return
+    const fuel = fuelOptions.find(
+      (option) => `${option.pumpNumber}:${option.nozzleNumber}` === selectedFuel,
+    )
+    if (!fuel) return
+
+    setAuthorizing(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const response = await fetch('/api/transactions/pre-fuel-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
+        body: JSON.stringify({
+          pumpNumber: fuel.pumpNumber,
+          nozzleNumber: fuel.nozzleNumber,
+          nozzleId: fuel.nozzleId,
+          customerId: selectedCustomer,
+        }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok || body?.ok === false) {
+        throw new Error(body?.error?.message ?? 'Unable to authorize nozzle')
+      }
+      setSuccess(
+        `Customer allocated to Pump ${fuel.pumpNumber} / Nozzle ${fuel.nozzleNumber}. Dispensing is authorized.`,
+      )
+      setSelectedFuel('')
+      setSelectedCustomer('')
+      setQ('')
+      setCustomers([])
+      await refreshPreFuelState()
+    } catch (reason: any) {
+      setError(reason?.message ?? String(reason))
+    } finally {
+      setAuthorizing(false)
+    }
+  }
+
+  const cancelPreFuel = async (allocation: PendingAllocation) => {
+    if (!csrfToken) return
+    setError(null)
+    setSuccess(null)
+    try {
+      const response = await fetch('/api/transactions/pre-fuel-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
+        body: JSON.stringify({ action: 'cancel', allocationId: allocation.id }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok || body?.ok === false) {
+        throw new Error(body?.error?.message ?? 'Unable to cancel allocation')
+      }
+      setSuccess('Pre-fuel customer allocation cancelled.')
+      await refreshPreFuelState()
+    } catch (reason: any) {
+      setError(reason?.message ?? String(reason))
+    }
+  }
+
+  if (captureOrder === 'before_transaction') {
+    return (
+      <div className="space-y-4">
+        <CsrfBootstrap onToken={setCsrfToken} />
+        {error ? <Alert variant={STATUS_VARIANT.ERROR}>{error}</Alert> : null}
+        {success ? (
+          <Alert variant={STATUS_VARIANT.SUCCESS}>{success}</Alert>
+        ) : null}
+
+        <Card className="space-y-4 p-4">
+          <div>
+            <div className="text-base font-semibold text-[var(--text-primary)]">
+              Pre-transaction customer capture
+            </div>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Select the customer and exact nozzle before dispensing. The
+              customer will be attached to the next transaction from that
+              nozzle before fiscalization.
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <div className="text-sm font-medium text-[var(--text-primary)]">
+                Nozzle
+              </div>
+              <Select
+                className="mt-1"
+                value={selectedFuel}
+                onChange={(event) => setSelectedFuel(event.target.value)}
+              >
+                <option value="">Select pump / nozzle...</option>
+                {fuelOptions.map((option) => (
+                  <option
+                    key={`${option.pumpNumber}:${option.nozzleNumber}`}
+                    value={`${option.pumpNumber}:${option.nozzleNumber}`}
+                  >
+                    Pump {option.pumpNumber} / Nozzle {option.nozzleNumber}
+                    {option.gradeName ? ` — ${option.gradeName}` : ''}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium text-[var(--text-primary)]">
+                Customer search
+              </div>
+              <Input
+                value={q}
+                onChange={(event) => setQ(event.target.value)}
+                placeholder="Search by name or PIN/TIN"
+                className="mt-1"
+              />
+              <Select
+                className="mt-2"
+                value={selectedCustomer}
+                onChange={(event) => setSelectedCustomer(event.target.value)}
+              >
+                <option value="">
+                  {loadingCustomers ? 'Searching...' : 'Select customer...'}
+                </option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customerName(customer)}
+                    {customer.tin ? ` — ${customer.tin}` : ''}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant="primary"
+              onClick={() => void authorizePreFuel()}
+              disabled={
+                !csrfToken || !selectedFuel || !selectedCustomer || authorizing
+              }
+            >
+              {authorizing ? 'Authorizing…' : 'Allocate customer & authorize'}
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <div className="border-b border-border px-4 py-3 text-sm font-semibold text-[var(--text-primary)]">
+            Pending nozzle allocations
+          </div>
+          {pending.length === 0 ? (
+            <div className="p-4 text-sm text-[var(--text-muted)]">
+              No nozzles are currently waiting for a transaction.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Pump</TableHead>
+                  <TableHead>Nozzle</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>PIN/TIN</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pending.map((allocation) => (
+                  <TableRow key={allocation.id}>
+                    <TableCell>{allocation.pump_number}</TableCell>
+                    <TableCell>{allocation.nozzle_number}</TableCell>
+                    <TableCell>{allocation.buyer_name || '—'}</TableCell>
+                    <TableCell>{allocation.tin || '—'}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void cancelPreFuel(allocation)}
+                      >
+                        Cancel
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <Card className="space-y-4 p-4">
@@ -180,9 +441,7 @@ export default function TenantTransactionsClient(props: {
                   </TableCell>
                   <TableCell className="align-top">
                     {t.remaining == null ? (
-                      <span className="text-xs text-[var(--text-muted)]">
-                        -
-                      </span>
+                      <span className="text-xs text-[var(--text-muted)]">-</span>
                     ) : t.remaining === 0 ? (
                       <Badge variant={STATUS_VARIANT.WARN}>Expired</Badge>
                     ) : (
@@ -205,9 +464,7 @@ export default function TenantTransactionsClient(props: {
                         <option value="">Select customer...</option>
                         {customers.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {(c.trade_name || '').toString() ||
-                              (c.tin || '').toString() ||
-                              c.id}
+                            {customerName(c)}
                           </option>
                         ))}
                       </Select>
