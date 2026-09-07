@@ -78,8 +78,8 @@ export const AutoPrintReceiptsForm = ({
         <input type="hidden" name="autoPrintReceipts" value="0" />
 
         <FormField
-          label="Auto-print fiscal receipts"
-          helpText="When enabled, fiscalized transactions immediately enqueue a receipt print job."
+          label="Auto-print receipts"
+          helpText="When enabled, transactions automatically enqueue a receipt according to the configured print order above."
         >
           <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
             <Checkbox
@@ -89,7 +89,7 @@ export const AutoPrintReceiptsForm = ({
               onChange={(event) => setChecked(event.target.checked)}
               disabled={busy}
             />
-            <span>Enable auto-printing after fiscalization</span>
+            <span>Enable automatic receipt printing</span>
           </label>
         </FormField>
 
