@@ -23,19 +23,6 @@ async function loadConfiguredBeforeFiscalizationCandidates(
         AND t.status IN ('OPEN', 'ALLOCATED', 'PENDING', 'FAILED')
         AND ss.auto_print_receipts = TRUE
         AND ss.print_receipt_order = 'before_fiscalization'
-        AND (
-          t.customer_id IS NOT NULL
-          OR (
-            ss.tin_capture_order <> 'before_transaction'
-            AND (
-              t.status = 'PENDING'
-              OR NOW() >= COALESCE(
-                   t.linking_window_expires_at,
-                   t.created_at + (COALESCE(ss.linking_window_seconds, 0) * INTERVAL '1 second')
-                 )
-            )
-          )
-        )
         AND NOT EXISTS (
           SELECT 1
             FROM print_jobs pj
