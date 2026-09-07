@@ -18,6 +18,8 @@ export async function updateStationSettings(args: {
   fiscalizationTransport?: string | null
   autoFiscalizeEnabled?: boolean | null
   autoPrintReceipts?: boolean | null
+  printReceiptOrder?: 'before_fiscalization' | 'after_fiscalization' | null
+  tinCaptureOrder?: 'before_transaction' | 'after_transaction' | null
   syncEnabled?: boolean | null
   syncTime?: string | null
   syncTimezone?: string | null
@@ -34,13 +36,15 @@ export async function updateStationSettings(args: {
              fiscalization_transport = COALESCE($4, fiscalization_transport),
              auto_fiscalize_enabled = COALESCE($5, auto_fiscalize_enabled),
              auto_print_receipts = COALESCE($6, auto_print_receipts),
-             sync_enabled = COALESCE($7, sync_enabled),
-             sync_time = COALESCE($8, sync_time),
-             sync_timezone = COALESCE($9, sync_timezone),
-             money_decimals = COALESCE($10, money_decimals),
-             unit_price_decimals = COALESCE($11, unit_price_decimals),
-             volume_decimals = COALESCE($12, volume_decimals)
-       WHERE station_id = $13
+             print_receipt_order = COALESCE($7, print_receipt_order),
+             tin_capture_order = COALESCE($8, tin_capture_order),
+             sync_enabled = COALESCE($9, sync_enabled),
+             sync_time = COALESCE($10, sync_time),
+             sync_timezone = COALESCE($11, sync_timezone),
+             money_decimals = COALESCE($12, money_decimals),
+             unit_price_decimals = COALESCE($13, unit_price_decimals),
+             volume_decimals = COALESCE($14, volume_decimals)
+       WHERE station_id = $15
     `,
     [
       args.linkingWindowSeconds ?? null,
@@ -49,6 +53,8 @@ export async function updateStationSettings(args: {
       args.fiscalizationTransport ?? null,
       args.autoFiscalizeEnabled ?? null,
       args.autoPrintReceipts ?? null,
+      args.printReceiptOrder ?? null,
+      args.tinCaptureOrder ?? null,
       args.syncEnabled ?? null,
       args.syncTime ?? null,
       args.syncTimezone ?? null,
