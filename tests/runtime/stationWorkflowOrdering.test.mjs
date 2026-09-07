@@ -29,7 +29,14 @@ test('station workflow ordering is persisted with backward-compatible defaults',
   assert.match(admin, /tinCaptureOrder: args\.body\.tinCaptureOrder/)
   assert.match(form, /name="printReceiptOrder"/)
   assert.match(form, /name="tinCaptureOrder"/)
+  assert.match(form, /name="linkingWindowSeconds"/)
+  assert.match(form, /name="autoPrintReceipts"/)
+  assert.match(form, /tinOrder === 'before_transaction'/)
   assert.match(page, /Transaction workflow/)
+  assert.doesNotMatch(page, /<CardTitle>Linking window<\/CardTitle>/)
+  assert.doesNotMatch(page, /<CardTitle>Receipt printing<\/CardTitle>/)
+  assert.doesNotMatch(page, /LinkingWindowForm/)
+  assert.doesNotMatch(page, /AutoPrintReceiptsForm/)
 })
 
 test('before-fiscalization receipt printing uses offline print and blocks fiscalization until DONE', () => {
@@ -76,6 +83,28 @@ test('Tanzania pre-fiscal receipt reserves verification prefix plus global count
   assert.match(receipt, /globalCount: String\(assignment\.global_counter\)/)
   assert.match(receipt, /buildTanzaniaReceiptVerificationUrl/)
   assert.match(receipt, /buildTanzaniaReceiptLines/)
+})
+
+test('linking window controls pre-transaction allocation lifetime and after-transaction fiscalization delay', () => {
+  const repo = read(
+    'src/modules/transactions/infrastructure/preFuelCustomerAllocation.ts',
+  )
+  const queue = read(
+    'src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts',
+  )
+  const transactionSql = read(
+    'src/modules/transactions/infrastructure/persistence/transaction.sql.ts',
+  )
+
+  assert.match(repo, /ss\.linking_window_seconds/)
+  assert.match(repo, /COALESCE\(ss\.linking_window_seconds, 0\) <= 0/)
+  assert.match(repo, /status = 'CANCELLED'/)
+  assert.doesNotMatch(repo, /INTERVAL '4 hours'/)
+  assert.match(queue, /ss\.linking_window_seconds/)
+  assert.match(queue, /a\.created_at \+ \(ss\.linking_window_seconds \* INTERVAL '1 second'\)/)
+  assert.doesNotMatch(queue, /INTERVAL '4 hours'/)
+  assert.match(transactionSql, /linking_window_expires_at/)
+  assert.match(transactionSql, /created_at \+ \(\$3::int \* INTERVAL '1 second'\)/)
 })
 
 test('before-transaction TIN capture is nozzle-specific, durable and single use', () => {
