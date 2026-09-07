@@ -11,6 +11,22 @@ async function attachPendingPreFuelCustomersTx(
   client: any,
   stationId: string,
 ) {
+  await txQuery(
+    client,
+    `UPDATE pre_fuel_customer_allocations a
+        SET status = 'CANCELLED',
+            cancelled_at = NOW(),
+            updated_at = NOW()
+       FROM station_settings ss
+      WHERE ss.station_id = a.station_id
+        AND a.station_id = $1::uuid
+        AND a.status = 'PENDING'
+        AND ss.tin_capture_order = 'before_transaction'
+        AND COALESCE(ss.linking_window_seconds, 0) > 0
+        AND a.created_at + (ss.linking_window_seconds * INTERVAL '1 second') <= NOW()`,
+    [stationId],
+  )
+
   const matches = await txQuery<{
     transaction_id: string
     allocation_id: string
@@ -35,7 +51,10 @@ async function attachPendingPreFuelCustomersTx(
               AND t.nozzle_number = a.nozzle_number
               AND t.status IN ('OPEN', 'PENDING', 'ALLOCATED', 'FAILED')
               AND t.transaction_date_time >= a.created_at - INTERVAL '2 minutes'
-              AND t.transaction_date_time <= a.created_at + INTERVAL '4 hours'
+              AND (
+                COALESCE(ss.linking_window_seconds, 0) <= 0
+                OR t.transaction_date_time < a.created_at + (ss.linking_window_seconds * INTERVAL '1 second')
+              )
             ORDER BY t.transaction_date_time ASC, t.created_at ASC
             LIMIT 1
          ) matched ON TRUE
