@@ -62,6 +62,24 @@ export async function createPreFuelCustomerAllocation(input: {
   )
 }
 
+export async function getPendingPreFuelCustomerAllocation(input: {
+  stationId: string
+  allocationId: string
+}) {
+  return await queryOne<PreFuelCustomerAllocation>(
+    `SELECT a.*, COALESCE(n.display_number, a.nozzle_number) AS display_number,
+            c.buyer_name, c.tin
+       FROM pre_fuel_customer_allocations a
+       JOIN customers c ON c.id = a.customer_id AND c.station_id = a.station_id
+  LEFT JOIN nozzles n ON n.id = a.nozzle_id AND n.station_id = a.station_id
+      WHERE a.station_id = $1::uuid
+        AND a.id = $2::uuid
+        AND a.status = 'PENDING'
+      LIMIT 1`,
+    [input.stationId, input.allocationId],
+  )
+}
+
 export async function cancelPreFuelCustomerAllocation(input: { stationId: string; allocationId: string }) {
   return await queryOne<PreFuelCustomerAllocation>(
     `UPDATE pre_fuel_customer_allocations
