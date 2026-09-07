@@ -73,6 +73,26 @@ async function attachPendingPreFuelCustomersTx(
       [match.allocation_id, match.transaction_id],
     )
   }
+
+  // A station configured for pre-transaction capture must never fall through
+  // the normal linking-window timeout and fiscalize an unmatched sale as an
+  // anonymous customer. Holding the expiry at infinity keeps the transaction
+  // OPEN until the matching nozzle allocation is attached above.
+  await txQuery(
+    client,
+    `UPDATE transactions t
+        SET linking_window_expires_at = 'infinity'::timestamptz,
+            status = CASE WHEN t.status = 'PENDING' THEN 'OPEN' ELSE t.status END,
+            updated_at = NOW()
+       FROM station_settings ss
+      WHERE ss.station_id = t.station_id
+        AND ss.tin_capture_order = 'before_transaction'
+        AND t.station_id = $1::uuid
+        AND t.deleted_at IS NULL
+        AND t.customer_id IS NULL
+        AND t.status IN ('OPEN', 'PENDING', 'ALLOCATED')`,
+    [stationId],
+  )
 }
 
 export async function claimEligibleTransactionFiscalizationQueueRepo(input: {
