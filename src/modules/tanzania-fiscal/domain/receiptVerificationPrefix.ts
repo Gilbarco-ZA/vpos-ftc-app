@@ -126,6 +126,8 @@ export function buildTanzaniaReceiptVerificationUrl(args: {
   receiptVerificationNumber: unknown
   urlMode?: TanzaniaReceiptVerificationUrlMode | null
   urlOverride?: unknown
+  /** @deprecated Prefix mode previously selected the URL environment too. */
+  mode?: unknown
   invoiceDate?: unknown
   receiptTime?: unknown
 }): string | null {
@@ -134,8 +136,14 @@ export function buildTanzaniaReceiptVerificationUrl(args: {
   ).trim()
   if (!receiptVerificationNumber) return null
 
+  const legacyMode =
+    args.mode === 'production'
+      ? 'production'
+      : args.mode === 'manual'
+        ? 'production'
+        : 'development'
   const baseUrl = resolveTanzaniaReceiptVerificationUrlBase({
-    mode: args.urlMode,
+    mode: args.urlMode ?? legacyMode,
     override: args.urlOverride,
   })
   const time =
