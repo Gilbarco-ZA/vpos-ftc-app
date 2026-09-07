@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = defineGetRoute({
-  roles: ['administrator', 'manager'],
+  roles: ['tenant', 'administrator', 'manager'],
   handler: async (_req, { user }) => {
     return ok(await getPumpRuntimeState(user.stationId))
   },
