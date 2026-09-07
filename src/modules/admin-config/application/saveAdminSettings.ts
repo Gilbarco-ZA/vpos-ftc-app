@@ -20,6 +20,8 @@ export async function saveAdminSettings(args: {
     fiscalizationTransport: args.body.fiscalizationTransport,
     autoFiscalizeEnabled: toBool(args.body.autoFiscalizeEnabled),
     autoPrintReceipts: toBool(args.body.autoPrintReceipts),
+    printReceiptOrder: args.body.printReceiptOrder,
+    tinCaptureOrder: args.body.tinCaptureOrder,
     syncEnabled: toBool(args.body.syncEnabled),
     syncTime: args.body.syncTime,
     syncTimezone: args.body.syncTimezone,
