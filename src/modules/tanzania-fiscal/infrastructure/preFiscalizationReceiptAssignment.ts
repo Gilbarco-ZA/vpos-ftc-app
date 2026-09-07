@@ -1,5 +1,6 @@
-import { txQuery, withTransaction } from '@/src/platform/db/postgres'
+import { queryOne, txQuery, withTransaction } from '@/src/platform/db/postgres'
 
+import { getRegisteredTanzaniaReceiptCode } from '@/src/modules/tanzania-fiscal/application/registeredReceiptCode'
 import { resolveTanzaniaReceiptVerificationPrefix } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
 import { dateParts } from '@/src/modules/tanzania-fiscal/infrastructure/xml'
 
@@ -13,10 +14,66 @@ export type TanzaniaPreFiscalizationReceiptAssignment = {
   timezone: string
 }
 
+const normalizeExisting = (row: any, timezone: string) => ({
+  ...row,
+  daily_counter: Number(row.daily_counter),
+  global_counter: Number(row.global_counter),
+  timezone,
+})
+
 export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
   stationId: string
   transactionId: string
 }): Promise<TanzaniaPreFiscalizationReceiptAssignment | null> {
+  const preliminary = await queryOne<any>(
+    `SELECT fs.country,
+            COALESCE(NULLIF(BTRIM(fs.timezone), ''), 'Africa/Dar_es_Salaam') AS timezone,
+            ss.tanzania_receipt_verification_prefix_mode AS receipt_verification_prefix_mode,
+            ss.tanzania_receipt_verification_prefix_override AS receipt_verification_prefix_override,
+            a.invoice_number,
+            a.receipt_verification_number,
+            a.z_number,
+            a.daily_counter,
+            a.global_counter,
+            a.invoice_date
+       FROM transactions t
+       JOIN fuel_stations fs ON fs.id = t.station_id
+       JOIN station_settings ss ON ss.station_id = t.station_id
+  LEFT JOIN tanzania_proxy_invoice_assignments a
+         ON a.station_id = t.station_id
+        AND a.transaction_id = t.id
+      WHERE t.station_id = $1::uuid
+        AND t.id = $2::uuid
+        AND t.deleted_at IS NULL
+      LIMIT 1`,
+    [input.stationId, input.transactionId],
+  )
+  if (!preliminary) return null
+
+  const country = String(preliminary.country ?? '').trim().toUpperCase()
+  if (!['TZ', 'TZA', 'TANZANIA', 'UNITED REPUBLIC OF TANZANIA'].includes(country)) {
+    return null
+  }
+
+  const timezone = String(preliminary.timezone || 'Africa/Dar_es_Salaam')
+  if (preliminary.receipt_verification_number) {
+    return normalizeExisting(preliminary, timezone)
+  }
+
+  const prefixMode =
+    preliminary.receipt_verification_prefix_mode === 'manual'
+      ? 'manual'
+      : 'registered'
+  const registeredReceiptCode =
+    prefixMode === 'registered'
+      ? await getRegisteredTanzaniaReceiptCode(input.stationId)
+      : null
+  const receiptVerificationPrefix = resolveTanzaniaReceiptVerificationPrefix({
+    mode: prefixMode,
+    registeredReceiptCode,
+    override: preliminary.receipt_verification_prefix_override,
+  })
+
   return await withTransaction(async (client) => {
     await txQuery(client, `SELECT pg_advisory_xact_lock(hashtext($1))`, [
       `tanzania-proxy-invoice:${input.stationId}:${input.transactionId}`,
@@ -26,32 +83,22 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
       country: string | null
       timezone: string | null
       transaction_date_time: string | Date
-      receipt_verification_prefix_mode: any
-      receipt_verification_prefix_override: string | null
     }>(
       client,
       `SELECT fs.country,
               fs.timezone,
-              t.transaction_date_time,
-              ss.tanzania_receipt_verification_prefix_mode AS receipt_verification_prefix_mode,
-              ss.tanzania_receipt_verification_prefix_override AS receipt_verification_prefix_override
+              t.transaction_date_time
          FROM transactions t
          JOIN fuel_stations fs ON fs.id = t.station_id
-         JOIN station_settings ss ON ss.station_id = t.station_id
         WHERE t.station_id = $1::uuid
           AND t.id = $2::uuid
           AND t.deleted_at IS NULL
         LIMIT 1
-        FOR SHARE OF t, fs, ss`,
+        FOR SHARE OF t, fs`,
       [input.stationId, input.transactionId],
     )
     const row = context.rows[0]
-    const country = String(row?.country ?? '')
-      .trim()
-      .toUpperCase()
-    if (!['TZ', 'TZA', 'TANZANIA', 'UNITED REPUBLIC OF TANZANIA'].includes(country)) {
-      return null
-    }
+    if (!row) return null
 
     const existing = await txQuery<any>(
       client,
@@ -67,26 +114,14 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
         LIMIT 1`,
       [input.stationId, input.transactionId],
     )
-    const timezone = String(row?.timezone || 'Africa/Dar_es_Salaam')
+    const lockedTimezone = String(row.timezone || timezone)
     if (existing.rows[0]) {
-      return {
-        ...existing.rows[0],
-        daily_counter: Number(existing.rows[0].daily_counter),
-        global_counter: Number(existing.rows[0].global_counter),
-        timezone,
-      }
+      return normalizeExisting(existing.rows[0], lockedTimezone)
     }
 
-    const transactionDate = dateParts(
-      row.transaction_date_time,
-      timezone,
-    )
+    const transactionDate = dateParts(row.transaction_date_time, lockedTimezone)
     const invoiceDate = new Date().toISOString()
-    const fiscalDate = dateParts(invoiceDate, timezone)
-    const receiptVerificationPrefix = resolveTanzaniaReceiptVerificationPrefix({
-      mode: row.receipt_verification_prefix_mode,
-      override: row.receipt_verification_prefix_override,
-    })
+    const fiscalDate = dateParts(invoiceDate, lockedTimezone)
 
     const global = await txQuery<{ counter_value: string | number }>(
       client,
@@ -141,11 +176,6 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
       ],
     )
 
-    return {
-      ...inserted.rows[0],
-      daily_counter: Number(inserted.rows[0].daily_counter),
-      global_counter: Number(inserted.rows[0].global_counter),
-      timezone,
-    }
+    return normalizeExisting(inserted.rows[0], lockedTimezone)
   })
 }
