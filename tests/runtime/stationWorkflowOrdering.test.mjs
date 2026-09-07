@@ -22,7 +22,7 @@ test('station workflow ordering is persisted with backward-compatible defaults',
   assert.match(migration, /DEFAULT 'after_transaction'/)
   assert.match(migration, /CREATE TABLE IF NOT EXISTS pre_fuel_customer_allocations/)
   assert.match(validation, /printReceiptOrder: z\s*\.enum\(\['before_fiscalization', 'after_fiscalization'\]\)/)
-  assert.match(validation, /tinCaptureOrder: z\.enum\(\['before_transaction', 'after_transaction'\]\)/)
+  assert.match(validation, /tinCaptureOrder: z\s*\.enum\(\['before_transaction', 'after_transaction'\]\)/)
   assert.match(settings, /print_receipt_order = COALESCE/)
   assert.match(settings, /tin_capture_order = COALESCE/)
   assert.match(admin, /printReceiptOrder: args\.body\.printReceiptOrder/)
