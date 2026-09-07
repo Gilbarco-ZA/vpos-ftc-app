@@ -4,6 +4,7 @@ import { enqueuePrintJob } from '@/src/modules/printing/application/enqueuePrint
 import { buildReferencePrintJobPayload } from '@/src/modules/printing/domain/printJobPayload'
 import { isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/infrastructure/country'
 import { getOrCreateLatestTransactionReceiptRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction-read.repository'
+import { getOrCreatePreFiscalizationReceipt } from './preFiscalizationReceipt'
 import { isOfflineProxySubmission } from './proxyOfflineSubmission'
 
 export type AutoPrintFiscalReceiptResult = {
@@ -12,6 +13,11 @@ export type AutoPrintFiscalReceiptResult = {
   receiptId: string | null
   printJobId: string | null
 }
+
+export type ReceiptPrintPhase =
+  | 'before_fiscalization'
+  | 'after_fiscalization'
+  | 'offline_recovery'
 
 async function resolveOfflinePrint(input: {
   stationId: string
@@ -53,9 +59,13 @@ export async function enqueueAutoPrintFiscalReceipt(input: {
   stationId: string
   transactionId: string
   offlinePrint?: boolean
+  phase?: ReceiptPrintPhase
 }): Promise<AutoPrintFiscalReceiptResult> {
-  const settings = await queryOne<{ auto_print_receipts: boolean | null }>(
-    `SELECT auto_print_receipts
+  const settings = await queryOne<{
+    auto_print_receipts: boolean | null
+    print_receipt_order: string | null
+  }>(
+    `SELECT auto_print_receipts, print_receipt_order
        FROM station_settings
       WHERE station_id = $1
       LIMIT 1`,
@@ -71,17 +81,44 @@ export async function enqueueAutoPrintFiscalReceipt(input: {
     }
   }
 
-  const receipt = await getOrCreateLatestTransactionReceiptRepo(
-    input.stationId,
-    input.transactionId,
-  )
+  const phase: ReceiptPrintPhase =
+    input.phase ?? (input.offlinePrint === true ? 'offline_recovery' : 'after_fiscalization')
+  const configuredOrder =
+    settings?.print_receipt_order === 'before_fiscalization'
+      ? 'before_fiscalization'
+      : 'after_fiscalization'
+
+  if (
+    phase !== 'offline_recovery' &&
+    ((phase === 'before_fiscalization' && configuredOrder !== 'before_fiscalization') ||
+      (phase === 'after_fiscalization' && configuredOrder !== 'after_fiscalization'))
+  ) {
+    return {
+      enabled: true,
+      enqueued: false,
+      receiptId: null,
+      printJobId: null,
+    }
+  }
+
+  const receipt =
+    phase === 'before_fiscalization'
+      ? await getOrCreatePreFiscalizationReceipt({
+          stationId: input.stationId,
+          transactionId: input.transactionId,
+        })
+      : await getOrCreateLatestTransactionReceiptRepo(
+          input.stationId,
+          input.transactionId,
+        )
   if (!receipt?.id) {
     throw new Error(
       `Unable to create an automatic receipt for transaction ${input.transactionId}`,
     )
   }
 
-  const offlinePrint = await resolveOfflinePrint(input)
+  const offlinePrint =
+    phase === 'before_fiscalization' ? true : await resolveOfflinePrint(input)
   const printJobId = await enqueuePrintJob(
     input.stationId,
     'print.receipt',
