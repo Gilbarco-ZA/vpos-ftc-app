@@ -4,6 +4,7 @@ import {
   defineMutationRoute,
 } from '@/src/shared/http/defineRoute'
 
+import { authorizePendingPreFuelCustomer } from '@/src/modules/transactions/application/commands/authorize-pre-fuel-customer'
 import {
   allocatePreFuelCustomer,
   cancelPendingPreFuelCustomer,
@@ -27,6 +28,15 @@ export const POST = defineMutationRoute({
       if (body.action === 'cancel') {
         return ok(
           await cancelPendingPreFuelCustomer({
+            stationId: user.stationId,
+            allocationId: body.allocationId,
+          }),
+        )
+      }
+
+      if (body.action === 'authorize') {
+        return ok(
+          await authorizePendingPreFuelCustomer({
             stationId: user.stationId,
             allocationId: body.allocationId,
           }),
