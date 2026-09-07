@@ -68,6 +68,11 @@ async function buildTanzaniaPreFiscalizationReceipt(input: {
     invoiceDate: assignment.invoice_date,
     receiptTime: invoiceDate.time,
   })
+  if (!verificationUrl) {
+    throw new Error(
+      `Unable to build Tanzania receipt verification URL for transaction ${input.transactionId}`,
+    )
+  }
   const model: FiscalReceiptModel = {
     ...base.model,
     transaction: {
