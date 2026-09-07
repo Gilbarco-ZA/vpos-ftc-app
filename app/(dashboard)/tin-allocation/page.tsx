@@ -9,7 +9,7 @@ import TinAllocationClient from '@/components/transactions/TinAllocationClient'
 export const dynamic = 'force-dynamic'
 
 export default async function TinAllocationPage() {
-  const user = await requireAuth(['tenant'])
+  const user = await requireAuth(['tenant', 'manager', 'administrator'])
   const settings = await getStationSettings(user.stationId)
   if (settings?.tin_capture_order !== 'before_transaction') {
     redirect('/transactions')
@@ -19,7 +19,7 @@ export default async function TinAllocationPage() {
     <div className="space-y-4">
       <PageHeader
         title="TIN allocation"
-        description="Select a customer, then allocate their TIN/PIN to a specific pump nozzle before dispensing."
+        description="Select a customer, then link their TIN/PIN to a specific pump nozzle before dispensing. Authorize the nozzle when DOMS reports that the fuel point is calling."
       />
       <TinAllocationClient />
     </div>
