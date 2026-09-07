@@ -302,3 +302,105 @@ export type CustomerSearchInput = z.infer<typeof customerSearchSchema>
 export type TransactionAllocateInput = z.infer<typeof transactionAllocateSchema>
 export type TransactionFilterInput = z.infer<typeof transactionFilterSchema>
 export type ReportFilterInput = z.infer<typeof reportFilterSchema>
+export type ProductCreateInput = z.infer<typeof productCreateSchema>
+export type BrandingSettingsInput = z.infer<typeof brandingSettingsSchema>
+export type StationSettingsInput = z.infer<typeof stationSettingsSchema>
+export type UserUpdateInput = z.infer<typeof userUpdateSchema>
+export type CreateStationInput = z.infer<typeof createStationSchema>
+
+// POS INTEGRATION SCHEMAS
+
+export const posBackendSchema = z.enum(['none', 'jpl', 'ppx', 'ligo', 'namos'])
+
+const httpUrlSchema = z
+  .string()
+  .url('Invalid URL')
+  .transform((v) => v.replace(/\/+$/, ''))
+
+const optionalNonEmptyString = z
+  .string()
+  .transform((v) => v.trim())
+  .refine((v) => v.length > 0, 'Required')
+
+export const jplIntegrationSchema = z
+  .object({
+    host: optionalNonEmptyString,
+    appId: optionalNonEmptyString.optional(),
+    countryCode: optionalNonEmptyString.optional(),
+    enabledApcs: z.array(z.enum(['apc1', 'apc2'])).optional(),
+    timeoutMs: z.number().int().min(1000).max(120_000).optional(),
+    posId: z.number().int().min(0).max(99).optional(),
+    fpOperationModeNo: z.number().int().min(0).max(99).optional(),
+    portOverrides: z
+      .object({
+        apc1: z.number().int().min(1).max(65535).optional(),
+        apc2: z.number().int().min(1).max(65535).optional(),
+      })
+      .optional(),
+  })
+  .partial({
+    appId: true,
+    countryCode: true,
+    enabledApcs: true,
+    timeoutMs: true,
+    posId: true,
+    fpOperationModeNo: true,
+    portOverrides: true,
+  })
+
+export const ppxIntegrationSchema = z
+  .object({
+    baseUrl: httpUrlSchema,
+    timeoutMs: z.number().int().min(1000).max(120_000).optional(),
+    apiKey: z.string().optional(),
+    healthPath: z.string().optional(),
+    commandPath: z.string().optional(),
+  })
+  .partial({
+    timeoutMs: true,
+    apiKey: true,
+    healthPath: true,
+    commandPath: true,
+  })
+
+export const ligoIntegrationSchema = z
+  .object({
+    baseUrl: httpUrlSchema.optional(),
+    timeoutMs: z.number().int().min(1000).max(120_000).optional(),
+    apiKey: z.string().optional(),
+  })
+  .partial()
+
+export const namosIntegrationSchema = z
+  .object({
+    baseUrl: httpUrlSchema.optional(),
+    timeoutMs: z.number().int().min(1000).max(120_000).optional(),
+    apiKey: z.string().optional(),
+  })
+  .partial()
+
+export const posIntegrationUpdateSchema = z
+  .object({
+    backend: posBackendSchema,
+    jpl: jplIntegrationSchema.optional(),
+    ppx: ppxIntegrationSchema.optional(),
+    ligo: ligoIntegrationSchema.optional(),
+    namos: namosIntegrationSchema.optional(),
+  })
+  .superRefine((v, ctx) => {
+    const jpl = v.jpl
+    if (v.backend === 'jpl' && !jpl?.host) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['jpl', 'host'],
+        message: 'JPL host is required',
+      })
+    }
+    if (v.backend === 'ppx' && !v.ppx?.baseUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ppx', 'baseUrl'],
+        message: 'PPX baseUrl is required',
+      })
+    }
+  })
