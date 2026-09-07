@@ -19,6 +19,12 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const nullableTrimmed = (value: unknown) => {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  return trimmed.length ? trimmed : null
+}
+
 const updateSchema = z
   .object({
     openingGrossTotal: z.preprocess(
@@ -40,10 +46,7 @@ const updateSchema = z
         .number()
         .int('Daily counter must be a whole number.')
         .min(0, 'Daily counter cannot be negative.')
-        .max(
-          Number.MAX_SAFE_INTEGER,
-          'Daily counter exceeds the supported range.',
-        )
+        .max(Number.MAX_SAFE_INTEGER, 'Daily counter exceeds the supported range.')
         .optional(),
     ),
     globalCounter: z.preprocess(
@@ -53,25 +56,18 @@ const updateSchema = z
         .number()
         .int('Global counter must be a whole number.')
         .min(0, 'Global counter cannot be negative.')
-        .max(
-          Number.MAX_SAFE_INTEGER,
-          'Global counter exceeds the supported range.',
-        )
+        .max(Number.MAX_SAFE_INTEGER, 'Global counter exceeds the supported range.')
         .optional(),
     ),
-    deviceIdOverride: z.preprocess((value) => {
-      if (typeof value !== 'string') return value
-      const trimmed = value.trim()
-      return trimmed.length ? trimmed : null
-    }, z.string().max(191, 'Device ID cannot exceed 191 characters.').nullable().optional()),
-    receiptVerificationPrefixMode: z
-      .enum(['development', 'production', 'manual'])
-      .optional(),
+    deviceIdOverride: z.preprocess(
+      nullableTrimmed,
+      z.string().max(191, 'Device ID cannot exceed 191 characters.').nullable().optional(),
+    ),
+    receiptVerificationPrefixMode: z.enum(['registered', 'manual']).optional(),
     receiptVerificationPrefixOverride: z.preprocess(
       (value) => {
-        if (typeof value !== 'string') return value
-        const normalized = value.trim().toUpperCase()
-        return normalized.length ? normalized : null
+        const trimmed = nullableTrimmed(value)
+        return typeof trimmed === 'string' ? trimmed.toUpperCase() : trimmed
       },
       z
         .string()
@@ -81,6 +77,13 @@ const updateSchema = z
         )
         .nullable()
         .optional(),
+    ),
+    receiptVerificationUrlMode: z
+      .enum(['development', 'production', 'manual'])
+      .optional(),
+    receiptVerificationUrlOverride: z.preprocess(
+      nullableTrimmed,
+      z.string().max(500, 'TRA verification URL cannot exceed 500 characters.').nullable().optional(),
     ),
   })
   .superRefine((values, context) => {
@@ -106,6 +109,28 @@ const updateSchema = z
           'A manual receipt verification prefix is required when Manual override is selected.',
       })
     }
+    if (
+      values.receiptVerificationUrlOverride !== undefined &&
+      values.receiptVerificationUrlMode === undefined
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['receiptVerificationUrlMode'],
+        message:
+          'Receipt verification URL mode is required when updating the manual URL.',
+      })
+    }
+    if (
+      values.receiptVerificationUrlMode === 'manual' &&
+      !values.receiptVerificationUrlOverride
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['receiptVerificationUrlOverride'],
+        message:
+          'A manual TRA receipt verification URL is required when Manual URL is selected.',
+      })
+    }
   })
 
 async function ensureTanzaniaStation(stationId: string) {
@@ -124,7 +149,6 @@ export const GET = defineGetRoute({
   handler: async (_req, { user }) => {
     const countryFailure = await ensureTanzaniaStation(user.stationId)
     if (countryFailure) return countryFailure
-
     return ok(await getTanzaniaGrossTotalSummary(user.stationId))
   },
 })
@@ -144,15 +168,22 @@ export const PATCH = defineMutationRoute<Record<string, unknown>>({
     }
 
     const before = await getTanzaniaGrossTotalSummary(user.stationId)
-    const after = await setTanzaniaFiscalOpeningValues(user.stationId, {
-      openingGrossTotal: parsed.data.openingGrossTotal,
-      dailyCounter: parsed.data.dailyCounter,
-      globalCounter: parsed.data.globalCounter,
-      deviceIdOverride: parsed.data.deviceIdOverride,
-      receiptVerificationPrefixMode: parsed.data.receiptVerificationPrefixMode,
-      receiptVerificationPrefixOverride:
-        parsed.data.receiptVerificationPrefixOverride,
-    })
+    let after
+    try {
+      after = await setTanzaniaFiscalOpeningValues(user.stationId, {
+        openingGrossTotal: parsed.data.openingGrossTotal,
+        dailyCounter: parsed.data.dailyCounter,
+        globalCounter: parsed.data.globalCounter,
+        deviceIdOverride: parsed.data.deviceIdOverride,
+        receiptVerificationPrefixMode: parsed.data.receiptVerificationPrefixMode,
+        receiptVerificationPrefixOverride:
+          parsed.data.receiptVerificationPrefixOverride,
+        receiptVerificationUrlMode: parsed.data.receiptVerificationUrlMode,
+        receiptVerificationUrlOverride: parsed.data.receiptVerificationUrlOverride,
+      })
+    } catch (error: any) {
+      return fail(String(error?.message || error || 'Invalid Tanzania fiscal settings.'), 400)
+    }
 
     await createAuditLog({
       stationId: user.stationId,
@@ -162,32 +193,30 @@ export const PATCH = defineMutationRoute<Record<string, unknown>>({
       oldValues: {
         openingGrossTotal: before.openingGrossTotal,
         effectiveGrossTotal: before.effectiveGrossTotal,
-        openingGrossTotalCaptured: before.openingGrossTotalCaptured,
-        openingGrossTotalCapturedAt: before.openingGrossTotalCapturedAt,
         dailyCounter: before.dailyCounter,
         globalCounter: before.globalCounter,
-        dailyCounterDate: before.dailyCounterDate,
         deviceIdOverride: before.deviceIdOverride,
+        registeredReceiptCode: before.registeredReceiptCode,
         receiptVerificationPrefixMode: before.receiptVerificationPrefixMode,
-        receiptVerificationPrefixOverride:
-          before.receiptVerificationPrefixOverride,
-        effectiveReceiptVerificationPrefix:
-          before.effectiveReceiptVerificationPrefix,
+        receiptVerificationPrefixOverride: before.receiptVerificationPrefixOverride,
+        effectiveReceiptVerificationPrefix: before.effectiveReceiptVerificationPrefix,
+        receiptVerificationUrlMode: before.receiptVerificationUrlMode,
+        receiptVerificationUrlOverride: before.receiptVerificationUrlOverride,
+        effectiveReceiptVerificationUrlBase: before.effectiveReceiptVerificationUrlBase,
       },
       newValues: {
         openingGrossTotal: after.openingGrossTotal,
         effectiveGrossTotal: after.effectiveGrossTotal,
-        openingGrossTotalCaptured: after.openingGrossTotalCaptured,
-        openingGrossTotalCapturedAt: after.openingGrossTotalCapturedAt,
         dailyCounter: after.dailyCounter,
         globalCounter: after.globalCounter,
-        dailyCounterDate: after.dailyCounterDate,
         deviceIdOverride: after.deviceIdOverride,
+        registeredReceiptCode: after.registeredReceiptCode,
         receiptVerificationPrefixMode: after.receiptVerificationPrefixMode,
-        receiptVerificationPrefixOverride:
-          after.receiptVerificationPrefixOverride,
-        effectiveReceiptVerificationPrefix:
-          after.effectiveReceiptVerificationPrefix,
+        receiptVerificationPrefixOverride: after.receiptVerificationPrefixOverride,
+        effectiveReceiptVerificationPrefix: after.effectiveReceiptVerificationPrefix,
+        receiptVerificationUrlMode: after.receiptVerificationUrlMode,
+        receiptVerificationUrlOverride: after.receiptVerificationUrlOverride,
+        effectiveReceiptVerificationUrlBase: after.effectiveReceiptVerificationUrlBase,
       },
       ipAddress:
         req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined,
