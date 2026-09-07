@@ -128,6 +128,8 @@ export async function saveStationSettingsRepo(args: {
   fiscalizationTransport?: string | null
   autoFiscalizeEnabled?: boolean | null
   autoPrintReceipts?: boolean | null
+  printReceiptOrder?: 'before_fiscalization' | 'after_fiscalization' | null
+  tinCaptureOrder?: 'before_transaction' | 'after_transaction' | null
   syncEnabled?: boolean | null
   syncTime?: string | null
   syncTimezone?: string | null
