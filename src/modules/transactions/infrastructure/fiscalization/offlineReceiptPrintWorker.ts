@@ -9,7 +9,46 @@ import { isOfflineProxySubmission } from './proxyOfflineSubmission'
 const WORKER_NAME = 'offlineReceiptPrintWorker'
 const DEFAULT_POLL_MS = 2_000
 
-async function loadCandidates(stationId: string, limit: number) {
+async function loadConfiguredBeforeFiscalizationCandidates(
+  stationId: string,
+  limit: number,
+) {
+  return await queryAll<{ transaction_id: string }>(
+    `SELECT t.id::text AS transaction_id
+       FROM transactions t
+       JOIN station_settings ss ON ss.station_id = t.station_id
+      WHERE t.station_id = $1::uuid
+        AND t.deleted_at IS NULL
+        AND t.fiscalization_reference IS NULL
+        AND t.status IN ('OPEN', 'ALLOCATED', 'PENDING', 'FAILED')
+        AND ss.auto_print_receipts = TRUE
+        AND ss.print_receipt_order = 'before_fiscalization'
+        AND (
+          t.customer_id IS NOT NULL
+          OR (
+            ss.tin_capture_order <> 'before_transaction'
+            AND (
+              t.status = 'PENDING'
+              OR NOW() >= COALESCE(
+                   t.linking_window_expires_at,
+                   t.created_at + (COALESCE(ss.linking_window_seconds, 0) * INTERVAL '1 second')
+                 )
+            )
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+            FROM print_jobs pj
+           WHERE pj.station_id = t.station_id
+             AND pj.idempotency_key = 'receipt:' || t.id::text || ':offline'
+        )
+      ORDER BY t.transaction_date_time ASC
+      LIMIT $2`,
+    [stationId, limit],
+  )
+}
+
+async function loadOfflineRecoveryCandidates(stationId: string, limit: number) {
   return await queryAll<{
     transaction_id: string
     response_payload: unknown
@@ -64,19 +103,36 @@ export function startOfflineReceiptPrintWorker(opts?: {
   async function tick() {
     if (stopped || tickInFlight) return
     tickInFlight = true
-    let matched = 0
+    let beforeMatched = 0
+    let recoveryMatched = 0
     let enqueued = 0
 
     try {
-      const candidates = await loadCandidates(stationId, batchSize)
-      for (const candidate of candidates) {
-        if (!isOfflineProxySubmission(candidate.response_payload)) continue
-        matched += 1
-
+      const beforeCandidates =
+        await loadConfiguredBeforeFiscalizationCandidates(stationId, batchSize)
+      for (const candidate of beforeCandidates) {
+        beforeMatched += 1
         const result = await enqueueAutoPrintFiscalReceipt({
           stationId,
           transactionId: candidate.transaction_id,
           offlinePrint: true,
+          phase: 'before_fiscalization',
+        })
+        if (result.enqueued) enqueued += 1
+      }
+
+      const recoveryCandidates = await loadOfflineRecoveryCandidates(
+        stationId,
+        batchSize,
+      )
+      for (const candidate of recoveryCandidates) {
+        if (!isOfflineProxySubmission(candidate.response_payload)) continue
+        recoveryMatched += 1
+        const result = await enqueueAutoPrintFiscalReceipt({
+          stationId,
+          transactionId: candidate.transaction_id,
+          offlinePrint: true,
+          phase: 'offline_recovery',
         })
         if (result.enqueued) enqueued += 1
       }
@@ -87,7 +143,13 @@ export function startOfflineReceiptPrintWorker(opts?: {
         pid: process.pid,
         status: 'running',
         connected: true,
-        metrics: { pollMs, batchSize, matched, enqueued },
+        metrics: {
+          pollMs,
+          batchSize,
+          beforeMatched,
+          recoveryMatched,
+          enqueued,
+        },
         lastError: null,
       })
     } catch (error: any) {
@@ -101,7 +163,13 @@ export function startOfflineReceiptPrintWorker(opts?: {
         pid: process.pid,
         status: 'running',
         connected: false,
-        metrics: { pollMs, batchSize, matched, enqueued },
+        metrics: {
+          pollMs,
+          batchSize,
+          beforeMatched,
+          recoveryMatched,
+          enqueued,
+        },
         lastError: String(error?.message || error),
       }).catch(() => {})
     } finally {
