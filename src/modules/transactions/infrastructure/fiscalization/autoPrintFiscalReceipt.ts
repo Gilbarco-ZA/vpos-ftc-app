@@ -19,6 +19,23 @@ export type ReceiptPrintPhase =
   | 'after_fiscalization'
   | 'offline_recovery'
 
+export async function requiresPreFiscalizationReceiptPrint(stationId: string) {
+  const settings = await queryOne<{
+    auto_print_receipts: boolean | null
+    print_receipt_order: string | null
+  }>(
+    `SELECT auto_print_receipts, print_receipt_order
+       FROM station_settings
+      WHERE station_id = $1
+      LIMIT 1`,
+    [stationId],
+  )
+  return Boolean(
+    settings?.auto_print_receipts === true &&
+      settings?.print_receipt_order === 'before_fiscalization',
+  )
+}
+
 async function resolveOfflinePrint(input: {
   stationId: string
   transactionId: string
@@ -82,7 +99,8 @@ export async function enqueueAutoPrintFiscalReceipt(input: {
   }
 
   const phase: ReceiptPrintPhase =
-    input.phase ?? (input.offlinePrint === true ? 'offline_recovery' : 'after_fiscalization')
+    input.phase ??
+    (input.offlinePrint === true ? 'offline_recovery' : 'after_fiscalization')
   const configuredOrder =
     settings?.print_receipt_order === 'before_fiscalization'
       ? 'before_fiscalization'
@@ -90,8 +108,10 @@ export async function enqueueAutoPrintFiscalReceipt(input: {
 
   if (
     phase !== 'offline_recovery' &&
-    ((phase === 'before_fiscalization' && configuredOrder !== 'before_fiscalization') ||
-      (phase === 'after_fiscalization' && configuredOrder !== 'after_fiscalization'))
+    ((phase === 'before_fiscalization' &&
+      configuredOrder !== 'before_fiscalization') ||
+      (phase === 'after_fiscalization' &&
+        configuredOrder !== 'after_fiscalization'))
   ) {
     return {
       enabled: true,
