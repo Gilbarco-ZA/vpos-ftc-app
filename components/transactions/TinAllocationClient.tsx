@@ -194,13 +194,7 @@ export default function TinAllocationClient() {
                 const allocation = pendingFor(pumpNumber, option.nozzleNumber)
                 const key = `${pumpNumber}:${option.nozzleNumber}`
                 return (
-                  <button
-                    type="button"
-                    key={key}
-                    onClick={() => allocation ? undefined : void allocate(option)}
-                    disabled={!selectedCustomer || Boolean(allocation) || busyKey === key}
-                    className="rounded-card border border-border bg-surface-card p-4 text-left transition hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
+                  <div key={key} className="rounded-card border border-border bg-surface-card p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-lg font-semibold">Nozzle {option.displayNumber ?? option.nozzleNumber}</div>
@@ -212,12 +206,23 @@ export default function TinAllocationClient() {
                       <div className="mt-3 rounded border border-[var(--border-default)] p-2 text-xs">
                         <div className="font-medium">Allocated: {allocation.buyer_name || allocation.tin || 'Customer'}</div>
                         <div className="mt-1 text-[var(--text-muted)]">TIN/PIN: {allocation.tin || '—'}</div>
-                        <Button type="button" variant="secondary" size="sm" className="mt-2" onClick={(event) => { event.stopPropagation(); void cancel(allocation) }}>Cancel allocation</Button>
+                        <Button type="button" variant="secondary" size="sm" className="mt-2" onClick={() => void cancel(allocation)}>Cancel allocation</Button>
                       </div>
                     ) : (
-                      <div className="mt-3 text-xs text-[var(--text-secondary)]">{selectedCustomer ? 'Select this nozzle to allocate and authorize.' : 'Select a customer to enable allocation.'}</div>
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs text-[var(--text-secondary)]">{selectedCustomer ? 'Allocate the selected customer to this nozzle.' : 'Select a customer to enable allocation.'}</div>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={() => void allocate(option)}
+                          disabled={!selectedCustomer || !csrfToken || busyKey === key}
+                        >
+                          {busyKey === key ? 'Allocating…' : 'Allocate & authorize'}
+                        </Button>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 )
               })}
             </CardContent>
