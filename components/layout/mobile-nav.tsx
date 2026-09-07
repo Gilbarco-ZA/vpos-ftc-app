@@ -6,21 +6,17 @@ import { Menu } from 'lucide-react'
 
 import { SidebarBranding, SidebarContent } from '@/components/layout/sidebar'
 import { Button } from '@/components/ui/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
 export const MobileNav = ({
   role,
   stationCountry,
+  tinCaptureOrder,
   branding,
 }: {
   role: UserRole
   stationCountry?: string | null
+  tinCaptureOrder?: 'before_transaction' | 'after_transaction' | null
   branding?: SidebarBranding
 }) => {
   const [open, setOpen] = useState(false)
@@ -42,17 +38,13 @@ export const MobileNav = ({
       <SheetContent
         side="left"
         className="w-full max-w-[85vw] border-r-2 p-0 text-[var(--text-primary)] shadow-[0_0_30px_rgba(0,245,255,0.1)] sm:max-w-xs"
-        style={{
-          background: 'var(--surface-page)',
-        }}
+        style={{ background: 'var(--surface-page)' }}
       >
-        <SheetHeader className="sr-only">
-          <SheetTitle>Navigation</SheetTitle>
-        </SheetHeader>
-
+        <SheetHeader className="sr-only"><SheetTitle>Navigation</SheetTitle></SheetHeader>
         <SidebarContent
           role={role}
           stationCountry={stationCountry}
+          tinCaptureOrder={tinCaptureOrder}
           branding={branding}
           collapsed={false}
           showCollapseToggle={false}
