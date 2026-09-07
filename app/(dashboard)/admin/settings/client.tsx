@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AutoPrintReceiptsForm } from './AutoPrintReceiptsForm'
 import { DecimalSettingsForm } from './DecimalSettingsForm'
 import { LinkingWindowForm } from './LinkingWindowForm'
+import { WorkflowOrderingForm } from './WorkflowOrderingForm'
 
 type AdminSettings = {
   linking_window_seconds?: number | null
@@ -19,6 +20,8 @@ type AdminSettings = {
   volume_decimals?: number | null
   unit_price_decimals?: number | null
   auto_print_receipts?: boolean | null
+  print_receipt_order?: 'before_fiscalization' | 'after_fiscalization' | null
+  tin_capture_order?: 'before_transaction' | 'after_transaction' | null
 }
 
 function SettingsSkeleton() {
@@ -98,7 +101,7 @@ export default function AdminSettingsClient() {
     <div className="space-y-4">
       <PageHeader
         title="Station settings"
-        description="Configure station behavior, storage retention, and integrations."
+        description="Configure station behavior, transaction workflow, storage retention, and integrations."
       />
 
       {loadError ? (
@@ -111,12 +114,37 @@ export default function AdminSettingsClient() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Transaction workflow</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Choose when receipts print and whether the tenant captures the
+            customer before or after fuel is dispensed.
+          </p>
+          <WorkflowOrderingForm
+            printReceiptOrder={
+              settings?.print_receipt_order === 'before_fiscalization'
+                ? 'before_fiscalization'
+                : 'after_fiscalization'
+            }
+            tinCaptureOrder={
+              settings?.tin_capture_order === 'before_transaction'
+                ? 'before_transaction'
+                : 'after_transaction'
+            }
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Linking window</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-[var(--text-secondary)]">
-            The linking window determines how long we wait to capture a TIN
-            before auto-fiscalizing without buyer information.
+            When TIN capture is after the pump transaction, the linking window
+            determines how long we wait to allocate a customer before
+            auto-fiscalizing without buyer information.
           </p>
           <LinkingWindowForm currentSeconds={linkingWindowSeconds} />
         </CardContent>
@@ -141,7 +169,8 @@ export default function AdminSettingsClient() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-[var(--text-secondary)]">
-            Control whether receipts print automatically after fiscalization.
+            Enable automatic receipt printing. The transaction workflow setting
+            above determines whether it occurs before or after fiscalization.
           </p>
           <AutoPrintReceiptsForm
             enabled={settings?.auto_print_receipts === true}
