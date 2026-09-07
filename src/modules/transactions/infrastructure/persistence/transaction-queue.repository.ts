@@ -74,10 +74,6 @@ async function attachPendingPreFuelCustomersTx(
     )
   }
 
-  // A station configured for pre-transaction capture must never fall through
-  // the normal linking-window timeout and fiscalize an unmatched sale as an
-  // anonymous customer. Holding the expiry at infinity keeps the transaction
-  // OPEN until the matching nozzle allocation is attached above.
   await txQuery(
     client,
     `UPDATE transactions t
@@ -95,14 +91,152 @@ async function attachPendingPreFuelCustomersTx(
   )
 }
 
+async function requiresCompletedPrePrintTx(client: any, stationId: string) {
+  const result = await txQuery<{
+    auto_print_receipts: boolean
+    print_receipt_order: string | null
+  }>(
+    client,
+    `SELECT auto_print_receipts, print_receipt_order
+       FROM station_settings
+      WHERE station_id = $1::uuid
+      LIMIT 1`,
+    [stationId],
+  )
+  const row = result.rows[0]
+  return Boolean(
+    row?.auto_print_receipts === true &&
+      row?.print_receipt_order === 'before_fiscalization',
+  )
+}
+
+const completedOfflinePrintGate = (transactionAlias: string) => `EXISTS (
+  SELECT 1
+    FROM print_jobs preprint
+   WHERE preprint.station_id = ${transactionAlias}.station_id
+     AND preprint.source_transaction_id = ${transactionAlias}.id
+     AND preprint.status = 'DONE'
+     AND COALESCE(preprint.payload->>'offlinePrint', 'false') = 'true'
+)`
+
+function buildBeforePrintLocalClaim(input: {
+  stationId: string
+  linkingWindowSeconds: number | null
+  limit?: number
+}) {
+  const limit = Math.max(1, Number(input.limit ?? 10))
+  const hasTimer =
+    typeof input.linkingWindowSeconds === 'number' &&
+    input.linkingWindowSeconds > 0
+  const eligibility = hasTimer
+    ? `(
+         customer_id IS NOT NULL
+         OR status = 'PENDING'
+         OR NOW() >= COALESCE(
+              linking_window_expires_at,
+              created_at + ($3::int * INTERVAL '1 second')
+            )
+       )`
+    : `(
+         customer_id IS NOT NULL
+         OR status = 'PENDING'
+       )`
+
+  return {
+    sql: `WITH candidates AS (
+      SELECT id
+        FROM transactions
+       WHERE station_id = $1
+         AND deleted_at IS NULL
+         AND status IN ('OPEN', 'ALLOCATED', 'PENDING')
+         AND (
+           fiscal_queue_enqueued_at IS NULL
+           OR EXISTS (
+             SELECT 1 FROM transaction_queue q
+              WHERE q.station_id = transactions.station_id
+                AND q.transaction_id = transactions.id
+                AND q.status = 'DONE'
+           )
+           OR NOT EXISTS (
+             SELECT 1 FROM transaction_queue q
+              WHERE q.station_id = transactions.station_id
+                AND q.transaction_id = transactions.id
+           )
+         )
+         AND ${eligibility}
+         AND ${completedOfflinePrintGate('transactions')}
+       ORDER BY transaction_date_time ASC
+       LIMIT $2
+       FOR UPDATE SKIP LOCKED
+    )
+    UPDATE transactions t
+       SET fiscal_queue_enqueued_at = NOW(),
+           status = CASE
+                      WHEN t.status = 'OPEN' AND t.customer_id IS NOT NULL
+                      THEN 'ALLOCATED'
+                      ${hasTimer ? `WHEN t.status = 'OPEN' AND t.customer_id IS NULL THEN 'PENDING'` : ''}
+                      ELSE t.status
+                    END,
+           ${hasTimer ? `linking_window_expires_at = COALESCE(t.linking_window_expires_at, t.created_at + ($3::int * INTERVAL '1 second')),` : ''}
+           updated_at = NOW()
+      FROM candidates c
+     WHERE t.id = c.id
+    RETURNING t.id`,
+    params: hasTimer
+      ? [input.stationId, limit, input.linkingWindowSeconds]
+      : [input.stationId, limit],
+  }
+}
+
+function buildBeforePrintProxyClaim(input: {
+  stationId: string
+  linkingWindowSeconds: number | null
+  limit?: number
+}) {
+  const limit = Math.max(1, Math.min(100, Number(input.limit || 10)))
+  return {
+    sql: `WITH eligible AS (
+      SELECT t.id
+        FROM transactions t
+        JOIN station_settings ss ON ss.station_id = t.station_id
+       WHERE t.station_id = $1
+         AND ss.fiscalization_transport = 'proxy'
+         AND t.deleted_at IS NULL
+         AND t.cloud_transaction_id IS NULL
+         AND t.fiscalization_reference IS NULL
+         AND t.status IN ('OPEN','ALLOCATED','PENDING')
+         AND (
+           t.customer_id IS NOT NULL
+           OR NOW() >= COALESCE(
+                t.linking_window_expires_at,
+                t.created_at + (COALESCE($2::int, 0) * INTERVAL '1 second')
+              )
+         )
+         AND ${completedOfflinePrintGate('t')}
+       ORDER BY t.transaction_date_time ASC
+       LIMIT $3
+       FOR UPDATE OF t SKIP LOCKED
+    )
+    UPDATE transactions t
+       SET status = 'FISCALIZING',
+           updated_at = NOW()
+      FROM eligible e
+     WHERE t.id = e.id
+    RETURNING t.*`,
+    params: [input.stationId, input.linkingWindowSeconds, limit],
+  }
+}
+
 export async function claimEligibleTransactionFiscalizationQueueRepo(input: {
   stationId: string
   linkingWindowSeconds: number | null
   limit?: number
 }) {
-  const statement = buildClaimEligibleTransactionFiscalizationQueueSql(input)
   return await withTransaction(async (client) => {
     await attachPendingPreFuelCustomersTx(client, input.stationId)
+    const statement = (await requiresCompletedPrePrintTx(client, input.stationId))
+      ? buildBeforePrintLocalClaim(input)
+      : buildClaimEligibleTransactionFiscalizationQueueSql(input)
     const result = await txQuery<any>(client, statement.sql, statement.params)
     return result.rows
   })
@@ -113,9 +247,11 @@ export async function claimEligibleProxyFiscalizationTransactionsRepo(input: {
   linkingWindowSeconds: number | null
   limit?: number
 }) {
-  const statement = buildClaimEligibleProxyFiscalizationTransactionsSql(input)
   return await withTransaction(async (client) => {
     await attachPendingPreFuelCustomersTx(client, input.stationId)
+    const statement = (await requiresCompletedPrePrintTx(client, input.stationId))
+      ? buildBeforePrintProxyClaim(input)
+      : buildClaimEligibleProxyFiscalizationTransactionsSql(input)
     const result = await txQuery<any>(client, statement.sql, statement.params)
     return result.rows
   })
