@@ -61,26 +61,6 @@ export async function allocatePreFuelCustomer(input: {
     )
   }
 
-  try {
-    await runPosControlCommand({
-      stationId: input.stationId,
-      command: 'preFuelCustomer',
-      body: {
-        pumpNumber,
-        nozzleNumber,
-        nozzleId: allocation.nozzle_id,
-        customerId,
-        wait: true,
-      },
-    })
-  } catch (error) {
-    await cancelPreFuelCustomerAllocation({
-      stationId: input.stationId,
-      allocationId: allocation.id,
-    }).catch(() => {})
-    throw error
-  }
-
   return allocation
 }
 
