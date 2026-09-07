@@ -1,6 +1,7 @@
 import type { SessionUser } from '@/src/shared/types'
 import { NextResponse } from 'next/server'
 
+import { queryOne } from '@/src/platform/db/postgres'
 import { ok, serverError } from '@/src/platform/web/api/response'
 import { requireAuth } from '@/src/shared/auth'
 
@@ -8,6 +9,7 @@ import {
   getReceiptRoutePayload,
   listReceiptRouteRows,
 } from '@/src/modules/transactions/application/queries/get-receipt-route-data'
+import { getOrCreatePreFiscalizationReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/preFiscalizationReceipt'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +25,22 @@ export const GET = async (req: Request) => {
     const previewMode = (searchParams.get('preview') || '').trim() === '1'
 
     if (transactionId && !listMode) {
+      if (previewMode) {
+        const workflow = await queryOne<{ print_receipt_order: string | null }>(
+          `SELECT print_receipt_order
+             FROM station_settings
+            WHERE station_id = $1::uuid
+            LIMIT 1`,
+          [user.stationId],
+        )
+        if (workflow?.print_receipt_order === 'before_fiscalization') {
+          await getOrCreatePreFiscalizationReceipt({
+            stationId: user.stationId,
+            transactionId,
+          })
+        }
+      }
+
       const result = await getReceiptRoutePayload({
         stationId: user.stationId,
         transactionId,
