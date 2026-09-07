@@ -5,17 +5,11 @@ import test from 'node:test'
 const read = (path) => fs.readFileSync(path, 'utf8')
 
 test('station workflow ordering is persisted with backward-compatible defaults', () => {
-  const migration = read(
-    'scripts/migrations/postgres/1290_station_workflow_ordering.sql',
-  )
+  const migration = read('scripts/migrations/postgres/1290_station_workflow_ordering.sql')
   const validation = read('src/shared/validations/index.ts')
   const settings = read('src/shared/settings/station.ts')
-  const admin = read(
-    'src/modules/admin-config/application/saveAdminSettings.ts',
-  )
-  const form = read(
-    'app/(dashboard)/admin/settings/WorkflowOrderingForm.tsx',
-  )
+  const admin = read('src/modules/admin-config/application/saveAdminSettings.ts')
+  const form = read('app/(dashboard)/admin/settings/WorkflowOrderingForm.tsx')
   const page = read('app/(dashboard)/admin/settings/client.tsx')
 
   assert.match(migration, /DEFAULT 'after_fiscalization'/)
@@ -40,18 +34,10 @@ test('station workflow ordering is persisted with backward-compatible defaults',
 })
 
 test('before-fiscalization receipt printing uses offline print and blocks fiscalization until DONE', () => {
-  const autoPrint = read(
-    'src/modules/transactions/infrastructure/fiscalization/autoPrintFiscalReceipt.ts',
-  )
-  const worker = read(
-    'src/modules/transactions/infrastructure/fiscalization/offlineReceiptPrintWorker.ts',
-  )
-  const queue = read(
-    'src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts',
-  )
-  const sendNow = read(
-    'src/modules/transactions/application/commands/send-transaction-to-proxy-now.ts',
-  )
+  const autoPrint = read('src/modules/transactions/infrastructure/fiscalization/autoPrintFiscalReceipt.ts')
+  const worker = read('src/modules/transactions/infrastructure/fiscalization/offlineReceiptPrintWorker.ts')
+  const queue = read('src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts')
+  const sendNow = read('src/modules/transactions/application/commands/send-transaction-to-proxy-now.ts')
 
   assert.match(autoPrint, /'before_fiscalization'/)
   assert.match(autoPrint, /phase === 'before_fiscalization' \? true/)
@@ -65,19 +51,12 @@ test('before-fiscalization receipt printing uses offline print and blocks fiscal
 })
 
 test('Tanzania pre-fiscal receipt reserves verification prefix plus global counter', () => {
-  const assignment = read(
-    'src/modules/tanzania-fiscal/infrastructure/preFiscalizationReceiptAssignment.ts',
-  )
-  const receipt = read(
-    'src/modules/transactions/infrastructure/fiscalization/preFiscalizationReceipt.ts',
-  )
+  const assignment = read('src/modules/tanzania-fiscal/infrastructure/preFiscalizationReceiptAssignment.ts')
+  const receipt = read('src/modules/transactions/infrastructure/fiscalization/preFiscalizationReceipt.ts')
 
   assert.match(assignment, /resolveTanzaniaReceiptVerificationPrefix/)
   assert.match(assignment, /'receipt:global'/)
-  assert.match(
-    assignment,
-    /const receiptVerificationNumber = `\$\{receiptVerificationPrefix\}\$\{globalCounter\}`/,
-  )
+  assert.match(assignment, /const receiptVerificationNumber = `\$\{receiptVerificationPrefix\}\$\{globalCounter\}`/)
   assert.match(assignment, /tanzania_proxy_invoice_assignments/)
   assert.match(receipt, /verificationCode: assignment\.receipt_verification_number/)
   assert.match(receipt, /globalCount: String\(assignment\.global_counter\)/)
@@ -86,15 +65,9 @@ test('Tanzania pre-fiscal receipt reserves verification prefix plus global count
 })
 
 test('linking window controls pre-transaction allocation lifetime and after-transaction fiscalization delay', () => {
-  const repo = read(
-    'src/modules/transactions/infrastructure/preFuelCustomerAllocation.ts',
-  )
-  const queue = read(
-    'src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts',
-  )
-  const transactionSql = read(
-    'src/modules/transactions/infrastructure/persistence/transaction.sql.ts',
-  )
+  const repo = read('src/modules/transactions/infrastructure/preFuelCustomerAllocation.ts')
+  const queue = read('src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts')
+  const transactionSql = read('src/modules/transactions/infrastructure/persistence/transaction.sql.ts')
 
   assert.match(repo, /ss\.linking_window_seconds/)
   assert.match(repo, /COALESCE\(ss\.linking_window_seconds, 0\) <= 0/)
@@ -109,28 +82,49 @@ test('linking window controls pre-transaction allocation lifetime and after-tran
 
 test('before-transaction TIN capture is nozzle-specific, durable and single use', () => {
   const api = read('app/api/transactions/pre-fuel-customer/route.ts')
-  const command = read(
-    'src/modules/transactions/application/commands/manage-pre-fuel-customer.ts',
-  )
-  const repo = read(
-    'src/modules/transactions/infrastructure/preFuelCustomerAllocation.ts',
-  )
-  const queue = read(
-    'src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts',
-  )
+  const command = read('src/modules/transactions/application/commands/manage-pre-fuel-customer.ts')
+  const repo = read('src/modules/transactions/infrastructure/preFuelCustomerAllocation.ts')
+  const queue = read('src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts')
   const tenant = read('components/transactions/TenantTransactionsClient.tsx')
 
   assert.match(api, /roles: \['tenant', 'manager', 'administrator'\]/)
   assert.match(api, /allocatePreFuelCustomer/)
   assert.match(command, /command: 'preFuelCustomer'/)
   assert.match(command, /cancelPreFuelCustomerAllocation/)
-  assert.match(repo, /uq_pre_fuel_customer_allocations_pending_nozzle|ON CONFLICT \(station_id, pump_number, nozzle_number\)/)
+  assert.match(repo, /ON CONFLICT \(station_id, pump_number, nozzle_number\)/)
   assert.match(repo, /status = 'CONSUMED'/)
   assert.match(queue, /ss\.tin_capture_order = 'before_transaction'/)
   assert.match(queue, /customer_id = candidates\.customer_id/)
   assert.match(queue, /'infinity'::timestamptz/)
   assert.match(tenant, /Pre-transaction customer capture/)
-  assert.match(tenant, /\/api\/transactions\/fuel-options/)
-  assert.match(tenant, /\/api\/transactions\/pre-fuel-customer/)
-  assert.match(tenant, /Allocate customer & authorize/)
+})
+
+test('tenant before-transaction flow has a visual pump board and human-readable nozzle numbers', () => {
+  const migration = read('scripts/migrations/postgres/1300_nozzle_display_number.sql')
+  const sidebar = read('components/layout/sidebar.tsx')
+  const layout = read('app/(dashboard)/layout.tsx')
+  const page = read('app/(dashboard)/tin-allocation/page.tsx')
+  const board = read('components/transactions/TinAllocationClient.tsx')
+  const fuelOptions = read('src/modules/transactions/application/queries/list-fuel-options.ts')
+  const pumpState = read('app/api/pumps/state/route.ts')
+  const pumpNozzles = read('src/modules/settings/application/pumpNozzles.ts')
+  const settingsClient = read('app/(dashboard)/settings/pumps/[id]/client.tsx')
+
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS display_number INTEGER/)
+  assert.match(migration, /SET display_number = nozzle_number/)
+  assert.match(migration, /uq_nozzles_active_display_number/)
+  assert.match(sidebar, /label: 'TIN Allocation'/)
+  assert.match(sidebar, /tinCaptureOrder === 'before_transaction'/)
+  assert.match(layout, /tinCaptureOrder=\{tinCaptureOrder\}/)
+  assert.match(page, /settings\?\.tin_capture_order !== 'before_transaction'/)
+  assert.match(page, /TinAllocationClient/)
+  assert.match(board, /Pump \{pumpNumber\}/)
+  assert.match(board, /Nozzle \{option\.displayNumber \?\? option\.nozzleNumber\}/)
+  assert.match(board, /formatState\(state\)/)
+  assert.match(board, /Allocate & authorize/)
+  assert.match(fuelOptions, /COALESCE\(n\.display_number, n\.nozzle_number\)/)
+  assert.match(pumpState, /roles: \['tenant', 'administrator', 'manager'\]/)
+  assert.match(pumpNozzles, /displayNumber/)
+  assert.match(settingsClient, /Display number/)
+  assert.match(settingsClient, /Controller nozzle \/ grade number/)
 })
