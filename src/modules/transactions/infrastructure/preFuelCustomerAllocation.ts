@@ -59,6 +59,8 @@ export async function createPreFuelCustomerAllocation(input: {
      DO UPDATE SET customer_id = EXCLUDED.customer_id,
                    nozzle_id = EXCLUDED.nozzle_id,
                    allocated_by = EXCLUDED.allocated_by,
+                   created_at = NOW(),
+                   cancelled_at = NULL,
                    updated_at = NOW()
      RETURNING *`,
     [
@@ -92,7 +94,21 @@ export async function cancelPreFuelCustomerAllocation(input: {
 
 export async function listPendingPreFuelCustomerAllocations(stationId: string) {
   return await queryAll<PreFuelCustomerAllocation>(
-    `SELECT a.*, c.buyer_name, c.tin
+    `WITH expired AS (
+       UPDATE pre_fuel_customer_allocations a
+          SET status = 'CANCELLED',
+              cancelled_at = NOW(),
+              updated_at = NOW()
+         FROM station_settings ss
+        WHERE ss.station_id = a.station_id
+          AND a.station_id = $1::uuid
+          AND a.status = 'PENDING'
+          AND ss.tin_capture_order = 'before_transaction'
+          AND COALESCE(ss.linking_window_seconds, 0) > 0
+          AND a.created_at + (ss.linking_window_seconds * INTERVAL '1 second') <= NOW()
+       RETURNING a.id
+     )
+     SELECT a.*, c.buyer_name, c.tin
        FROM pre_fuel_customer_allocations a
        JOIN customers c ON c.id = a.customer_id AND c.station_id = a.station_id
       WHERE a.station_id = $1::uuid
@@ -114,17 +130,21 @@ export async function claimPendingPreFuelCustomerAllocationTx(
   if (!input.nozzleNumber) return null
   const result = await txQuery<PreFuelCustomerAllocation>(
     client,
-    `SELECT *
-       FROM pre_fuel_customer_allocations
-      WHERE station_id = $1::uuid
-        AND pump_number = $2::int
-        AND nozzle_number = $3::int
-        AND status = 'PENDING'
-        AND created_at <= $4::timestamptz + INTERVAL '2 minutes'
-        AND created_at >= $4::timestamptz - INTERVAL '4 hours'
-      ORDER BY created_at DESC
+    `SELECT a.*
+       FROM pre_fuel_customer_allocations a
+       JOIN station_settings ss ON ss.station_id = a.station_id
+      WHERE a.station_id = $1::uuid
+        AND a.pump_number = $2::int
+        AND a.nozzle_number = $3::int
+        AND a.status = 'PENDING'
+        AND a.created_at <= $4::timestamptz + INTERVAL '2 minutes'
+        AND (
+          COALESCE(ss.linking_window_seconds, 0) <= 0
+          OR $4::timestamptz < a.created_at + (ss.linking_window_seconds * INTERVAL '1 second')
+        )
+      ORDER BY a.created_at DESC
       LIMIT 1
-      FOR UPDATE`,
+      FOR UPDATE OF a`,
     [input.stationId, input.pumpNumber, input.nozzleNumber, input.occurredAt],
   )
   return result.rows[0] ?? null
