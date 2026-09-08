@@ -15,6 +15,7 @@ This directory separates current guidance from historical evidence.
 - [Technician Setup Guide](manuals/TECHNICIAN_SETUP_GUIDE.md)
 - [Management Guide](manuals/MANAGEMENT_GUIDE.md)
 - [API Guide for Third-Party Developers](manuals/API_GUIDE.md)
+- [Installed-Package API Wire Contract Reference](manuals/API_WIRE_CONTRACTS.md) — concrete request/response DTOs, envelopes, enums, aliases, pagination, content types, and compatibility boundaries for developers who do not have source access
 
 ## Domains
 
