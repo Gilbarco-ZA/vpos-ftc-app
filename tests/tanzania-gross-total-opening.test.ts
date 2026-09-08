@@ -37,6 +37,10 @@ test('Tanzania opening total is persisted, administered, and added during daily 
     'scripts/migrations/postgres/1283_tanzania_receipt_verification_prefix.sql',
     'utf8',
   )
+  const receiptSettingsMigration = readFileSync(
+    'scripts/migrations/postgres/1310_tanzania_receipt_verification_settings.sql',
+    'utf8',
+  )
   const dailyTotals = readFileSync(
     'src/modules/tanzania-fiscal/infrastructure/proxyDailyTotals.ts',
     'utf8',
@@ -73,28 +77,40 @@ test('Tanzania opening total is persisted, administered, and added during daily 
     receiptPrefixMigration,
     /tanzania_receipt_verification_prefix_mode VARCHAR\(16\)/,
   )
-  assert.match(receiptPrefixMigration, /'development', 'production', 'manual'/)
   assert.match(receiptPrefixMigration, /\^\[A-Z0-9\]\{6\}\$/)
+  assert.match(
+    receiptSettingsMigration,
+    /SET tanzania_receipt_verification_prefix_mode = 'registered'/,
+  )
+  assert.match(receiptSettingsMigration, /SET DEFAULT 'registered'/)
+  assert.match(receiptSettingsMigration, /IN \('registered', 'manual'\)/)
+  assert.match(receiptSettingsMigration, /tanzania_receipt_verification_url_mode/)
+  assert.match(receiptSettingsMigration, /'development', 'production', 'manual'/)
   assert.match(dailyTotals, /calculateTanzaniaGrossTotal\(/)
   assert.match(dailyTotals, /ss\.tanzania_gross_total_opening/)
   assert.match(dailyTotals, /opening_gross_total_captured_at/)
   assert.match(dailyTotals, /has not been captured/)
   assert.match(route, /roles: \['administrator'\]/)
   assert.match(route, /createAuditLog/)
-  assert.match(route, /openingGrossTotalCapturedAt/)
   assert.match(route, /setTanzaniaFiscalOpeningValues/)
   assert.match(route, /dailyCounter/)
   assert.match(route, /globalCounter/)
   assert.match(route, /deviceIdOverride/)
   assert.match(route, /receiptVerificationPrefixMode/)
   assert.match(route, /receiptVerificationPrefixOverride/)
+  assert.match(route, /receiptVerificationUrlMode/)
+  assert.match(route, /receiptVerificationUrlOverride/)
+  assert.match(service, /openingGrossTotalCapturedAt/)
   assert.match(service, /counter_key = 'receipt:global'/)
   assert.match(service, /'receipt:' \|\| TO_CHAR/)
   assert.match(service, /counter_value = EXCLUDED\.counter_value/)
   assert.match(service, /CURRENT_TIMESTAMP AT TIME ZONE/)
   assert.match(service, /tanzania_device_id_override/)
   assert.match(service, /tanzania_receipt_verification_prefix_mode/)
+  assert.match(service, /tanzania_receipt_verification_url_mode/)
+  assert.match(service, /registeredReceiptCode/)
   assert.match(service, /effectiveReceiptVerificationPrefix/)
+  assert.match(service, /effectiveReceiptVerificationUrlBase/)
   assert.match(client, /label="Daily counter"/)
   assert.match(client, /label="Global counter"/)
   assert.match(client, /next invoice uses this value \+ 1/i)
@@ -103,8 +119,11 @@ test('Tanzania opening total is persisted, administered, and added during daily 
   assert.match(client, /label="Device ID override"/)
   assert.match(client, /deviceIdOverrideDirty \? \{ deviceIdOverride \} : \{\}/)
   assert.match(client, /FTC does not send this value as deviceId or x-device-id/i)
-  assert.match(client, /Development \(F1D845\)/)
-  assert.match(client, /Production \(4BC37A\)/)
+  assert.match(client, /Registered TRA receiptCode/)
   assert.match(client, /Manual override/)
+  assert.match(client, /Receipt verification URL environment/)
+  assert.match(client, /<option value="development">Development<\/option>/)
+  assert.match(client, /<option value="production">Production<\/option>/)
+  assert.match(client, /<option value="manual">Manual URL<\/option>/)
   assert.match(page, /TanzaniaGrossTotalOpeningClient/)
 })
