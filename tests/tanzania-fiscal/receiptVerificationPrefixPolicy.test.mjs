@@ -62,3 +62,23 @@ test('Tanzania receipt prefix and verification URL selection are persisted and a
   assert.match(metadata, /rctVerificationNum/)
   assert.match(metadata, /receiptVerificationNumber/)
 })
+
+test('Tanzania receipt settings migration drops the legacy prefix constraint before converting values to registered', () => {
+  const settingsMigration = read(
+    'scripts/migrations/postgres/1310_tanzania_receipt_verification_settings.sql',
+  )
+
+  const dropLegacyConstraintAt = settingsMigration.indexOf(
+    'DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_prefix_mode',
+  )
+  const migrateLegacyValuesAt = settingsMigration.indexOf(
+    "SET tanzania_receipt_verification_prefix_mode = 'registered'",
+  )
+
+  assert.notEqual(dropLegacyConstraintAt, -1)
+  assert.notEqual(migrateLegacyValuesAt, -1)
+  assert.ok(
+    dropLegacyConstraintAt < migrateLegacyValuesAt,
+    'legacy prefix mode constraint must be dropped before development/production values are converted to registered',
+  )
+})
