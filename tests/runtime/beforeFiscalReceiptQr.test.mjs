@@ -9,6 +9,9 @@ test('before-fiscalization printing includes unallocated transactions and previe
     'src/modules/transactions/infrastructure/fiscalization/offlineReceiptPrintWorker.ts',
   )
   const route = read('app/api/receipts/route.ts')
+  const previewCommand = read(
+    'src/modules/transactions/application/commands/prepare-receipt-preview.ts',
+  )
   const preFiscalReceipt = read(
     'src/modules/transactions/infrastructure/fiscalization/preFiscalizationReceipt.ts',
   )
@@ -18,9 +21,13 @@ test('before-fiscalization printing includes unallocated transactions and previe
   assert.doesNotMatch(worker, /t\.customer_id IS NOT NULL/)
   assert.doesNotMatch(worker, /ss\.tin_capture_order <> 'before_transaction'/)
 
-  assert.match(route, /previewMode/)
-  assert.match(route, /workflow\?\.print_receipt_order === 'before_fiscalization'/)
-  assert.match(route, /getOrCreatePreFiscalizationReceipt/)
+  assert.match(route, /prepareReceiptPreview/)
+  assert.doesNotMatch(route, /src\/platform\/db\/postgres/)
+  assert.doesNotMatch(route, /\/infrastructure\//)
+
+  assert.match(previewCommand, /previewMode/)
+  assert.match(previewCommand, /workflow\?\.print_receipt_order !== 'before_fiscalization'/)
+  assert.match(previewCommand, /getOrCreatePreFiscalizationReceipt/)
 
   assert.match(preFiscalReceipt, /ensureTanzaniaPreFiscalizationReceiptAssignment/)
   assert.match(preFiscalReceipt, /verificationCode: assignment\.receipt_verification_number/)
