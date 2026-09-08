@@ -7,6 +7,7 @@ import type {
 
 import { queryOne, txQuery, withTransaction } from '@/src/platform/db/postgres'
 
+import { getRegisteredTanzaniaReceiptCode } from '@/src/modules/tanzania-fiscal/application/registeredReceiptCode'
 import { resolveTanzaniaCustomerIdentity } from '@/src/modules/tanzania-fiscal/domain/customerIdentity'
 import { resolveTanzaniaReceiptVerificationPrefix } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
 
@@ -109,6 +110,26 @@ async function allocateAssignment(args: {
   fiscalizationDate: string
   timezone: string
 }) {
+  const existingBeforeLock = await loadAssignment(args.stationId, args.transactionId)
+  if (existingBeforeLock) return existingBeforeLock
+
+  const configuredPrefix = await queryOne<ReceiptPrefixRow>(
+    `SELECT tanzania_receipt_verification_prefix_mode AS receipt_verification_prefix_mode,
+            tanzania_receipt_verification_prefix_override AS receipt_verification_prefix_override
+       FROM station_settings
+      WHERE station_id = $1::uuid
+      LIMIT 1`,
+    [args.stationId],
+  )
+  const configuredPrefixMode =
+    configuredPrefix?.receipt_verification_prefix_mode === 'manual'
+      ? 'manual'
+      : 'registered'
+  const registeredReceiptCode =
+    configuredPrefixMode === 'registered'
+      ? await getRegisteredTanzaniaReceiptCode(args.stationId)
+      : null
+
   return await withTransaction(async (client) => {
     await txQuery(client, `SELECT pg_advisory_xact_lock(hashtext($1))`, [
       `tanzania-proxy-invoice:${args.stationId}:${args.transactionId}`,
@@ -132,8 +153,13 @@ async function allocateAssignment(args: {
       [args.stationId],
     )
     const prefixRow = prefixResult.rows?.[0]
+    const prefixMode =
+      prefixRow?.receipt_verification_prefix_mode === 'manual'
+        ? 'manual'
+        : 'registered'
     const receiptVerificationPrefix = resolveTanzaniaReceiptVerificationPrefix({
-      mode: prefixRow?.receipt_verification_prefix_mode,
+      mode: prefixMode,
+      registeredReceiptCode,
       override: prefixRow?.receipt_verification_prefix_override,
     })
 
