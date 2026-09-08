@@ -6,18 +6,21 @@ ALTER TABLE station_settings
   ADD COLUMN IF NOT EXISTS tanzania_receipt_verification_url_mode VARCHAR(16) NOT NULL DEFAULT 'development',
   ADD COLUMN IF NOT EXISTS tanzania_receipt_verification_url_override TEXT;
 
+-- Remove the legacy mode constraint before migrating existing values to the
+-- new registered/manual model. The legacy constraint only permits
+-- development/production/manual and would reject 'registered'.
+ALTER TABLE station_settings
+  DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_prefix_mode,
+  DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_prefix_manual,
+  DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_url_mode,
+  DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_url_manual;
+
 UPDATE station_settings
    SET tanzania_receipt_verification_prefix_mode = 'registered'
  WHERE tanzania_receipt_verification_prefix_mode IN ('development', 'production');
 
 ALTER TABLE station_settings
   ALTER COLUMN tanzania_receipt_verification_prefix_mode SET DEFAULT 'registered';
-
-ALTER TABLE station_settings
-  DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_prefix_mode,
-  DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_prefix_manual,
-  DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_url_mode,
-  DROP CONSTRAINT IF EXISTS ck_station_settings_tanzania_receipt_url_manual;
 
 ALTER TABLE station_settings
   ADD CONSTRAINT ck_station_settings_tanzania_receipt_prefix_mode
