@@ -62,10 +62,16 @@ test('Tanzania proxy invoice fiscal identifiers use the required authority forma
     'src/modules/transactions/infrastructure/persistence/transaction-read.repository.ts',
   )
 
-  assert.match(prefixPolicy, /development: 'F1D845'/)
-  assert.match(prefixPolicy, /production: '4BC37A'/)
+  assert.match(prefixPolicy, /TanzaniaReceiptVerificationPrefixMode = 'registered' \| 'manual'/)
+  assert.match(prefixPolicy, /DEFAULT_TANZANIA_RECEIPT_VERIFICATION_PREFIX_MODE[\s\S]*'registered'/)
+  assert.match(prefixPolicy, /registeredReceiptCode/)
+  assert.match(prefixPolicy, /TANZANIA_RECEIPT_VERIFICATION_URLS/)
+  assert.match(prefixPolicy, /development: 'https:\/\/virtual\.tra\.go\.tz\/efdmsRctVerify\/'/)
+  assert.match(prefixPolicy, /production: 'https:\/\/verify\.tra\.go\.tz\/'/)
   assert.match(enrichment, /tanzania_receipt_verification_prefix_mode/)
   assert.match(enrichment, /tanzania_receipt_verification_prefix_override/)
+  assert.match(enrichment, /getRegisteredTanzaniaReceiptCode/)
+  assert.match(enrichment, /registeredReceiptCode/)
   assert.match(enrichment, /resolveTanzaniaReceiptVerificationPrefix/)
   assert.match(
     enrichment,
