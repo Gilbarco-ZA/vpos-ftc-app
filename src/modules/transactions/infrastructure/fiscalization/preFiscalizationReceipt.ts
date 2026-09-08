@@ -53,9 +53,11 @@ async function buildTanzaniaPreFiscalizationReceipt(input: {
   if (!assignment) return null
 
   const settings = await queryOne<{
-    tanzania_receipt_verification_prefix_mode: any
+    tanzania_receipt_verification_url_mode: any
+    tanzania_receipt_verification_url_override: string | null
   }>(
-    `SELECT tanzania_receipt_verification_prefix_mode
+    `SELECT tanzania_receipt_verification_url_mode,
+            tanzania_receipt_verification_url_override
        FROM station_settings
       WHERE station_id = $1::uuid`,
     [input.stationId],
@@ -64,7 +66,8 @@ async function buildTanzaniaPreFiscalizationReceipt(input: {
   const invoiceDate = toDateParts(assignment.invoice_date)
   const verificationUrl = buildTanzaniaReceiptVerificationUrl({
     receiptVerificationNumber: assignment.receipt_verification_number,
-    mode: settings?.tanzania_receipt_verification_prefix_mode,
+    urlMode: settings?.tanzania_receipt_verification_url_mode,
+    urlOverride: settings?.tanzania_receipt_verification_url_override,
     invoiceDate: assignment.invoice_date,
     receiptTime: invoiceDate.time,
   })
