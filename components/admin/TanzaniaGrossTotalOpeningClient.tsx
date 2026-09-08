@@ -19,7 +19,8 @@ import { FormField } from '@/components/ui/form-field'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 
-type ReceiptVerificationPrefixMode = 'development' | 'production' | 'manual'
+type ReceiptVerificationPrefixMode = 'registered' | 'manual'
+type ReceiptVerificationUrlMode = 'development' | 'production' | 'manual'
 
 type GrossTotalSummary = {
   openingGrossTotal: number
@@ -31,9 +32,13 @@ type GrossTotalSummary = {
   globalCounter: number
   dailyCounterDate: string | null
   deviceIdOverride: string | null
+  registeredReceiptCode: string | null
   receiptVerificationPrefixMode: ReceiptVerificationPrefixMode
   receiptVerificationPrefixOverride: string | null
-  effectiveReceiptVerificationPrefix: string
+  effectiveReceiptVerificationPrefix: string | null
+  receiptVerificationUrlMode: ReceiptVerificationUrlMode
+  receiptVerificationUrlOverride: string | null
+  effectiveReceiptVerificationUrlBase: string
 }
 
 const endpoint = '/api/admin/tanzania-fiscal/gross-total-opening'
@@ -61,21 +66,50 @@ export function TanzaniaGrossTotalOpeningClient() {
   const [globalCounter, setGlobalCounter] = useState('0')
   const [deviceIdOverride, setDeviceIdOverride] = useState('')
   const [receiptVerificationPrefixMode, setReceiptVerificationPrefixMode] =
-    useState<ReceiptVerificationPrefixMode>('development')
+    useState<ReceiptVerificationPrefixMode>('registered')
   const [
     receiptVerificationPrefixOverride,
     setReceiptVerificationPrefixOverride,
   ] = useState('')
+  const [receiptVerificationUrlMode, setReceiptVerificationUrlMode] =
+    useState<ReceiptVerificationUrlMode>('development')
+  const [receiptVerificationUrlOverride, setReceiptVerificationUrlOverride] =
+    useState('')
   const [dailyCounterDirty, setDailyCounterDirty] = useState(false)
   const [globalCounterDirty, setGlobalCounterDirty] = useState(false)
   const [deviceIdOverrideDirty, setDeviceIdOverrideDirty] = useState(false)
   const [receiptVerificationPrefixDirty, setReceiptVerificationPrefixDirty] =
+    useState(false)
+  const [receiptVerificationUrlDirty, setReceiptVerificationUrlDirty] =
     useState(false)
   const [csrfToken, setCsrfToken] = useState('')
   const [busy, setBusy] = useState<'load' | 'save' | null>('load')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const openingNotCaptured = summary?.openingGrossTotalCaptured === false
+
+  const applySummary = (data: GrossTotalSummary) => {
+    setSummary(data)
+    setOpeningGrossTotal(Number(data.openingGrossTotal || 0).toFixed(2))
+    setDailyCounter(String(Number(data.dailyCounter || 0)))
+    setGlobalCounter(String(Number(data.globalCounter || 0)))
+    setDeviceIdOverride(data.deviceIdOverride ?? '')
+    setReceiptVerificationPrefixMode(
+      data.receiptVerificationPrefixMode ?? 'registered',
+    )
+    setReceiptVerificationPrefixOverride(
+      data.receiptVerificationPrefixOverride ?? '',
+    )
+    setReceiptVerificationUrlMode(
+      data.receiptVerificationUrlMode ?? 'development',
+    )
+    setReceiptVerificationUrlOverride(data.receiptVerificationUrlOverride ?? '')
+    setDailyCounterDirty(false)
+    setGlobalCounterDirty(false)
+    setDeviceIdOverrideDirty(false)
+    setReceiptVerificationPrefixDirty(false)
+    setReceiptVerificationUrlDirty(false)
+  }
 
   const load = useCallback(async () => {
     setBusy('load')
@@ -88,22 +122,7 @@ export function TanzaniaGrossTotalOpeningClient() {
           messageFrom(body, 'Failed to load Tanzania fiscal opening values'),
         )
       }
-      const data = (body?.data ?? body) as GrossTotalSummary
-      setSummary(data)
-      setOpeningGrossTotal(Number(data.openingGrossTotal || 0).toFixed(2))
-      setDailyCounter(String(Number(data.dailyCounter || 0)))
-      setGlobalCounter(String(Number(data.globalCounter || 0)))
-      setDeviceIdOverride(data.deviceIdOverride ?? '')
-      setReceiptVerificationPrefixMode(
-        data.receiptVerificationPrefixMode ?? 'development',
-      )
-      setReceiptVerificationPrefixOverride(
-        data.receiptVerificationPrefixOverride ?? '',
-      )
-      setDailyCounterDirty(false)
-      setGlobalCounterDirty(false)
-      setDeviceIdOverrideDirty(false)
-      setReceiptVerificationPrefixDirty(false)
+      applySummary((body?.data ?? body) as GrossTotalSummary)
     } catch (reason: any) {
       setError(reason?.message || String(reason))
     } finally {
@@ -135,8 +154,13 @@ export function TanzaniaGrossTotalOpeningClient() {
           ...(receiptVerificationPrefixDirty
             ? {
                 receiptVerificationPrefixMode,
-                receiptVerificationPrefixOverride:
-                  receiptVerificationPrefixOverride,
+                receiptVerificationPrefixOverride,
+              }
+            : {}),
+          ...(receiptVerificationUrlDirty
+            ? {
+                receiptVerificationUrlMode,
+                receiptVerificationUrlOverride,
               }
             : {}),
         }),
@@ -147,22 +171,7 @@ export function TanzaniaGrossTotalOpeningClient() {
           messageFrom(body, 'Failed to save Tanzania fiscal opening values'),
         )
       }
-      const data = (body?.data ?? body) as GrossTotalSummary
-      setSummary(data)
-      setOpeningGrossTotal(Number(data.openingGrossTotal || 0).toFixed(2))
-      setDailyCounter(String(Number(data.dailyCounter || 0)))
-      setGlobalCounter(String(Number(data.globalCounter || 0)))
-      setDeviceIdOverride(data.deviceIdOverride ?? '')
-      setReceiptVerificationPrefixMode(
-        data.receiptVerificationPrefixMode ?? 'development',
-      )
-      setReceiptVerificationPrefixOverride(
-        data.receiptVerificationPrefixOverride ?? '',
-      )
-      setDailyCounterDirty(false)
-      setGlobalCounterDirty(false)
-      setDeviceIdOverrideDirty(false)
-      setReceiptVerificationPrefixDirty(false)
+      applySummary((body?.data ?? body) as GrossTotalSummary)
       setNotice('Tanzania fiscal settings saved.')
     } catch (reason: any) {
       setError(reason?.message || String(reason))
@@ -176,9 +185,9 @@ export function TanzaniaGrossTotalOpeningClient() {
       <CardHeader>
         <CardTitle>Fiscal values and local compatibility settings</CardTitle>
         <CardDescription>
-          Capture the cumulative grossTotal baseline and receipt counters,
-          select the receipt verification environment, and manage optional
-          compatibility values.
+          Capture the cumulative grossTotal baseline and receipt counters, use
+          the TRA-issued receiptCode or a manual prefix, and independently choose
+          the TRA receipt-verification URL used by QR codes.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -275,14 +284,34 @@ export function TanzaniaGrossTotalOpeningClient() {
             </p>
           </div>
           <div className="rounded-lg border p-3">
+            <p className="text-muted-foreground text-xs">TRA receiptCode</p>
+            <p className="mt-1 text-lg font-semibold">
+              {summary?.registeredReceiptCode || 'Unavailable'}
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Captured by vpos-proxy from successful TRA registration
+            </p>
+          </div>
+          <div className="rounded-lg border p-3">
             <p className="text-muted-foreground text-xs">
-              Receipt verification prefix
+              Effective receipt prefix
             </p>
             <p className="mt-1 text-lg font-semibold">
               {summary?.effectiveReceiptVerificationPrefix || '—'}
             </p>
             <p className="text-muted-foreground mt-1 text-xs capitalize">
               {summary?.receiptVerificationPrefixMode || 'Not loaded'}
+            </p>
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="text-muted-foreground text-xs">
+              Receipt verification URL
+            </p>
+            <p className="mt-1 break-all text-sm font-semibold">
+              {summary?.effectiveReceiptVerificationUrlBase || '—'}
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs capitalize">
+              {summary?.receiptVerificationUrlMode || 'Not loaded'}
             </p>
           </div>
           <div className="rounded-lg border p-3">
@@ -357,8 +386,8 @@ export function TanzaniaGrossTotalOpeningClient() {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <FormField
-            label="Receipt verification environment"
-            helpText="Development uses F1D845. Production uses 4BC37A. Choose Manual override only when a different authority-issued prefix is required."
+            label="Receipt verification prefix source"
+            helpText="Use the receiptCode returned by TRA registration, or explicitly override the prefix for this station."
             required
           >
             <Select
@@ -371,8 +400,7 @@ export function TanzaniaGrossTotalOpeningClient() {
                 setReceiptVerificationPrefixDirty(true)
               }}
             >
-              <option value="development">Development (F1D845)</option>
-              <option value="production">Production (4BC37A)</option>
+              <option value="registered">Registered TRA receiptCode</option>
               <option value="manual">Manual override</option>
             </Select>
           </FormField>
@@ -399,6 +427,49 @@ export function TanzaniaGrossTotalOpeningClient() {
                   event.target.value.toUpperCase(),
                 )
                 setReceiptVerificationPrefixDirty(true)
+              }}
+            />
+          </FormField>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <FormField
+            label="Receipt verification URL environment"
+            helpText="Select the TRA verification service used to build receipt QR codes. This setting does not change the receipt prefix."
+            required
+          >
+            <Select
+              value={receiptVerificationUrlMode}
+              disabled={busy !== null}
+              onChange={(event) => {
+                setReceiptVerificationUrlMode(
+                  event.target.value as ReceiptVerificationUrlMode,
+                )
+                setReceiptVerificationUrlDirty(true)
+              }}
+            >
+              <option value="development">Development</option>
+              <option value="production">Production</option>
+              <option value="manual">Manual URL</option>
+            </Select>
+          </FormField>
+
+          <FormField
+            label="Manual TRA verification URL"
+            helpText="Base URL used only when Manual URL is selected. The receipt verification value is appended to this URL."
+            required={receiptVerificationUrlMode === 'manual'}
+          >
+            <Input
+              type="url"
+              maxLength={500}
+              autoComplete="off"
+              spellCheck={false}
+              value={receiptVerificationUrlOverride}
+              disabled={busy !== null || receiptVerificationUrlMode !== 'manual'}
+              placeholder="https://example.tra.go.tz/verify/"
+              onChange={(event) => {
+                setReceiptVerificationUrlOverride(event.target.value)
+                setReceiptVerificationUrlDirty(true)
               }}
             />
           </FormField>
