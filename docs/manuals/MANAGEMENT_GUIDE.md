@@ -2,7 +2,7 @@
 
 **Audience:** Station managers, supervisors, administrators, and operational support staff  
 **Purpose:** Operate and manage an installed VPOS FTC station safely and consistently.  
-**Documentation baseline:** `vpos-ftc-app` commit `2b0ad7f21c7ef19a4b7c6e8dad8293f155c745c3`
+**Documentation baseline:** reviewed against `vpos-ftc-app` `main` commit `bbd11ab2ee9d364fd96771c7f4119d0199a03923` on 2026-09-08
 
 This guide describes the current role-based VPOS interface. Some menu items are country-dependent or configuration-dependent. Tanzania fiscal functions, for example, are shown only for Tanzania stations.
 
@@ -151,6 +151,8 @@ Before taking corrective action:
 
 Do not repeatedly resubmit or duplicate a fiscal request without understanding the prior state. Escalate persistent failures with the transaction ID and any request/error reference shown by the system.
 
+For Tanzania stations, a delayed transaction can retain its original transaction-date invoice/daily-counter scope even when its first receipt/fiscal assignment happens on a later date. That is expected. Do not treat a difference between the invoice-number date and Z-number/invoice date as corruption by itself.
+
 ## 7. Fiscalized transactions and receipt lookup
 
 Use **Fiscalized** and **Receipt Viewer** to confirm that completed transactions have the expected fiscal and receipt information.
@@ -163,12 +165,16 @@ Managers and administrators can request a receipt print from the transaction wor
 
 Use **Receipts** for normal receipt access. Administrators can use **Print Jobs** for printer troubleshooting and queue visibility.
 
+For stations configured to print before fiscalization, opening a receipt preview can reserve/persist receipt identity. In Tanzania this may allocate the receipt verification identity, global counter, transaction-date daily counter, fiscal-date Z number, and invoice date before fiscalization completes. Reopening or retrying the same transaction is expected to reuse that persisted identity rather than generate a new one.
+
 If a receipt does not print:
 
 1. confirm that the transaction exists and has the expected receipt data
 2. check whether a print job was created
 3. check printer connectivity and paper/device status
 4. retry only after establishing whether the first job failed or remains queued
+
+If a receipt preview itself returns an internal error, record the transaction ID and `requestId` before retrying. Do not delete or recreate the customer or transaction as the first troubleshooting step.
 
 Printer configuration is an administrator function under **Printers** and should not be changed as a first response to a single failed print.
 
@@ -191,7 +197,9 @@ For Tanzania stations, **Daily Totals** is available in Daily Operations and Tan
 
 Use these functions according to the station's fiscal operating procedure. Treat any discrepancy between local transaction totals, fiscal totals, and TRA-facing records as an exception requiring investigation.
 
-Do not manually change receipt-verification or fiscal device settings to correct a single transaction discrepancy.
+The Tanzania receipt daily counter is scoped to the originating transaction business date, while the Z number and invoice date are scoped to the first fiscalization/pre-fiscalization assignment date. Delayed transactions can therefore legitimately show the same daily-counter value under a later Z number when their originating dates differ.
+
+Do not manually change receipt-verification, daily/global counter, or fiscal device settings to correct a single transaction discrepancy. Current deployments include migration `1320_tanzania_assignment_counter_scope.sql`, which removes the obsolete database uniqueness rule that incorrectly rejected this valid cross-date case.
 
 ## 11. Customer management
 
@@ -200,6 +208,8 @@ Use **Customers** to locate and maintain customer records used by station operat
 Before creating a duplicate customer, search by the known customer identifiers. Where tax/TIN information is captured, verify the value against the source supplied by the customer or the applicable station process.
 
 Do not repurpose one customer's record for another customer merely to complete a transaction.
+
+If a receipt problem appears only when a customer is assigned, preserve the customer association and capture the receipt/API error details first. Customer data may change the receipt content, but it does not define Tanzania counter allocation or sequencing.
 
 ## 12. Product stock
 
@@ -314,6 +324,8 @@ Useful evidence normally includes:
 - fiscal/proxy state when relevant
 - exact error text and request/reference IDs
 
+For API errors that include a `requestId`, preserve that value. Support can use it to correlate the visible failure with station-side logs, including database details that are intentionally not exposed to the browser.
+
 Avoid screenshots that omit timestamps, transaction IDs, or the affected device when those details are available.
 
 ## 20. Proxy and fiscal services
@@ -322,12 +334,14 @@ Avoid screenshots that omit timestamps, transaction IDs, or the affected device 
 
 When fiscalization is degraded, determine whether the failure is:
 
-- local transaction generation
+- local transaction/receipt generation
 - station-to-proxy connectivity/configuration
 - proxy/cloud processing
 - country fiscal service/device processing
 
-Do not alter proxy URLs, credentials, fiscal device values, or Tanzania verification settings as a generic troubleshooting step.
+For Tanzania receipt-preview failures, distinguish a local assignment/database failure from a proxy/cloud failure. Receipt preview may allocate the persisted Tanzania receipt identity locally before proxy fiscal delivery begins.
+
+Do not alter proxy URLs, credentials, fiscal device values, Tanzania verification settings, or counter values as a generic troubleshooting step.
 
 ## 21. Station Settings, Station Config, datasets, languages, and branding
 
@@ -361,8 +375,9 @@ Recommended checks:
 - confirm significant pump/tank faults are logged
 - confirm failed print jobs requiring action are known
 - for Tanzania stations, complete the required fiscal daily procedure
+- identify delayed Tanzania transactions that remain non-fiscalized and preserve their transaction IDs for follow-up
 - record any configuration or price changes made during the shift
-- provide transaction IDs and diagnostic references for open support cases
+- provide transaction IDs and diagnostic/request references for open support cases
 
 ## 24. Troubleshooting decision guide
 
@@ -370,6 +385,8 @@ Recommended checks:
 | --- | --- | --- |
 | One transaction missing/incorrect | Search by transaction ID/pump/time and check status | Inspect diagnostics/fiscal state before recovery action |
 | Many transactions not fiscalizing | Check Non-fiscalized view and establish start time | Check proxy/fiscal status and logs/diagnostics |
+| Tanzania receipt preview returns internal error | Record transaction ID and `requestId`; do not recreate customer/transaction | Correlate request ID with server logs; verify current package/migrations, especially migration 1320 for the retired Z/daily constraint |
+| Delayed Tanzania receipt shows older invoice-number date than Z-number date | Treat as potentially expected and verify transaction origin date | Confirm persisted assignment uses transaction-date daily counter and fiscal-date Z/invoice date |
 | One pump unavailable | Check pump state and physical forecourt condition | Check device/JPL details and mapping |
 | All/many pumps stale | Treat as forecourt connectivity issue | Inspect Forecourt Monitor/Diagnostics and JPL session |
 | Receipt not printed | Confirm transaction/receipt and avoid duplicate prints | Check Print Jobs and printer connectivity |
@@ -387,8 +404,11 @@ When escalating to technical support, provide enough information to reproduce th
 - exact menu/workflow
 - transaction, pump, nozzle, tank, receipt, or print-job reference as applicable
 - exact error message
+- API `requestId` where present
+- whether the transaction has an assigned customer/TIN where relevant to reproduction
 - whether the issue affects one item or the whole station
 - last known successful time
+- whether the transaction originated on an earlier business date
 - whether any configuration/restart/change was made immediately beforehand
 
 ## 26. Operating principles
@@ -397,6 +417,7 @@ When escalating to technical support, provide enough information to reproduce th
 - Prefer diagnosis over repeated retry/restart actions.
 - Keep VPOS configuration consistent with the physical site and DOMS/PSS configuration.
 - Apply pricing, topology, fiscal, and runtime changes only under the appropriate authority.
+- For Tanzania, do not manually normalize invoice-number, daily-counter, Z-number, or invoice-date values across delayed transactions; their date scopes are intentionally different.
 - Use administrator access sparingly.
 - Record unresolved exceptions at shift handover.
 
