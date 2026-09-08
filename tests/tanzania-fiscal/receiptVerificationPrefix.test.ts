@@ -8,16 +8,31 @@ import {
 } from '../../src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
 import { extractTanzaniaProxyReceiptMetadata } from '../../src/modules/tanzania-fiscal/domain/proxyReceiptMetadata'
 
-test('resolves the built-in Tanzania receipt prefixes', () => {
+test('resolves the registered TRA receiptCode as the default prefix', () => {
   assert.equal(
-    resolveTanzaniaReceiptVerificationPrefix({ mode: 'development' }),
+    resolveTanzaniaReceiptVerificationPrefix({
+      mode: 'registered',
+      registeredReceiptCode: ' f1d845 ',
+    }),
     'F1D845',
   )
   assert.equal(
-    resolveTanzaniaReceiptVerificationPrefix({ mode: 'production' }),
+    resolveTanzaniaReceiptVerificationPrefix({
+      registeredReceiptCode: '4bc37a',
+    }),
     '4BC37A',
   )
-  assert.equal(resolveTanzaniaReceiptVerificationPrefix({}), 'F1D845')
+})
+
+test('rejects registered prefix mode when TRA receiptCode is unavailable', () => {
+  assert.throws(
+    () => resolveTanzaniaReceiptVerificationPrefix({ mode: 'registered' }),
+    /registered Tanzania receiptCode is unavailable/i,
+  )
+  assert.throws(
+    () => resolveTanzaniaReceiptVerificationPrefix({}),
+    /registered Tanzania receiptCode is unavailable/i,
+  )
 })
 
 test('normalizes and resolves a manual Tanzania receipt prefix', () => {
@@ -84,11 +99,11 @@ test('does not confuse invoice number with receipt verification number', () => {
   assert.equal(metadata?.receiptVerificationNumber, 'F1D8455')
 })
 
-test('builds scannable TRA verification URLs for proxy receipts', () => {
+test('builds scannable TRA verification URLs independently of prefix source', () => {
   assert.equal(
     buildTanzaniaReceiptVerificationUrl({
       receiptVerificationNumber: 'F1D845335741',
-      mode: 'development',
+      urlMode: 'development',
       invoiceDate: '2026-09-02T09:14:35+03:00',
     }),
     'https://virtual.tra.go.tz/efdmsRctVerify/F1D845335741_091435',
@@ -96,9 +111,18 @@ test('builds scannable TRA verification URLs for proxy receipts', () => {
   assert.equal(
     buildTanzaniaReceiptVerificationUrl({
       receiptVerificationNumber: '4BC37A335741',
-      mode: 'production',
+      urlMode: 'production',
       invoiceDate: '2026-09-02T09:14:35+03:00',
     }),
     'https://verify.tra.go.tz/4BC37A335741_091435',
+  )
+  assert.equal(
+    buildTanzaniaReceiptVerificationUrl({
+      receiptVerificationNumber: 'ABC1239',
+      urlMode: 'manual',
+      urlOverride: 'https://example.test/tra-verify',
+      invoiceDate: '2026-09-02T09:14:35+03:00',
+    }),
+    'https://example.test/tra-verify/ABC1239_091435',
   )
 })
