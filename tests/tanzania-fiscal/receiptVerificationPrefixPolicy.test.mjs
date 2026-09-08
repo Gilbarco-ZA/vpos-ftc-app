@@ -8,9 +8,12 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../..')
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8')
 
-test('Tanzania receipt prefix selection is persisted and administered', () => {
-  const migration = read(
+test('Tanzania receipt prefix and verification URL selection are persisted and administered independently', () => {
+  const prefixMigration = read(
     'scripts/migrations/postgres/1283_tanzania_receipt_verification_prefix.sql',
+  )
+  const settingsMigration = read(
+    'scripts/migrations/postgres/1310_tanzania_receipt_verification_settings.sql',
   )
   const service = read(
     'src/modules/tanzania-fiscal/application/grossTotalOpening.ts',
@@ -22,24 +25,40 @@ test('Tanzania receipt prefix selection is persisted and administered', () => {
   const metadata = read(
     'src/modules/tanzania-fiscal/domain/proxyReceiptMetadata.ts',
   )
+  const receiptCode = read(
+    'src/modules/tanzania-fiscal/application/registeredReceiptCode.ts',
+  )
 
   assert.match(
-    migration,
+    prefixMigration,
     /tanzania_receipt_verification_prefix_mode VARCHAR\(16\)/,
   )
-  assert.match(migration, /DEFAULT 'development'/)
-  assert.match(migration, /'development', 'production', 'manual'/)
-  assert.match(migration, /\^\[A-Z0-9\]\{6\}\$/)
+  assert.match(prefixMigration, /\^\[A-Z0-9\]\{6\}\$/)
+  assert.match(settingsMigration, /SET tanzania_receipt_verification_prefix_mode = 'registered'/)
+  assert.match(settingsMigration, /SET DEFAULT 'registered'/)
+  assert.match(settingsMigration, /IN \('registered', 'manual'\)/)
+  assert.match(settingsMigration, /tanzania_receipt_verification_url_mode/)
+  assert.match(settingsMigration, /'development', 'production', 'manual'/)
+  assert.match(service, /registeredReceiptCode/)
   assert.match(service, /tanzania_receipt_verification_prefix_mode/)
   assert.match(service, /tanzania_receipt_verification_prefix_override/)
+  assert.match(service, /tanzania_receipt_verification_url_mode/)
+  assert.match(service, /tanzania_receipt_verification_url_override/)
   assert.match(service, /effectiveReceiptVerificationPrefix/)
+  assert.match(service, /effectiveReceiptVerificationUrlBase/)
   assert.match(route, /receiptVerificationPrefixMode/)
   assert.match(route, /receiptVerificationPrefixOverride/)
+  assert.match(route, /receiptVerificationUrlMode/)
+  assert.match(route, /receiptVerificationUrlOverride/)
   assert.match(route, /createAuditLog/)
-  assert.match(client, /Development \(F1D845\)/)
-  assert.match(client, /Production \(4BC37A\)/)
+  assert.match(client, /Registered TRA receiptCode/)
   assert.match(client, /Manual override/)
+  assert.match(client, /Receipt verification URL environment/)
+  assert.match(client, /<option value="development">Development<\/option>/)
+  assert.match(client, /<option value="production">Production<\/option>/)
+  assert.match(client, /<option value="manual">Manual URL<\/option>/)
   assert.match(client, /existing assignments retain their original prefix/i)
+  assert.match(receiptCode, /\/api\/tanzania\/registrations\/tra\/status/)
   assert.match(metadata, /rctVerificationNum/)
   assert.match(metadata, /receiptVerificationNumber/)
 })
