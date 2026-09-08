@@ -2,7 +2,7 @@
 
 **Audience:** Gilbarco/authorized field technicians and commissioning engineers  
 **Purpose:** Install and commission the packaged `vpos-ftc-app` on a production DOMS/PSS site.  
-**Documentation baseline:** `vpos-ftc-app` commit `2b0ad7f21c7ef19a4b7c6e8dad8293f155c745c3`  
+**Documentation baseline:** reviewed against `vpos-ftc-app` `main` commit `bbd11ab2ee9d364fd96771c7f4119d0199a03923` on 2026-09-08  
 **Applies to:** packaged CPB-539 (`armv7l`) and CPB-579 (`arm64`) targets built by the production pipeline.
 
 > **Safety and change-control boundary**
@@ -103,6 +103,8 @@ On startup, VPOS performs bootstrap work including database availability checks 
 Do not manually edit migration state or run SQL migrations by hand as part of normal commissioning.
 
 If startup fails during a migration, capture the complete error and resolve the migration/database problem before continuing setup.
+
+Current Tanzania deployments must include migration `1320_tanzania_assignment_counter_scope.sql`. It removes a legacy uniqueness rule that incorrectly coupled fiscal-date Z numbers to transaction-date daily counters for delayed transactions. Do not re-create that removed constraint in production.
 
 ## 6. Confirm process health before configuration
 
@@ -319,6 +321,19 @@ For Tanzania stations, also complete the current Tanzania fiscal commissioning w
 
 Do not bypass device registration, receipt-code, TRA verification, or fiscal cutover checks merely to complete station setup.
 
+### Tanzania receipt identity and delayed transactions
+
+When receipt workflow is configured to print before fiscalization, opening a receipt in preview mode can persist the pre-fiscalization receipt identity. That is expected behavior and is not a read-only rendering operation.
+
+The current Tanzania identity model intentionally uses two date scopes:
+
+- `invoiceNumber` and `dailyCounter` are tied to the originating transaction date in the station timezone.
+- `zNumber` and `invoiceDate` are tied to the first fiscalization/pre-fiscalization assignment date.
+
+For a delayed transaction, those dates can legitimately differ. A `dailyCounter` value may therefore appear under a later `zNumber` even when another originating business date used the same daily-counter value. Migration `1320_tanzania_assignment_counter_scope.sql` removes the obsolete database rule that rejected this valid case.
+
+Receipt identity is persisted and reused by later preview/fiscalization attempts. Do not manually renumber a delayed transaction merely because its invoice-number date differs from its Z-number date.
+
 ## 18. Finalize setup
 
 The Setup Wizard considers the core setup ready to finalize when it has, at minimum:
@@ -359,6 +374,8 @@ Minimum evidence:
 - tank-level/wet-stock visibility where configured
 - no unresolved alarms or repeated protocol/session errors
 
+For Tanzania stations using pre-fiscalization receipt printing, include a controlled receipt-preview check. Verify customer-assigned and non-customer transactions render correctly. Where approved test data includes a delayed/non-fiscalized transaction from an earlier business date, verify that its receipt can be previewed without a counter-collision error and that later retries reuse the same persisted Tanzania receipt identity.
+
 Where a fuel transaction is required for acceptance, use the site's controlled test procedure and reconcile the test sale afterward.
 
 ## 20. Reboot/recovery check
@@ -396,6 +413,16 @@ Do not accept a station that works only until the next package restart.
 - capture the complete PostgreSQL error including SQLSTATE and constraint name
 - verify the package contains the current migrations
 - do not modify `schema_migrations` manually unless directed by an approved recovery procedure
+
+### Tanzania receipt preview returns `500`
+
+1. Record the transaction ID, station-local time, user workflow, and API `requestId` shown in the error response.
+2. Inspect station/server logs using the same `requestId` and record PostgreSQL `pgCode`, `pgDetail`, and `pgConstraint` when present.
+3. If the error references `tanzania_proxy_invoice_assign_station_id_z_number_daily_cou_key`, verify the installed package includes migration `1320_tanzania_assignment_counter_scope.sql` and that migrations completed successfully.
+4. Upgrade/apply the approved current package rather than editing receipt assignments or counters by hand.
+5. Retry the same receipt after the migration is present. A failed assignment attempt is transaction-protected; do not create a replacement transaction merely to obtain a new counter.
+
+Customer assignment changes what customer data appears on the receipt, but it does not define Tanzania counter scope. If a failure occurs only when a customer is assigned, still diagnose the logged server/database error before modifying customer data.
 
 ### JPL test cannot connect
 
@@ -443,6 +470,7 @@ Record and hand over:
 - [ ] products and prices checked
 - [ ] printer tests passed
 - [ ] proxy/fiscal checks passed where applicable
+- [ ] Tanzania receipt-preview/delayed-transaction behavior checked where applicable
 - [ ] controlled transaction/receipt test completed
 - [ ] restart/recovery check completed
 - [ ] diagnostics/support evidence captured
@@ -454,6 +482,7 @@ Record and hand over:
 - [Configuration](../configuration.md)
 - [Startup flow](../startup-flow.md)
 - [Forecourt and DOMS/JPL](../domains/forecourt.md)
+- [Tanzania fiscalization](../domains/tanzania-fiscalization.md)
 - [Commissioning runbook](../runbooks/commissioning.md)
 - [Forecourt recovery](../runbooks/forecourt-recovery.md)
 - [Secure artifacts](../runbooks/secure-artifacts.md)
