@@ -38,8 +38,12 @@ test('Tanzania assignments retain independent transaction, invoice, and global-c
   assert.match(originalMigration, /UNIQUE \(station_id, invoice_number\)/)
   assert.match(originalMigration, /UNIQUE \(station_id, global_counter\)/)
 
-  assert.doesNotMatch(
-    scopeMigration,
-    /DROP CONSTRAINT IF EXISTS[^;]*(invoice|global)/i,
+  const droppedConstraints = Array.from(
+    scopeMigration.matchAll(/DROP CONSTRAINT IF EXISTS\s+([A-Za-z0-9_]+)/g),
+    (match) => match[1],
   )
+
+  assert.deepEqual(droppedConstraints, [
+    'tanzania_proxy_invoice_assign_station_id_z_number_daily_cou_key',
+  ])
 })
