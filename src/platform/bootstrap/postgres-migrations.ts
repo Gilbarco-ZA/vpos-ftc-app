@@ -30,6 +30,7 @@ const CHECKSUM_BYPASS = new Set([
   '036_product_price_slices.sql',
   '037_rename_pump_number.sql',
   '038_transaction_lines.sql',
+  '1310_tanzania_receipt_verification_settings.sql',
 ])
 
 type MigrationGlobals = typeof globalThis & {
