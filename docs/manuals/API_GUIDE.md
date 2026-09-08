@@ -2,7 +2,7 @@
 
 **Audience:** Approved third-party developers, integrators, monitoring teams, and solution architects  
 **Purpose:** Describe the current HTTP API surface of an installed VPOS FTC station and the boundary between supported operational endpoints and internal application APIs.  
-**Documentation baseline:** `vpos-ftc-app` commit `2b0ad7f21c7ef19a4b7c6e8dad8293f155c745c3`
+**Documentation baseline:** reviewed against `vpos-ftc-app` `main` commit `bbd11ab2ee9d364fd96771c7f4119d0199a03923` on 2026-09-08
 
 ## 1. Current API status
 
@@ -16,6 +16,8 @@ Third-party developers should therefore distinguish between:
 2. **session-protected application endpoints**, which must not be treated as a stable external contract unless an explicit integration agreement says otherwise.
 
 Do not build a production integration by scraping browser behavior or depending on undocumented internal routes.
+
+A route using HTTP `GET` is also not automatically side-effect free in the current internal application API. For example, receipt preview can prepare and persist receipt identity when the station is configured to print before fiscalization. This is one reason internal routes must not be treated as a conventional external REST contract without explicit documentation.
 
 ## 2. Base URL
 
@@ -75,7 +77,7 @@ Authentication, authorization, validation, and internal errors can additionally 
 }
 ```
 
-Preserve `requestId` when reporting an API error to station support. It is intended to help correlate the client failure with server-side logging.
+Internal errors can use a generic client-facing message such as `Internal server error` while station-side logs retain the underlying exception. Preserve `requestId` when reporting an API error to station support; it is the correlation key between the visible response and server-side diagnostics.
 
 Not every endpoint returns the generic JSON envelope. `/api/metrics`, for example, returns Prometheus text.
 
@@ -212,11 +214,14 @@ A session cookie alone is therefore insufficient for the normal protected mutati
 
 This protection is appropriate for browser/session authentication. A future machine-to-machine API should use a dedicated non-browser authentication mechanism rather than teaching third-party services to emulate browser CSRF state.
 
+Do not infer safety or idempotency solely from the HTTP method of an internal route. Some internal GET workflows can prepare application state as part of rendering or preview behavior.
+
 ## 7. Protected business APIs are internal unless contracted
 
 The repository contains many application routes for domains such as:
 
 - transactions
+- receipts
 - customers
 - products and stock
 - pumps and tanks
@@ -226,7 +231,7 @@ The repository contains many application routes for domains such as:
 - administrative setup
 - fiscal/proxy operations
 
-Their presence under `/api` does **not** make them a supported external API. Route names, payloads, response details, authorization rules, and workflow semantics may change with the application.
+Their presence under `/api` does **not** make them a supported external API. Route names, payloads, response details, authorization rules, side effects, and workflow semantics may change with the application.
 
 A third-party integration may use one of these routes only when the interface has been explicitly approved and documented as part of that integration.
 
@@ -274,7 +279,36 @@ The same route currently accepts `POST` for receipt-print enqueueing and restric
 
 This illustrates why internal route names should not be interpreted as a REST resource contract: a `POST /api/transactions` in the current application is not a generic “create transaction” endpoint.
 
-## 9. HTTP status and error handling
+## 9. Example: receipt route and preview semantics
+
+`GET /api/receipts` is also an internal, session-protected application route. Current allowed roles are `tenant`, `manager`, and `administrator`.
+
+Important query parameters include:
+
+| Parameter | Purpose |
+| --- | --- |
+| `transactionId` | Select a transaction/receipt |
+| `list=1` | Use receipt-list behavior |
+| `preview=1` | Prepare and render preview behavior for a transaction |
+
+When `transactionId` is supplied and `list=1` is not set, the route prepares the receipt preview before returning the receipt payload.
+
+If `preview=1` and the station setting `print_receipt_order` is `before_fiscalization`, receipt preparation calls the pre-fiscalization receipt workflow. That workflow can create durable receipt-related state. Therefore this GET request must **not** be assumed to be read-only or safe to replay arbitrarily.
+
+### Tanzania-specific receipt preview
+
+For Tanzania stations, pre-fiscalization receipt preparation can persist the Tanzania receipt assignment and receipt record before fiscalization completes. The assignment is designed to be reused by subsequent preview/fiscalization attempts.
+
+The current Tanzania sequencing model deliberately uses separate date scopes:
+
+- `invoiceNumber` and `dailyCounter` are based on the originating transaction date in the station timezone;
+- `zNumber` and `invoiceDate` are based on the first fiscalization/pre-fiscalization assignment date.
+
+For delayed transactions those dates can differ legitimately. Integrations or reconciliation tools must not assume `(zNumber, dailyCounter)` is globally unique for a station. Current schema migration `1320_tanzania_assignment_counter_scope.sql` explicitly removes that invalid uniqueness assumption while retaining transaction, invoice-number, and global-counter uniqueness.
+
+These details document current internal behavior; they do not make `/api/receipts` a supported third-party API.
+
+## 10. HTTP status and error handling
 
 Integrators should always inspect both the HTTP status and the response body.
 
@@ -301,16 +335,19 @@ For support, record:
 - `error.code`
 - `error.requestId`
 - the station identifier known to the integration
+- transaction/receipt ID where applicable
 
-## 10. Pagination and filtering
+A `500` response may intentionally hide PostgreSQL or internal exception detail. Use `requestId` to correlate with authorized station logs instead of exposing raw database errors to clients.
+
+## 11. Pagination and filtering
 
 There is no single documented pagination contract covering every current internal route. `/api/transactions` supports `page`, `pageSize`, and `limit`, but other routes may differ.
 
 A future public API should standardize pagination and return explicit pagination metadata. Until then, do not assume one route's query conventions apply to another route.
 
-## 11. Date and time handling
+## 12. Date and time handling
 
-VPOS is a station-local operational platform and station timezone matters to management and reporting.
+VPOS is a station-local operational platform and station timezone matters to management, reporting, and fiscal sequencing.
 
 For third-party integrations:
 
@@ -318,24 +355,30 @@ For third-party integrations:
 - retain timezone/offset information when available
 - do not assume the station uses UTC for business-day boundaries
 - do not construct daily totals by naively truncating UTC timestamps unless the contract explicitly requires that behavior
+- do not infer one fiscal date scope from another field without reading the country-specific contract
+
+For Tanzania specifically, originating transaction date and first fiscalization/receipt-assignment date can both be authoritative for different fields on the same receipt.
 
 Country and station timezone configuration must remain authoritative for station operations.
 
-## 12. Retries and idempotency
+## 13. Retries and idempotency
 
-The current repository does not expose a blanket idempotency-key contract for all mutations.
+The current repository does not expose a blanket idempotency-key contract for all mutations or state-preparing internal workflows.
 
 Therefore:
 
-- safe GET operations may be retried according to normal network policy
-- do not blindly retry a write/mutation after a timeout
-- first determine whether the prior request reached the station and whether the action already occurred
+- simple operational GET endpoints such as liveness/health may be retried according to normal network policy
+- do not assume every internal GET is side-effect free
+- do not blindly retry a write or receipt-preview workflow after a timeout
+- first determine whether the prior request reached the station and whether durable state was already created
 
-This is particularly important for transaction, fiscal, printing, pricing, and forecourt-control operations where duplicate actions can have real operational consequences.
+This is particularly important for transaction, receipt, fiscal, printing, pricing, and forecourt-control operations where duplicate actions can have real operational consequences.
+
+Tanzania receipt assignments are intentionally persisted and reused for the same transaction. A retrying client should not expect or request a fresh invoice/global/daily counter allocation for each attempt.
 
 A future public write API should define idempotency semantics explicitly.
 
-## 13. Network and security guidance
+## 14. Network and security guidance
 
 Even public operational endpoints should normally be reachable only from the approved station or management network.
 
@@ -349,7 +392,7 @@ Third-party deployments should follow these principles:
 - retain request IDs, not secrets, for troubleshooting
 - avoid exposing the entire VPOS application through a public reverse proxy merely to consume one endpoint
 
-## 14. DOMS/JPL is not a third-party HTTP API through VPOS
+## 15. DOMS/JPL is not a third-party HTTP API through VPOS
 
 VPOS connects to the station DOMS/PSS using the JPL TCP integration. Third-party developers should not assume VPOS provides a transparent HTTP proxy to the underlying DOMS/JPL command set.
 
@@ -357,19 +400,21 @@ Forecourt operations in VPOS have station state, permissions, safety checks, per
 
 Do not attempt to use internal VPOS routes to circumvent the station's approved DOMS/PSS access policy.
 
-## 15. Fiscal and proxy integration boundary
+## 16. Fiscal and proxy integration boundary
 
-`vpos-ftc-app` owns the station application/runtime. Cloud fiscal delivery and endpoint routing are owned by `vpos-proxy`.
+`vpos-ftc-app` owns the station application/runtime and local receipt/fiscal preparation state. Cloud fiscal delivery and endpoint routing are owned by `vpos-proxy`.
 
-A third-party developer integrating with cloud fiscal services should confirm whether the intended contract belongs to:
+A third-party developer integrating with fiscal services should confirm whether the intended contract belongs to:
 
 - the station-local VPOS FTC API
 - `vpos-proxy`
 - a country fiscal service/device API
 
+A local receipt-preview or assignment error can occur before a request reaches the proxy/cloud layer. Do not classify every fiscal-looking `500` as a proxy outage without correlating the station error.
+
 Do not use a station-internal route when the authoritative contract belongs to the proxy/cloud component.
 
-## 16. Recommended contract for future third-party business integrations
+## 17. Recommended contract for future third-party business integrations
 
 For machine-to-machine business access, the recommended direction is a dedicated versioned integration surface rather than exposing existing browser APIs directly.
 
@@ -382,6 +427,7 @@ A production-grade design should include:
 - stable request and response schemas
 - an OpenAPI specification
 - standardized pagination/filtering
+- explicit safe/idempotent method semantics
 - idempotency keys for retry-sensitive mutations
 - explicit rate limits
 - audit records identifying the external client
@@ -392,7 +438,7 @@ For sessionless machine authentication, CSRF should not be the primary anti-forg
 
 This section is a design recommendation, not current application behavior.
 
-## 17. Recommended endpoint stability classes
+## 18. Recommended endpoint stability classes
 
 When agreeing an external integration, classify endpoints explicitly:
 
@@ -400,10 +446,10 @@ When agreeing an external integration, classify endpoints explicitly:
 | --- | --- | --- |
 | Operational public | Intended for local health/monitoring use | `/api/livez`, `/api/readyz`, `/api/healthz`, `/api/metrics` |
 | Contracted integration | Stable only when separately specified for a partner | None established globally by this repository today |
-| Internal application API | Used by VPOS UI; may change with application releases | `/api/transactions` and most business/admin routes |
+| Internal application API | Used by VPOS UI; may change with application releases | `/api/transactions`, `/api/receipts`, and most business/admin routes |
 | Setup/bootstrap | Used during station commissioning; not general partner APIs | `/api/setup/...`, `/api/admin/setup/...` |
 
-## 18. Monitoring example
+## 19. Monitoring example
 
 A simple local monitoring sequence can distinguish process liveness from deeper readiness:
 
@@ -423,7 +469,7 @@ For Prometheus, configure the approved scraper to request:
 
 Do not treat a successful metrics scrape as proof that fiscal or forecourt operations are healthy; use readiness/health and domain-specific alerting as appropriate.
 
-## 19. Integration approval checklist
+## 20. Integration approval checklist
 
 Before a third party consumes a VPOS business endpoint in production, the interface owner should define:
 
@@ -435,6 +481,7 @@ Before a third party consumes a VPOS business endpoint in production, the interf
 - [ ] request schema
 - [ ] response schema
 - [ ] error codes
+- [ ] whether each HTTP method is actually safe/read-only
 - [ ] pagination/filtering semantics
 - [ ] retry/idempotency rules
 - [ ] expected request volume and rate limits
@@ -447,18 +494,21 @@ Before a third party consumes a VPOS business endpoint in production, the interf
 
 If these items are not defined, treat the route as internal rather than an external production contract.
 
-## 20. Related documentation
+## 21. Related documentation
 
 - [Technician Setup Guide](TECHNICIAN_SETUP_GUIDE.md)
 - [Management Guide](MANAGEMENT_GUIDE.md)
 - [Architecture](../ARCHITECTURE.md)
 - [Configuration](../configuration.md)
 - [Transactions and fiscalization](../domains/transactions.md)
+- [Tanzania fiscalization](../domains/tanzania-fiscalization.md)
 - [Forecourt and DOMS/JPL](../domains/forecourt.md)
 - [Runtime and workers](../domains/runtime-workers.md)
 
-## 21. Summary for third-party developers
+## 22. Summary for third-party developers
 
 Today, the safest supported external use of the station HTTP surface is operational monitoring through the explicitly unauthenticated health/metrics endpoints. Most other APIs are role-protected browser/application routes and must not be assumed to be stable machine-to-machine contracts.
 
-For a third party that needs transactions, stock, forecourt, customer, fiscal, or write access, define and implement a dedicated versioned integration contract rather than coupling the partner to the current VPOS UI APIs.
+In particular, do not infer REST semantics from route names or HTTP methods alone. Current internal receipt preview behavior can persist receipt/fiscal identity, and Tanzania fiscal fields intentionally use different transaction-date and fiscal-date scopes.
+
+For a third party that needs transactions, receipts, stock, forecourt, customer, fiscal, or write access, define and implement a dedicated versioned integration contract rather than coupling the partner to the current VPOS UI APIs.
