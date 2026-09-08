@@ -10,6 +10,12 @@ This directory separates current guidance from historical evidence.
 - [Configuration](configuration.md)
 - [Startup flow](startup-flow.md)
 
+## Manuals
+
+- [Technician Setup Guide](manuals/TECHNICIAN_SETUP_GUIDE.md)
+- [Management Guide](manuals/MANAGEMENT_GUIDE.md)
+- [API Guide for Third-Party Developers](manuals/API_GUIDE.md)
+
 ## Domains
 
 - [Forecourt and DOMS/JPL](domains/forecourt.md)
