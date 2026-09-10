@@ -1,9 +1,13 @@
-import type { FiscalReceiptModel, PrintableLine } from '@/src/shared/fiscalization/receipt/types'
+import type {
+  FiscalReceiptModel,
+  PrintableLine,
+} from '@/src/shared/fiscalization/receipt/types'
 
 import { queryOne } from '@/src/platform/db/postgres'
 import { buildReceiptLines as buildTanzaniaReceiptLines } from '@/src/shared/fiscalization/receipt/templates/TZ'
 import { buildTanzaniaReceiptVerificationUrl } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
 import { ensureTanzaniaPreFiscalizationReceiptAssignment } from '@/src/modules/tanzania-fiscal/infrastructure/preFiscalizationReceiptAssignment'
+import { dateParts } from '@/src/modules/tanzania-fiscal/infrastructure/xml'
 import { generateReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptGenerator'
 import { buildFiscalReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptBuilder'
 import { uuidv4 } from '@/src/shared/utils/uuid'
@@ -36,15 +40,6 @@ const renderReceiptText = (lines: PrintableLine[], width = WIDTH) => {
   return output.join('\n')
 }
 
-const toDateParts = (value: string | Date) => {
-  const date = new Date(value)
-  if (!Number.isFinite(date.getTime())) return { date: '', time: '' }
-  return {
-    date: date.toISOString().slice(0, 10),
-    time: date.toISOString().slice(11, 19),
-  }
-}
-
 async function buildTanzaniaPreFiscalizationReceipt(input: {
   stationId: string
   transactionId: string
@@ -63,7 +58,7 @@ async function buildTanzaniaPreFiscalizationReceipt(input: {
     [input.stationId],
   )
   const base = await buildFiscalReceipt(input)
-  const invoiceDate = toDateParts(assignment.invoice_date)
+  const invoiceDate = dateParts(assignment.invoice_date, assignment.timezone)
   const verificationUrl = buildTanzaniaReceiptVerificationUrl({
     receiptVerificationNumber: assignment.receipt_verification_number,
     urlMode: settings?.tanzania_receipt_verification_url_mode,
@@ -80,7 +75,7 @@ async function buildTanzaniaPreFiscalizationReceipt(input: {
     ...base.model,
     transaction: {
       ...base.model.transaction,
-      receiptDate: invoiceDate.date || base.model.transaction.receiptDate,
+      receiptDate: invoiceDate.isoDate || base.model.transaction.receiptDate,
       receiptTime: invoiceDate.time || base.model.transaction.receiptTime,
     },
     fiscalMeta: {
@@ -116,12 +111,17 @@ export async function getOrCreatePreFiscalizationReceipt(input: {
     `SELECT country FROM fuel_stations WHERE id = $1::uuid`,
     [input.stationId],
   )
-  const isTanzania = ['TZ', 'TZA', 'TANZANIA', 'UNITED REPUBLIC OF TANZANIA'].includes(
-    String(station?.country ?? '').trim().toUpperCase(),
-  )
+  const isTanzania = [
+    'TZ',
+    'TZA',
+    'TANZANIA',
+    'UNITED REPUBLIC OF TANZANIA',
+  ].includes(String(station?.country ?? '').trim().toUpperCase())
 
   let expectedVerificationCode = ''
-  let preparedTanzaniaReceipt: Awaited<ReturnType<typeof buildTanzaniaPreFiscalizationReceipt>> = null
+  let preparedTanzaniaReceipt: Awaited<
+    ReturnType<typeof buildTanzaniaPreFiscalizationReceipt>
+  > = null
   if (isTanzania) {
     preparedTanzaniaReceipt = await buildTanzaniaPreFiscalizationReceipt(input)
     expectedVerificationCode = String(
@@ -160,11 +160,12 @@ export async function getOrCreatePreFiscalizationReceipt(input: {
     }
   }
 
-  const generated = isTanzania && preparedTanzaniaReceipt
-    ? await generateReceipt(input, {
-        buildReceipt: async () => preparedTanzaniaReceipt!,
-      })
-    : await generateReceipt(input)
+  const generated =
+    isTanzania && preparedTanzaniaReceipt
+      ? await generateReceipt(input, {
+          buildReceipt: async () => preparedTanzaniaReceipt!,
+        })
+      : await generateReceipt(input)
 
   return await queryOne<any>(
     `INSERT INTO receipts (
