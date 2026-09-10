@@ -12,6 +12,24 @@ export const printJobsSql = {
        AND device_type = 'printer'
        AND enabled = TRUE
      ORDER BY updated_at DESC, device_key ASC`,
+  selectAutoPrintEnabled: `SELECT auto_print_receipts
+     FROM station_settings
+     WHERE station_id = $1::uuid
+     LIMIT 1`,
+  releasePendingPrintJobs: `UPDATE print_jobs
+     SET scheduled_at = NOW(),
+         updated_at = NOW()
+     WHERE station_id = $1::uuid
+       AND status = 'PENDING'
+       AND scheduled_at > NOW()
+     RETURNING id`,
+  holdForConnectivityRetry: `UPDATE print_jobs
+     SET status = 'PENDING',
+         attempts = GREATEST(attempts - 1, 0),
+         scheduled_at = NOW() + ($2::text || ' seconds')::interval,
+         last_error = $3,
+         updated_at = NOW()
+     WHERE id = $1::uuid`,
   selectTransactionPumpNumber: `SELECT pump_number
      FROM transactions
      WHERE station_id = $1
@@ -93,6 +111,10 @@ export const printJobsSql = {
      WHERE station_id = $1::uuid
        AND id = $2::uuid
        AND status IN ('DONE', 'FAILED')`,
+  clearAllAdminPrintJobs: `DELETE FROM print_jobs
+     WHERE station_id = $1::uuid
+       AND status IN ('PENDING', 'DONE', 'FAILED')
+     RETURNING id`,
   selectReportPrintSource: `SELECT id, report_type, report_date_time, payload
      FROM reports
      WHERE station_id = $1
