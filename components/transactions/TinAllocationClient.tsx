@@ -3,6 +3,7 @@
 import type { PumpStateSnapshot } from '@/src/shared/pumps/types'
 import { useEffect, useMemo, useState } from 'react'
 
+import { CustomerDrawer } from '@/components/customers/CustomerDrawer'
 import {
   formatState,
   healthVariant,
@@ -36,6 +37,10 @@ type PendingAllocation = {
   tin?: string | null
 }
 
+type TinAllocationClientProps = {
+  stationCountry?: string | null
+}
+
 const customerRows = (data: any): Customer[] => {
   const payload = data?.data ?? data
   if (Array.isArray(payload)) return payload
@@ -59,7 +64,9 @@ const isAuthorizableState = (state: string) =>
 const isAuthorizedState = (state: string) =>
   state === 'auth' || state === 'preauthorized' || state === 'starting'
 
-export default function TinAllocationClient() {
+export default function TinAllocationClient({
+  stationCountry,
+}: TinAllocationClientProps) {
   const [csrfToken, setCsrfToken] = useState('')
   const [fuelOptions, setFuelOptions] = useState<FuelOption[]>([])
   const [snapshot, setSnapshot] = useState<PumpStateSnapshot | null>(null)
@@ -67,6 +74,7 @@ export default function TinAllocationClient() {
   const [query, setQuery] = useState('')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState('')
+  const [customerDrawerOpen, setCustomerDrawerOpen] = useState(false)
   const [busyKey, setBusyKey] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -151,6 +159,15 @@ export default function TinAllocationClient() {
       (item) =>
         item.pump_number === pumpNumber && item.nozzle_number === nozzleNumber,
     )
+
+  const handleCustomerSaved = (customer: Customer) => {
+    const customerId = String(customer?.id ?? '').trim()
+    if (!customerId) return
+    setCustomers([customer])
+    setSelectedCustomer(customerId)
+    setQuery(customerName(customer) || String(customer?.tin ?? ''))
+    setSuccess('Customer captured and selected for TIN allocation.')
+  }
 
   const allocate = async (option: FuelOption) => {
     if (!csrfToken || !selectedCustomer || option.nozzleNumber == null) return
@@ -280,6 +297,19 @@ export default function TinAllocationClient() {
               </option>
             ))}
           </Select>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setCustomerDrawerOpen(true)}
+            >
+              Capture customer
+            </Button>
+            <span className="text-xs text-[var(--text-muted)]">
+              Use this when the customer is not yet registered.
+            </span>
+          </div>
           <p className="text-xs text-[var(--text-muted)]">
             Select a customer, then link them to the required physical nozzle.
             The allocation remains active while waiting for DOMS to report the
@@ -417,6 +447,14 @@ export default function TinAllocationClient() {
           No configured pump/nozzle options are available.
         </Card>
       ) : null}
+
+      <CustomerDrawer
+        open={customerDrawerOpen}
+        mode="create"
+        stationCountry={stationCountry}
+        onOpenChange={setCustomerDrawerOpen}
+        onSaved={handleCustomerSaved}
+      />
     </div>
   )
 }
