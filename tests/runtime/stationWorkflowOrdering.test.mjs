@@ -33,22 +33,26 @@ test('station workflow ordering is persisted with backward-compatible defaults',
   assert.doesNotMatch(page, /AutoPrintReceiptsForm/)
 })
 
-test('before-fiscalization receipt printing uses offline print and blocks fiscalization until DONE', () => {
+test('before-fiscalization receipt printing fails open only when the printer is unavailable', () => {
   const autoPrint = read('src/modules/transactions/infrastructure/fiscalization/autoPrintFiscalReceipt.ts')
-  const worker = read('src/modules/transactions/infrastructure/fiscalization/offlineReceiptPrintWorker.ts')
+  const worker = read('src/modules/printing/infrastructure/printJobsWorker.ts')
   const queue = read('src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts')
   const sendNow = read('src/modules/transactions/application/commands/send-transaction-to-proxy-now.ts')
 
   assert.match(autoPrint, /'before_fiscalization'/)
   assert.match(autoPrint, /phase === 'before_fiscalization' \? true/)
   assert.match(autoPrint, /getOrCreatePreFiscalizationReceipt/)
-  assert.match(worker, /ss\.print_receipt_order = 'before_fiscalization'/)
-  assert.match(worker, /phase: 'before_fiscalization'/)
+  assert.match(worker, /PRINTER_UNAVAILABLE:/)
+  assert.match(worker, /holdForConnectivityRetry/)
+  assert.match(worker, /EHOSTDOWN/)
+  assert.match(worker, /ENOTFOUND/)
   assert.match(queue, /preprint\.status = 'DONE'/)
+  assert.match(queue, /preprint\.last_error/)
+  assert.match(queue, /PRINTER_UNAVAILABLE:%/)
   assert.match(queue, /preprint\.payload->>'offlinePrint'/)
-  assert.match(queue, /: 'TRUE'/)
   assert.match(sendNow, /requiresPreFiscalizationReceiptPrint/)
-  assert.match(sendNow, /job\?\.status !== 'DONE'/)
+  assert.match(sendNow, /isPrinterUnavailable/)
+  assert.match(sendNow, /job\?\.status !== 'DONE' && !printerUnavailable/)
 })
 
 test('Tanzania pre-fiscal receipt reserves verification prefix plus global counter', () => {
