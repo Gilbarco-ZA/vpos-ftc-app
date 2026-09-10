@@ -129,13 +129,16 @@ async function requiresCompletedPrePrintTx(client: any, stationId: string) {
   )
 }
 
-const completedOfflinePrintGate = (transactionAlias: string) => `EXISTS (
+const completedOrUnavailableOfflinePrintGate = (transactionAlias: string) => `EXISTS (
   SELECT 1
     FROM print_jobs preprint
    WHERE preprint.station_id = ${transactionAlias}.station_id
      AND preprint.source_transaction_id = ${transactionAlias}.id
-     AND preprint.status = 'DONE'
      AND COALESCE(preprint.payload->>'offlinePrint', 'false') = 'true'
+     AND (
+       preprint.status = 'DONE'
+       OR COALESCE(preprint.last_error, '') LIKE 'PRINTER_UNAVAILABLE:%'
+     )
 )`
 
 function buildBeforePrintLocalClaim(input: {
@@ -180,7 +183,7 @@ function buildBeforePrintLocalClaim(input: {
            )
          )
          AND ${eligibility}
-         AND ${completedOfflinePrintGate('transactions')}
+         AND ${completedOrUnavailableOfflinePrintGate('transactions')}
        ORDER BY transaction_date_time ASC
        LIMIT $2
        FOR UPDATE SKIP LOCKED
@@ -228,7 +231,7 @@ function buildBeforePrintProxyClaim(input: {
                 t.created_at + (COALESCE($2::int, 0) * INTERVAL '1 second')
               )
          )
-         AND ${completedOfflinePrintGate('t')}
+         AND ${completedOrUnavailableOfflinePrintGate('t')}
        ORDER BY t.transaction_date_time ASC
        LIMIT $3
        FOR UPDATE OF t SKIP LOCKED
