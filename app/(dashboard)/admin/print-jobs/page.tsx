@@ -44,12 +44,20 @@ const shortId = (value: string | null | undefined) =>
 export default function PrintJobsPage() {
   const [csrf, setCsrf] = useState('')
   const [jobs, setJobs] = useState<PrintJob[]>([])
-  const [summary, setSummary] = useState<Summary>({ PENDING: 0, PROCESSING: 0, DONE: 0, FAILED: 0 })
+  const [summary, setSummary] = useState<Summary>({
+    PENDING: 0,
+    PROCESSING: 0,
+    DONE: 0,
+    FAILED: 0,
+  })
   const [status, setStatus] = useState('')
   const [type, setType] = useState('')
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const [message, setMessage] = useState<{ variant: 'success' | 'error' | 'info'; text: string } | null>(null)
+  const [message, setMessage] = useState<{
+    variant: 'success' | 'error' | 'info'
+    text: string
+  } | null>(null)
 
   const types = useMemo(
     () => Array.from(new Set(jobs.map((job) => job.job_type))).sort(),
@@ -70,7 +78,8 @@ export default function PrintJobsPage() {
       const csrfJson = await csrfRes.json().catch(() => ({}))
       const jobsJson = await jobsRes.json().catch(() => ({}))
       if (typeof csrfJson?.token === 'string') setCsrf(csrfJson.token)
-      if (!jobsRes.ok) throw new Error(jobsJson?.error ?? 'Failed to load print jobs')
+      if (!jobsRes.ok)
+        throw new Error(jobsJson?.error ?? 'Failed to load print jobs')
       const data = jobsJson?.data ?? jobsJson
       setJobs(Array.isArray(data?.jobs) ? data.jobs : [])
       setSummary({
@@ -100,7 +109,8 @@ export default function PrintJobsPage() {
         body: JSON.stringify({ csrf_token: csrf, jobId, action }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json?.error ?? `Failed to ${action} print job`)
+      if (!res.ok)
+        throw new Error(json?.error ?? `Failed to ${action} print job`)
       const data = json?.data ?? json
       setMessage({
         variant: 'success',
@@ -117,19 +127,70 @@ export default function PrintJobsPage() {
     }
   }
 
+  const clearAll = async () => {
+    const count = summary.PENDING + summary.DONE + summary.FAILED
+    if (!count || !csrf) return
+    if (
+      !window.confirm(
+        `Clear ${count} queued/terminal print job${count === 1 ? '' : 's'}? Jobs currently printing will not be removed.`,
+      )
+    ) {
+      return
+    }
+
+    setBusy('clearAll')
+    setMessage(null)
+    try {
+      const res = await fetch('/api/admin/print-jobs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-csrf-token': csrf },
+        body: JSON.stringify({ csrf_token: csrf, action: 'clearAll' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error ?? 'Failed to clear print jobs')
+      const data = json?.data ?? json
+      setMessage({
+        variant: 'success',
+        text: `Cleared ${Number(data?.clearedCount ?? 0)} print jobs. Any job already printing was left untouched.`,
+      })
+      await load()
+    } catch (error: any) {
+      setMessage({ variant: 'error', text: error?.message ?? String(error) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Print Jobs"
-        description="Monitor queued printer work, investigate failures, retry failed jobs, and clear completed history."
+        description="Monitor queued printer work, investigate failures, retry failed jobs, and clear queue history."
         actions={
-          <Button variant="secondary" onClick={load} disabled={!!busy}>
-            {busy === 'load' ? 'Refreshing…' : 'Refresh'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              onClick={() => void clearAll()}
+              disabled={
+                !!busy ||
+                !csrf ||
+                summary.PENDING + summary.DONE + summary.FAILED === 0
+              }
+            >
+              {busy === 'clearAll' ? 'Clearing…' : 'Clear all'}
+            </Button>
+            <Button variant="secondary" onClick={load} disabled={!!busy}>
+              {busy === 'load' ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          </div>
         }
       />
 
-      {message ? <Alert variant={message.variant} title="Print jobs">{message.text}</Alert> : null}
+      {message ? (
+        <Alert variant={message.variant} title="Print jobs">
+          {message.text}
+        </Alert>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {(['PENDING', 'PROCESSING', 'DONE', 'FAILED'] as const).map((key) => (
@@ -139,8 +200,12 @@ export default function PrintJobsPage() {
             onClick={() => setStatus(status === key ? '' : key)}
             className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4 text-left hover:bg-[var(--surface-muted)]"
           >
-            <div className="text-xs font-semibold text-[var(--text-secondary)]">{key}</div>
-            <div className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{summary[key]}</div>
+            <div className="text-xs font-semibold text-[var(--text-secondary)]">
+              {key}
+            </div>
+            <div className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+              {summary[key]}
+            </div>
           </button>
         ))}
       </div>
@@ -151,13 +216,28 @@ export default function PrintJobsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search job, transaction, report or error" />
-            <Select value={status} onChange={(event) => setStatus(event.target.value)}>
-              {STATUSES.map((value) => <option key={value || 'all'} value={value}>{value || 'All statuses'}</option>)}
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search job, transaction, report or error"
+            />
+            <Select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              {STATUSES.map((value) => (
+                <option key={value || 'all'} value={value}>
+                  {value || 'All statuses'}
+                </option>
+              ))}
             </Select>
             <Select value={type} onChange={(event) => setType(event.target.value)}>
               <option value="">All job types</option>
-              {types.map((value) => <option key={value} value={value}>{value}</option>)}
+              {types.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
             </Select>
           </div>
 
@@ -178,28 +258,83 @@ export default function PrintJobsPage() {
               </thead>
               <tbody>
                 {jobs.map((job) => (
-                  <tr key={job.id} className="border-t border-[var(--border-default)] align-top">
-                    <td className="whitespace-nowrap px-3 py-3">{formatDate(job.created_at)}</td>
-                    <td className="px-3 py-3"><div className="font-medium">{job.job_type}</div><div className="text-xs text-[var(--text-secondary)]" title={job.id}>{shortId(job.id)}</div></td>
+                  <tr
+                    key={job.id}
+                    className="border-t border-[var(--border-default)] align-top"
+                  >
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {formatDate(job.created_at)}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="font-medium">{job.job_type}</div>
+                      <div
+                        className="text-xs text-[var(--text-secondary)]"
+                        title={job.id}
+                      >
+                        {shortId(job.id)}
+                      </div>
+                    </td>
                     <td className="px-3 py-3">{job.printer_key || 'default'}</td>
                     <td className="px-3 py-3">
-                      {job.source_transaction_id ? <div title={job.source_transaction_id}>Transaction {shortId(job.source_transaction_id)}</div> : null}
-                      {job.source_report_id ? <div title={job.source_report_id}>Report {shortId(job.source_report_id)}</div> : null}
-                      {!job.source_transaction_id && !job.source_report_id ? '—' : null}
+                      {job.source_transaction_id ? (
+                        <div title={job.source_transaction_id}>
+                          Transaction {shortId(job.source_transaction_id)}
+                        </div>
+                      ) : null}
+                      {job.source_report_id ? (
+                        <div title={job.source_report_id}>
+                          Report {shortId(job.source_report_id)}
+                        </div>
+                      ) : null}
+                      {!job.source_transaction_id && !job.source_report_id
+                        ? '—'
+                        : null}
                     </td>
-                    <td className="px-3 py-3"><Badge variant={job.status === 'DONE' ? 'success' : job.status === 'FAILED' ? 'error' : job.status === 'PROCESSING' ? 'info' : 'neutral'}>{job.status}</Badge></td>
-                    <td className="px-3 py-3">{job.attempts}/{job.max_attempts}</td>
-                    <td className="whitespace-nowrap px-3 py-3">{formatDate(job.completed_at)}</td>
-                    <td className="max-w-[320px] px-3 py-3 text-xs text-[var(--text-secondary)]"><div className="line-clamp-3" title={job.last_error ?? ''}>{job.last_error || '—'}</div></td>
+                    <td className="px-3 py-3">
+                      <Badge
+                        variant={
+                          job.status === 'DONE'
+                            ? 'success'
+                            : job.status === 'FAILED'
+                              ? 'error'
+                              : job.status === 'PROCESSING'
+                                ? 'info'
+                                : 'neutral'
+                        }
+                      >
+                        {job.status}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-3">
+                      {job.attempts}/{job.max_attempts}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {formatDate(job.completed_at)}
+                    </td>
+                    <td className="max-w-[320px] px-3 py-3 text-xs text-[var(--text-secondary)]">
+                      <div className="line-clamp-3" title={job.last_error ?? ''}>
+                        {job.last_error || '—'}
+                      </div>
+                    </td>
                     <td className="px-3 py-3">
                       <div className="flex gap-2">
                         {job.status === 'FAILED' ? (
-                          <Button size="sm" variant="secondary" disabled={!!busy || !csrf} onClick={() => mutateJob(job.id, 'retry')}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={!!busy || !csrf}
+                            onClick={() => mutateJob(job.id, 'retry')}
+                          >
                             {busy === `retry:${job.id}` ? 'Queuing…' : 'Retry'}
                           </Button>
                         ) : null}
                         {['DONE', 'FAILED'].includes(job.status) ? (
-                          <Button size="sm" variant="ghost" disabled={!!busy || !csrf} onClick={() => mutateJob(job.id, 'clear')}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!!busy || !csrf}
+                            onClick={() => mutateJob(job.id, 'clear')}
+                          >
                             {busy === `clear:${job.id}` ? 'Clearing…' : 'Clear'}
                           </Button>
                         ) : null}
@@ -208,7 +343,14 @@ export default function PrintJobsPage() {
                   </tr>
                 ))}
                 {!jobs.length ? (
-                  <tr><td colSpan={9} className="px-4 py-10 text-center text-[var(--text-secondary)]">No print jobs match the current filters.</td></tr>
+                  <tr>
+                    <td
+                      colSpan={9}
+                      className="px-4 py-10 text-center text-[var(--text-secondary)]"
+                    >
+                      No print jobs match the current filters.
+                    </td>
+                  </tr>
                 ) : null}
               </tbody>
             </table>
