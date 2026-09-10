@@ -9,6 +9,7 @@ import { startAtgPollingWorker } from '@/src/modules/forecourt/infrastructure/at
 import { startForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
 import { startPosCommandsWorker } from '@/src/modules/pos/infrastructure/posCommandsWorker'
 import { startPrintJobsWorker } from '@/src/modules/printing/infrastructure/printJobsWorker'
+import { startPrinterConnectivityWorker } from '@/src/modules/printing/infrastructure/printerConnectivityWorker'
 import { startReportQueueWorker } from '@/src/modules/reports/infrastructure/reportQueueWorker'
 import {
   startArchiveBusListener,
@@ -35,9 +36,7 @@ function toStopFn(h: StopHandle): () => void {
 type WorkerSpec = {
   name: string
   start: () => StopHandle
-  // Heartbeat freshness threshold in ms before considering it stale.
   staleMs: number
-  // Restart backoff base in ms.
   backoffMs: number
 }
 
@@ -55,7 +54,6 @@ export function startInProcessRuntime(
       ? configuredTanzaniaDailyTotalsPollMs
       : 60_000
 
-  // Ensure migration bus listeners are active before workers start emitting.
   startPosBusListener()
   startFiscalBusListener()
   startArchiveBusListener()
@@ -76,6 +74,12 @@ export function startInProcessRuntime(
     {
       name: 'printJobsWorker',
       start: () => startPrintJobsWorker(),
+      staleMs: 25_000,
+      backoffMs: 3_000,
+    },
+    {
+      name: 'printerConnectivityWorker',
+      start: () => startPrinterConnectivityWorker(),
       staleMs: 25_000,
       backoffMs: 3_000,
     },
@@ -147,7 +151,6 @@ export function startInProcessRuntime(
       workerStartedAt.set(spec.name, Date.now())
       stopFns.set(spec.name, toStopFn(h))
     } catch (e: any) {
-      // Record and allow monitor loop to retry.
       logger.error('[inProcessRuntime]', {
         msg: 'worker start failed',
         worker: spec.name,
@@ -171,7 +174,6 @@ export function startInProcessRuntime(
     workerStartedAt.delete(name)
   }
 
-  // Start all workers immediately
   for (const s of specs) startOne(s)
 
   async function monitorTick() {
@@ -179,7 +181,6 @@ export function startInProcessRuntime(
     const now = Date.now()
 
     for (const spec of specs) {
-      // Simple "staleness" check via heartbeats
       const hb = await safeAsync(
         getProcessHeartbeat(stationId, spec.name),
         `inProcessRuntime.heartbeat.${spec.name}`,
@@ -195,15 +196,12 @@ export function startInProcessRuntime(
         : 0
       const stale = last && now - last > spec.staleMs
 
-      // A heartbeat row from the previous process must not trigger an immediate
-      // restart of the freshly-started worker before its first heartbeat write.
       if (hb.pid != null && Number(hb.pid) !== process.pid && !stale) continue
       if (!stale) continue
 
       const allowAt = nextAllowedRestartAt.get(spec.name) ?? 0
       if (now < allowAt) continue
 
-      // Restart
       stopOne(spec.name)
 
       const count = (restartCounts.get(spec.name) ?? 0) + 1
