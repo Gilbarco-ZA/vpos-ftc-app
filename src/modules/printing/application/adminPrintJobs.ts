@@ -50,9 +50,13 @@ export async function runAdminPrintJobAction(args: {
     await createAuditLog({
       stationId: args.stationId,
       userId: args.userId,
-      action: 'PRINT_JOBS_CLEARED_ALL',
+      action: 'PRINT_JOB_CLEARED',
       entityType: 'print_jobs',
-      metadata: { clearedCount: cleared.length },
+      metadata: {
+        bulk: true,
+        clearedCount: cleared.length,
+        scope: 'all_clearable',
+      },
     }).catch(() => {})
     return { ok: true as const, data: { clearedCount: cleared.length } }
   }
