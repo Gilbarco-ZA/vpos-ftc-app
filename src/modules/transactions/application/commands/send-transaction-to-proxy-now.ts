@@ -7,6 +7,12 @@ import { sendTransactionToProxyNow } from '../../infrastructure/fiscalization/pr
 import { getTinCaptureOrderRepo } from '../../infrastructure/preFuelCustomerAllocation'
 import { getTransactionDetails } from '../queries/get-transaction-details'
 
+const PRINTER_UNAVAILABLE_ERROR_PREFIX = 'PRINTER_UNAVAILABLE:'
+
+function isPrinterUnavailable(lastError: string | null | undefined) {
+  return String(lastError || '').startsWith(PRINTER_UNAVAILABLE_ERROR_PREFIX)
+}
+
 export async function sendTransactionToProxyNowCommand(
   input: Parameters<typeof sendTransactionToProxyNow>[0],
 ) {
@@ -36,7 +42,9 @@ export async function sendTransactionToProxyNowCommand(
     const job = print.printJobId
       ? await getPrintJobStatus(input.stationId, print.printJobId)
       : null
-    if (job?.status !== 'DONE') {
+    const printerUnavailable = isPrinterUnavailable(job?.last_error)
+
+    if (job?.status !== 'DONE' && !printerUnavailable) {
       return {
         ok: false as const,
         skipped: true as const,
