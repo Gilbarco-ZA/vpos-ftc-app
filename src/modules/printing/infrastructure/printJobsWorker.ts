@@ -16,14 +16,18 @@ const CONNECTIVITY_RETRY_SECONDS = Math.max(
   1,
   Number(process.env.VPOS_PRINTER_CONNECTIVITY_RETRY_SECONDS || 5),
 )
+const PRINTER_UNAVAILABLE_ERROR_PREFIX = 'PRINTER_UNAVAILABLE:'
 
 async function claimNextJob(stationId: string): Promise<PrintJobRow | null> {
   return (await printJobsRepo.claimNextForWorker(stationId)) ?? null
 }
 
 function isPrinterConnectivityError(error: unknown) {
-  const text = String((error as any)?.code || '') + ' ' + String((error as any)?.message || error || '')
-  return /ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|EPIPE|printer connection timeout|socket hang up/i.test(
+  const text =
+    String((error as any)?.code || '') +
+    ' ' +
+    String((error as any)?.message || error || '')
+  return /ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|EHOSTDOWN|ENETUNREACH|ENETDOWN|ENOTFOUND|EAI_AGAIN|EPIPE|printer connection timeout|socket hang up/i.test(
     text,
   )
 }
@@ -83,7 +87,7 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
           if (connectivityError) {
             await printJobsRepo.holdForConnectivityRetry(
               job.id,
-              msg,
+              `${PRINTER_UNAVAILABLE_ERROR_PREFIX} ${msg}`,
               CONNECTIVITY_RETRY_SECONDS,
             )
           } else {
