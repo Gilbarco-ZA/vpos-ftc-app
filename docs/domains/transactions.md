@@ -15,6 +15,7 @@ The transactions module owns transaction lifecycle, line and payment data, fisca
 - Compatibility reads must have an explicit retirement gate before removal.
 - For DOMS fuel sales, pump-session completion and JPL transaction-buffer capture are two observations of the same physical sale. They must converge on one `transactions` row under a shared advisory lock. When one path has already persisted a matching sale on the same pump/nozzle within the station linking window and with matching amount/volume, the other path attaches its correlation metadata instead of inserting a duplicate transaction.
 - `/transactions` and `/receipts` default to the station's current business day. Date-only filters are interpreted in the configured `fuel_stations.timezone`, with an exclusive next-day upper boundary so daylight-saving and UTC offsets do not omit or duplicate records. Operators can explicitly select **All dates** or a custom range.
+- When receipt printing is configured before fiscalization, a healthy printer still preserves print-before-fiscalize ordering. If the print worker confirms that the configured printer is unavailable because of a transport, DNS, network, or socket failure, fiscalization fails open rather than blocking the sale. The receipt print job remains pending for retry and can be released when printer connectivity returns. Receipt rendering, data, or other non-connectivity print failures continue to block the pre-fiscalization gate.
 
 ## Product stock lifecycle
 
