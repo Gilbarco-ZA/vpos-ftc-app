@@ -4,6 +4,7 @@ import { startAtgPollingWorker as startCanonicalAtgPollingWorker } from '@/src/m
 import { startForecourtConfigSyncWorker as startLegacyForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
 import { startPosCommandsWorker as startCanonicalPosCommandsWorker } from '@/src/modules/pos/infrastructure/posCommandsWorker'
 import { startPrintJobsWorker as startLegacyPrintJobsWorker } from '@/src/modules/printing/infrastructure/printJobsWorker'
+import { startPrinterConnectivityWorker as startCanonicalPrinterConnectivityWorker } from '@/src/modules/printing/infrastructure/printerConnectivityWorker'
 import { startReportQueueWorker as startLegacyReportQueueWorker } from '@/src/modules/reports/infrastructure/reportQueueWorker'
 import { startInProcessRuntime as startCanonicalInProcessRuntime } from '@/src/modules/runtime/infrastructure/inProcessRuntime'
 import { startSupervisorMonitorWorker as startCanonicalSupervisorMonitorWorker } from '@/src/modules/runtime/infrastructure/supervisorMonitorWorker'
@@ -14,14 +15,6 @@ import { startOfflineReceiptPrintWorker as startCanonicalOfflineReceiptPrintWork
 import { startProxyFiscalSenderWorker as startLegacyProxyFiscalSenderWorker } from '@/src/modules/transactions/infrastructure/fiscalization/proxySenderWorker'
 import { startTransactionFiscalizationSchedulerWorker as startCanonicalTransactionFiscalizationSchedulerWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionFiscalizationSchedulerWorker'
 import { startTransactionQueueWorker as startCanonicalTransactionQueueWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionQueueWorker'
-
-/**
- * Canonical runtime worker service wrappers.
- *
- * These wrappers give scripts, workers, and local server entrypoints a stable
- * platform-owned import surface while the underlying queue/scheduler logic is
- * still being extracted from legacy implementations.
- */
 
 export type RuntimeWorkerStopHandle =
   | { stop: () => void | Promise<void> }
@@ -35,7 +28,6 @@ export function startAtgPollingRuntimeWorker(opts: { stationId: string }) {
   })
 }
 
-// Compatibility alias. Prefer startAtgPollingRuntimeWorker.
 export function startAtgHistoryRuntimeWorker(opts: { stationId: string }) {
   return startAtgPollingRuntimeWorker(opts)
 }
@@ -57,6 +49,13 @@ export function startPssXmlSyncRuntimeWorker(opts: {
 
 export function startReceiptPrintRuntimeWorker(opts?: { pollMs?: number }) {
   return startLegacyPrintJobsWorker(opts)
+}
+
+export function startPrinterConnectivityRuntimeWorker(opts?: {
+  pollMs?: number
+  timeoutMs?: number
+}) {
+  return startCanonicalPrinterConnectivityWorker(opts)
 }
 
 export function startReportQueueRuntimeWorker(opts?: { pollMs?: number }) {
