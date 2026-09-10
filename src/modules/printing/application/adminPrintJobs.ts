@@ -5,7 +5,7 @@ import { printJobsRepo } from '../infrastructure/printJobsRepo'
 
 const STATUSES = ['PENDING', 'PROCESSING', 'DONE', 'FAILED'] as const
 
-type AdminPrintJobAction = 'retry' | 'clear'
+type AdminPrintJobAction = 'retry' | 'clear' | 'clearAll'
 
 export function normalizePrintJobStatus(value: string | null) {
   const status = String(value ?? '').trim().toUpperCase()
@@ -42,9 +42,21 @@ export async function listAdminPrintJobs(args: {
 export async function runAdminPrintJobAction(args: {
   stationId: string
   userId: string
-  jobId: string
+  jobId?: string
   action?: AdminPrintJobAction
 }) {
+  if (args.action === 'clearAll') {
+    const cleared = await printJobsRepo.clearAllAdminPrintJobs(args.stationId)
+    await createAuditLog({
+      stationId: args.stationId,
+      userId: args.userId,
+      action: 'PRINT_JOBS_CLEARED_ALL',
+      entityType: 'print_jobs',
+      metadata: { clearedCount: cleared.length },
+    }).catch(() => {})
+    return { ok: true as const, data: { clearedCount: cleared.length } }
+  }
+
   const jobId = String(args.jobId ?? '').trim()
   if (!jobId) return { ok: false as const, status: 400, error: 'jobId is required' }
 
