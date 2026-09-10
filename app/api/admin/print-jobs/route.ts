@@ -10,7 +10,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type PrintJobAction = {
-  action?: 'retry' | 'clear'
+  action?: 'retry' | 'clear' | 'clearAll'
   jobId?: string
 }
 
@@ -35,7 +35,7 @@ export const POST = defineMutationRoute<PrintJobAction>({
     const result = await runAdminPrintJobAction({
       stationId: user.stationId,
       userId: user.id,
-      jobId: String(body.jobId ?? ''),
+      jobId: body.jobId,
       action: body.action,
     })
 
