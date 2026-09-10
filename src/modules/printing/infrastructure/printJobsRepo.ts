@@ -26,6 +26,28 @@ export const printJobsRepo = {
     ])
   },
 
+  async isAutoPrintEnabled(stationId: string) {
+    const row = await queryOne<{ auto_print_receipts: boolean | null }>(
+      printJobsSql.selectAutoPrintEnabled,
+      [stationId],
+    )
+    return row?.auto_print_receipts === true
+  },
+
+  async releasePendingPrintJobs(stationId: string) {
+    return await queryAll<{ id: string }>(printJobsSql.releasePendingPrintJobs, [
+      stationId,
+    ])
+  },
+
+  async holdForConnectivityRetry(id: string, err: string, delaySeconds: number) {
+    await query(printJobsSql.holdForConnectivityRetry, [
+      id,
+      String(Math.max(1, delaySeconds)),
+      err.slice(0, 2000),
+    ])
+  },
+
   async getTransactionPumpNumber(stationId: string, transactionId: string) {
     const row = await queryOne<{ pump_number: number | null }>(
       printJobsSql.selectTransactionPumpNumber,
@@ -100,6 +122,12 @@ export const printJobsRepo = {
 
   async clearTerminalAdminPrintJob(stationId: string, jobId: string) {
     await query(printJobsSql.clearTerminalAdminPrintJob, [stationId, jobId])
+  },
+
+  async clearAllAdminPrintJobs(stationId: string) {
+    return await queryAll<{ id: string }>(printJobsSql.clearAllAdminPrintJobs, [
+      stationId,
+    ])
   },
 
   async getReportPrintSource(stationId: string, reportId: string) {
