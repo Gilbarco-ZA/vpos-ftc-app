@@ -19,6 +19,7 @@ import { validateRegistrationCode } from '@/src/shared/setup/validate'
 import { kvGetMany } from '@/src/shared/storage/stationKv'
 
 import { enrichRegistrationStatus } from '@/src/modules/setup/application/enrichRegistrationStatus'
+import { getDeviceOperationalStatus } from '@/src/modules/setup/application/getDeviceOperationalStatus'
 import { registerPublicSetupDevice } from '@/src/modules/setup/application/registerPublicSetupDevice'
 
 export const dynamic = 'force-dynamic'
@@ -29,7 +30,17 @@ export const GET = async () => {
   try {
     user = await requireAuth(['administrator'])
     const [result, cached] = await Promise.all([
-      getRegistrationStatusViaProxy(user.stationId),
+      getRegistrationStatusViaProxy(user.stationId).catch((error: unknown) => ({
+        ok: false,
+        status: 0,
+        data: {
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Unable to reach VPOS proxy registration endpoint',
+        },
+        url: '',
+      })),
       kvGetMany<any>(user.stationId, [
         KV_KEYS.VPOS_DEVICE_DATA,
         KV_KEYS.VPOS_DEVICE_REGISTRATION,
@@ -51,8 +62,31 @@ export const GET = async () => {
       result.data && typeof result.data === 'object' && result.data.details
         ? { ...result.data, details: enrich(result.data.details) }
         : enrich(result.data)
+    const registrationPayload =
+      data && typeof data === 'object' && 'details' in data
+        ? (data as Record<string, any>).details
+        : data
+    const operationalStatus = await getDeviceOperationalStatus({
+      stationId: user.stationId,
+      registrationPayload,
+      registrationUrl: result.url,
+    })
 
-    return NextResponse.json({ ...result, data })
+    const responseData =
+      data && typeof data === 'object' && 'details' in data
+        ? {
+            ...(data as Record<string, any>),
+            details: {
+              ...(registrationPayload as Record<string, any>),
+              operationalStatus,
+            },
+          }
+        : {
+            ...(data as Record<string, any>),
+            operationalStatus,
+          }
+
+    return NextResponse.json({ ...result, data: responseData })
   } catch (err) {
     return await serverError(err, { stationId: user?.stationId })
   }
