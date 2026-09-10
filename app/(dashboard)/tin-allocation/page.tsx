@@ -21,7 +21,7 @@ export default async function TinAllocationPage() {
         title="TIN allocation"
         description="Select a customer, then link their TIN/PIN to a specific pump nozzle before dispensing. Authorize the nozzle when DOMS reports that the fuel point is calling."
       />
-      <TinAllocationClient />
+      <TinAllocationClient stationCountry={user.station?.country ?? null} />
     </div>
   )
 }
