@@ -1,5 +1,5 @@
 import type { AlertVariant } from '@/src/shared/status/ui'
-import { ReactNode, useState } from 'react'
+import { isValidElement, ReactNode, useState } from 'react'
 import { AlertCircle, CheckCircle2, Info, XCircle } from 'lucide-react'
 
 import { cx } from '@/src/shared/utils/cx'
@@ -20,6 +20,22 @@ const variantIcons: Record<AlertVariant, ReactNode> = {
   info: <Info className="h-4 w-4" />,
 }
 
+function alertNodeText(node: ReactNode): string {
+  if (node == null || typeof node === 'boolean') return ''
+  if (
+    typeof node === 'string' ||
+    typeof node === 'number' ||
+    typeof node === 'bigint'
+  ) {
+    return String(node)
+  }
+  if (Array.isArray(node)) return node.map(alertNodeText).join('|')
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return alertNodeText(node.props.children)
+  }
+  return ''
+}
+
 export type AlertProps = {
   variant: AlertVariant
   title?: string
@@ -35,12 +51,13 @@ export function Alert({
   title,
   children,
   icon,
-  dismissible,
+  dismissible = true,
   onDismiss,
   className,
 }: AlertProps) {
-  const [dismissed, setDismissed] = useState(false)
-  if (dismissed) return null
+  const alertKey = `${variant}|${title ?? ''}|${alertNodeText(children)}`
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null)
+  if (dismissedKey === alertKey) return null
 
   const defaultIcon = variantIcons[variant]
 
@@ -62,11 +79,12 @@ export function Alert({
         <button
           type="button"
           onClick={() => {
-            setDismissed(true)
+            setDismissedKey(alertKey)
             onDismiss?.()
           }}
-          className="shrink-0 rounded-md p-1 opacity-70 transition-opacity hover:opacity-100"
-          aria-label="Dismiss"
+          className="shrink-0 rounded-md p-1 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+          aria-label="Dismiss alert"
+          title="Dismiss alert"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -78,6 +96,7 @@ export function Alert({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            aria-hidden="true"
           >
             <path d="M18 6 6 18" />
             <path d="m6 6 12 12" />
