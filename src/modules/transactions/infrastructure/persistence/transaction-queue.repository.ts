@@ -156,10 +156,7 @@ function buildBeforePrintLocalClaim(input: {
               created_at + ($3::int * INTERVAL '1 second')
             )
        )`
-    : `(
-         customer_id IS NOT NULL
-         OR status = 'PENDING'
-       )`
+    : 'TRUE'
 
   return {
     sql: `WITH candidates AS (
