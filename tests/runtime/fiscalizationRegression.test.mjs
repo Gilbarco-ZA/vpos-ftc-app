@@ -57,3 +57,20 @@ test('Tanzania proxy invoice metadata uses transaction time rather than send tim
     /invoiceDate: isoDateTimeInTimezone\(row\.invoice_date, args\.timezone\)/,
   )
 })
+
+test('timestamp backfill only changes assignments that have not been submitted or fiscalized', () => {
+  const migration = read(
+    'scripts/migrations/postgres/1330_tanzania_unfiscalized_assignment_time_backfill.sql',
+  )
+
+  assert.match(migration, /SET invoice_date = t\.transaction_date_time/)
+  assert.match(migration, /t\.fiscalization_reference IS NULL/)
+  assert.match(migration, /t\.cloud_transaction_id IS NULL/)
+  assert.match(
+    migration,
+    /t\.status IN \('OPEN', 'ALLOCATED', 'PENDING', 'FAILED', 'FISCALIZING'\)/,
+  )
+  assert.doesNotMatch(migration, /SET[\s\S]*invoice_number\s*=/)
+  assert.doesNotMatch(migration, /SET[\s\S]*daily_counter\s*=/)
+  assert.doesNotMatch(migration, /SET[\s\S]*global_counter\s*=/)
+})
