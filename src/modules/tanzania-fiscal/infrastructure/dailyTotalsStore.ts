@@ -1,4 +1,5 @@
 import { query, queryAll, queryOne } from '@/src/platform/db/postgres'
+import { resolveStationTimezone } from '@/src/shared/time/localTimezone'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import type { TanzaniaDailyTotalRequest } from './proxyDailyTotals'
@@ -36,7 +37,6 @@ export type TanzaniaDailyTotalsScheduleConfig = {
 }
 
 type ScheduleRow = {
-  timezone: string
   send_time: string | null
 }
 
@@ -62,26 +62,25 @@ const isoOrNull = (value: string | Date | null) =>
 export async function getTanzaniaDailyTotalsScheduleConfig(
   stationId: string,
 ): Promise<TanzaniaDailyTotalsScheduleConfig> {
-  const row = await queryOne<ScheduleRow>(
-    `SELECT COALESCE(
-              NULLIF(BTRIM(fs.timezone), ''),
-              'Africa/Dar_es_Salaam'
-            ) AS timezone,
-            COALESCE(
-              TO_CHAR(ss.tanzania_daily_totals_send_time, 'HH24:MI'),
-              $2
-            ) AS send_time
-       FROM fuel_stations fs
-       LEFT JOIN station_settings ss ON ss.station_id = fs.id
-      WHERE fs.id = $1::uuid
-      LIMIT 1`,
-    [stationId, DEFAULT_TANZANIA_DAILY_TOTALS_SEND_TIME],
-  )
+  const [row, timezone] = await Promise.all([
+    queryOne<ScheduleRow>(
+      `SELECT COALESCE(
+                TO_CHAR(ss.tanzania_daily_totals_send_time, 'HH24:MI'),
+                $2
+              ) AS send_time
+         FROM fuel_stations fs
+         LEFT JOIN station_settings ss ON ss.station_id = fs.id
+        WHERE fs.id = $1::uuid
+        LIMIT 1`,
+      [stationId, DEFAULT_TANZANIA_DAILY_TOTALS_SEND_TIME],
+    ),
+    resolveStationTimezone(stationId),
+  ])
 
   if (!row) throw new Error(`Station ${stationId} not found`)
 
   return {
-    timezone: row.timezone || 'Africa/Dar_es_Salaam',
+    timezone,
     sendTime: normalizeTanzaniaDailyTotalsSendTime(
       row.send_time || DEFAULT_TANZANIA_DAILY_TOTALS_SEND_TIME,
     ),
