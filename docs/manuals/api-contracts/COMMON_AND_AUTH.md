@@ -81,7 +81,7 @@ interface AuthFailure {
   ok: false
   success: false
   error: {
-    code: "UNAUTHORIZED" | "FORBIDDEN"
+    code: 'UNAUTHORIZED' | 'FORBIDDEN'
     message: string
     requestId: string
   }
@@ -116,8 +116,8 @@ interface InternalError {
   ok: false
   success: false
   error: {
-    code: "INTERNAL_ERROR"
-    message: "Internal server error"
+    code: 'INTERNAL_ERROR'
+    message: 'Internal server error'
     details: null | {
       originalMessage: string
       pgCode?: string | null
@@ -138,11 +138,7 @@ interface InternalError {
 ### 3.1 UserRole
 
 ```ts
-type UserRole =
-  | "administrator"
-  | "manager"
-  | "tenant"
-  | "field_engineer"
+type UserRole = 'administrator' | 'manager' | 'tenant' | 'field_engineer'
 ```
 
 Not every route permits all four roles.
@@ -413,7 +409,7 @@ interface Health {
 interface LivezResponse {
   ok: true
   success: true
-  status: "running"
+  status: 'running'
 }
 ```
 
@@ -450,8 +446,17 @@ Representative shape:
       "namos": { "configured": false, "ok": true },
       "ppx": { "configured": false, "ok": true },
       "proxyFiscalization": { "configured": true, "ok": true, "status": 200 },
-      "archiveExporters": { "configured": false, "ok": true, "destinations": [] },
-      "printer": { "configured": true, "ok": true, "ip": "192.0.2.10", "port": 9100 },
+      "archiveExporters": {
+        "configured": false,
+        "ok": true,
+        "destinations": []
+      },
+      "printer": {
+        "configured": true,
+        "ok": true,
+        "ip": "192.0.2.10",
+        "port": 9100
+      },
       "workers": {
         "configured": true,
         "ok": true,

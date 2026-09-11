@@ -46,7 +46,10 @@ const updateSchema = z
         .number()
         .int('Daily counter must be a whole number.')
         .min(0, 'Daily counter cannot be negative.')
-        .max(Number.MAX_SAFE_INTEGER, 'Daily counter exceeds the supported range.')
+        .max(
+          Number.MAX_SAFE_INTEGER,
+          'Daily counter exceeds the supported range.',
+        )
         .optional(),
     ),
     globalCounter: z.preprocess(
@@ -56,12 +59,19 @@ const updateSchema = z
         .number()
         .int('Global counter must be a whole number.')
         .min(0, 'Global counter cannot be negative.')
-        .max(Number.MAX_SAFE_INTEGER, 'Global counter exceeds the supported range.')
+        .max(
+          Number.MAX_SAFE_INTEGER,
+          'Global counter exceeds the supported range.',
+        )
         .optional(),
     ),
     deviceIdOverride: z.preprocess(
       nullableTrimmed,
-      z.string().max(191, 'Device ID cannot exceed 191 characters.').nullable().optional(),
+      z
+        .string()
+        .max(191, 'Device ID cannot exceed 191 characters.')
+        .nullable()
+        .optional(),
     ),
     receiptVerificationPrefixMode: z.enum(['registered', 'manual']).optional(),
     receiptVerificationPrefixOverride: z.preprocess(
@@ -83,7 +93,11 @@ const updateSchema = z
       .optional(),
     receiptVerificationUrlOverride: z.preprocess(
       nullableTrimmed,
-      z.string().max(500, 'TRA verification URL cannot exceed 500 characters.').nullable().optional(),
+      z
+        .string()
+        .max(500, 'TRA verification URL cannot exceed 500 characters.')
+        .nullable()
+        .optional(),
     ),
   })
   .superRefine((values, context) => {
@@ -175,14 +189,19 @@ export const PATCH = defineMutationRoute<Record<string, unknown>>({
         dailyCounter: parsed.data.dailyCounter,
         globalCounter: parsed.data.globalCounter,
         deviceIdOverride: parsed.data.deviceIdOverride,
-        receiptVerificationPrefixMode: parsed.data.receiptVerificationPrefixMode,
+        receiptVerificationPrefixMode:
+          parsed.data.receiptVerificationPrefixMode,
         receiptVerificationPrefixOverride:
           parsed.data.receiptVerificationPrefixOverride,
         receiptVerificationUrlMode: parsed.data.receiptVerificationUrlMode,
-        receiptVerificationUrlOverride: parsed.data.receiptVerificationUrlOverride,
+        receiptVerificationUrlOverride:
+          parsed.data.receiptVerificationUrlOverride,
       })
     } catch (error: any) {
-      return fail(String(error?.message || error || 'Invalid Tanzania fiscal settings.'), 400)
+      return fail(
+        String(error?.message || error || 'Invalid Tanzania fiscal settings.'),
+        400,
+      )
     }
 
     await createAuditLog({
@@ -198,11 +217,14 @@ export const PATCH = defineMutationRoute<Record<string, unknown>>({
         deviceIdOverride: before.deviceIdOverride,
         registeredReceiptCode: before.registeredReceiptCode,
         receiptVerificationPrefixMode: before.receiptVerificationPrefixMode,
-        receiptVerificationPrefixOverride: before.receiptVerificationPrefixOverride,
-        effectiveReceiptVerificationPrefix: before.effectiveReceiptVerificationPrefix,
+        receiptVerificationPrefixOverride:
+          before.receiptVerificationPrefixOverride,
+        effectiveReceiptVerificationPrefix:
+          before.effectiveReceiptVerificationPrefix,
         receiptVerificationUrlMode: before.receiptVerificationUrlMode,
         receiptVerificationUrlOverride: before.receiptVerificationUrlOverride,
-        effectiveReceiptVerificationUrlBase: before.effectiveReceiptVerificationUrlBase,
+        effectiveReceiptVerificationUrlBase:
+          before.effectiveReceiptVerificationUrlBase,
       },
       newValues: {
         openingGrossTotal: after.openingGrossTotal,
@@ -212,11 +234,14 @@ export const PATCH = defineMutationRoute<Record<string, unknown>>({
         deviceIdOverride: after.deviceIdOverride,
         registeredReceiptCode: after.registeredReceiptCode,
         receiptVerificationPrefixMode: after.receiptVerificationPrefixMode,
-        receiptVerificationPrefixOverride: after.receiptVerificationPrefixOverride,
-        effectiveReceiptVerificationPrefix: after.effectiveReceiptVerificationPrefix,
+        receiptVerificationPrefixOverride:
+          after.receiptVerificationPrefixOverride,
+        effectiveReceiptVerificationPrefix:
+          after.effectiveReceiptVerificationPrefix,
         receiptVerificationUrlMode: after.receiptVerificationUrlMode,
         receiptVerificationUrlOverride: after.receiptVerificationUrlOverride,
-        effectiveReceiptVerificationUrlBase: after.effectiveReceiptVerificationUrlBase,
+        effectiveReceiptVerificationUrlBase:
+          after.effectiveReceiptVerificationUrlBase,
       },
       ipAddress:
         req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined,

@@ -73,7 +73,9 @@ export default function PrintJobsPage() {
       if (search.trim()) params.set('search', search.trim())
       const [csrfRes, jobsRes] = await Promise.all([
         fetch('/api/security/csrf', { cache: 'no-store' }),
-        fetch(`/api/admin/print-jobs?${params.toString()}`, { cache: 'no-store' }),
+        fetch(`/api/admin/print-jobs?${params.toString()}`, {
+          cache: 'no-store',
+        }),
       ])
       const csrfJson = await csrfRes.json().catch(() => ({}))
       const jobsJson = await jobsRes.json().catch(() => ({}))
@@ -231,7 +233,10 @@ export default function PrintJobsPage() {
                 </option>
               ))}
             </Select>
-            <Select value={type} onChange={(event) => setType(event.target.value)}>
+            <Select
+              value={type}
+              onChange={(event) => setType(event.target.value)}
+            >
               <option value="">All job types</option>
               {types.map((value) => (
                 <option key={value} value={value}>
@@ -274,7 +279,9 @@ export default function PrintJobsPage() {
                         {shortId(job.id)}
                       </div>
                     </td>
-                    <td className="px-3 py-3">{job.printer_key || 'default'}</td>
+                    <td className="px-3 py-3">
+                      {job.printer_key || 'default'}
+                    </td>
                     <td className="px-3 py-3">
                       {job.source_transaction_id ? (
                         <div title={job.source_transaction_id}>
@@ -312,7 +319,10 @@ export default function PrintJobsPage() {
                       {formatDate(job.completed_at)}
                     </td>
                     <td className="max-w-[320px] px-3 py-3 text-xs text-[var(--text-secondary)]">
-                      <div className="line-clamp-3" title={job.last_error ?? ''}>
+                      <div
+                        className="line-clamp-3"
+                        title={job.last_error ?? ''}
+                      >
                         {job.last_error || '—'}
                       </div>
                     </td>

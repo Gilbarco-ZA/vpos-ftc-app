@@ -97,7 +97,14 @@ export async function createPumpNozzle(input: {
           SET tank_id = $1, tank_group_id = $2, display_number = $3,
               is_active = TRUE, updated_at = NOW()
         WHERE id = $4 AND station_id = $5 AND pump_id = $6`,
-      [input.tankId, tankGroupId, input.displayNumber, existing.id, input.stationId, input.pumpId],
+      [
+        input.tankId,
+        tankGroupId,
+        input.displayNumber,
+        existing.id,
+        input.stationId,
+        input.pumpId,
+      ],
     )
     return { ok: true, id: existing.id }
   }
@@ -107,7 +114,15 @@ export async function createPumpNozzle(input: {
     `INSERT INTO nozzles (id, station_id, pump_id, tank_id, nozzle_number, display_number, tank_group_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id`,
-    [id, input.stationId, input.pumpId, input.tankId, input.nozzleNumber, input.displayNumber, tankGroupId],
+    [
+      id,
+      input.stationId,
+      input.pumpId,
+      input.tankId,
+      input.nozzleNumber,
+      input.displayNumber,
+      tankGroupId,
+    ],
   )
   return { ok: true, id: String(row?.id ?? '') }
 }
@@ -121,8 +136,10 @@ export async function updatePumpNozzle(input: {
   tankId: string
   tankGroup: unknown
 }): Promise<MutationResult> {
-  if (!(await pumpExists(input.stationId, input.pumpId))) return { ok: false, error: 'Pump not found' }
-  if (!(await tankExists(input.stationId, input.tankId))) return { ok: false, error: 'Invalid tank' }
+  if (!(await pumpExists(input.stationId, input.pumpId)))
+    return { ok: false, error: 'Pump not found' }
+  if (!(await tankExists(input.stationId, input.tankId)))
+    return { ok: false, error: 'Invalid tank' }
 
   const existing = await queryOne<{ id: string }>(
     `SELECT id FROM nozzles WHERE station_id = $1 AND pump_id = $2 AND nozzle_number = $3`,
@@ -137,7 +154,8 @@ export async function updatePumpNozzle(input: {
         AND display_number = $3 AND is_active = TRUE AND id <> $4::uuid`,
     [input.stationId, input.pumpId, input.displayNumber, input.nozzleId],
   )
-  if (duplicateDisplay?.id) return { ok: false, error: 'Display number must be unique per pump' }
+  if (duplicateDisplay?.id)
+    return { ok: false, error: 'Display number must be unique per pump' }
 
   const tankGroupId = await ensureTankGroup(input.stationId, input.tankGroup)
   await queryOne(
@@ -145,12 +163,24 @@ export async function updatePumpNozzle(input: {
         SET tank_id = $1, nozzle_number = $2, display_number = $3,
             tank_group_id = $4, is_active = TRUE, updated_at = NOW()
       WHERE id = $5 AND station_id = $6 AND pump_id = $7`,
-    [input.tankId, input.nozzleNumber, input.displayNumber, tankGroupId, input.nozzleId, input.stationId, input.pumpId],
+    [
+      input.tankId,
+      input.nozzleNumber,
+      input.displayNumber,
+      tankGroupId,
+      input.nozzleId,
+      input.stationId,
+      input.pumpId,
+    ],
   )
   return { ok: true, id: input.nozzleId }
 }
 
-export async function deletePumpNozzle(input: { stationId: string; pumpId: string; nozzleId: string }): Promise<MutationResult> {
+export async function deletePumpNozzle(input: {
+  stationId: string
+  pumpId: string
+  nozzleId: string
+}): Promise<MutationResult> {
   await queryOne(
     `UPDATE nozzles SET is_active = FALSE, updated_at = NOW()
       WHERE id = $1 AND station_id = $2 AND pump_id = $3`,

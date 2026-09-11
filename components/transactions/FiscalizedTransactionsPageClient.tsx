@@ -332,25 +332,29 @@ const FiscalizedTransactionsPageClient = ({
       }
       const payload = body?.data ?? body
       const items = Array.isArray(payload?.items) ? payload.items : []
-      const mapped: FiscalizedTransactionListItem[] = items.map((item: any) => ({
-        id: String(item?.id ?? ''),
-        fiscalizedAt: item?.fiscalized_at ?? item?.fiscalizedAt ?? null,
-        transactionDateTime:
-          item?.transaction_date_time ?? item?.transactionDateTime ?? null,
-        posReference: item?.pos_reference ?? item?.posReference ?? null,
-        receiptNumber: item?.receipt_number ?? item?.receiptNumber ?? null,
-        cloudTransactionId:
-          item?.cloud_transaction_id ?? item?.cloudTransactionId ?? null,
-        pumpNumber: Number(item?.pump_number ?? item?.pumpNumber ?? 0),
-        fuelType: item?.fuel_type ?? item?.fuelType ?? null,
-        volume: item?.volume ?? null,
-        totalAmount: Number(item?.total_amount ?? item?.totalAmount ?? 0),
-        status: String(item?.status ?? ''),
-        fiscalizationReference:
-          item?.fiscalization_reference ?? item?.fiscalizationReference ?? null,
-        buyerName: item?.buyer_name ?? item?.buyerName ?? null,
-        tin: item?.tin ?? null,
-      }))
+      const mapped: FiscalizedTransactionListItem[] = items.map(
+        (item: any) => ({
+          id: String(item?.id ?? ''),
+          fiscalizedAt: item?.fiscalized_at ?? item?.fiscalizedAt ?? null,
+          transactionDateTime:
+            item?.transaction_date_time ?? item?.transactionDateTime ?? null,
+          posReference: item?.pos_reference ?? item?.posReference ?? null,
+          receiptNumber: item?.receipt_number ?? item?.receiptNumber ?? null,
+          cloudTransactionId:
+            item?.cloud_transaction_id ?? item?.cloudTransactionId ?? null,
+          pumpNumber: Number(item?.pump_number ?? item?.pumpNumber ?? 0),
+          fuelType: item?.fuel_type ?? item?.fuelType ?? null,
+          volume: item?.volume ?? null,
+          totalAmount: Number(item?.total_amount ?? item?.totalAmount ?? 0),
+          status: String(item?.status ?? ''),
+          fiscalizationReference:
+            item?.fiscalization_reference ??
+            item?.fiscalizationReference ??
+            null,
+          buyerName: item?.buyer_name ?? item?.buyerName ?? null,
+          tin: item?.tin ?? null,
+        }),
+      )
       setTransactions(mapped)
     } catch (err: unknown) {
       setLoadError(err)
@@ -762,7 +766,8 @@ const FiscalizedTransactionsPageClient = ({
                   Original transaction
                 </div>
                 <div className="mt-1 font-medium text-[var(--text-primary)]">
-                  {creditNoteTransaction.receiptNumber || creditNoteTransaction.id}
+                  {creditNoteTransaction.receiptNumber ||
+                    creditNoteTransaction.id}
                 </div>
                 <div className="mt-1 text-xs text-[var(--text-secondary)]">
                   Amount {formatMoney(creditNoteTransaction.totalAmount)} · Pump{' '}

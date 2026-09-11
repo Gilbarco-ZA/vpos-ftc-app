@@ -4,6 +4,7 @@ import { enqueuePrintJob } from '@/src/modules/printing/application/enqueuePrint
 import { buildReferencePrintJobPayload } from '@/src/modules/printing/domain/printJobPayload'
 import { isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/infrastructure/country'
 import { getOrCreateLatestTransactionReceiptRepo } from '@/src/modules/transactions/infrastructure/persistence/transaction-read.repository'
+
 import { getOrCreatePreFiscalizationReceipt } from './preFiscalizationReceipt'
 import { isOfflineProxySubmission } from './proxyOfflineSubmission'
 
@@ -32,7 +33,7 @@ export async function requiresPreFiscalizationReceiptPrint(stationId: string) {
   )
   return Boolean(
     settings?.auto_print_receipts === true &&
-      settings?.print_receipt_order === 'before_fiscalization',
+    settings?.print_receipt_order === 'before_fiscalization',
   )
 }
 
@@ -68,7 +69,7 @@ async function resolveOfflinePrint(input: {
 
   return Boolean(
     isTanzaniaCountry(context?.country) &&
-      isOfflineProxySubmission(context?.response_payload),
+    isOfflineProxySubmission(context?.response_payload),
   )
 }
 

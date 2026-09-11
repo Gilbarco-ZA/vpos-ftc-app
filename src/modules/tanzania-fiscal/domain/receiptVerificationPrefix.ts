@@ -85,7 +85,9 @@ export function normalizeTanzaniaReceiptVerificationUrlOverride(
     throw new Error('Manual TRA receipt verification URL must be a valid URL.')
   }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new Error('Manual TRA receipt verification URL must use HTTP or HTTPS.')
+    throw new Error(
+      'Manual TRA receipt verification URL must use HTTP or HTTPS.',
+    )
   }
   const normalized = parsed.toString()
   return normalized.endsWith('/') ? normalized : `${normalized}/`
@@ -102,7 +104,9 @@ export function resolveTanzaniaReceiptVerificationUrlBase(args: {
   if (mode !== 'manual') {
     throw new Error(`Unsupported receipt verification URL mode: ${mode}`)
   }
-  const override = normalizeTanzaniaReceiptVerificationUrlOverride(args.override)
+  const override = normalizeTanzaniaReceiptVerificationUrlOverride(
+    args.override,
+  )
   if (!override) {
     throw new Error(
       'A manual TRA receipt verification URL is required when Manual URL is selected.',

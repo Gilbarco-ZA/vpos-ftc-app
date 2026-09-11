@@ -50,10 +50,7 @@ export function startPrinterConnectivityWorker(opts?: {
 }) {
   const stationId = getStationId()
   const pollMs = Math.max(1_000, Number(opts?.pollMs ?? DEFAULT_POLL_MS))
-  const timeoutMs = Math.max(
-    250,
-    Number(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-  )
+  const timeoutMs = Math.max(250, Number(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS))
   const previous = new Map<string, boolean>()
   let stopped = false
   let tickInFlight = false
@@ -87,7 +84,8 @@ export function startPrinterConnectivityWorker(opts?: {
             autoPrintEnabled = await printJobsRepo.isAutoPrintEnabled(stationId)
           }
           if (autoPrintEnabled) {
-            const released = await printJobsRepo.releasePendingPrintJobs(stationId)
+            const released =
+              await printJobsRepo.releasePendingPrintJobs(stationId)
             releasedJobs += released.length
           }
         }

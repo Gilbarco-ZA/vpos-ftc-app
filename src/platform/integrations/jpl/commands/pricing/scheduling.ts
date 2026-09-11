@@ -64,7 +64,11 @@ export async function handleChangeGradePrices(
   const payload = ((cmd as any).payload ?? {}) as Record<string, unknown>
   const entries = extractEntries(payload)
   if (!entries.length) {
-    return { ok: false, accepted: false, error: 'No price entries were provided' }
+    return {
+      ok: false,
+      accepted: false,
+      error: 'No price entries were provided',
+    }
   }
 
   const requestedActivation =
@@ -93,14 +97,18 @@ export async function handleChangeGradePrices(
   let currentResponse: any = null
   let currentPriceSetSubCode: string | undefined
   try {
-    const currentPriceSetResult = await deps.readCurrentPriceSet(client, timeoutMs)
+    const currentPriceSetResult = await deps.readCurrentPriceSet(
+      client,
+      timeoutMs,
+    )
     currentResponse = currentPriceSetResult.response
     currentPriceSetSubCode = currentPriceSetResult.usedSubCode
   } catch {
     currentResponse = null
   }
 
-  const baseBank = toPriceBank(currentResponse) ?? extractExplicitPriceBank(payload)
+  const baseBank =
+    toPriceBank(currentResponse) ?? extractExplicitPriceBank(payload)
   if (!baseBank) {
     return {
       ok: false,

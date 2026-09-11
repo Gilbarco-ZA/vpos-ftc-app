@@ -53,12 +53,19 @@ export const upsertSimPump = (
   if (existing) {
     const nozzles = existing.nozzles.slice()
     const nozzleIndex = nozzles.findIndex((n) => n.nozzleId === nozzleId)
-    if (nozzleIndex >= 0) nozzles[nozzleIndex] = { ...nozzles[nozzleIndex], ...nozzle }
+    if (nozzleIndex >= 0)
+      nozzles[nozzleIndex] = { ...nozzles[nozzleIndex], ...nozzle }
     else nozzles.push(nozzle)
     const idx = pumps.findIndex((item) => item.pumpId === pumpId)
     pumps[idx] = { ...existing, nozzles, updatedAt: now }
   } else {
-    pumps.push({ pumpId, nozzles: [nozzle], updatedAt: now, lastSeenAt: now, health: 'unknown' })
+    pumps.push({
+      pumpId,
+      nozzles: [nozzle],
+      updatedAt: now,
+      lastSeenAt: now,
+      health: 'unknown',
+    })
   }
 
   return { ...snapshot, pumps, updatedAt: now }

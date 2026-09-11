@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import {
-  conflictError,
-  notFoundError,
-} from '@/src/platform/web/api/api-error'
+import { conflictError, notFoundError } from '@/src/platform/web/api/api-error'
 import { getReturnUrl, wantsHtmlRedirect } from '@/src/platform/web/api/request'
 import { ok } from '@/src/platform/web/api/response'
 import { defineMutationRoute } from '@/src/shared/http/defineRoute'

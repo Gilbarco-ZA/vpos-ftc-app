@@ -13,7 +13,9 @@ import { Topbar } from '@/components/layout/topbar'
 import { RuntimeImage } from '@/components/ui/runtime-image'
 
 const hexToRgb = (value?: string | null) => {
-  const hex = String(value ?? '').trim().replace(/^#/, '')
+  const hex = String(value ?? '')
+    .trim()
+    .replace(/^#/, '')
   if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null
   return {
     r: Number.parseInt(hex.slice(0, 2), 16),
@@ -35,7 +37,10 @@ const rgbaForHex = (value: string | null | undefined, alpha: number) => {
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`
 }
 
-const buildBrandStyle = (primary?: string | null, secondary?: string | null) => {
+const buildBrandStyle = (
+  primary?: string | null,
+  secondary?: string | null,
+) => {
   const style: Record<string, string> = {}
   if (primary) {
     style['--brand-primary'] = primary
@@ -44,7 +49,8 @@ const buildBrandStyle = (primary?: string | null, secondary?: string | null) => 
     style['--neon-cyan'] = primary
     style['--neon-primary-foreground'] = foregroundForHex(primary)
     style['--border-neon-cyan'] = rgbaForHex(primary, 0.38) || primary
-    style['--shadow-glow-cyan'] = `0 0 24px ${rgbaForHex(primary, 0.28) || primary}`
+    style['--shadow-glow-cyan'] =
+      `0 0 24px ${rgbaForHex(primary, 0.28) || primary}`
     style['--auth-accent-top'] = primary
     const focus = rgbaForHex(primary, 0.35)
     if (focus) style['--border-focus'] = focus
@@ -54,7 +60,8 @@ const buildBrandStyle = (primary?: string | null, secondary?: string | null) => 
     style['--brand-secondary-foreground'] = foregroundForHex(secondary)
     style['--neon-magenta'] = secondary
     style['--border-neon-magenta'] = rgbaForHex(secondary, 0.38) || secondary
-    style['--shadow-glow-magenta'] = `0 0 24px ${rgbaForHex(secondary, 0.28) || secondary}`
+    style['--shadow-glow-magenta'] =
+      `0 0 24px ${rgbaForHex(secondary, 0.28) || secondary}`
     style['--auth-accent-bottom'] = secondary
   }
   return style
@@ -85,7 +92,10 @@ const DashboardLayout = async ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--surface-page)]" style={brandStyle as any}>
+    <div
+      className="min-h-screen bg-[var(--surface-page)]"
+      style={brandStyle as any}
+    >
       <div className="flex min-h-screen">
         <div className="no-print hidden xl:block">
           <Sidebar
@@ -119,17 +129,25 @@ const DashboardLayout = async ({ children }: { children: ReactNode }) => {
                     </div>
                   ) : null}
                   <div className="min-w-0">
-                    <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-muted)]">Station</div>
+                    <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                      Station
+                    </div>
                     <div className="flex items-center gap-2">
-                      <div className="truncate text-sm font-medium text-[var(--text-primary)]">{(stationDisplayName || user.station.name) as string}</div>
-                      <span className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">{user.station.code}</span>
+                      <div className="truncate text-sm font-medium text-[var(--text-primary)]">
+                        {(stationDisplayName || user.station.name) as string}
+                      </div>
+                      <span className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+                        {user.station.code}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
             }
           />
-          <main className="flex-1 animate-fade-in"><div className="page-shell">{children}</div></main>
+          <main className="flex-1 animate-fade-in">
+            <div className="page-shell">{children}</div>
+          </main>
         </div>
       </div>
       <StationConfigGuard />

@@ -3,10 +3,7 @@ import {
   requestWithSubCodeFallback,
 } from '@/src/platform/integrations/jpl/protocol/runtime'
 
-import type {
-  ChangePriceSetOptions,
-  ChangePriceSetPayload,
-} from './contracts'
+import type { ChangePriceSetOptions, ChangePriceSetPayload } from './contracts'
 
 export async function readPriceSetStatus(client: any, timeoutMs: number) {
   const result = await requestWithSubCodeFallback(client, {

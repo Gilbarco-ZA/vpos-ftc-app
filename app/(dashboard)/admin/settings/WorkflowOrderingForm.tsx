@@ -56,7 +56,9 @@ export function WorkflowOrderingForm({
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body?.error?.message ?? 'Failed to save workflow settings')
+        throw new Error(
+          body?.error?.message ?? 'Failed to save workflow settings',
+        )
       }
       showToast('Transaction workflow settings saved', 'success')
       router.refresh()
@@ -94,7 +96,8 @@ export function WorkflowOrderingForm({
             value={tinOrder}
             onChange={(event) =>
               setTinOrder(
-                event.target.value as WorkflowOrderingFormProps['tinCaptureOrder'],
+                event.target
+                  .value as WorkflowOrderingFormProps['tinCaptureOrder'],
               )
             }
             disabled={busy}
@@ -104,7 +107,10 @@ export function WorkflowOrderingForm({
           </Select>
         </FormField>
 
-        <FormField label="Linking window (seconds)" helpText={linkingWindowHelp}>
+        <FormField
+          label="Linking window (seconds)"
+          helpText={linkingWindowHelp}
+        >
           <Input
             name="linkingWindowSeconds"
             type="number"
@@ -144,13 +150,16 @@ export function WorkflowOrderingForm({
                 value={printOrder}
                 onChange={(event) =>
                   setPrintOrder(
-                    event.target.value as WorkflowOrderingFormProps['printReceiptOrder'],
+                    event.target
+                      .value as WorkflowOrderingFormProps['printReceiptOrder'],
                   )
                 }
                 disabled={busy || !autoPrint}
               >
                 <option value="after_fiscalization">After fiscalization</option>
-                <option value="before_fiscalization">Before fiscalization</option>
+                <option value="before_fiscalization">
+                  Before fiscalization
+                </option>
               </Select>
             </FormField>
           </div>

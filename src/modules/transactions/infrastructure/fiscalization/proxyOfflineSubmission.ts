@@ -3,7 +3,10 @@ const asRecord = (value: unknown): Record<string, any> | null =>
     ? (value as Record<string, any>)
     : null
 
-const upper = (value: unknown) => String(value ?? '').trim().toUpperCase()
+const upper = (value: unknown) =>
+  String(value ?? '')
+    .trim()
+    .toUpperCase()
 
 const toBoolean = (value: unknown): boolean | null => {
   if (value === true || value === false) return value

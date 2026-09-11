@@ -77,7 +77,10 @@ export const StationConfigGuard = () => {
     }
 
     void run()
-    const intervalId = window.setInterval(() => void ensureSession(), SESSION_CHECK_INTERVAL_MS)
+    const intervalId = window.setInterval(
+      () => void ensureSession(),
+      SESSION_CHECK_INTERVAL_MS,
+    )
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibilityChange)
 

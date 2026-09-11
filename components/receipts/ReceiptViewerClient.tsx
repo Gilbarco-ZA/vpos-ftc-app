@@ -386,7 +386,9 @@ const ReceiptViewerClient = ({
           {printError ? (
             <Alert variant={STATUS_VARIANT.ERROR} title="Receipt print failed">
               The receipt print job did not complete successfully. Review the{' '}
-              <Link href="/admin/config/printers">station printer settings</Link>{' '}
+              <Link href="/admin/config/printers">
+                station printer settings
+              </Link>{' '}
               and the print runtime.
             </Alert>
           ) : null}

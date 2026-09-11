@@ -8,17 +8,14 @@ These endpoints are intended for administrators/support/runtime tooling. They ar
 ## 1. Fiscal inbox enums and DTOs
 
 ```ts
-type FiscalInboxTopic =
-  | "fiscal"
-  | "pos"
-  | "external_fiscalization"
+type FiscalInboxTopic = 'fiscal' | 'pos' | 'external_fiscalization'
 
 type FiscalInboxStatus =
-  | "PENDING"
-  | "PROCESSING"
-  | "PROCESSED"
-  | "FAILED"
-  | "DEAD"
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'PROCESSED'
+  | 'FAILED'
+  | 'DEAD'
 ```
 
 ### FiscalInboxListRow
@@ -99,8 +96,8 @@ Query:
 ```ts
 interface FiscalInboxListQuery {
   stationId?: string // defaults to authenticated station
-  status?: "ANY" | FiscalInboxStatus | string
-  topic?: "ANY" | FiscalInboxTopic | string
+  status?: 'ANY' | FiscalInboxStatus | string
+  topic?: 'ANY' | FiscalInboxTopic | string
   limit?: string // positive integer; default 50
   offset?: string // non-negative integer; default 0
 }
@@ -156,12 +153,12 @@ Invalid IDs return `400`; missing records return `404`.
 
 ```ts
 type FiscalInboxItemAction =
-  | "REQUEUE"
-  | "CLONE_REQUEUE"
-  | "MARK_DEAD"
-  | "MARK_FAILED"
-  | "MARK_PROCESSED"
-  | "DELETE"
+  | 'REQUEUE'
+  | 'CLONE_REQUEUE'
+  | 'MARK_DEAD'
+  | 'MARK_FAILED'
+  | 'MARK_PROCESSED'
+  | 'DELETE'
 
 interface FiscalInboxItemMutation {
   action: FiscalInboxItemAction
@@ -182,11 +179,11 @@ Success is `SuccessEnvelope<unknown>`, where the result is the exact command res
 
 ```ts
 type BulkFiscalInboxAction =
-  | "REQUEUE"
-  | "MARK_FAILED"
-  | "MARK_DEAD"
-  | "MARK_PROCESSED"
-  | "DELETE"
+  | 'REQUEUE'
+  | 'MARK_FAILED'
+  | 'MARK_DEAD'
+  | 'MARK_PROCESSED'
+  | 'DELETE'
 
 interface BulkFiscalInboxRequest {
   ids: Array<number | string>
@@ -254,7 +251,9 @@ This lookup selects durable inbox records by request/correlation ID.
 Request query uses a request identifier and may use station context as supported by the route. Returned rows are repository records and use the generic record form:
 
 ```ts
-type FiscalInboxByRequestResponse = SuccessEnvelope<Array<Record<string, unknown>>>
+type FiscalInboxByRequestResponse = SuccessEnvelope<
+  Array<Record<string, unknown>>
+>
 ```
 
 Consumers should prefer `GET /api/runtime/fiscal/inbox/{id}` for normalized support-view fields after resolving an ID.

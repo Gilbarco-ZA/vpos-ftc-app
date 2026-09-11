@@ -130,11 +130,12 @@ export async function getTanzaniaGrossTotalSummary(
 
   let effectiveReceiptVerificationPrefix: string | null = null
   try {
-    effectiveReceiptVerificationPrefix = resolveTanzaniaReceiptVerificationPrefix({
-      mode: receiptVerificationPrefixMode,
-      registeredReceiptCode,
-      override: receiptVerificationPrefixOverride,
-    })
+    effectiveReceiptVerificationPrefix =
+      resolveTanzaniaReceiptVerificationPrefix({
+        mode: receiptVerificationPrefixMode,
+        registeredReceiptCode,
+        override: receiptVerificationPrefixOverride,
+      })
   } catch {}
 
   return {
@@ -156,10 +157,11 @@ export async function getTanzaniaGrossTotalSummary(
     effectiveReceiptVerificationPrefix,
     receiptVerificationUrlMode,
     receiptVerificationUrlOverride,
-    effectiveReceiptVerificationUrlBase: resolveTanzaniaReceiptVerificationUrlBase({
-      mode: receiptVerificationUrlMode,
-      override: receiptVerificationUrlOverride,
-    }),
+    effectiveReceiptVerificationUrlBase:
+      resolveTanzaniaReceiptVerificationUrlBase({
+        mode: receiptVerificationUrlMode,
+        override: receiptVerificationUrlOverride,
+      }),
   }
 }
 
@@ -306,7 +308,11 @@ export async function setTanzaniaFiscalOpeningValues(
                 tanzania_receipt_verification_prefix_override = $3,
                 updated_at = NOW()
           WHERE station_id = $1::uuid`,
-        [stationId, receiptVerificationPrefixMode, receiptVerificationPrefixOverride],
+        [
+          stationId,
+          receiptVerificationPrefixMode,
+          receiptVerificationPrefixOverride,
+        ],
       )
     }
     if (shouldUpdateReceiptUrl) {

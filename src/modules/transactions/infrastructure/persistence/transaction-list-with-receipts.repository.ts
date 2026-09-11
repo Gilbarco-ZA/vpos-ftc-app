@@ -1,6 +1,6 @@
-import type { ListTransactionsRepoOptions } from './transaction.types'
-
 import { queryAll, queryPaginated } from '@/src/platform/db/postgres'
+
+import type { ListTransactionsRepoOptions } from './transaction.types'
 
 const receiptNumberJoinSql = `
   LEFT JOIN LATERAL (
@@ -182,12 +182,10 @@ export async function listTransactionsWithReceiptNumbersRepo(
       200,
       Math.max(1, Number(opts.pageSize || opts.limit || 50)),
     )
-    const paginated = await queryPaginated<any>(
-      baseQuery,
-      baseCount,
-      params,
-      { page, pageSize },
-    )
+    const paginated = await queryPaginated<any>(baseQuery, baseCount, params, {
+      page,
+      pageSize,
+    })
     return {
       items: paginated.data,
       total: paginated.total,

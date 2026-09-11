@@ -110,7 +110,10 @@ async function allocateAssignment(args: {
   fiscalizationDate: string
   timezone: string
 }) {
-  const existingBeforeLock = await loadAssignment(args.stationId, args.transactionId)
+  const existingBeforeLock = await loadAssignment(
+    args.stationId,
+    args.transactionId,
+  )
   if (existingBeforeLock) return existingBeforeLock
 
   const configuredPrefix = await queryOne<ReceiptPrefixRow>(

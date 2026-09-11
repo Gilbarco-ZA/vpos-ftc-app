@@ -1,5 +1,8 @@
 import { fail, ok } from '@/src/platform/web/api/response'
-import { defineGetRoute, defineMutationRoute } from '@/src/shared/http/defineRoute'
+import {
+  defineGetRoute,
+  defineMutationRoute,
+} from '@/src/shared/http/defineRoute'
 
 import {
   listAdminPrintJobs,

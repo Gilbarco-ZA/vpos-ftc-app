@@ -48,7 +48,9 @@ export const formatReceiptTime = (value?: unknown) => {
   const text = String(value ?? '').trim()
   if (!text) return ''
 
-  const literalTime = text.match(/(?:^|[T\s])(\d{2}:\d{2}:\d{2})(?:[.\sZ+\-]|$)/)
+  const literalTime = text.match(
+    /(?:^|[T\s])(\d{2}:\d{2}:\d{2})(?:[.\sZ+\-]|$)/,
+  )
   if (literalTime) return literalTime[1]
 
   const timeOnly = text.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)

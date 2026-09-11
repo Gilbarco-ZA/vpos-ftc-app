@@ -52,19 +52,19 @@ Direct response:
 ```ts
 interface StationSettingsUpdate {
   linkingWindowSeconds?: number | string // integer 0..3600
-  unallocatedHandling?: "anonymous" | "placeholder"
-  fiscalizationEngine?: "TZ" | "KE" | "mock"
-  fiscalizationTransport?: "proxy" | "local_tz"
+  unallocatedHandling?: 'anonymous' | 'placeholder'
+  fiscalizationEngine?: 'TZ' | 'KE' | 'mock'
+  fiscalizationTransport?: 'proxy' | 'local_tz'
   autoFiscalizeEnabled?: boolean | string
   autoPrintReceipts?: boolean | string
-  printReceiptOrder?: "before_fiscalization" | "after_fiscalization"
-  tinCaptureOrder?: "before_transaction" | "after_transaction"
+  printReceiptOrder?: 'before_fiscalization' | 'after_fiscalization'
+  tinCaptureOrder?: 'before_transaction' | 'after_transaction'
   syncEnabled?: boolean | string
-  syncTime?: string       // HH:MM:SS
-  syncTimezone?: string   // max 50
-  moneyDecimals?: number | string     // integer 0..3
+  syncTime?: string // HH:MM:SS
+  syncTimezone?: string // max 50
+  moneyDecimals?: number | string // integer 0..3
   unitPriceDecimals?: number | string // integer 0..3
-  volumeDecimals?: number | string    // integer 0..3
+  volumeDecimals?: number | string // integer 0..3
 }
 ```
 
@@ -164,7 +164,7 @@ interface PumpSettingsInput {
   id?: string // used on update, ignored on create
   code: string
   name: string
-  status?: "ACTIVE" | "INACTIVE" | string // default ACTIVE
+  status?: 'ACTIVE' | 'INACTIVE' | string // default ACTIVE
   pumpNumber: number | string
   hasNozzleSelector?: boolean | string | number
   tankGroupId?: string
@@ -266,7 +266,7 @@ interface TankSettingsInput {
   code: string
   name: string
   productId: string
-  status?: "ACTIVE" | "INACTIVE" | string
+  status?: 'ACTIVE' | 'INACTIVE' | string
   capacityLitres: number | string
   lowLevelLitres?: number | string | null
   criticalLevelLitres?: number | string | null
@@ -362,8 +362,8 @@ Direct response:
 
 ```ts
 interface ForecourtRuntimeConfig {
-  mode: "jpl_tcp"
-  jplOperationMode: "unsupervised" | "supervised" | string
+  mode: 'jpl_tcp'
+  jplOperationMode: 'unsupervised' | 'supervised' | string
   jplHost: string
   jplPort: number
   jplPosId: string
@@ -404,7 +404,7 @@ All fields are optional; omitted values preserve the current setting:
 ```ts
 interface SaveForecourtSettingsRequest {
   mode?: string
-  jplOperationMode?: "unsupervised" | "supervised" | string
+  jplOperationMode?: 'unsupervised' | 'supervised' | string
   jplHost?: string
   jplPort?: number
   jplPosId?: string
@@ -459,7 +459,7 @@ interface CreateUserRequest {
   username: string
   email: string
   password: string
-  role: "administrator" | "manager" | "tenant" | "field_engineer"
+  role: 'administrator' | 'manager' | 'tenant' | 'field_engineer'
   fullName?: string
   csrf_token?: string
 }
@@ -544,7 +544,7 @@ interface InitialAdminRequest {
   password: string
   email?: string
   fullName?: string
-  deviceRegistered?: boolean | "true" | string
+  deviceRegistered?: boolean | 'true' | string
   csrf_token?: string
 }
 ```
@@ -558,7 +558,7 @@ Direct success:
 ```ts
 interface InitialAdminSuccess {
   success: true
-  message: "Admin user created successfully"
+  message: 'Admin user created successfully'
   userId: string
   username: string
 }
@@ -572,7 +572,7 @@ A pre-existing user returns HTTP `409` with `{success:false,error:"User already 
 
 ```ts
 interface SetupDeviceRequest {
-  action?: "register" | "reset"
+  action?: 'register' | 'reset'
   registrationCode?: string
   RegistrationCode?: string
   countryCode?: string
@@ -602,12 +602,12 @@ Register success is `SuccessEnvelope<Record<string, unknown>>`; the nested objec
 ```ts
 type SetupSiteRequest =
   | {
-      action: "set-country"
+      action: 'set-country'
       country: string
       csrf_token?: string
     }
   | {
-      action?: "sync"
+      action?: 'sync'
       csrf_token?: string
     }
 ```
@@ -661,11 +661,11 @@ The nested object is the registration-status object returned by `vpos-proxy`; VP
 
 ```ts
 interface BrandingUpdate {
-  primaryColor?: string       // #RRGGBB
-  secondaryColor?: string     // #RRGGBB
+  primaryColor?: string // #RRGGBB
+  secondaryColor?: string // #RRGGBB
   stationDisplayName?: string // max 255
-  receiptFooterText?: string  // max 1000
-  receiptHeaderText?: string  // max 1000
+  receiptFooterText?: string // max 1000
+  receiptHeaderText?: string // max 1000
   logoPath?: string
   logo?: File
 }

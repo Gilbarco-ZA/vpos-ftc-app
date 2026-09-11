@@ -3,6 +3,11 @@
 import type { PumpStateSnapshot } from '@/src/shared/pumps/types'
 import { useEffect, useMemo, useState } from 'react'
 
+import {
+  FORECOURT_CONNECTION_STATUS,
+  STATUS_VARIANT,
+} from '@/src/shared/status/ui'
+
 import { CustomerDrawer } from '@/components/customers/CustomerDrawer'
 import {
   formatState,
@@ -16,7 +21,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { FORECOURT_CONNECTION_STATUS, STATUS_VARIANT } from '@/src/shared/status/ui'
 
 type FuelOption = {
   pumpNumber: number
@@ -80,11 +84,13 @@ export default function TinAllocationClient({
   const [success, setSuccess] = useState<string | null>(null)
 
   const refresh = async () => {
-    const [fuelResponse, stateResponse, allocationResponse] = await Promise.all([
-      fetch('/api/transactions/fuel-options', { cache: 'no-store' }),
-      fetch('/api/pumps/state', { cache: 'no-store' }),
-      fetch('/api/transactions/pre-fuel-customer', { cache: 'no-store' }),
-    ])
+    const [fuelResponse, stateResponse, allocationResponse] = await Promise.all(
+      [
+        fetch('/api/transactions/fuel-options', { cache: 'no-store' }),
+        fetch('/api/pumps/state', { cache: 'no-store' }),
+        fetch('/api/transactions/pre-fuel-customer', { cache: 'no-store' }),
+      ],
+    )
     const fuelBody = await fuelResponse.json().catch(() => ({}))
     const stateBody = await stateResponse.json().catch(() => ({}))
     const allocationBody = await allocationResponse.json().catch(() => ({}))
@@ -98,8 +104,12 @@ export default function TinAllocationClient({
       if (!next) return previous
       if (!previous || (previous.pumps?.length ?? 0) === 0) return next
 
-      const previousHasLive = previous.pumps.some((pump) => Boolean(pump.lastSeenAt))
-      const nextHasLive = next.pumps?.some((pump: any) => Boolean(pump.lastSeenAt))
+      const previousHasLive = previous.pumps.some((pump) =>
+        Boolean(pump.lastSeenAt),
+      )
+      const nextHasLive = next.pumps?.some((pump: any) =>
+        Boolean(pump.lastSeenAt),
+      )
       return previousHasLive && !nextHasLive ? previous : next
     })
     setPending(
@@ -329,7 +339,8 @@ export default function TinAllocationClient({
                   <Badge variant={healthVariant(pumpState?.health)}>
                     {pumpState?.health === FORECOURT_CONNECTION_STATUS.ONLINE
                       ? 'Online'
-                      : pumpState?.health === FORECOURT_CONNECTION_STATUS.OFFLINE
+                      : pumpState?.health ===
+                          FORECOURT_CONNECTION_STATUS.OFFLINE
                         ? 'Offline'
                         : 'Unknown'}
                   </Badge>
@@ -338,10 +349,7 @@ export default function TinAllocationClient({
               <CardContent className="grid gap-3 sm:grid-cols-2">
                 {nozzles.map((option) => {
                   const state = stateFor(pumpNumber, option.nozzleNumber)
-                  const allocation = pendingFor(
-                    pumpNumber,
-                    option.nozzleNumber,
-                  )
+                  const allocation = pendingFor(pumpNumber, option.nozzleNumber)
                   const key = `${pumpNumber}:${option.nozzleNumber}`
                   const canAuthorize = isAuthorizableState(state)
                   const alreadyAuthorized = isAuthorizedState(state)
@@ -354,8 +362,7 @@ export default function TinAllocationClient({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-lg font-semibold">
-                            Nozzle{' '}
-                            {option.displayNumber ?? option.nozzleNumber}
+                            Nozzle {option.displayNumber ?? option.nozzleNumber}
                           </div>
                           <div className="mt-1 text-xs text-[var(--text-muted)]">
                             {option.gradeName || option.productCode || 'Fuel'}
@@ -387,7 +394,9 @@ export default function TinAllocationClient({
                               onClick={() => void authorize(allocation)}
                               disabled={!csrfToken || busyKey === key}
                             >
-                              {busyKey === key ? 'Authorizing…' : 'Authorize nozzle'}
+                              {busyKey === key
+                                ? 'Authorizing…'
+                                : 'Authorize nozzle'}
                             </Button>
                           ) : alreadyAuthorized ? (
                             <div className="mt-2 font-medium text-[var(--text-secondary)]">
@@ -395,7 +404,8 @@ export default function TinAllocationClient({
                             </div>
                           ) : (
                             <div className="mt-2 text-[var(--text-secondary)]">
-                              Waiting for DOMS CALLING state before authorization.
+                              Waiting for DOMS CALLING state before
+                              authorization.
                             </div>
                           )}
 
@@ -422,9 +432,7 @@ export default function TinAllocationClient({
                             size="sm"
                             onClick={() => void allocate(option)}
                             disabled={
-                              !selectedCustomer ||
-                              !csrfToken ||
-                              busyKey === key
+                              !selectedCustomer || !csrfToken || busyKey === key
                             }
                           >
                             {busyKey === key

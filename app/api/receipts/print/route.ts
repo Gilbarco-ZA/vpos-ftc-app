@@ -51,7 +51,8 @@ export const GET = async (req: Request) => {
       status,
       completed: status === 'DONE' || status === 'FAILED',
       success: status === 'DONE',
-      error: status === 'FAILED' ? job.last_error || 'Receipt print failed' : null,
+      error:
+        status === 'FAILED' ? job.last_error || 'Receipt print failed' : null,
       completedAt: job.completed_at ?? null,
     })
   } catch (err) {

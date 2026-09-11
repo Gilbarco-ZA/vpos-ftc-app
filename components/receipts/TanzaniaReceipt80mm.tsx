@@ -2,9 +2,10 @@
 
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import type { NormalizedReceipt } from '@/src/shared/receipts/normalizeReceipt'
-import { formatReceiptDateTimeDisplay } from '@/src/shared/receipts/receiptDateTimeDisplay'
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
+
+import { formatReceiptDateTimeDisplay } from '@/src/shared/receipts/receiptDateTimeDisplay'
 
 import { RuntimeImage } from '@/components/ui/runtime-image'
 
@@ -200,13 +201,13 @@ const TanzaniaReceipt80mm = ({ receipt }: TanzaniaReceipt80mmProps) => {
           ) : null}
           {receiptDateTime.date ? (
             <div className="flex justify-between gap-3">
-              <span>Date:</span>
+              <span>RECEIPT DATE:</span>
               <span className="text-right">{receiptDateTime.date}</span>
             </div>
           ) : null}
           {receiptDateTime.time ? (
             <div className="flex justify-between gap-3">
-              <span>Time:</span>
+              <span>RECEIPT TIME:</span>
               <span className="text-right">{receiptDateTime.time}</span>
             </div>
           ) : null}

@@ -56,7 +56,9 @@ export async function allocatePreFuelCustomer(input: {
   })
   if (!allocation) {
     throw Object.assign(
-      new Error('The selected customer/nozzle is not available at this station'),
+      new Error(
+        'The selected customer/nozzle is not available at this station',
+      ),
       { status: 400 },
     )
   }

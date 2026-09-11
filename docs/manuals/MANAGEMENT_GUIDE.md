@@ -10,11 +10,11 @@ This guide describes the current role-based VPOS interface. Some menu items are 
 
 VPOS currently uses three application roles:
 
-| Role | Primary responsibility | Typical access |
-| --- | --- | --- |
-| `tenant` | Daily POS operation | Dashboard, POS, transactions, receipts, customers, and TIN Allocation when configured |
-| `manager` | Station operations and controlled configuration | Tenant functions plus reports, stock, transaction review, pumps, tanks, tank levels, forecourt setup, tank/pump configuration, and pricing |
-| `administrator` | Technical and security administration | Manager functions plus fiscal inbox, diagnostics, device status, print jobs, users, runtime control, maintenance, proxy/fiscal settings, setup wizard, products, station configuration, languages, datasets, and branding |
+| Role            | Primary responsibility                          | Typical access                                                                                                                                                                                                            |
+| --------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tenant`        | Daily POS operation                             | Dashboard, POS, transactions, receipts, customers, and TIN Allocation when configured                                                                                                                                     |
+| `manager`       | Station operations and controlled configuration | Tenant functions plus reports, stock, transaction review, pumps, tanks, tank levels, forecourt setup, tank/pump configuration, and pricing                                                                                |
+| `administrator` | Technical and security administration           | Manager functions plus fiscal inbox, diagnostics, device status, print jobs, users, runtime control, maintenance, proxy/fiscal settings, setup wizard, products, station configuration, languages, datasets, and branding |
 
 Use the least-privileged role required for the task. Do not share administrator accounts for routine cashier or manager work.
 
@@ -381,18 +381,18 @@ Recommended checks:
 
 ## 24. Troubleshooting decision guide
 
-| Symptom | First management action | Administrator/support action |
-| --- | --- | --- |
-| One transaction missing/incorrect | Search by transaction ID/pump/time and check status | Inspect diagnostics/fiscal state before recovery action |
-| Many transactions not fiscalizing | Check Non-fiscalized view and establish start time | Check proxy/fiscal status and logs/diagnostics |
-| Tanzania receipt preview returns internal error | Record transaction ID and `requestId`; do not recreate customer/transaction | Correlate request ID with server logs; verify current package/migrations, especially migration 1320 for the retired Z/daily constraint |
-| Delayed Tanzania receipt shows older invoice-number date than Z-number date | Treat as potentially expected and verify transaction origin date | Confirm persisted assignment uses transaction-date daily counter and fiscal-date Z/invoice date |
-| One pump unavailable | Check pump state and physical forecourt condition | Check device/JPL details and mapping |
-| All/many pumps stale | Treat as forecourt connectivity issue | Inspect Forecourt Monitor/Diagnostics and JPL session |
-| Receipt not printed | Confirm transaction/receipt and avoid duplicate prints | Check Print Jobs and printer connectivity |
-| Tank value unexpected | Compare with physical/site wet-stock evidence | Check DOMS data and tank mapping |
-| Price mismatch | Stop and verify approved price source | Reconcile VPOS/PSS pricing configuration under change control |
-| UI available but station degraded | Do not assume all integrations are healthy | Use health/readiness and diagnostics |
+| Symptom                                                                     | First management action                                                     | Administrator/support action                                                                                                           |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| One transaction missing/incorrect                                           | Search by transaction ID/pump/time and check status                         | Inspect diagnostics/fiscal state before recovery action                                                                                |
+| Many transactions not fiscalizing                                           | Check Non-fiscalized view and establish start time                          | Check proxy/fiscal status and logs/diagnostics                                                                                         |
+| Tanzania receipt preview returns internal error                             | Record transaction ID and `requestId`; do not recreate customer/transaction | Correlate request ID with server logs; verify current package/migrations, especially migration 1320 for the retired Z/daily constraint |
+| Delayed Tanzania receipt shows older invoice-number date than Z-number date | Treat as potentially expected and verify transaction origin date            | Confirm persisted assignment uses transaction-date daily counter and fiscal-date Z/invoice date                                        |
+| One pump unavailable                                                        | Check pump state and physical forecourt condition                           | Check device/JPL details and mapping                                                                                                   |
+| All/many pumps stale                                                        | Treat as forecourt connectivity issue                                       | Inspect Forecourt Monitor/Diagnostics and JPL session                                                                                  |
+| Receipt not printed                                                         | Confirm transaction/receipt and avoid duplicate prints                      | Check Print Jobs and printer connectivity                                                                                              |
+| Tank value unexpected                                                       | Compare with physical/site wet-stock evidence                               | Check DOMS data and tank mapping                                                                                                       |
+| Price mismatch                                                              | Stop and verify approved price source                                       | Reconcile VPOS/PSS pricing configuration under change control                                                                          |
+| UI available but station degraded                                           | Do not assume all integrations are healthy                                  | Use health/readiness and diagnostics                                                                                                   |
 
 ## 25. Escalation information
 

@@ -223,7 +223,9 @@ export const stationSettingsSchema = z.object({
   printReceiptOrder: z
     .enum(['before_fiscalization', 'after_fiscalization'])
     .optional(),
-  tinCaptureOrder: z.enum(['before_transaction', 'after_transaction']).optional(),
+  tinCaptureOrder: z
+    .enum(['before_transaction', 'after_transaction'])
+    .optional(),
   syncEnabled: z.boolean().optional(),
   syncTime: z
     .string()

@@ -40,7 +40,9 @@ export async function cancelStuckFiscalizationRepo(input: {
     const transaction = locked.rows?.[0]
     if (!transaction) return { ok: false, reason: 'NOT_FOUND' as const }
 
-    const status = String(transaction.status ?? '').trim().toUpperCase()
+    const status = String(transaction.status ?? '')
+      .trim()
+      .toUpperCase()
     if (String(transaction.fiscalization_reference ?? '').trim()) {
       return {
         ok: false,

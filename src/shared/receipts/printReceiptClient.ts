@@ -4,7 +4,8 @@ type ReceiptPrintResult = {
   error?: unknown
 }
 
-const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+const sleep = (ms: number) =>
+  new Promise((resolve) => window.setTimeout(resolve, ms))
 
 export async function printReceiptAndWait(args: {
   csrfToken: string
@@ -35,7 +36,9 @@ export async function printReceiptAndWait(args: {
   }
 
   const payload = body?.data ?? body
-  const jobId = String(payload?.printJobId ?? payload?.print?.printJobId ?? '').trim()
+  const jobId = String(
+    payload?.printJobId ?? payload?.print?.printJobId ?? '',
+  ).trim()
   const receiptId = String(payload?.receiptId ?? '').trim()
   if (!jobId) {
     return {
@@ -82,6 +85,8 @@ export async function printReceiptAndWait(args: {
   return {
     success: false,
     status: 'TIMEOUT',
-    error: { message: 'Timed out waiting for the printer to confirm completion' },
+    error: {
+      message: 'Timed out waiting for the printer to confirm completion',
+    },
   }
 }

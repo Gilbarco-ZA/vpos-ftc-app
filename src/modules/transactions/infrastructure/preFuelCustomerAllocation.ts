@@ -24,7 +24,9 @@ export async function getTinCaptureOrderRepo(stationId: string) {
     `SELECT tin_capture_order FROM station_settings WHERE station_id = $1::uuid LIMIT 1`,
     [stationId],
   )
-  return row?.tin_capture_order === 'before_transaction' ? 'before_transaction' : 'after_transaction'
+  return row?.tin_capture_order === 'before_transaction'
+    ? 'before_transaction'
+    : 'after_transaction'
 }
 
 export async function createPreFuelCustomerAllocation(input: {
@@ -58,7 +60,15 @@ export async function createPreFuelCustomerAllocation(input: {
                    cancelled_at = NULL,
                    updated_at = NOW()
      RETURNING *`,
-    [uuidv4(), input.stationId, input.pumpNumber, input.nozzleNumber, input.allocatedBy ?? null, input.customerId, input.nozzleId ?? null],
+    [
+      uuidv4(),
+      input.stationId,
+      input.pumpNumber,
+      input.nozzleNumber,
+      input.allocatedBy ?? null,
+      input.customerId,
+      input.nozzleId ?? null,
+    ],
   )
 }
 
@@ -80,7 +90,10 @@ export async function getPendingPreFuelCustomerAllocation(input: {
   )
 }
 
-export async function cancelPreFuelCustomerAllocation(input: { stationId: string; allocationId: string }) {
+export async function cancelPreFuelCustomerAllocation(input: {
+  stationId: string
+  allocationId: string
+}) {
   return await queryOne<PreFuelCustomerAllocation>(
     `UPDATE pre_fuel_customer_allocations
         SET status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW()
@@ -117,7 +130,12 @@ export async function listPendingPreFuelCustomerAllocations(stationId: string) {
 
 export async function claimPendingPreFuelCustomerAllocationTx(
   client: PoolClient,
-  input: { stationId: string; pumpNumber: number; nozzleNumber?: number | null; occurredAt: Date },
+  input: {
+    stationId: string
+    pumpNumber: number
+    nozzleNumber?: number | null
+    occurredAt: Date
+  },
 ) {
   if (!input.nozzleNumber) return null
   const result = await txQuery<PreFuelCustomerAllocation>(

@@ -12,31 +12,31 @@ This file documents current HTTP wire formats for customer, transaction, receipt
 `POST /api/customers` accepts the following JSON object. `tin` and `buyerName` are required. All other business fields are optional.
 
 ```ts
-type PaymentType = "CASH" | "CARD"
+type PaymentType = 'CASH' | 'CARD'
 
 interface CustomerInput {
-  tin: string                 // required, 1..50; normalized uppercase
-  buyerName: string           // required, 1..255; trimmed
-  buyerType?: string          // max 45
-  pin?: string                // max 50
-  passportNumber?: string     // max 45
-  businessName?: string       // max 255
-  taxNinbrn?: string          // max 50
-  contactPhone?: string       // max 50
-  contactMobile?: string      // max 50
-  contactFax?: string         // max 50
-  contactEmail?: string       // max 255
-  contactWebsite?: string     // max 255
-  contactPerson?: string      // max 255
-  addressStreet?: string      // max 255
-  addressCity?: string        // max 100
-  addressState?: string       // max 100
-  addressProvince?: string    // max 100
-  addressPostalCode?: string  // max 20
+  tin: string // required, 1..50; normalized uppercase
+  buyerName: string // required, 1..255; trimmed
+  buyerType?: string // max 45
+  pin?: string // max 50
+  passportNumber?: string // max 45
+  businessName?: string // max 255
+  taxNinbrn?: string // max 50
+  contactPhone?: string // max 50
+  contactMobile?: string // max 50
+  contactFax?: string // max 50
+  contactEmail?: string // max 255
+  contactWebsite?: string // max 255
+  contactPerson?: string // max 255
+  addressStreet?: string // max 255
+  addressCity?: string // max 100
+  addressState?: string // max 100
+  addressProvince?: string // max 100
+  addressPostalCode?: string // max 20
   addressCountryCode?: string // max 2; normalized uppercase
-  country?: string            // max 100; normalized uppercase
-  odometer?: string           // max 50
-  vehicleRegNr?: string       // max 50
+  country?: string // max 100; normalized uppercase
+  odometer?: string // max 50
+  vehicleRegNr?: string // max 50
   paymentType?: PaymentType
 }
 ```
@@ -153,7 +153,7 @@ interface ListCustomersQuery {
   q?: string
   country?: string
   buyerType?: string
-  includeDeleted?: "true" | "1" | "yes" | string
+  includeDeleted?: 'true' | '1' | 'yes' | string
   page?: string // parsed as number; default 1
   pageSize?: string // parsed as number; default 20
 }
@@ -306,20 +306,20 @@ Current status values used by application code include:
 
 ```ts
 type TransactionStatus =
-  | "OPEN"
-  | "ALLOCATED"
-  | "PENDING"
-  | "QUEUED"
-  | "SENT"
-  | "FISCALIZING"
-  | "FISCALIZED"
-  | "SUCCESS"
-  | "FAILED"
-  | "REJECTED"
-  | "CANCELLED"
-  | "PRINTED"
-  | "REPRINTED"
-  | "CREDITED"
+  | 'OPEN'
+  | 'ALLOCATED'
+  | 'PENDING'
+  | 'QUEUED'
+  | 'SENT'
+  | 'FISCALIZING'
+  | 'FISCALIZED'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'PRINTED'
+  | 'REPRINTED'
+  | 'CREDITED'
 ```
 
 Do not reject unknown future statuses in a forward-compatible reader solely because they are absent from this baseline.
@@ -471,16 +471,16 @@ interface ListTransactionsQuery {
   pageSize?: string
   status?: string
   excludeStatus?: string
-  scope?: "all" | "non-fiscalized" | "fiscalized"
+  scope?: 'all' | 'non-fiscalized' | 'fiscalized'
   transactionId?: string
   pumpNumber?: string
-  pump?: string              // alias of pumpNumber
+  pump?: string // alias of pumpNumber
   search?: string
-  q?: string                 // alias of search
+  q?: string // alias of search
   from?: string
   to?: string
-  startDate?: string         // business date in station timezone
-  endDate?: string           // inclusive business date in station timezone
+  startDate?: string // business date in station timezone
+  endDate?: string // inclusive business date in station timezone
 }
 ```
 
@@ -543,8 +543,8 @@ This route does **not** create a transaction. It enqueues receipt printing for a
 interface TransactionPrintEnqueueRequest {
   transactionId?: string
   filename?: string // legacy alias used when transactionId is absent
-  data?: unknown    // accepted compatibility field; not used to select transaction
-  state?: unknown   // accepted compatibility field
+  data?: unknown // accepted compatibility field; not used to select transaction
+  state?: unknown // accepted compatibility field
   csrf_token?: string
 }
 ```
@@ -750,7 +750,7 @@ The success data is the country fiscalization workflow result. Its nested fiscal
 
 ```ts
 interface PreFuelCustomerState {
-  captureOrder: "before_transaction" | "after_transaction" | string
+  captureOrder: 'before_transaction' | 'after_transaction' | string
   allocations: RawPreFuelAllocation[]
 }
 
@@ -781,7 +781,7 @@ Cancel:
 
 ```ts
 interface CancelPreFuelCustomerRequest {
-  action: "cancel"
+  action: 'cancel'
   allocationId: string
 }
 ```
@@ -790,7 +790,7 @@ Authorize:
 
 ```ts
 interface AuthorizePreFuelCustomerRequest {
-  action: "authorize"
+  action: 'authorize'
   allocationId: string
 }
 ```
@@ -934,8 +934,8 @@ Query:
 ```ts
 interface ReceiptQuery {
   transactionId?: string
-  list?: "1" | string
-  preview?: "1" | string
+  list?: '1' | string
+  preview?: '1' | string
 }
 ```
 
@@ -1043,7 +1043,7 @@ If stored HTML is absent but plain text exists, the response layer can generate 
 ### 7.1 ProductSyncStatus
 
 ```ts
-type ProductSyncStatus = "pending" | "synced" | "failed" | "skipped"
+type ProductSyncStatus = 'pending' | 'synced' | 'failed' | 'skipped'
 ```
 
 ### 7.2 ProductListItem
@@ -1071,32 +1071,32 @@ interface ProductCreateInput {
   productName: string
   productClassCode: string
   productTypeCode: string
-  sku?: string                 // max 120
-  barcode?: string             // max 120
-  unitPrice: number | string   // coerced to number; >= 0
-  unitCost: number | string    // coerced to number; >= 0
+  sku?: string // max 120
+  barcode?: string // max 120
+  unitPrice: number | string // coerced to number; >= 0
+  unitCost: number | string // coerced to number; >= 0
   currency: string
-  taxRate?: number | string    // default 16; >= 0
-  category?: string            // max 120
-  categoryId?: string          // UUID
-  unitOfMeasure?: string       // max 30
-  unitOfPackaging?: string     // max 30
-  packSize?: number | string   // integer >= 0
-  taxCode: string              // 1..30
-  commodityCode?: string       // max 120
+  taxRate?: number | string // default 16; >= 0
+  category?: string // max 120
+  categoryId?: string // UUID
+  unitOfMeasure?: string // max 30
+  unitOfPackaging?: string // max 30
+  packSize?: number | string // integer >= 0
+  taxCode: string // 1..30
+  commodityCode?: string // max 120
   hazardousIndicator?: boolean // default false
-  extProductId?: string        // max 64
-  extProductCode?: string      // max 64
+  extProductId?: string // max 64
+  extProductCode?: string // max 64
   extProductClassCode?: string // max 32
-  extProductTypeCode?: string  // max 32
-  extDescription?: string      // max 255
-  extUnitOfMeasure?: string    // max 30
-  extUnitOfPackaging?: string  // max 30
+  extProductTypeCode?: string // max 32
+  extDescription?: string // max 255
+  extUnitOfMeasure?: string // max 30
+  extUnitOfPackaging?: string // max 30
   extUnitPrice?: number
-  extCurrency?: string         // max 8
-  extTaxCode?: string          // max 32
+  extCurrency?: string // max 8
+  extTaxCode?: string // max 32
   extHazardousIndicator?: boolean // default true
-  devFlowOverride?: "offline" | "timeout" | null
+  devFlowOverride?: 'offline' | 'timeout' | null
 }
 ```
 
@@ -1217,16 +1217,16 @@ Success data:
 
 ```ts
 interface CreatedProductView extends ProductRecord {
-  lastSyncStatus: "pending"
+  lastSyncStatus: 'pending'
   lastSyncAt: null
-  lastSyncMessage: "Saved locally, sync queued"
+  lastSyncMessage: 'Saved locally, sync queued'
 }
 
 interface CreateProductsData {
   products: CreatedProductView[]
   sync: {
     ok: false
-    message: "Saved locally, sync queued"
+    message: 'Saved locally, sync queued'
   }
 }
 
@@ -1242,7 +1242,7 @@ interface InvalidProductFailure {
   ok: false
   success: false
   error: {
-    message: "Invalid product payload"
+    message: 'Invalid product payload'
     details: unknown // flattened validation details
   }
 }

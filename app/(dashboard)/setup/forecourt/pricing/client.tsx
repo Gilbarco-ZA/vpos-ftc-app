@@ -261,7 +261,9 @@ export default function ForecourtPricingClient() {
       return
     }
     if (applyMode === 'scheduled' && !effectiveAt) {
-      setSubmitError('Select an effective date and time for the scheduled update.')
+      setSubmitError(
+        'Select an effective date and time for the scheduled update.',
+      )
       return
     }
 
@@ -281,7 +283,9 @@ export default function ForecourtPricingClient() {
       const body = await res.json().catch(() => ({}))
       if (!res.ok || body?.success === false) {
         throw new Error(
-          body?.error?.message ?? body?.message ?? 'Failed to update DOMS prices',
+          body?.error?.message ??
+            body?.message ??
+            'Failed to update DOMS prices',
         )
       }
 
@@ -364,7 +368,8 @@ export default function ForecourtPricingClient() {
                     DOMS price bank status
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">
-                    Review the active price bank and pending activations on the controller.
+                    Review the active price bank and pending activations on the
+                    controller.
                   </p>
                 </div>
                 <Badge
@@ -386,19 +391,25 @@ export default function ForecourtPricingClient() {
 
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-card border border-border bg-surface-card p-3">
-                  <div className="text-xs text-[var(--text-muted)]">Current price set</div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Current price set
+                  </div>
                   <div className="text-lg font-semibold">
                     {currentBank?.fcPriceSetId ?? '—'}
                   </div>
                 </div>
                 <div className="rounded-card border border-border bg-surface-card p-3">
-                  <div className="text-xs text-[var(--text-muted)]">Price groups</div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Price groups
+                  </div>
                   <div className="text-lg font-semibold">
                     {currentBank?.fcPriceGroupIds.length ?? 0}
                   </div>
                 </div>
                 <div className="rounded-card border border-border bg-surface-card p-3">
-                  <div className="text-xs text-[var(--text-muted)]">Grades in bank</div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Grades in bank
+                  </div>
                   <div className="text-lg font-semibold">
                     {currentBank?.fcGradeIds.length ?? 0}
                   </div>
@@ -407,11 +418,13 @@ export default function ForecourtPricingClient() {
 
               {priceStateError ? (
                 <div className="rounded-card border border-rose-300/40 bg-rose-500/10 p-3 text-xs text-rose-100">
-                  Unable to load DOMS price state from the active forecourt connection: {priceStateError}
+                  Unable to load DOMS price state from the active forecourt
+                  connection: {priceStateError}
                 </div>
               ) : priceState?.currentError ? (
                 <div className="rounded-card border border-amber-300/40 bg-amber-500/10 p-3 text-xs text-amber-100">
-                  Unable to load the current active price bank: {priceState.currentError}
+                  Unable to load the current active price bank:{' '}
+                  {priceState.currentError}
                 </div>
               ) : null}
 
@@ -480,7 +493,9 @@ export default function ForecourtPricingClient() {
                   Update product prices
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Apply now sends DOMS a zero activation timestamp for immediate activation. Schedule keeps the existing future activation workflow.
+                  Apply now sends DOMS a zero activation timestamp for immediate
+                  activation. Schedule keeps the existing future activation
+                  workflow.
                 </p>
               </div>
 
@@ -512,12 +527,16 @@ export default function ForecourtPricingClient() {
                     />
                   </label>
                   <div className="rounded-card border border-border bg-surface-card p-3 text-xs text-[var(--text-muted)]">
-                    DOMS expects activation timestamps in controller time. The selected local clock time is preserved when converting to FC_DATE_AND_TIME.
+                    DOMS expects activation timestamps in controller time. The
+                    selected local clock time is preserved when converting to
+                    FC_DATE_AND_TIME.
                   </div>
                 </div>
               ) : (
                 <div className="rounded-card border border-border bg-surface-card p-3 text-xs text-[var(--text-muted)]">
-                  The update will be sent with PriceSetActivationDateAndTime = 00000000000000. DOMS may still apply configured device delays to pumps or price poles after the price bank becomes active.
+                  The update will be sent with PriceSetActivationDateAndTime =
+                  00000000000000. DOMS may still apply configured device delays
+                  to pumps or price poles after the price bank becomes active.
                 </div>
               )}
 
@@ -543,7 +562,8 @@ export default function ForecourtPricingClient() {
                             key={product.id}
                             value={product.productId || product.id}
                           >
-                            {product.productName} ({product.productId || product.id})
+                            {product.productName} (
+                            {product.productId || product.id})
                           </option>
                         ))}
                       </Select>

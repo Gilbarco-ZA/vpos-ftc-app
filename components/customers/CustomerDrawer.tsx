@@ -91,8 +91,10 @@ const stationCountryCode = (country?: string | null) =>
     .trim()
     .toUpperCase()
 
-const isKenyaStation = (country?: string | null) => stationCountryCode(country) === 'KE'
-const isTanzaniaStation = (country?: string | null) => stationCountryCode(country) === 'TZ'
+const isKenyaStation = (country?: string | null) =>
+  stationCountryCode(country) === 'KE'
+const isTanzaniaStation = (country?: string | null) =>
+  stationCountryCode(country) === 'TZ'
 
 const customerSchema = z
   .object({
@@ -242,7 +244,9 @@ export const CustomerDrawer = ({
                       }
                     }}
                     placeholder={
-                      isTanzania ? 'Customer PIN/TIN' : 'Tax identification number'
+                      isTanzania
+                        ? 'Customer PIN/TIN'
+                        : 'Tax identification number'
                     }
                   />
                 </FormField>
@@ -264,7 +268,9 @@ export const CustomerDrawer = ({
                     <FormField label="Business name">
                       <Input
                         value={form.businessName}
-                        onChange={(e) => setField('businessName', e.target.value)}
+                        onChange={(e) =>
+                          setField('businessName', e.target.value)
+                        }
                         placeholder="Business name"
                       />
                     </FormField>
@@ -278,7 +284,9 @@ export const CustomerDrawer = ({
                     <FormField label="Passport number">
                       <Input
                         value={form.passportNumber}
-                        onChange={(e) => setField('passportNumber', e.target.value)}
+                        onChange={(e) =>
+                          setField('passportNumber', e.target.value)
+                        }
                         placeholder="Passport number"
                       />
                     </FormField>
@@ -311,7 +319,9 @@ export const CustomerDrawer = ({
                     <FormField label="Vehicle reg no.">
                       <Input
                         value={form.vehicleRegNr || ''}
-                        onChange={(e) => setField('vehicleRegNr', e.target.value)}
+                        onChange={(e) =>
+                          setField('vehicleRegNr', e.target.value)
+                        }
                         placeholder="T123 ABC"
                       />
                     </FormField>
@@ -340,21 +350,27 @@ export const CustomerDrawer = ({
                     <FormField label="Contact person">
                       <Input
                         value={form.contactPerson}
-                        onChange={(e) => setField('contactPerson', e.target.value)}
+                        onChange={(e) =>
+                          setField('contactPerson', e.target.value)
+                        }
                         placeholder="Contact person"
                       />
                     </FormField>
                     <FormField label="Contact phone">
                       <Input
                         value={form.contactPhone}
-                        onChange={(e) => setField('contactPhone', e.target.value)}
+                        onChange={(e) =>
+                          setField('contactPhone', e.target.value)
+                        }
                         placeholder="Contact phone"
                       />
                     </FormField>
                     <FormField label="Mobile">
                       <Input
                         value={form.contactMobile}
-                        onChange={(e) => setField('contactMobile', e.target.value)}
+                        onChange={(e) =>
+                          setField('contactMobile', e.target.value)
+                        }
                         placeholder="Mobile"
                       />
                     </FormField>
@@ -368,14 +384,18 @@ export const CustomerDrawer = ({
                     <FormField label="Email">
                       <Input
                         value={form.contactEmail}
-                        onChange={(e) => setField('contactEmail', e.target.value)}
+                        onChange={(e) =>
+                          setField('contactEmail', e.target.value)
+                        }
                         placeholder="Email"
                       />
                     </FormField>
                     <FormField label="Website">
                       <Input
                         value={form.contactWebsite}
-                        onChange={(e) => setField('contactWebsite', e.target.value)}
+                        onChange={(e) =>
+                          setField('contactWebsite', e.target.value)
+                        }
                         placeholder="Website"
                       />
                     </FormField>
@@ -391,21 +411,27 @@ export const CustomerDrawer = ({
                       <Textarea
                         rows={2}
                         value={form.addressStreet}
-                        onChange={(e) => setField('addressStreet', e.target.value)}
+                        onChange={(e) =>
+                          setField('addressStreet', e.target.value)
+                        }
                         placeholder="Street"
                       />
                     </FormField>
                     <FormField label="City">
                       <Input
                         value={form.addressCity}
-                        onChange={(e) => setField('addressCity', e.target.value)}
+                        onChange={(e) =>
+                          setField('addressCity', e.target.value)
+                        }
                         placeholder="City"
                       />
                     </FormField>
                     <FormField label="State">
                       <Input
                         value={form.addressState}
-                        onChange={(e) => setField('addressState', e.target.value)}
+                        onChange={(e) =>
+                          setField('addressState', e.target.value)
+                        }
                         placeholder="State"
                       />
                     </FormField>

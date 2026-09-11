@@ -5,12 +5,13 @@ import type {
 
 import { queryOne } from '@/src/platform/db/postgres'
 import { buildReceiptLines as buildTanzaniaReceiptLines } from '@/src/shared/fiscalization/receipt/templates/TZ'
+import { uuidv4 } from '@/src/shared/utils/uuid'
+
 import { buildTanzaniaReceiptVerificationUrl } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
 import { ensureTanzaniaPreFiscalizationReceiptAssignment } from '@/src/modules/tanzania-fiscal/infrastructure/preFiscalizationReceiptAssignment'
 import { dateParts } from '@/src/modules/tanzania-fiscal/infrastructure/xml'
-import { generateReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptGenerator'
 import { buildFiscalReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptBuilder'
-import { uuidv4 } from '@/src/shared/utils/uuid'
+import { generateReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptGenerator'
 
 const WIDTH = 42
 
@@ -32,7 +33,9 @@ const renderReceiptText = (lines: PrintableLine[], width = WIDTH) => {
       const pad = Math.max(0, Math.floor((width - line.value.length) / 2))
       output.push(`${' '.repeat(pad)}${line.value}`)
     } else if (line.align === 'right') {
-      output.push(`${' '.repeat(Math.max(0, width - line.value.length))}${line.value}`)
+      output.push(
+        `${' '.repeat(Math.max(0, width - line.value.length))}${line.value}`,
+      )
     } else {
       output.push(line.value)
     }
@@ -44,7 +47,8 @@ async function buildTanzaniaPreFiscalizationReceipt(input: {
   stationId: string
   transactionId: string
 }) {
-  const assignment = await ensureTanzaniaPreFiscalizationReceiptAssignment(input)
+  const assignment =
+    await ensureTanzaniaPreFiscalizationReceiptAssignment(input)
   if (!assignment) return null
 
   const settings = await queryOne<{
@@ -116,7 +120,11 @@ export async function getOrCreatePreFiscalizationReceipt(input: {
     'TZA',
     'TANZANIA',
     'UNITED REPUBLIC OF TANZANIA',
-  ].includes(String(station?.country ?? '').trim().toUpperCase())
+  ].includes(
+    String(station?.country ?? '')
+      .trim()
+      .toUpperCase(),
+  )
 
   let expectedVerificationCode = ''
   let preparedTanzaniaReceipt: Awaited<

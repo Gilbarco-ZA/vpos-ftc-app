@@ -1,14 +1,16 @@
 import { createAuditLog } from '@/src/shared/audit/log'
 
-import { enqueuePrintJob } from './enqueuePrintJob'
 import { printJobsRepo } from '../infrastructure/printJobsRepo'
+import { enqueuePrintJob } from './enqueuePrintJob'
 
 const STATUSES = ['PENDING', 'PROCESSING', 'DONE', 'FAILED'] as const
 
 type AdminPrintJobAction = 'retry' | 'clear' | 'clearAll'
 
 export function normalizePrintJobStatus(value: string | null) {
-  const status = String(value ?? '').trim().toUpperCase()
+  const status = String(value ?? '')
+    .trim()
+    .toUpperCase()
   return STATUSES.includes(status as (typeof STATUSES)[number]) ? status : null
 }
 
@@ -25,7 +27,13 @@ export async function listAdminPrintJobs(args: {
   const limit = Math.max(10, Math.min(250, Number(args.limit ?? 100) || 100))
 
   const [jobs, summaryRows] = await Promise.all([
-    printJobsRepo.listAdminPrintJobs(args.stationId, status, type, search, limit),
+    printJobsRepo.listAdminPrintJobs(
+      args.stationId,
+      status,
+      type,
+      search,
+      limit,
+    ),
     printJobsRepo.listAdminPrintJobStatusCounts(args.stationId),
   ])
 
@@ -62,10 +70,12 @@ export async function runAdminPrintJobAction(args: {
   }
 
   const jobId = String(args.jobId ?? '').trim()
-  if (!jobId) return { ok: false as const, status: 400, error: 'jobId is required' }
+  if (!jobId)
+    return { ok: false as const, status: 400, error: 'jobId is required' }
 
   const job = await printJobsRepo.getAdminPrintJob(args.stationId, jobId)
-  if (!job) return { ok: false as const, status: 404, error: 'Print job not found' }
+  if (!job)
+    return { ok: false as const, status: 404, error: 'Print job not found' }
 
   if (args.action === 'retry') {
     if (job.status !== 'FAILED') {
@@ -121,5 +131,9 @@ export async function runAdminPrintJobAction(args: {
     return { ok: true as const, data: { cleared: true } }
   }
 
-  return { ok: false as const, status: 400, error: 'Unsupported print job action' }
+  return {
+    ok: false as const,
+    status: 400,
+    error: 'Unsupported print job action',
+  }
 }

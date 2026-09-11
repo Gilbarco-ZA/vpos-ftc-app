@@ -98,24 +98,24 @@ JPL numeric IDs are generally normalized to two-character ID fields (`01`, `02`,
 
 ### Tank control and delivery commands
 
-| Endpoint | Request body accepted by VPOS | Result |
-| --- | --- | --- |
-| `POST /api/pos/doms/blockTank` | `TankSelector & Record<string, unknown>` | `LegacyDomsSuccess<unknown>` |
-| `POST /api/pos/doms/unblockTank` | `TankSelector & Record<string, unknown>` | same |
-| `POST /api/pos/doms/clearTgError` | `TankSelector & Record<string, unknown>` | same |
-| `POST /api/pos/doms/resetTg` | `TankSelector & Record<string, unknown>` | same |
-| `POST /api/pos/doms/getTgStatus` | `TankSelector & Record<string, unknown>` | same |
-| `POST /api/pos/doms/getTgErrorMsg` | `TankSelector & Record<string, unknown>`; direct or under `data` | same |
-| `POST /api/pos/doms/getTankControlStatus` | `TankSelector & Record<string, unknown>` | same |
-| `POST /api/pos/doms/openTankController` | `TankSelector & Record<string, unknown>`; direct or under `data` | same |
-| `POST /api/pos/doms/closeTankController` | same | same |
-| `POST /api/pos/doms/startDeliveryProcess` | same | same |
-| `POST /api/pos/doms/stopDeliveryProcess` | same | same |
-| `POST /api/pos/doms/markDeliveryStarting` | `TankSelector & Record<string, unknown>`; direct or under `data` | same |
-| `POST /api/pos/doms/markDeliveryFinished` | same | same |
-| `POST /api/pos/doms/getAllTankDeliveryData` | `{}` or controller-supported selector/options object | same |
-| `POST /api/pos/doms/getAllTgData` | `{}` or controller-supported selector/options object | same |
-| `POST /api/pos/doms/getSiteDeliveryStatus` | `{}` or controller-supported options object | same |
+| Endpoint                                    | Request body accepted by VPOS                                    | Result                       |
+| ------------------------------------------- | ---------------------------------------------------------------- | ---------------------------- |
+| `POST /api/pos/doms/blockTank`              | `TankSelector & Record<string, unknown>`                         | `LegacyDomsSuccess<unknown>` |
+| `POST /api/pos/doms/unblockTank`            | `TankSelector & Record<string, unknown>`                         | same                         |
+| `POST /api/pos/doms/clearTgError`           | `TankSelector & Record<string, unknown>`                         | same                         |
+| `POST /api/pos/doms/resetTg`                | `TankSelector & Record<string, unknown>`                         | same                         |
+| `POST /api/pos/doms/getTgStatus`            | `TankSelector & Record<string, unknown>`                         | same                         |
+| `POST /api/pos/doms/getTgErrorMsg`          | `TankSelector & Record<string, unknown>`; direct or under `data` | same                         |
+| `POST /api/pos/doms/getTankControlStatus`   | `TankSelector & Record<string, unknown>`                         | same                         |
+| `POST /api/pos/doms/openTankController`     | `TankSelector & Record<string, unknown>`; direct or under `data` | same                         |
+| `POST /api/pos/doms/closeTankController`    | same                                                             | same                         |
+| `POST /api/pos/doms/startDeliveryProcess`   | same                                                             | same                         |
+| `POST /api/pos/doms/stopDeliveryProcess`    | same                                                             | same                         |
+| `POST /api/pos/doms/markDeliveryStarting`   | `TankSelector & Record<string, unknown>`; direct or under `data` | same                         |
+| `POST /api/pos/doms/markDeliveryFinished`   | same                                                             | same                         |
+| `POST /api/pos/doms/getAllTankDeliveryData` | `{}` or controller-supported selector/options object             | same                         |
+| `POST /api/pos/doms/getAllTgData`           | `{}` or controller-supported selector/options object             | same                         |
+| `POST /api/pos/doms/getSiteDeliveryStatus`  | `{}` or controller-supported options object                      | same                         |
 
 `Record<string, unknown>` here is intentional: after VPOS normalizes known aliases, the JPL command builder owns additional controller fields. VPOS does not expose a second independent public schema for those nested JPL fields.
 
@@ -160,12 +160,12 @@ On successful DOMS acknowledgement, VPOS also marks matching wet-stock delivery 
 
 ### Forecourt date/time and mode
 
-| Endpoint | Preferred VPOS request | Result |
-| --- | --- | --- |
-| `POST /api/pos/doms/getFcDateTime` | `{}` | `LegacyDomsSuccess<unknown>` |
-| `POST /api/pos/doms/changeFcDateTime` | controller date/time fields; direct or under `data` | same |
-| `POST /api/pos/doms/getFcOperationModeStatus` | `{}` | same |
-| `POST /api/pos/doms/changeFcOperationMode` | controller operation-mode fields; direct or under `data` | same |
+| Endpoint                                      | Preferred VPOS request                                   | Result                       |
+| --------------------------------------------- | -------------------------------------------------------- | ---------------------------- |
+| `POST /api/pos/doms/getFcDateTime`            | `{}`                                                     | `LegacyDomsSuccess<unknown>` |
+| `POST /api/pos/doms/changeFcDateTime`         | controller date/time fields; direct or under `data`      | same                         |
+| `POST /api/pos/doms/getFcOperationModeStatus` | `{}`                                                     | same                         |
+| `POST /api/pos/doms/changeFcOperationMode`    | controller operation-mode fields; direct or under `data` | same                         |
 
 The JPL controller contract uses a forecourt date/time representation normalized by VPOS to the JPL `YYYYMMDDhhmmss`-style 14-digit field when required. Do not send locale-formatted dates.
 
@@ -248,15 +248,15 @@ When both activation time and price-set ID resolve successfully, VPOS deletes th
 
 ### Totals and diagnostic commands
 
-| Endpoint | Request body | Result |
-| --- | --- | --- |
-| `POST /api/pos/doms/getFpGradeTotals` | `FuellingPointSelector & Record<string, unknown>` | legacy DOMS result |
-| `POST /api/pos/doms/getPumpGradeTotals` | pump/grade selector object | legacy DOMS result |
-| `POST /api/pos/doms/getPumpGradeBlendTotals` | pump/grade/blend selector object | legacy DOMS result |
-| `POST /api/pos/doms/getFallbackTotals` | selector/options object or `{}` | legacy DOMS result |
-| `POST /api/pos/doms/clearFallbackTotals` | selector/context object; direct or under `data` | legacy DOMS result |
-| `POST /api/pos/doms/utilEcho` | arbitrary JSON object, direct or under `data` | echoed/controller diagnostic result |
-| `POST /api/pos/doms/changeDynamicTankData` | JPL dynamic tank data object, direct or under `data` | legacy DOMS result |
+| Endpoint                                     | Request body                                         | Result                              |
+| -------------------------------------------- | ---------------------------------------------------- | ----------------------------------- |
+| `POST /api/pos/doms/getFpGradeTotals`        | `FuellingPointSelector & Record<string, unknown>`    | legacy DOMS result                  |
+| `POST /api/pos/doms/getPumpGradeTotals`      | pump/grade selector object                           | legacy DOMS result                  |
+| `POST /api/pos/doms/getPumpGradeBlendTotals` | pump/grade/blend selector object                     | legacy DOMS result                  |
+| `POST /api/pos/doms/getFallbackTotals`       | selector/options object or `{}`                      | legacy DOMS result                  |
+| `POST /api/pos/doms/clearFallbackTotals`     | selector/context object; direct or under `data`      | legacy DOMS result                  |
+| `POST /api/pos/doms/utilEcho`                | arbitrary JSON object, direct or under `data`        | echoed/controller diagnostic result |
+| `POST /api/pos/doms/changeDynamicTankData`   | JPL dynamic tank data object, direct or under `data` | legacy DOMS result                  |
 
 For these commands the exact inner JPL fields are owned by the installed DOMS/JPL protocol implementation. VPOS's HTTP contract is a JSON object plus the known aliases above; additional fields are passed to the JPL command normalizer.
 
@@ -272,14 +272,14 @@ type PosControlPayload = Record<string, unknown>
 
 The command mapping is:
 
-| HTTP endpoint | Internal command type |
-| --- | --- |
-| `/api/pos/control/attendantAuth` | `ATTENDANT_AUTH` |
-| `/api/pos/control/clearFpError` | `CLEAR_FP_ERROR` |
+| HTTP endpoint                           | Internal command type    |
+| --------------------------------------- | ------------------------ |
+| `/api/pos/control/attendantAuth`        | `ATTENDANT_AUTH`         |
+| `/api/pos/control/clearFpError`         | `CLEAR_FP_ERROR`         |
 | `/api/pos/control/clearPreFuelCustomer` | `CLEAR_PREFUEL_CUSTOMER` |
-| `/api/pos/control/closeFps` | `CLOSE_FPS` |
-| `/api/pos/control/openFps` | `OPEN_FPS` |
-| `/api/pos/control/preFuelCustomer` | `PREFUEL_CUSTOMER` |
+| `/api/pos/control/closeFps`             | `CLOSE_FPS`              |
+| `/api/pos/control/openFps`              | `OPEN_FPS`               |
+| `/api/pos/control/preFuelCustomer`      | `PREFUEL_CUSTOMER`       |
 
 Success is a direct legacy acknowledgement:
 
@@ -387,12 +387,12 @@ interface MaintenancePreviewRequest {
 Preview item:
 
 ```ts
-type PreviewRisk = "read-only" | "high" | "blocked"
+type PreviewRisk = 'read-only' | 'high' | 'blocked'
 type PreviewCategory =
-  | "snapshot-read"
-  | "clear-install-preview"
-  | "install-fp-preview"
-  | "manual-only"
+  | 'snapshot-read'
+  | 'clear-install-preview'
+  | 'install-fp-preview'
+  | 'manual-only'
 
 interface MaintenanceCommandPreview {
   id: string
@@ -405,7 +405,7 @@ interface MaintenanceCommandPreview {
   commandName?: string | null
   subCode?: string | null
   envelope?: Record<string, unknown> | null
-  validationStatus: "validated" | "blocked"
+  validationStatus: 'validated' | 'blocked'
   blockers: string[]
   sendsDomsCommand: false
   previewOnly: true

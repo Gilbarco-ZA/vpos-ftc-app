@@ -21,10 +21,10 @@ The production build generates a standalone Node entry point, `vpos-server.cjs`.
 
 The production CI currently creates packages for:
 
-| Target | Architecture | Runtime |
-| --- | --- | --- |
-| CPB-539 | `armv7l` | Node 22.15.0 |
-| CPB-579 | `arm64` | Node 22.15.0 |
+| Target  | Architecture | Runtime      |
+| ------- | ------------ | ------------ |
+| CPB-539 | `armv7l`     | Node 22.15.0 |
+| CPB-579 | `arm64`      | Node 22.15.0 |
 
 Do **not** perform a source checkout and `npm install` on a production controller. Install the approved package produced by the deployment pipeline using the site's approved FCC/DOMS application-package procedure.
 
@@ -163,26 +163,26 @@ The supported forecourt runtime is `jpl_tcp`.
 
 ### Required core fields
 
-| UI field | Runtime key | Guidance |
-| --- | --- | --- |
-| JPL TCP host | `JPL_TCP_HOST` | Set to the production DOMS/PSS host. Do not use loopback for a remote production PSS. |
-| JPL TCP port | `JPL_TCP_PORT` | Default `8888`; use the approved site port. |
-| JPL POS ID | `JPL_POS_ID` | Default `01`; use the unique site-assigned POS ID. |
-| Operation mode | `JPL_OPERATION_MODE` | `unsupervised` or `supervised`; must match the approved site model. |
-| JPL access code | `JPL_FC_ACCESS_CODE` | Default is `POS`; field acceptance may require additional approved flags such as diagnostic/reject information. |
-| JPL country code | `JPL_COUNTRY_CODE` | Default `1`; use the site/vendor value. |
-| POS version ID | `JPL_POS_VERSION_ID` | Application default `470-02-1.08`. |
-| Expected minimum version | `JPL_EXPECTED_MIN_VERSION` | Application default `470-02-1.07`. |
+| UI field                 | Runtime key                | Guidance                                                                                                        |
+| ------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| JPL TCP host             | `JPL_TCP_HOST`             | Set to the production DOMS/PSS host. Do not use loopback for a remote production PSS.                           |
+| JPL TCP port             | `JPL_TCP_PORT`             | Default `8888`; use the approved site port.                                                                     |
+| JPL POS ID               | `JPL_POS_ID`               | Default `01`; use the unique site-assigned POS ID.                                                              |
+| Operation mode           | `JPL_OPERATION_MODE`       | `unsupervised` or `supervised`; must match the approved site model.                                             |
+| JPL access code          | `JPL_FC_ACCESS_CODE`       | Default is `POS`; field acceptance may require additional approved flags such as diagnostic/reject information. |
+| JPL country code         | `JPL_COUNTRY_CODE`         | Default `1`; use the site/vendor value.                                                                         |
+| POS version ID           | `JPL_POS_VERSION_ID`       | Application default `470-02-1.08`.                                                                              |
+| Expected minimum version | `JPL_EXPECTED_MIN_VERSION` | Application default `470-02-1.07`.                                                                              |
 
 ### Connection timing defaults
 
-| Setting | Default | Commissioning note |
-| --- | ---: | --- |
-| Unsolicited DR seconds | `5` s | Keep aligned with approved JPL behavior. |
-| Heartbeat interval | `15000` ms | UI guidance requires 15 seconds or less. |
-| Dead connection timeout | `30000` ms | Must be greater than the heartbeat interval. |
-| Status update code | `3` | Change only when required by the approved integration contract. |
-| Bootstrap snapshot | enabled | Leave enabled unless an approved site exception exists. |
+| Setting                 |    Default | Commissioning note                                              |
+| ----------------------- | ---------: | --------------------------------------------------------------- |
+| Unsolicited DR seconds  |      `5` s | Keep aligned with approved JPL behavior.                        |
+| Heartbeat interval      | `15000` ms | UI guidance requires 15 seconds or less.                        |
+| Dead connection timeout | `30000` ms | Must be greater than the heartbeat interval.                    |
+| Status update code      |        `3` | Change only when required by the approved integration contract. |
+| Bootstrap snapshot      |    enabled | Leave enabled unless an approved site exception exists.         |
 
 ### Default unsolicited subscriptions
 

@@ -1,6 +1,6 @@
 {
   "name": "@gilbarcoafs/vpos-ftc-app",
-  "version": "0.1.19",
+  "version": "0.1.34",
   "private": true,
   "main": "start.cjs",
   "engines": {
@@ -48,7 +48,7 @@
     "typecheck": "tsc --noEmit",
     "check:hygiene": "node scripts/check-repository-hygiene.mjs",
     "check:docs": "node scripts/check-docs-consistency.mjs",
-    "check": "npm run lint && npm run typecheck && npm run check:architecture && npm run check:hygiene && npm run check:docs && npm test",
+    "check": "npm run lint && npm run typecheck && rm tsconfig.tsbuildinfo && npm run check:architecture && npm run check:hygiene && npm run check:docs && npm test",
     "agent:manifest": "node scripts/generate-agent-manifest.mjs",
     "agent:find": "node scripts/agent-context.mjs find",
     "agent:deps": "node scripts/agent-context.mjs deps",

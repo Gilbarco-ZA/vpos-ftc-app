@@ -35,12 +35,17 @@ export const printJobsRepo = {
   },
 
   async releasePendingPrintJobs(stationId: string) {
-    return await queryAll<{ id: string }>(printJobsSql.releasePendingPrintJobs, [
-      stationId,
-    ])
+    return await queryAll<{ id: string }>(
+      printJobsSql.releasePendingPrintJobs,
+      [stationId],
+    )
   },
 
-  async holdForConnectivityRetry(id: string, err: string, delaySeconds: number) {
+  async holdForConnectivityRetry(
+    id: string,
+    err: string,
+    delaySeconds: number,
+  ) {
     await query(printJobsSql.holdForConnectivityRetry, [
       id,
       String(Math.max(1, delaySeconds)),

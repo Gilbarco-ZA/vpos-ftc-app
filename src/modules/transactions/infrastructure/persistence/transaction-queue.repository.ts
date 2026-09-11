@@ -7,10 +7,7 @@ import {
   upsertTransactionQueueSql,
 } from './transaction.sql'
 
-async function attachPendingPreFuelCustomersTx(
-  client: any,
-  stationId: string,
-) {
+async function attachPendingPreFuelCustomersTx(client: any, stationId: string) {
   await txQuery(
     client,
     `UPDATE pre_fuel_customer_allocations a
@@ -129,11 +126,13 @@ async function requiresCompletedPrePrintTx(client: any, stationId: string) {
   const row = result.rows[0]
   return Boolean(
     row?.auto_print_receipts === true &&
-      row?.print_receipt_order === 'before_fiscalization',
+    row?.print_receipt_order === 'before_fiscalization',
   )
 }
 
-const completedOrUnavailableOfflinePrintGate = (transactionAlias: string) => `EXISTS (
+const completedOrUnavailableOfflinePrintGate = (
+  transactionAlias: string,
+) => `EXISTS (
   SELECT 1
     FROM print_jobs preprint
    WHERE preprint.station_id = ${transactionAlias}.station_id
@@ -257,7 +256,10 @@ export async function claimEligibleTransactionFiscalizationQueueRepo(input: {
 }) {
   return await withTransaction(async (client) => {
     await attachPendingPreFuelCustomersTx(client, input.stationId)
-    const statement = (await requiresCompletedPrePrintTx(client, input.stationId))
+    const statement = (await requiresCompletedPrePrintTx(
+      client,
+      input.stationId,
+    ))
       ? buildBeforePrintLocalClaim(input)
       : buildClaimEligibleTransactionFiscalizationQueueSql(input)
     const result = await txQuery<any>(client, statement.sql, statement.params)
@@ -272,7 +274,10 @@ export async function claimEligibleProxyFiscalizationTransactionsRepo(input: {
 }) {
   return await withTransaction(async (client) => {
     await attachPendingPreFuelCustomersTx(client, input.stationId)
-    const statement = (await requiresCompletedPrePrintTx(client, input.stationId))
+    const statement = (await requiresCompletedPrePrintTx(
+      client,
+      input.stationId,
+    ))
       ? buildBeforePrintProxyClaim(input)
       : buildClaimEligibleProxyFiscalizationTransactionsSql(input)
     const result = await txQuery<any>(client, statement.sql, statement.params)

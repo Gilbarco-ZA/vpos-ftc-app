@@ -1,5 +1,5 @@
-import { getProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { proxyRequest } from '@/src/shared/proxy/client'
+import { getProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 
 import { getLatestProxyFiscalizationSignal } from '../infrastructure/deviceOperationalStatusRepo'
 
@@ -27,9 +27,7 @@ function findNestedValue(
   maxDepth = 4,
 ): unknown {
   const wanted = new Set(keys.map((key) => key.toLowerCase()))
-  const queue: Array<{ value: unknown; depth: number }> = [
-    { value, depth: 0 },
-  ]
+  const queue: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }]
   const seen = new Set<object>()
 
   while (queue.length > 0) {
@@ -140,9 +138,7 @@ function buildUpstreamConnection(value: unknown) {
     .trim()
     .toLowerCase()
   const networkReachable =
-    typeof entry.networkReachable === 'boolean'
-      ? entry.networkReachable
-      : null
+    typeof entry.networkReachable === 'boolean' ? entry.networkReachable : null
   const connected =
     statusText === 'healthy' ||
     statusText === 'online' ||
@@ -161,8 +157,7 @@ function buildUpstreamConnection(value: unknown) {
   return {
     status,
     connected: status === 'unknown' ? null : connected,
-    statusCode:
-      typeof entry.statusCode === 'number' ? entry.statusCode : null,
+    statusCode: typeof entry.statusCode === 'number' ? entry.statusCode : null,
     responseTime:
       typeof entry.responseTime === 'number' ? entry.responseTime : null,
     dnsResolved:

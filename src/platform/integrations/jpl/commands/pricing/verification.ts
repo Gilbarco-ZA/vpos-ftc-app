@@ -60,7 +60,8 @@ export async function verifyImmediatePriceChange(params: {
       }
     } catch (error) {
       activePriceSet = null
-      verificationError = errorMessage(error) || 'Unable to read active price bank'
+      verificationError =
+        errorMessage(error) || 'Unable to read active price bank'
     }
 
     if (attempt < VERIFY_ATTEMPTS) {

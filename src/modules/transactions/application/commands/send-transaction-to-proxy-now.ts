@@ -1,4 +1,5 @@
 import { getPrintJobStatus } from '@/src/modules/printing/application/getPrintJobStatus'
+
 import {
   enqueueAutoPrintFiscalReceipt,
   requiresPreFiscalizationReceiptPrint,

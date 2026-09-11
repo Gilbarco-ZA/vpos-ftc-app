@@ -50,8 +50,12 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
   )
   if (!preliminary) return null
 
-  const country = String(preliminary.country ?? '').trim().toUpperCase()
-  if (!['TZ', 'TZA', 'TANZANIA', 'UNITED REPUBLIC OF TANZANIA'].includes(country)) {
+  const country = String(preliminary.country ?? '')
+    .trim()
+    .toUpperCase()
+  if (
+    !['TZ', 'TZA', 'TANZANIA', 'UNITED REPUBLIC OF TANZANIA'].includes(country)
+  ) {
     return null
   }
 

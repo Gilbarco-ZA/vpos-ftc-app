@@ -165,7 +165,9 @@ export const DeviceStatusPanel = () => {
 
       if (!res.ok) {
         setLoadError(
-          data?.error?.message || data?.message || 'Failed to load device status',
+          data?.error?.message ||
+            data?.message ||
+            'Failed to load device status',
         )
       }
     } catch (err: any) {
@@ -216,7 +218,8 @@ export const DeviceStatusPanel = () => {
   const operational = registration?.operationalStatus
   const printer = operational?.printer
   const license = operational?.license
-  const licenseExpired = license?.expired === true || license?.status === 'EXPIRED'
+  const licenseExpired =
+    license?.expired === true || license?.status === 'EXPIRED'
   const requiresRegistration =
     registration?.requiresRegistration ||
     registration?.isRegistered === false ||
@@ -242,7 +245,8 @@ export const DeviceStatusPanel = () => {
   const internetDetail =
     operational?.internet?.status === 'online'
       ? `Cloud reachable${operational.internet.responseTime != null ? ` in ${operational.internet.responseTime} ms` : ''}`
-      : operational?.internet?.error || 'Cloud/internet connectivity unavailable'
+      : operational?.internet?.error ||
+        'Cloud/internet connectivity unavailable'
   const proxyDetail =
     operational?.proxy?.status === 'online'
       ? operational.proxy.health &&
@@ -289,7 +293,9 @@ export const DeviceStatusPanel = () => {
             ) : null}
 
             <div className="relative">
-              {loading ? <LoadingOverlay label="Refreshing device status…" /> : null}
+              {loading ? (
+                <LoadingOverlay label="Refreshing device status…" />
+              ) : null}
               <div className="stagger-enter grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <StatusCard
                   label="Internet"
@@ -435,7 +441,9 @@ export const DeviceStatusPanel = () => {
                     Registration
                   </div>
                   <div className="mt-1 text-xs text-[var(--text-secondary)]">
-                    {registration?.isRegistered ? 'Registered' : 'Not registered'}
+                    {registration?.isRegistered
+                      ? 'Registered'
+                      : 'Not registered'}
                   </div>
                 </div>
                 <div>
@@ -535,7 +543,8 @@ export const DeviceStatusPanel = () => {
 
               {printer?.lastHeartbeatAt ? (
                 <p className="mt-3 text-[11px] text-[var(--text-muted)]">
-                  Printer status last checked {formatDate(printer.lastHeartbeatAt)}.
+                  Printer status last checked{' '}
+                  {formatDate(printer.lastHeartbeatAt)}.
                 </p>
               ) : null}
             </div>

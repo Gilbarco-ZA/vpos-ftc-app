@@ -8,8 +8,8 @@ import { serializeError } from '@/src/shared/utils/serializeError'
 import { startAtgPollingWorker } from '@/src/modules/forecourt/infrastructure/atgPollingWorker'
 import { startForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
 import { startPosCommandsWorker } from '@/src/modules/pos/infrastructure/posCommandsWorker'
-import { startPrintJobsWorker } from '@/src/modules/printing/infrastructure/printJobsWorker'
 import { startPrinterConnectivityWorker } from '@/src/modules/printing/infrastructure/printerConnectivityWorker'
+import { startPrintJobsWorker } from '@/src/modules/printing/infrastructure/printJobsWorker'
 import { startReportQueueWorker } from '@/src/modules/reports/infrastructure/reportQueueWorker'
 import {
   startArchiveBusListener,

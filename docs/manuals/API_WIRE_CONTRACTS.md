@@ -14,69 +14,69 @@ A client should be able to implement request and response types from these docum
 
 ## 2. Contract documents
 
-| Contract | Covers |
-| --- | --- |
-| [COMMON_AND_AUTH.md](./api-contracts/COMMON_AND_AUTH.md) | success/failure envelopes, authentication, session user, CSRF, liveness, readiness, health, metrics |
-| [BUSINESS.md](./api-contracts/BUSINESS.md) | customers, transactions, transaction lines/allocation/fiscalization, pre-fuel customer flow, receipts, products |
-| [CATALOG_STOCK_REPORTING_MISC.md](./api-contracts/CATALOG_STOCK_REPORTING_MISC.md) | product categories, stock, reports/exports, proxy config, assets, config dictionaries |
-| [SETTINGS_SETUP_ADMIN.md](./api-contracts/SETTINGS_SETUP_ADMIN.md) | console settings, station settings, pumps, tanks, ATG, pump mode, forecourt settings, users, setup, branding, admin config |
-| [RUNTIME_SUPPORT.md](./api-contracts/RUNTIME_SUPPORT.md) | fiscal inbox list/detail/actions/bulk/export, runtime bus |
-| [FORECOURT_AND_COMPATIBILITY.md](./api-contracts/FORECOURT_AND_COMPATIBILITY.md) | POS/DOMS, JPL selectors, POS control, generic DOMS/control/terminal, maintenance preview, compatibility boundary |
+| Contract                                                                           | Covers                                                                                                                     |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| [COMMON_AND_AUTH.md](./api-contracts/COMMON_AND_AUTH.md)                           | success/failure envelopes, authentication, session user, CSRF, liveness, readiness, health, metrics                        |
+| [BUSINESS.md](./api-contracts/BUSINESS.md)                                         | customers, transactions, transaction lines/allocation/fiscalization, pre-fuel customer flow, receipts, products            |
+| [CATALOG_STOCK_REPORTING_MISC.md](./api-contracts/CATALOG_STOCK_REPORTING_MISC.md) | product categories, stock, reports/exports, proxy config, assets, config dictionaries                                      |
+| [SETTINGS_SETUP_ADMIN.md](./api-contracts/SETTINGS_SETUP_ADMIN.md)                 | console settings, station settings, pumps, tanks, ATG, pump mode, forecourt settings, users, setup, branding, admin config |
+| [RUNTIME_SUPPORT.md](./api-contracts/RUNTIME_SUPPORT.md)                           | fiscal inbox list/detail/actions/bulk/export, runtime bus                                                                  |
+| [FORECOURT_AND_COMPATIBILITY.md](./api-contracts/FORECOURT_AND_COMPATIBILITY.md)   | POS/DOMS, JPL selectors, POS control, generic DOMS/control/terminal, maintenance preview, compatibility boundary           |
 
 ## 3. Endpoint-to-contract map
 
 The table maps the installed package endpoint families to the wire contract that defines the request/response shape.
 
-| Endpoint or family | Wire contract |
-| --- | --- |
-| `/api/livez` | COMMON_AND_AUTH §9 |
-| `/api/readyz` | COMMON_AND_AUTH §10 |
-| `/api/healthz` | COMMON_AND_AUTH §11 |
-| `/api/metrics` | COMMON_AND_AUTH §12 |
-| `/api/auth/login` | COMMON_AND_AUTH §4 |
-| `/api/auth/logout` | COMMON_AND_AUTH §5 |
-| `/api/auth/session` | COMMON_AND_AUTH §6 |
-| `/api/security/csrf` | COMMON_AND_AUTH §7 |
-| `/api/customers`, `/api/customers/{id}`, `/lookup`, `/search` | BUSINESS §§1–2 |
-| `/api/transactions` | BUSINESS §4.1–4.2 |
-| `/api/transactions/{id}` | BUSINESS §4.3 |
-| `/api/transactions/allocate` | BUSINESS §4.4 |
-| `/api/transactions/manual` | BUSINESS §4.5 |
-| `/api/transactions/fuel-options` | BUSINESS §4.6 |
-| `/api/transactions/{id}/lines` | BUSINESS §4.7–4.8 |
-| `/api/transactions/{id}/fiscalize` | BUSINESS §4.9 |
-| `/api/transactions/pre-fuel-customer` | BUSINESS §4.10–4.11 |
-| `/api/receipts` | BUSINESS §§5–6 |
-| `/api/products` | BUSINESS §§7–8 |
-| `/api/product-categories`, `/api/product-categories/{categoryId}` | CATALOG_STOCK_REPORTING_MISC §1 |
-| `/api/stock`, `/api/stock/{movementId}/retry` | CATALOG_STOCK_REPORTING_MISC §§2–4; retry route uses selected movement ID and action result |
-| `/api/reports`, `/api/reports/*` | CATALOG_STOCK_REPORTING_MISC §5 |
-| `/api/proxy-config`, `/api/proxy-config/{key}` | CATALOG_STOCK_REPORTING_MISC §6; key route targets one proxy KV key |
-| `/api/config/*` lookup/dictionary routes | CATALOG_STOCK_REPORTING_MISC §8 |
-| `/api/settings` | SETTINGS_SETUP_ADMIN §1 |
-| `/api/admin/settings` | SETTINGS_SETUP_ADMIN §2 |
-| `/api/settings/pumps*` | SETTINGS_SETUP_ADMIN §3 |
-| `/api/settings/tanks*` | SETTINGS_SETUP_ADMIN §§4–5 |
-| `/api/settings/pump-mode` | SETTINGS_SETUP_ADMIN §6 |
-| `/api/admin/setup/forecourt-settings` | SETTINGS_SETUP_ADMIN §7 |
-| `/api/users`, `/api/users/{id}` | SETTINGS_SETUP_ADMIN §8 |
-| `/api/setup/admin` | SETTINGS_SETUP_ADMIN §9 |
-| `/api/setup/device` | SETTINGS_SETUP_ADMIN §10 |
-| `/api/setup/site` | SETTINGS_SETUP_ADMIN §11 |
-| `/api/setup/status` | SETTINGS_SETUP_ADMIN §12 |
-| `/api/setup/forecourt` | SETTINGS_SETUP_ADMIN §13 |
-| `/api/setup/proxy-status` | SETTINGS_SETUP_ADMIN §14 |
-| `/api/admin/branding` and branding asset behavior | SETTINGS_SETUP_ADMIN §15 |
-| `/api/admin/config/devices`, `/plugins`, `/station` | SETTINGS_SETUP_ADMIN §16 |
-| `/api/runtime/fiscal/inbox*` | RUNTIME_SUPPORT §§1–9 |
-| `/api/runtime/bus/publish` | RUNTIME_SUPPORT §10 |
-| `/api/pos/doms/*` | FORECOURT_AND_COMPATIBILITY §§1–4 |
-| `/api/pos/control/*` | FORECOURT_AND_COMPATIBILITY §5 |
-| `/api/doms/{command}` | FORECOURT_AND_COMPATIBILITY §6 |
-| `/api/control/{module}/{command}` | FORECOURT_AND_COMPATIBILITY §7 |
-| `/api/terminal/{command}` | FORECOURT_AND_COMPATIBILITY §8 |
-| `/api/admin/forecourt/maintenance/preview` | FORECOURT_AND_COMPATIBILITY §9 |
-| `/api/supervisor/*`, `/api/vpos/*` compatibility families | FORECOURT_AND_COMPATIBILITY §10 plus the endpoint catalog for path/method/aim |
+| Endpoint or family                                                | Wire contract                                                                               |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `/api/livez`                                                      | COMMON_AND_AUTH §9                                                                          |
+| `/api/readyz`                                                     | COMMON_AND_AUTH §10                                                                         |
+| `/api/healthz`                                                    | COMMON_AND_AUTH §11                                                                         |
+| `/api/metrics`                                                    | COMMON_AND_AUTH §12                                                                         |
+| `/api/auth/login`                                                 | COMMON_AND_AUTH §4                                                                          |
+| `/api/auth/logout`                                                | COMMON_AND_AUTH §5                                                                          |
+| `/api/auth/session`                                               | COMMON_AND_AUTH §6                                                                          |
+| `/api/security/csrf`                                              | COMMON_AND_AUTH §7                                                                          |
+| `/api/customers`, `/api/customers/{id}`, `/lookup`, `/search`     | BUSINESS §§1–2                                                                              |
+| `/api/transactions`                                               | BUSINESS §4.1–4.2                                                                           |
+| `/api/transactions/{id}`                                          | BUSINESS §4.3                                                                               |
+| `/api/transactions/allocate`                                      | BUSINESS §4.4                                                                               |
+| `/api/transactions/manual`                                        | BUSINESS §4.5                                                                               |
+| `/api/transactions/fuel-options`                                  | BUSINESS §4.6                                                                               |
+| `/api/transactions/{id}/lines`                                    | BUSINESS §4.7–4.8                                                                           |
+| `/api/transactions/{id}/fiscalize`                                | BUSINESS §4.9                                                                               |
+| `/api/transactions/pre-fuel-customer`                             | BUSINESS §4.10–4.11                                                                         |
+| `/api/receipts`                                                   | BUSINESS §§5–6                                                                              |
+| `/api/products`                                                   | BUSINESS §§7–8                                                                              |
+| `/api/product-categories`, `/api/product-categories/{categoryId}` | CATALOG_STOCK_REPORTING_MISC §1                                                             |
+| `/api/stock`, `/api/stock/{movementId}/retry`                     | CATALOG_STOCK_REPORTING_MISC §§2–4; retry route uses selected movement ID and action result |
+| `/api/reports`, `/api/reports/*`                                  | CATALOG_STOCK_REPORTING_MISC §5                                                             |
+| `/api/proxy-config`, `/api/proxy-config/{key}`                    | CATALOG_STOCK_REPORTING_MISC §6; key route targets one proxy KV key                         |
+| `/api/config/*` lookup/dictionary routes                          | CATALOG_STOCK_REPORTING_MISC §8                                                             |
+| `/api/settings`                                                   | SETTINGS_SETUP_ADMIN §1                                                                     |
+| `/api/admin/settings`                                             | SETTINGS_SETUP_ADMIN §2                                                                     |
+| `/api/settings/pumps*`                                            | SETTINGS_SETUP_ADMIN §3                                                                     |
+| `/api/settings/tanks*`                                            | SETTINGS_SETUP_ADMIN §§4–5                                                                  |
+| `/api/settings/pump-mode`                                         | SETTINGS_SETUP_ADMIN §6                                                                     |
+| `/api/admin/setup/forecourt-settings`                             | SETTINGS_SETUP_ADMIN §7                                                                     |
+| `/api/users`, `/api/users/{id}`                                   | SETTINGS_SETUP_ADMIN §8                                                                     |
+| `/api/setup/admin`                                                | SETTINGS_SETUP_ADMIN §9                                                                     |
+| `/api/setup/device`                                               | SETTINGS_SETUP_ADMIN §10                                                                    |
+| `/api/setup/site`                                                 | SETTINGS_SETUP_ADMIN §11                                                                    |
+| `/api/setup/status`                                               | SETTINGS_SETUP_ADMIN §12                                                                    |
+| `/api/setup/forecourt`                                            | SETTINGS_SETUP_ADMIN §13                                                                    |
+| `/api/setup/proxy-status`                                         | SETTINGS_SETUP_ADMIN §14                                                                    |
+| `/api/admin/branding` and branding asset behavior                 | SETTINGS_SETUP_ADMIN §15                                                                    |
+| `/api/admin/config/devices`, `/plugins`, `/station`               | SETTINGS_SETUP_ADMIN §16                                                                    |
+| `/api/runtime/fiscal/inbox*`                                      | RUNTIME_SUPPORT §§1–9                                                                       |
+| `/api/runtime/bus/publish`                                        | RUNTIME_SUPPORT §10                                                                         |
+| `/api/pos/doms/*`                                                 | FORECOURT_AND_COMPATIBILITY §§1–4                                                           |
+| `/api/pos/control/*`                                              | FORECOURT_AND_COMPATIBILITY §5                                                              |
+| `/api/doms/{command}`                                             | FORECOURT_AND_COMPATIBILITY §6                                                              |
+| `/api/control/{module}/{command}`                                 | FORECOURT_AND_COMPATIBILITY §7                                                              |
+| `/api/terminal/{command}`                                         | FORECOURT_AND_COMPATIBILITY §8                                                              |
+| `/api/admin/forecourt/maintenance/preview`                        | FORECOURT_AND_COMPATIBILITY §9                                                              |
+| `/api/supervisor/*`, `/api/vpos/*` compatibility families         | FORECOURT_AND_COMPATIBILITY §10 plus the endpoint catalog for path/method/aim               |
 
 ## 4. How to interpret `unknown` and `Record<string, unknown>`
 

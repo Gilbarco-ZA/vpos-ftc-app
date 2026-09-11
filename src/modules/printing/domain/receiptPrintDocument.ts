@@ -187,7 +187,8 @@ export function buildReceiptEscposLines(input: {
     if (offlinePrint) {
       const hasOfflineMarker = lines.some(
         (line) =>
-          line.type === 'text' && line.value.trim().toUpperCase() === 'OFFLINE PRINT',
+          line.type === 'text' &&
+          line.value.trim().toUpperCase() === 'OFFLINE PRINT',
       )
       if (!hasOfflineMarker) {
         const marker: EscposLine = {

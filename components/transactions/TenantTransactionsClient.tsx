@@ -172,7 +172,8 @@ export default function TenantTransactionsClient(props: {
   const authorizePreFuel = async () => {
     if (!csrfToken || !selectedFuel || !selectedCustomer || authorizing) return
     const fuel = fuelOptions.find(
-      (option) => `${option.pumpNumber}:${option.nozzleNumber}` === selectedFuel,
+      (option) =>
+        `${option.pumpNumber}:${option.nozzleNumber}` === selectedFuel,
     )
     if (!fuel) return
 
@@ -252,8 +253,8 @@ export default function TenantTransactionsClient(props: {
             </div>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
               Select the customer and exact nozzle before dispensing. The
-              customer will be attached to the next transaction from that
-              nozzle before fiscalization.
+              customer will be attached to the next transaction from that nozzle
+              before fiscalization.
             </p>
           </div>
 
@@ -441,7 +442,9 @@ export default function TenantTransactionsClient(props: {
                   </TableCell>
                   <TableCell className="align-top">
                     {t.remaining == null ? (
-                      <span className="text-xs text-[var(--text-muted)]">-</span>
+                      <span className="text-xs text-[var(--text-muted)]">
+                        -
+                      </span>
                     ) : t.remaining === 0 ? (
                       <Badge variant={STATUS_VARIANT.WARN}>Expired</Badge>
                     ) : (

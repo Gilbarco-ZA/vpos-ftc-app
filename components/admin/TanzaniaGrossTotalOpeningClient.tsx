@@ -186,8 +186,8 @@ export function TanzaniaGrossTotalOpeningClient() {
         <CardTitle>Fiscal values and local compatibility settings</CardTitle>
         <CardDescription>
           Capture the cumulative grossTotal baseline and receipt counters, use
-          the TRA-issued receiptCode or a manual prefix, and independently choose
-          the TRA receipt-verification URL used by QR codes.
+          the TRA-issued receiptCode or a manual prefix, and independently
+          choose the TRA receipt-verification URL used by QR codes.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -465,7 +465,9 @@ export function TanzaniaGrossTotalOpeningClient() {
               autoComplete="off"
               spellCheck={false}
               value={receiptVerificationUrlOverride}
-              disabled={busy !== null || receiptVerificationUrlMode !== 'manual'}
+              disabled={
+                busy !== null || receiptVerificationUrlMode !== 'manual'
+              }
               placeholder="https://example.tra.go.tz/verify/"
               onChange={(event) => {
                 setReceiptVerificationUrlOverride(event.target.value)

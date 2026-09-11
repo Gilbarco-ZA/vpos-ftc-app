@@ -32,7 +32,7 @@ Query:
 
 ```ts
 interface ProductCategoryQuery {
-  includeInactive?: "true" | string
+  includeInactive?: 'true' | string
 }
 ```
 
@@ -74,28 +74,24 @@ The path parameter is the category ID. GET returns `SuccessEnvelope<ProductCateg
 ## 2. Stock DTOs
 
 ```ts
-type StockMovementType = "STOCK_IN" | "STOCK_OUT"
+type StockMovementType = 'STOCK_IN' | 'STOCK_OUT'
 
-type StockInReason =
-  | "Delivery"
-  | "Transfer In"
-  | "Production"
-  | "Stock Count"
+type StockInReason = 'Delivery' | 'Transfer In' | 'Production' | 'Stock Count'
 
 type StockOutReason =
-  | "Expired"
-  | "Damaged"
-  | "Personal Use"
-  | "Raw Material"
-  | "Other"
-  | "Transfer Out"
-  | "Waste"
-  | "Return"
-  | "Production"
-  | "Stock Count"
+  | 'Expired'
+  | 'Damaged'
+  | 'Personal Use'
+  | 'Raw Material'
+  | 'Other'
+  | 'Transfer Out'
+  | 'Waste'
+  | 'Return'
+  | 'Production'
+  | 'Stock Count'
 
-type StockProxyStatus = "PENDING" | "SENT" | "FAILED" | "NOT_REQUIRED"
-type StockSourceType = "MANUAL" | "POS_TRANSACTION" | "CSV_IMPORT"
+type StockProxyStatus = 'PENDING' | 'SENT' | 'FAILED' | 'NOT_REQUIRED'
+type StockSourceType = 'MANUAL' | 'POS_TRANSACTION' | 'CSV_IMPORT'
 ```
 
 ### StockProductSummary
@@ -149,7 +145,7 @@ interface StockMovementRecord {
   createdByName: string
   sourceType: StockSourceType
   sourceTransactionId: string | null
-  sourceAction: "CAPTURE" | "EDIT" | null
+  sourceAction: 'CAPTURE' | 'EDIT' | null
   proxyStatus: StockProxyStatus
   proxyResponse: unknown
   proxySentAt: string | null

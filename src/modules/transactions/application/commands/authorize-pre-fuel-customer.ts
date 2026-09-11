@@ -1,5 +1,5 @@
-import { getPumpRuntimeState } from '@/src/modules/pumps/application/getPumpRuntimeState'
 import { runPosControlCommand } from '@/src/modules/pos/application/runPosControlCommand'
+import { getPumpRuntimeState } from '@/src/modules/pumps/application/getPumpRuntimeState'
 import { getPendingPreFuelCustomerAllocation } from '@/src/modules/transactions/infrastructure/preFuelCustomerAllocation'
 
 export async function authorizePendingPreFuelCustomer(input: {

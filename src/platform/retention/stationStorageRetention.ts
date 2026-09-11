@@ -53,7 +53,6 @@ export async function runStationStorageRetention(
 ) {
   const policy = await getStationStorageRetentionPolicy(stationId)
   if (!policy.enabled && !options.force) {
-
     return {
       enabled: false,
       dryRun: policy.dryRun,

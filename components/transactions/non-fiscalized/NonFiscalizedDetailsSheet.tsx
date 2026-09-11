@@ -116,7 +116,10 @@ const NonFiscalizedDetailsSheet = ({
                       size="sm"
                       className="h-7 w-7 px-0"
                       onClick={() =>
-                        onCopy('Receipt number', transaction.receiptNumber ?? '')
+                        onCopy(
+                          'Receipt number',
+                          transaction.receiptNumber ?? '',
+                        )
                       }
                       aria-label="Copy receipt number"
                       title="Copy receipt number"
