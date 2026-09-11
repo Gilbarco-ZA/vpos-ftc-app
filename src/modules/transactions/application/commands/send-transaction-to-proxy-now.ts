@@ -4,8 +4,6 @@ import {
   requiresPreFiscalizationReceiptPrint,
 } from '../../infrastructure/fiscalization/autoPrintFiscalReceipt'
 import { sendTransactionToProxyNow } from '../../infrastructure/fiscalization/proxySenderWorker'
-import { getTinCaptureOrderRepo } from '../../infrastructure/preFuelCustomerAllocation'
-import { getTransactionDetails } from '../queries/get-transaction-details'
 
 const PRINTER_UNAVAILABLE_ERROR_PREFIX = 'PRINTER_UNAVAILABLE:'
 
@@ -16,22 +14,6 @@ function isPrinterUnavailable(lastError: string | null | undefined) {
 export async function sendTransactionToProxyNowCommand(
   input: Parameters<typeof sendTransactionToProxyNow>[0],
 ) {
-  if ((await getTinCaptureOrderRepo(input.stationId)) === 'before_transaction') {
-    const transaction = await getTransactionDetails(
-      input.stationId,
-      input.transactionId,
-    )
-    const customerId = transaction?.customer_id ?? transaction?.customerId ?? null
-    if (!customerId) {
-      return {
-        ok: false as const,
-        skipped: true as const,
-        reason:
-          'Pre-transaction customer allocation has not yet been attached to this sale.',
-      }
-    }
-  }
-
   if (await requiresPreFiscalizationReceiptPrint(input.stationId)) {
     const print = await enqueueAutoPrintFiscalReceipt({
       stationId: input.stationId,
