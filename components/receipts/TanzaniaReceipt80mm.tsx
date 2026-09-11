@@ -2,6 +2,7 @@
 
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import type { NormalizedReceipt } from '@/src/shared/receipts/normalizeReceipt'
+import { formatReceiptDateTimeDisplay } from '@/src/shared/receipts/receiptDateTimeDisplay'
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 
@@ -41,7 +42,11 @@ const TanzaniaReceipt80mm = ({ receipt }: TanzaniaReceipt80mmProps) => {
   const discount = Number(receipt.totals.discount ?? 0)
   const receiptNumber =
     receipt.meta.receiptTraNumber || receipt.meta.receiptNumber
-  const receiptDate = receipt.meta.receiptDate || receipt.meta.receiptDateTime
+  const receiptDateTime = formatReceiptDateTimeDisplay({
+    receiptDate: receipt.meta.receiptDate,
+    receiptTime: receipt.meta.receiptTime,
+    receiptDateTime: receipt.meta.receiptDateTime,
+  })
   const paymentMethod =
     receipt.totals.paymentMethod || receipt.buyer?.paymentType || 'Cash'
   const customerName = String(receipt.buyer?.name ?? '').trim()
@@ -193,16 +198,16 @@ const TanzaniaReceipt80mm = ({ receipt }: TanzaniaReceipt80mmProps) => {
               <span className="text-right">{receipt.meta.receiptZNumber}</span>
             </div>
           ) : null}
-          {receiptDate ? (
+          {receiptDateTime.date ? (
             <div className="flex justify-between gap-3">
-              <span>RECEIPT DATE:</span>
-              <span className="text-right">{receiptDate}</span>
+              <span>Date:</span>
+              <span className="text-right">{receiptDateTime.date}</span>
             </div>
           ) : null}
-          {receipt.meta.receiptTime ? (
+          {receiptDateTime.time ? (
             <div className="flex justify-between gap-3">
-              <span>RECEIPT TIME:</span>
-              <span className="text-right">{receipt.meta.receiptTime}</span>
+              <span>Time:</span>
+              <span className="text-right">{receiptDateTime.time}</span>
             </div>
           ) : null}
         </div>
