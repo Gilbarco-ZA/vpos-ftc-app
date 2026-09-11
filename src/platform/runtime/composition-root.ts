@@ -57,7 +57,8 @@ function toStopFn(handle: RuntimeWorkerStopHandle): () => Promise<void> {
  * Important runtime composition:
  * - Dedicated worker process starts supervisor monitoring, proxy sending,
  *   forecourt config sync, POS command polling, transaction scheduling,
- *   transaction fiscalization execution, and optional PSS XML watching.
+ *   transaction fiscalization execution, pre-fiscal receipt preparation,
+ *   and optional PSS XML watching.
  * - Single-process server runtime starts the in-process worker set and
  *   conditionally starts proxy sending after bootstrap completes.
  * - Print and report workers still exist as standalone entrypoints, but remain
@@ -124,12 +125,16 @@ export function startDedicatedWorkerProcess() {
       ),
     )
     stopFns.push(
-      toStopFn(startOfflineReceiptPrintRuntimeWorker({ pollMs: txPollMs })),
-    )
-    stopFns.push(
       toStopFn(startEwuraRetryRuntimeWorker({ pollMs: ewuraRetryPollMs })),
     )
   }
+
+  // Proxy fiscalization can depend on a completed pre-fiscal receipt print.
+  // Keep this worker available even when local/internal fiscalization workers
+  // are disabled, otherwise the proxy sender can have no eligible rows to claim.
+  stopFns.push(
+    toStopFn(startOfflineReceiptPrintRuntimeWorker({ pollMs: txPollMs })),
+  )
 
   // Preserved intentionally: print/report workers remain standalone entrypoints
   // and are not started inside the omnibus worker script today.
