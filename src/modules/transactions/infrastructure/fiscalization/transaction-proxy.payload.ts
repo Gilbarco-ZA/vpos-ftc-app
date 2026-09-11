@@ -14,6 +14,12 @@ function compact<T>(value: T): T {
   return value
 }
 
+function withoutTimezoneSuffix(value: unknown) {
+  const text = String(value ?? '').trim()
+  if (!text) return text
+  return text.replace(/(?:Z|[+-]\d{2}:?\d{2})$/i, '')
+}
+
 function toLegacyInvoicePayload(invoice: ProxyInvoiceRequest) {
   return compact({
     DocumentId: invoice.documentId ?? null,
@@ -46,11 +52,24 @@ function toLegacyInvoicePayload(invoice: ProxyInvoiceRequest) {
 }
 
 function toTanzaniaInvoicePayload(invoice: ProxyInvoiceRequest) {
+  const tanzaniaInvoiceDate = withoutTimezoneSuffix(
+    invoice.tanzania?.invoiceDate ?? invoice.issueDateTime,
+  )
+  const tanzania = invoice.tanzania
+    ? {
+        ...invoice.tanzania,
+        invoiceDate: tanzaniaInvoiceDate,
+      }
+    : undefined
+
   return compact({
     documentId: invoice.documentId ?? null,
     documentNumber: invoice.documentNumber ?? null,
     documentType: invoice.documentType ?? null,
-    issueDateTime: invoice.issueDateTime,
+    // Tanzania fiscal timestamps are local EAT wall-clock values. Do not send
+    // Z/+HH:mm suffixes to vpos-proxy, and keep the generic and Tanzania
+    // timestamp fields identical so the proxy cannot pick a different clock.
+    issueDateTime: tanzaniaInvoiceDate,
     currency: invoice.currency ?? null,
     createdByName: invoice.createdByName ?? 'VPOS-LITE',
     isOnline: invoice.isOnline ?? true,
@@ -89,7 +108,7 @@ function toTanzaniaInvoicePayload(invoice: ProxyInvoiceRequest) {
     payment: invoice.payment ?? undefined,
     notes: invoice.notes ?? null,
     countryCode: invoice.countryCode ?? null,
-    tanzania: invoice.tanzania ?? undefined,
+    tanzania,
   })
 }
 
