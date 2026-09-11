@@ -89,6 +89,15 @@ export function startInProcessRuntime(
       staleMs: 25_000,
       backoffMs: 3_000,
     },
+    {
+      // Proxy fiscalization also depends on this worker when receipts are
+      // configured to print before fiscalization. Do not hide it behind the
+      // local/internal fiscalization-worker switch.
+      name: 'offlineReceiptPrintWorker',
+      start: () => startOfflineReceiptPrintWorker(),
+      staleMs: 25_000,
+      backoffMs: 3_000,
+    },
     ...(shouldRunInternalFiscalizationWorkers()
       ? [
           {
@@ -100,12 +109,6 @@ export function startInProcessRuntime(
           {
             name: 'transactionQueueWorker',
             start: () => startTransactionQueueWorker(),
-            staleMs: 25_000,
-            backoffMs: 3_000,
-          },
-          {
-            name: 'offlineReceiptPrintWorker',
-            start: () => startOfflineReceiptPrintWorker(),
             staleMs: 25_000,
             backoffMs: 3_000,
           },
