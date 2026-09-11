@@ -3,6 +3,7 @@ import { queryOne, txQuery, withTransaction } from '@/src/platform/db/postgres'
 import { getRegisteredTanzaniaReceiptCode } from '@/src/modules/tanzania-fiscal/application/registeredReceiptCode'
 import { resolveTanzaniaReceiptVerificationPrefix } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
 import { dateParts } from '@/src/modules/tanzania-fiscal/infrastructure/xml'
+import { resolveTanzaniaFiscalTimezone } from '@/src/modules/tanzania-fiscal/infrastructure/timezone'
 
 export type TanzaniaPreFiscalizationReceiptAssignment = {
   invoice_number: string
@@ -27,7 +28,6 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
 }): Promise<TanzaniaPreFiscalizationReceiptAssignment | null> {
   const preliminary = await queryOne<any>(
     `SELECT fs.country,
-            COALESCE(NULLIF(BTRIM(fs.timezone), ''), 'Africa/Dar_es_Salaam') AS timezone,
             ss.tanzania_receipt_verification_prefix_mode AS receipt_verification_prefix_mode,
             ss.tanzania_receipt_verification_prefix_override AS receipt_verification_prefix_override,
             a.invoice_number,
@@ -59,7 +59,7 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
     return null
   }
 
-  const timezone = String(preliminary.timezone || 'Africa/Dar_es_Salaam')
+  const timezone = await resolveTanzaniaFiscalTimezone(input.stationId)
   if (preliminary.receipt_verification_number) {
     return normalizeExisting(preliminary, timezone)
   }
@@ -85,12 +85,10 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
 
     const context = await txQuery<{
       country: string | null
-      timezone: string | null
       transaction_date_time: string | Date
     }>(
       client,
       `SELECT fs.country,
-              fs.timezone,
               t.transaction_date_time
          FROM transactions t
          JOIN fuel_stations fs ON fs.id = t.station_id
@@ -118,13 +116,12 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
         LIMIT 1`,
       [input.stationId, input.transactionId],
     )
-    const lockedTimezone = String(row.timezone || timezone)
     if (existing.rows[0]) {
-      return normalizeExisting(existing.rows[0], lockedTimezone)
+      return normalizeExisting(existing.rows[0], timezone)
     }
 
     const invoiceDate = new Date(row.transaction_date_time).toISOString()
-    const transactionDate = dateParts(invoiceDate, lockedTimezone)
+    const transactionDate = dateParts(invoiceDate, timezone)
     const fiscalDate = transactionDate
 
     const global = await txQuery<{ counter_value: string | number }>(
@@ -180,6 +177,6 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
       ],
     )
 
-    return normalizeExisting(inserted.rows[0], lockedTimezone)
+    return normalizeExisting(inserted.rows[0], timezone)
   })
 }
