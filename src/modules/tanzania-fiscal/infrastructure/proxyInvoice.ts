@@ -232,8 +232,6 @@ export async function enrichTanzaniaProxyInvoice(args: {
   createdByName: string | null
   invoice: ProxyInvoiceRequest
 }): Promise<ProxyInvoiceRequest> {
-  // Validate before allocating receipt counters so a proxy-rejected tax code
-  // cannot create gaps in the Tanzania fiscal sequence.
   assertTanzaniaProxyTaxCodes(args.invoice)
 
   const config = await readTanzaniaFiscalConfig(args.stationId)
@@ -242,9 +240,6 @@ export async function enrichTanzaniaProxyInvoice(args: {
     throw new Error('Tanzania invoice requires a transaction id')
   }
 
-  // Resolve and persist the Tanzania regulatory tank projection before
-  // allocating fiscal counters. Configuration/ATG failures therefore do not
-  // consume an invoice number, and retries retain the original ATG baseline.
   const hasFuelLine = (args.invoice.lines ?? []).some((line) =>
     Boolean(line.product?.fuel),
   )
@@ -264,9 +259,9 @@ export async function enrichTanzaniaProxyInvoice(args: {
     : args.invoice
 
   // A fiscal receipt describes the sale, not the moment the background worker
-  // happened to submit it. Use the persisted transaction timestamp as the
-  // canonical invoice/receipt time; station timezone formatting happens in
-  // asMetadata() via isoDateTimeInTimezone().
+  // submits it. The persisted transaction instant is formatted in the
+  // effective local timezone resolved by readTanzaniaFiscalConfig(): Site
+  // Profile override first, otherwise the device/runtime timezone.
   const transactionDate = new Date(
     args.transaction?.transaction_date_time ?? invoice.issueDateTime,
   ).toISOString()
@@ -276,7 +271,7 @@ export async function enrichTanzaniaProxyInvoice(args: {
     transactionId,
     transactionDate,
     fiscalizationDate,
-    timezone: config.station.timezone || 'Africa/Dar_es_Salaam',
+    timezone: config.station.timezone,
   })
   const amount = Number(
     invoice.totals?.amount ?? args.transaction?.total_amount ?? 0,
@@ -286,7 +281,7 @@ export async function enrichTanzaniaProxyInvoice(args: {
     createdByName: args.createdByName,
     paymentType: args.transaction?.payment_type,
     amount: Number.isFinite(amount) ? amount : 0,
-    timezone: config.station.timezone || 'Africa/Dar_es_Salaam',
+    timezone: config.station.timezone,
   })
 
   return {
