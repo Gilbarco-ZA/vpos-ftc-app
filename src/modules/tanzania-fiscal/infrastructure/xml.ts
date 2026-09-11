@@ -1,6 +1,5 @@
 import { signXmlSha1Base64 } from './certificates'
-
-export const TANZANIA_TIMEZONE = 'Africa/Dar_es_Salaam'
+import { resolveLocalTimezone } from './timezone'
 
 export function xmlEscape(value: unknown): string {
   return String(value ?? '')
@@ -48,7 +47,7 @@ export function numberText(value: unknown, digits = 2, fallback = 0): string {
   return Number.isFinite(n) ? n.toFixed(digits) : fallback.toFixed(digits)
 }
 
-type TanzaniaDateTimeParts = {
+type FiscalDateTimeParts = {
   year: string
   month: string
   day: string
@@ -58,7 +57,7 @@ type TanzaniaDateTimeParts = {
   fractionalSecond: string
 }
 
-function literalLocalParts(value: unknown): TanzaniaDateTimeParts | null {
+function literalLocalParts(value: unknown): FiscalDateTimeParts | null {
   if (value instanceof Date) return null
   const text = String(value ?? '').trim()
   const match = text.match(
@@ -76,7 +75,10 @@ function literalLocalParts(value: unknown): TanzaniaDateTimeParts | null {
   }
 }
 
-function tanzaniaDateTimeParts(value: unknown): TanzaniaDateTimeParts {
+function fiscalDateTimeParts(
+  value: unknown,
+  timezone?: string,
+): FiscalDateTimeParts {
   const literal = literalLocalParts(value)
   if (literal) return literal
 
@@ -86,8 +88,9 @@ function tanzaniaDateTimeParts(value: unknown): TanzaniaDateTimeParts {
     throw new Error('Invalid date value')
   }
 
+  const effectiveTimezone = resolveLocalTimezone(timezone)
   const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TANZANIA_TIMEZONE,
+    timeZone: effectiveTimezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -112,14 +115,8 @@ function tanzaniaDateTimeParts(value: unknown): TanzaniaDateTimeParts {
   }
 }
 
-export function dateParts(
-  value: unknown,
-  _timezone = TANZANIA_TIMEZONE,
-) {
-  // Tanzania fiscal documents must always use East Africa Time. The station
-  // timezone can be stale or inherited from a South African deployment, so it
-  // is deliberately not allowed to alter regulatory receipt timestamps.
-  const parts = tanzaniaDateTimeParts(value)
+export function dateParts(value: unknown, timezone?: string) {
+  const parts = fiscalDateTimeParts(value, timezone)
 
   return {
     isoDate: `${parts.year}-${parts.month}-${parts.day}`,
@@ -129,14 +126,11 @@ export function dateParts(
   }
 }
 
-export function isoDateTimeInTimezone(
-  value: unknown,
-  _timezone = TANZANIA_TIMEZONE,
-) {
-  const parts = tanzaniaDateTimeParts(value)
+export function isoDateTimeInTimezone(value: unknown, timezone?: string) {
+  const parts = fiscalDateTimeParts(value, timezone)
 
-  // The vpos-proxy Tanzania contract expects local fiscal wall-clock time.
-  // Do not append Z or an explicit +03:00 offset; vpos-proxy forwards this
-  // field as supplied to the Tanzania API mapper.
+  // vpos-proxy receives the effective site/device local wall-clock time.
+  // Do not append Z or an explicit offset; the proxy forwards this field as
+  // supplied to the country fiscal API mapper.
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.${parts.fractionalSecond}`
 }
