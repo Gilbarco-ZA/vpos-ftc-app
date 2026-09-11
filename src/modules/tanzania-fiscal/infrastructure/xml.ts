@@ -1,5 +1,7 @@
 import { signXmlSha1Base64 } from './certificates'
 
+export const TANZANIA_TIMEZONE = 'Africa/Dar_es_Salaam'
+
 export function xmlEscape(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -46,35 +48,38 @@ export function numberText(value: unknown, digits = 2, fallback = 0): string {
   return Number.isFinite(n) ? n.toFixed(digits) : fallback.toFixed(digits)
 }
 
-export function dateParts(value: unknown, timezone = 'Africa/Dar_es_Salaam') {
-  const date =
-    value instanceof Date ? value : new Date(String(value || Date.now()))
-  const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-  const parts = Object.fromEntries(
-    fmt.formatToParts(date).map((part) => [part.type, part.value]),
-  ) as Record<string, string>
+type TanzaniaDateTimeParts = {
+  year: string
+  month: string
+  day: string
+  hour: string
+  minute: string
+  second: string
+  fractionalSecond: string
+}
 
+function literalLocalParts(value: unknown): TanzaniaDateTimeParts | null {
+  if (value instanceof Date) return null
+  const text = String(value ?? '').trim()
+  const match = text.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/,
+  )
+  if (!match) return null
   return {
-    isoDate: `${parts.year}-${parts.month}-${parts.day}`,
-    slashDate: `${parts.day}/${parts.month}/${parts.year}`,
-    compactDate: `${parts.year}${parts.month}${parts.day}`,
-    time: `${parts.hour}:${parts.minute}:${parts.second}`,
+    year: match[1],
+    month: match[2],
+    day: match[3],
+    hour: match[4],
+    minute: match[5],
+    second: match[6],
+    fractionalSecond: String(match[7] ?? '0').padEnd(3, '0'),
   }
 }
 
-export function isoDateTimeInTimezone(
-  value: unknown,
-  timezone = 'Africa/Dar_es_Salaam',
-) {
+function tanzaniaDateTimeParts(value: unknown): TanzaniaDateTimeParts {
+  const literal = literalLocalParts(value)
+  if (literal) return literal
+
   const date =
     value instanceof Date ? value : new Date(String(value || Date.now()))
   if (!Number.isFinite(date.getTime())) {
@@ -82,7 +87,7 @@ export function isoDateTimeInTimezone(
   }
 
   const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
+    timeZone: TANZANIA_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -96,21 +101,42 @@ export function isoDateTimeInTimezone(
     fmt.formatToParts(date).map((part) => [part.type, part.value]),
   ) as Record<string, string>
 
-  const milliseconds = Number(parts.fractionalSecond || '0')
-  const zonedAsUtc = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    Number(parts.hour),
-    Number(parts.minute),
-    Number(parts.second),
-    milliseconds,
-  )
-  const offsetMinutes = Math.round((zonedAsUtc - date.getTime()) / 60_000)
-  const sign = offsetMinutes < 0 ? '-' : '+'
-  const absoluteOffset = Math.abs(offsetMinutes)
-  const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0')
-  const offsetMins = String(absoluteOffset % 60).padStart(2, '0')
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: parts.hour,
+    minute: parts.minute,
+    second: parts.second,
+    fractionalSecond: String(parts.fractionalSecond || '0').padStart(3, '0'),
+  }
+}
 
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.${String(milliseconds).padStart(3, '0')}${sign}${offsetHours}:${offsetMins}`
+export function dateParts(
+  value: unknown,
+  _timezone = TANZANIA_TIMEZONE,
+) {
+  // Tanzania fiscal documents must always use East Africa Time. The station
+  // timezone can be stale or inherited from a South African deployment, so it
+  // is deliberately not allowed to alter regulatory receipt timestamps.
+  const parts = tanzaniaDateTimeParts(value)
+
+  return {
+    isoDate: `${parts.year}-${parts.month}-${parts.day}`,
+    slashDate: `${parts.day}/${parts.month}/${parts.year}`,
+    compactDate: `${parts.year}${parts.month}${parts.day}`,
+    time: `${parts.hour}:${parts.minute}:${parts.second}`,
+  }
+}
+
+export function isoDateTimeInTimezone(
+  value: unknown,
+  _timezone = TANZANIA_TIMEZONE,
+) {
+  const parts = tanzaniaDateTimeParts(value)
+
+  // The vpos-proxy Tanzania contract expects local fiscal wall-clock time.
+  // Do not append Z or an explicit +03:00 offset; vpos-proxy forwards this
+  // field as supplied to the Tanzania API mapper.
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.${parts.fractionalSecond}`
 }
