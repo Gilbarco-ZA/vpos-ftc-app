@@ -93,11 +93,15 @@ async function attachPendingPreFuelCustomersTx(
     )
   }
 
+  // Pre-transaction capture is an opportunity to attach a customer before the
+  // sale, not a hard fiscalization dependency. If no allocation matched, mark
+  // the transaction as immediately eligible so both local and proxy claim
+  // paths can continue without a customer/TIN.
   await txQuery(
     client,
     `UPDATE transactions t
-        SET linking_window_expires_at = 'infinity'::timestamptz,
-            status = CASE WHEN t.status = 'PENDING' THEN 'OPEN' ELSE t.status END,
+        SET linking_window_expires_at = NOW(),
+            status = 'PENDING',
             updated_at = NOW()
        FROM station_settings ss
       WHERE ss.station_id = t.station_id
