@@ -119,9 +119,9 @@ export async function ensureTanzaniaPreFiscalizationReceiptAssignment(input: {
       return normalizeExisting(existing.rows[0], lockedTimezone)
     }
 
-    const transactionDate = dateParts(row.transaction_date_time, lockedTimezone)
-    const invoiceDate = new Date().toISOString()
-    const fiscalDate = dateParts(invoiceDate, lockedTimezone)
+    const invoiceDate = new Date(row.transaction_date_time).toISOString()
+    const transactionDate = dateParts(invoiceDate, lockedTimezone)
+    const fiscalDate = transactionDate
 
     const global = await txQuery<{ counter_value: string | number }>(
       client,
