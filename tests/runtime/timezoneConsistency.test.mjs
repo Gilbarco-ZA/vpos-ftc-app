@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
 
 test('runtime timezone selection uses Site Profile or device local timezone', () => {
   const resolver = read('src/shared/time/localTimezone.ts')
+  const core = read('src/shared/time/timezoneCore.ts')
   const projection = read('src/shared/time/localDateTime.ts')
   const bootstrap = read('src/platform/bootstrap/first-boot.ts')
   const envDefaults = read('src/platform/runtime/env-defaults.cjs')
@@ -20,15 +21,19 @@ test('runtime timezone selection uses Site Profile or device local timezone', ()
   )
 
   assert.match(resolver, /KV_KEYS\.SITE_PROFILE/)
-  assert.match(
-    resolver,
-    /Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone/,
-  )
   assert.match(resolver, /resolveStationTimezone/)
   assert.match(resolver, /resolveStationTimezoneContext/)
+  assert.match(resolver, /from '@\/src\/shared\/time\/timezoneCore'/)
   assert.doesNotMatch(resolver, /Africa\/[A-Za-z_]+/)
 
+  assert.match(core, /Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone/)
+  assert.match(core, /export function resolveLocalTimezone/)
+  assert.doesNotMatch(core, /stationKv|postgres|KV_KEYS/)
+
   assert.match(projection, /export function localDateTime/)
+  assert.match(projection, /from '@\/src\/shared\/time\/timezoneCore'/)
+  assert.doesNotMatch(projection, /from '@\/src\/shared\/time\/localTimezone'/)
+  assert.doesNotMatch(projection, /stationKv|postgres|KV_KEYS/)
   assert.match(projection, /resolveLocalTimezone\(timezone\)/)
   assert.match(projection, /displayDate/)
   assert.match(projection, /compactDate/)
