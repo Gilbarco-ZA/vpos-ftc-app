@@ -1,6 +1,13 @@
 import { KV_KEYS } from '@/src/shared/setup/keys'
 import { kvGet } from '@/src/shared/storage/stationKv'
 
+export type StationTimezoneSource = 'site-profile' | 'device-runtime'
+
+export type StationTimezoneContext = {
+  timezone: string
+  source: StationTimezoneSource
+}
+
 export function isValidIanaTimezone(value: string) {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date(0))
@@ -35,16 +42,36 @@ export function resolveLocalTimezone(override?: unknown): string {
   return explicit
 }
 
-export async function resolveStationTimezone(stationId: string): Promise<string> {
+export async function resolveStationTimezoneContext(
+  stationId: string,
+): Promise<StationTimezoneContext> {
   const normalizedStationId = String(stationId ?? '').trim()
-  if (!normalizedStationId) return deviceLocalTimezone()
+  if (!normalizedStationId) {
+    return {
+      timezone: deviceLocalTimezone(),
+      source: 'device-runtime',
+    }
+  }
 
   const profile = await kvGet<{ timezone?: string | null }>(
     normalizedStationId,
     KV_KEYS.SITE_PROFILE,
   )
+  const explicit = String(profile?.timezone ?? '').trim()
 
-  // Site Profile is the only station-level timezone override. If it is not
-  // configured, use the timezone of the device/runtime running VPOS.
-  return resolveLocalTimezone(profile?.timezone)
+  if (explicit) {
+    return {
+      timezone: resolveLocalTimezone(explicit),
+      source: 'site-profile',
+    }
+  }
+
+  return {
+    timezone: deviceLocalTimezone(),
+    source: 'device-runtime',
+  }
+}
+
+export async function resolveStationTimezone(stationId: string): Promise<string> {
+  return (await resolveStationTimezoneContext(stationId)).timezone
 }
