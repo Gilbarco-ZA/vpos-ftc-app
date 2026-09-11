@@ -7,6 +7,7 @@ import {
 import { bootstrapStationConfig } from '@/src/platform/config/loader'
 import { prepareStationKvWrite } from '@/src/platform/config/station-kv-policy'
 import { getPool } from '@/src/platform/db/postgres'
+import { deviceLocalTimezone } from '@/src/shared/time/localTimezone'
 import { logger } from '@/src/shared/utils/logger'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
@@ -77,7 +78,8 @@ const runFirstBoot = async (
   const client = await pool.connect()
 
   const name = (process.env.DEFAULT_STATION_NAME || 'Default Station').trim()
-  const tz = (process.env.DEFAULT_STATION_TIMEZONE || 'Africa/Sao_Tome').trim()
+  const configuredTimezone = String(process.env.DEFAULT_STATION_TIMEZONE || '').trim()
+  const tz = configuredTimezone || deviceLocalTimezone()
 
   try {
     await client.query('SELECT pg_advisory_lock($1, $2)', [
