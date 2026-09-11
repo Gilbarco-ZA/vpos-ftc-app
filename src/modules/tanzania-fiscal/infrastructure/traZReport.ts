@@ -18,6 +18,7 @@ import {
 } from './db'
 import { getTraBearerToken } from './traAuth'
 import { buildTraReceiptVatTotals, normalizeTraPaymentType } from './traReceipt'
+import { resolveTanzaniaFiscalTimezone } from './timezone'
 import {
   dateParts,
   numberText,
@@ -370,7 +371,8 @@ export async function loadTraZReportSummaryFromDb(args: {
   businessDate: string
   timezone?: string | null
 }): Promise<TraZReportSummary> {
-  const timezone = args.timezone || 'Africa/Dar_es_Salaam'
+  const timezone =
+    args.timezone || (await resolveTanzaniaFiscalTimezone(args.stationId))
   const row = await queryOne<{
     daily_total_amount: string | number | null
     gross: string | number | null
@@ -421,8 +423,6 @@ export async function loadTraZReportSummaryFromDb(args: {
     INVOICE: Number(row?.invoice_total ?? 0),
   }
 
-  // Preserve package-compatible payment buckets but fold unknown/empty payment
-  // values into CASH by using the daily total fallback if the explicit buckets are zero.
   const bucketTotal = Object.values(payments).reduce(
     (acc, amount) => acc + Number(amount ?? 0),
     0,
