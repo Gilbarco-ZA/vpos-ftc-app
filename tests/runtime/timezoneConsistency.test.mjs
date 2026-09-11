@@ -24,6 +24,7 @@ test('runtime timezone selection uses Site Profile or device local timezone', ()
     /Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone/,
   )
   assert.match(resolver, /resolveStationTimezone/)
+  assert.match(resolver, /resolveStationTimezoneContext/)
   assert.doesNotMatch(resolver, /Africa\/[A-Za-z_]+/)
 
   assert.match(bootstrap, /deviceLocalTimezone\(\)/)
@@ -40,4 +41,20 @@ test('runtime timezone selection uses Site Profile or device local timezone', ()
 
   assert.match(fiscalTimezone, /resolveStationTimezone\(stationId\)/)
   assert.doesNotMatch(fiscalTimezone, /Africa\/Dar_es_Salaam/)
+})
+
+test('dashboard clock uses the effective server-resolved timezone', () => {
+  const dashboardPage = read('app/(dashboard)/dashboard/page.tsx')
+  const dashboardHome = read('components/dashboard/RoleDashboardHome.tsx')
+  const clock = read('components/dashboard/FiscalClock.tsx')
+
+  assert.match(dashboardPage, /resolveStationTimezoneContext\(user\.stationId\)/)
+  assert.match(dashboardPage, /timezone=\{timezoneContext\.timezone\}/)
+  assert.match(dashboardPage, /timezoneSource=\{timezoneContext\.source\}/)
+
+  assert.match(dashboardHome, /<FiscalClock timezone=\{timezone\} source=\{timezoneSource\} \/>/)
+  assert.match(clock, /timeZone:\s*timezone/)
+  assert.match(clock, /Receipt & report time/)
+  assert.match(clock, /This is the local time used for receipts, reports, and fiscal business-date calculations/)
+  assert.match(clock, /href="\/admin\/setup"/)
 })
