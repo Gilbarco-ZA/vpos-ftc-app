@@ -11,6 +11,7 @@ import {
   EWURA_PRODUCTION_BASE_URL,
   TRA_PRODUCTION_BASE_URL,
 } from './defaults'
+import { resolveTanzaniaFiscalTimezone } from './timezone'
 
 export type TanzaniaFiscalConfig = {
   stationId: string
@@ -162,7 +163,7 @@ export async function readTanzaniaFiscalConfig(
             fs.country,
             fs.phone,
             fs.email,
-            COALESCE(NULLIF(BTRIM(fs.timezone), ''), 'Africa/Dar_es_Salaam') AS timezone,
+            NULLIF(BTRIM(fs.timezone), '') AS timezone,
             ss.fiscalization_engine,
             ss.fiscalization_transport,
             ss.vat_rate_tz,
@@ -182,6 +183,7 @@ export async function readTanzaniaFiscalConfig(
     fiscalConfigRow,
     fiscalRegistrationRow,
     kvs,
+    effectiveTimezone,
   ] = await Promise.all([
     queryOne<{ config_json: unknown }>(
       `SELECT config_json FROM ewura_config WHERE station_id = $1`,
@@ -210,6 +212,7 @@ export async function readTanzaniaFiscalConfig(
       'vpos.ewura.config',
       'vpos.ewura.registration',
     ]),
+    resolveTanzaniaFiscalTimezone(stationId),
   ])
 
   const ewuraConfig = toObject(ewuraConfigRow?.config_json)
@@ -340,7 +343,7 @@ export async function readTanzaniaFiscalConfig(
       country: row.country ?? null,
       phone: row.phone ?? null,
       email: row.email ?? null,
-      timezone: row.timezone || 'Africa/Dar_es_Salaam',
+      timezone: effectiveTimezone,
     },
     settings: {
       fiscalizationEngine: row.fiscalization_engine || 'mock',
