@@ -87,12 +87,13 @@ test('linking window controls pre-transaction allocation lifetime and after-tran
   assert.match(transactionSql, /created_at \+ \(\$3::int \* INTERVAL '1 second'\)/)
 })
 
-test('before-transaction TIN capture is nozzle-specific, durable and single use', () => {
+test('before-transaction TIN capture is optional when no customer was allocated', () => {
   const api = read('app/api/transactions/pre-fuel-customer/route.ts')
   const command = read('src/modules/transactions/application/commands/manage-pre-fuel-customer.ts')
   const authorize = read('src/modules/transactions/application/commands/authorize-pre-fuel-customer.ts')
   const repo = read('src/modules/transactions/infrastructure/preFuelCustomerAllocation.ts')
   const queue = read('src/modules/transactions/infrastructure/persistence/transaction-queue.repository.ts')
+  const sendNow = read('src/modules/transactions/application/commands/send-transaction-to-proxy-now.ts')
 
   assert.match(api, /roles: \['tenant', 'manager', 'administrator'\]/)
   assert.match(api, /body\.action === 'authorize'/)
@@ -107,7 +108,11 @@ test('before-transaction TIN capture is nozzle-specific, durable and single use'
   assert.match(repo, /status = 'CONSUMED'/)
   assert.match(queue, /ss\.tin_capture_order = 'before_transaction'/)
   assert.match(queue, /customer_id = candidates\.customer_id/)
-  assert.match(queue, /'infinity'::timestamptz/)
+  assert.match(queue, /SET linking_window_expires_at = NOW\(\)/)
+  assert.match(queue, /status = 'PENDING'/)
+  assert.doesNotMatch(queue, /'infinity'::timestamptz/)
+  assert.doesNotMatch(sendNow, /getTinCaptureOrderRepo/)
+  assert.doesNotMatch(sendNow, /Pre-transaction customer allocation has not yet been attached/)
 })
 
 test('before-transaction TIN allocation is available to operational roles with a DOMS pump board', () => {
