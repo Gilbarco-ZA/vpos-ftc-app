@@ -1,5 +1,6 @@
 import { DeviceStatusPanel } from '@/components/admin/device/DeviceStatusPanel'
 import { DashboardSummary } from '@/components/dashboard/DashboardSummary'
+import { FiscalClock } from '@/components/dashboard/FiscalClock'
 import { DashboardHero } from '@/components/hero/dashboard-hero'
 
 export type DashboardRole = 'tenant' | 'manager' | 'administrator'
@@ -40,11 +41,15 @@ export const RoleDashboardHome = ({
   stationName,
   stationCode,
   logoPath,
+  timezone,
+  timezoneSource,
 }: {
   role: DashboardRole
   stationName: string
   stationCode?: string | null
   logoPath?: string | null
+  timezone: string
+  timezoneSource: 'site-profile' | 'device-runtime'
 }) => {
   const config = getRoleConfig(role)
 
@@ -61,6 +66,8 @@ export const RoleDashboardHome = ({
           { label: 'Data range', value: 'Today', tone: 'primary' },
         ]}
       />
+
+      <FiscalClock timezone={timezone} source={timezoneSource} />
 
       <div className="glass-panel rounded-2xl p-1 shadow-card">
         <DashboardSummary title={config.summaryTitle} initialPreset="today" />
