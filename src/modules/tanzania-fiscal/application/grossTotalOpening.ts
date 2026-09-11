@@ -4,6 +4,7 @@ import {
   txQuery,
   withTransaction,
 } from '@/src/platform/db/postgres'
+import { localDateTime } from '@/src/shared/time/localDateTime'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
 import type {
@@ -20,6 +21,7 @@ import {
   resolveTanzaniaReceiptVerificationUrlBase,
 } from '../domain/receiptVerificationPrefix'
 import { getRegisteredTanzaniaReceiptCode } from './registeredReceiptCode'
+import { resolveTanzaniaFiscalTimezone } from '../infrastructure/timezone'
 
 type GrossTotalRow = {
   opening_gross_total: string | number | null
@@ -78,36 +80,28 @@ const counter = (value: unknown): number => {
 export async function getTanzaniaGrossTotalSummary(
   stationId: string,
 ): Promise<TanzaniaGrossTotalSummary> {
+  const timezone = await resolveTanzaniaFiscalTimezone(stationId)
+  const stationNow = localDateTime(new Date(), timezone)
+  const dailyCounterKey = `receipt:${stationNow.compactDate}`
+
   const [row, registeredReceiptCode] = await Promise.all([
     queryOne<GrossTotalRow>(
-      `WITH station_context AS (
-         SELECT COALESCE(NULLIF(BTRIM(fs.timezone), ''), 'Africa/Dar_es_Salaam') AS timezone
-           FROM fuel_stations fs
-          WHERE fs.id = $1::uuid
-       ),
-       counter_context AS (
-         SELECT TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE sc.timezone, 'YYYY-MM-DD') AS daily_counter_date,
-                'receipt:' || TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE sc.timezone, 'YYYYMMDD') AS daily_counter_key
-           FROM station_context sc
-       )
-       SELECT COALESCE((SELECT ss.tanzania_gross_total_opening FROM station_settings ss WHERE ss.station_id = $1::uuid), 0) AS opening_gross_total,
+      `SELECT COALESCE((SELECT ss.tanzania_gross_total_opening FROM station_settings ss WHERE ss.station_id = $1::uuid), 0) AS opening_gross_total,
               (SELECT ss.tanzania_gross_total_opening_captured_at FROM station_settings ss WHERE ss.station_id = $1::uuid) AS opening_gross_total_captured_at,
               COALESCE(SUM(t.total_amount), 0) AS local_fiscal_turnover,
               COALESCE((SELECT tc.counter_value FROM tanzania_fiscal_counters tc WHERE tc.station_id = $1::uuid AND tc.counter_key = 'receipt:global'), 0) AS global_counter,
-              COALESCE((SELECT tc.counter_value FROM tanzania_fiscal_counters tc WHERE tc.station_id = $1::uuid AND tc.counter_key = cc.daily_counter_key), 0) AS daily_counter,
-              cc.daily_counter_date,
+              COALESCE((SELECT tc.counter_value FROM tanzania_fiscal_counters tc WHERE tc.station_id = $1::uuid AND tc.counter_key = $2), 0) AS daily_counter,
+              $3::text AS daily_counter_date,
               (SELECT NULLIF(BTRIM(ss.tanzania_device_id_override), '') FROM station_settings ss WHERE ss.station_id = $1::uuid) AS device_id_override,
               (SELECT ss.tanzania_receipt_verification_prefix_mode FROM station_settings ss WHERE ss.station_id = $1::uuid) AS receipt_verification_prefix_mode,
               (SELECT ss.tanzania_receipt_verification_prefix_override FROM station_settings ss WHERE ss.station_id = $1::uuid) AS receipt_verification_prefix_override,
               (SELECT ss.tanzania_receipt_verification_url_mode FROM station_settings ss WHERE ss.station_id = $1::uuid) AS receipt_verification_url_mode,
               (SELECT ss.tanzania_receipt_verification_url_override FROM station_settings ss WHERE ss.station_id = $1::uuid) AS receipt_verification_url_override
-         FROM counter_context cc
-         LEFT JOIN transactions t
-           ON t.station_id = $1::uuid
+         FROM transactions t
+        WHERE t.station_id = $1::uuid
           AND t.deleted_at IS NULL
-          AND t.status IN ('FISCALIZED', 'PRINTED', 'REPRINTED', 'CREDITED')
-        GROUP BY cc.daily_counter_date, cc.daily_counter_key`,
-      [stationId],
+          AND t.status IN ('FISCALIZED', 'PRINTED', 'REPRINTED', 'CREDITED')`,
+      [stationId, dailyCounterKey, stationNow.isoDate],
     ),
     getRegisteredTanzaniaReceiptCode(stationId),
   ])
@@ -243,20 +237,18 @@ export async function setTanzaniaFiscalOpeningValues(
     })
   }
 
+  const timezone = await resolveTanzaniaFiscalTimezone(stationId)
+  const dailyCounterKey = `receipt:${localDateTime(new Date(), timezone).compactDate}`
+
   await withTransaction(async (client) => {
-    const counterContext = await txQuery<{ daily_counter_key: string }>(
+    const station = await txQuery<{ exists: boolean }>(
       client,
-      `SELECT 'receipt:' || TO_CHAR(
-                CURRENT_TIMESTAMP AT TIME ZONE COALESCE(NULLIF(BTRIM(fs.timezone), ''), 'Africa/Dar_es_Salaam'),
-                'YYYYMMDD'
-              ) AS daily_counter_key
-         FROM fuel_stations fs
-        WHERE fs.id = $1::uuid
-        LIMIT 1`,
+      `SELECT EXISTS(
+         SELECT 1 FROM fuel_stations WHERE id = $1::uuid AND deleted_at IS NULL
+       ) AS exists`,
       [stationId],
     )
-    const dailyCounterKey = counterContext.rows?.[0]?.daily_counter_key
-    if (!dailyCounterKey) throw new Error(`Station ${stationId} not found`)
+    if (!station.rows?.[0]?.exists) throw new Error(`Station ${stationId} not found`)
 
     await txQuery(
       client,
