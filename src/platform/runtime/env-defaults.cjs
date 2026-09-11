@@ -63,7 +63,7 @@ const ENV_DEFAULTS = Object.freeze({
   STATION_CODE: '',
   COUNTRY_CODE: 'UN',
   DEFAULT_STATION_NAME: 'Default Station',
-  DEFAULT_STATION_TIMEZONE: 'Africa/Johannesburg',
+  DEFAULT_STATION_TIMEZONE: '',
   DEFAULT_LINKING_WINDOW_SECONDS: '300',
   DEFAULT_ADMIN_USERNAME: 'admin',
   DEFAULT_ADMIN_EMAIL: 'admin@example.com',
