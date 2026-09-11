@@ -1,3 +1,5 @@
+import { localDateTime } from '@/src/shared/time/localDateTime'
+
 export const DEFAULT_TANZANIA_DAILY_TOTALS_SEND_TIME = '00:00'
 
 const HH_MM_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
@@ -11,22 +13,6 @@ export function normalizeTanzaniaDailyTotalsSendTime(value: unknown): string {
   return candidate
 }
 
-function localClockMinutes(now: Date, timezone: string): number {
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-  const parts = Object.fromEntries(
-    formatter
-      .formatToParts(now)
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value]),
-  ) as Record<string, string>
-  return Number(parts.hour || 0) * 60 + Number(parts.minute || 0)
-}
-
 export function isTanzaniaDailyTotalsSendTimeReached(args: {
   now: Date
   timezone: string
@@ -35,5 +21,5 @@ export function isTanzaniaDailyTotalsSendTimeReached(args: {
   const sendTime = normalizeTanzaniaDailyTotalsSendTime(args.sendTime)
   const [hour, minute] = sendTime.split(':').map(Number)
   const scheduledMinutes = hour * 60 + minute
-  return localClockMinutes(args.now, args.timezone) >= scheduledMinutes
+  return localDateTime(args.now, args.timezone).timeMinutes >= scheduledMinutes
 }
