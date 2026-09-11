@@ -29,6 +29,7 @@ test('runtime timezone selection uses Site Profile or device local timezone', ()
   assert.doesNotMatch(resolver, /Africa\/[A-Za-z_]+/)
 
   assert.match(projection, /export function localDateTime/)
+  assert.match(projection, /resolveLocalTimezone\(timezone\)/)
   assert.match(projection, /displayDate/)
   assert.match(projection, /compactDate/)
   assert.match(projection, /timeMinutes/)
@@ -72,6 +73,12 @@ test('fiscal and receipt formatting delegate to the shared local time projection
   const fiscalXml = read('src/modules/tanzania-fiscal/infrastructure/xml.ts')
   const receiptDisplay = read('src/shared/receipts/receiptDateTimeDisplay.ts')
   const schedule = read('src/modules/tanzania-fiscal/domain/dailyTotalsSchedule.ts')
+  const grossTotal = read(
+    'src/modules/tanzania-fiscal/application/grossTotalOpening.ts',
+  )
+  const zReport = read(
+    'src/modules/tanzania-fiscal/infrastructure/traZReport.ts',
+  )
 
   assert.match(fiscalXml, /localDateTime\(value, timezone\)/)
   assert.doesNotMatch(fiscalXml, /Intl\.DateTimeFormat/)
@@ -81,4 +88,11 @@ test('fiscal and receipt formatting delegate to the shared local time projection
 
   assert.match(schedule, /localDateTime\(args\.now, args\.timezone\)\.timeMinutes/)
   assert.doesNotMatch(schedule, /Intl\.DateTimeFormat/)
+
+  assert.match(grossTotal, /localDateTime\(new Date\(\), timezone\)/)
+  assert.doesNotMatch(grossTotal, /Africa\/Dar_es_Salaam/)
+  assert.doesNotMatch(grossTotal, /CURRENT_TIMESTAMP AT TIME ZONE/)
+
+  assert.match(zReport, /resolveTanzaniaFiscalTimezone\(args\.stationId\)/)
+  assert.doesNotMatch(zReport, /Africa\/Dar_es_Salaam/)
 })
