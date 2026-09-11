@@ -1,4 +1,4 @@
-import { resolveLocalTimezone } from '@/src/shared/time/localTimezone'
+import { resolveLocalTimezone } from '@/src/shared/time/timezoneCore'
 
 export type LocalDateTimeParts = {
   timezone: string
@@ -68,12 +68,6 @@ function offsetlessLocalParts(value: unknown) {
   }
 }
 
-/**
- * Single local date/time projection used by VPOS.
- * Station-sensitive callers pass the effective timezone resolved on the server.
- * Offsetless local timestamps are preserved as local wall-clock values; all
- * absolute instants are projected into the effective timezone here.
- */
 export function localDateTime(
   value: unknown = new Date(),
   timezone?: string | null,
