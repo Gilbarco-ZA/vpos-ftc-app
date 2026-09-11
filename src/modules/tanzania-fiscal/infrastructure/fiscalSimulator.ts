@@ -1,3 +1,4 @@
+import { deviceLocalTimezone } from '@/src/shared/time/localTimezone'
 import { parseXmlTag, xmlEscape, xmlTag } from './xml'
 
 export type TanzaniaSimulatorTank = {
@@ -114,7 +115,7 @@ function round(value: number, precision = 2) {
 
 function defaultConfig(config: TanzaniaFiscalSimulatorConfig = {}) {
   return {
-    timezone: config.timezone || 'Africa/Dar_es_Salaam',
+    timezone: config.timezone || deviceLocalTimezone(),
     operatorTin: config.operatorTin || '100000001',
     operatorVrn: config.operatorVrn || '40000001A',
     operatorName: config.operatorName || 'FTC SIMULATOR OPERATOR',
