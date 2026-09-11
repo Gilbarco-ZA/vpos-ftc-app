@@ -1,3 +1,5 @@
+import { localDateTime } from '@/src/shared/time/localDateTime'
+
 /* ------------------------------------------------------------------ */
 /*  Safe parsing                                                      */
 /* ------------------------------------------------------------------ */
@@ -30,28 +32,28 @@ export const toDateTime = (
 /*  Formatting                                                        */
 /* ------------------------------------------------------------------ */
 
-/**
- * Format a value as `YYYY-MM-DD HH:mm` (local time).
- * Falls back to stringified input on invalid dates.
- */
-export const formatDateTime = (value: unknown): string => {
-  const date = value ? new Date(value as string) : new Date()
-  if (Number.isNaN(date.getTime())) return String(value ?? '')
-  const yyyy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  const hh = String(date.getHours()).padStart(2, '0')
-  const min = String(date.getMinutes()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
+/** Format a value as `YYYY-MM-DD HH:mm` through the shared local-time projection. */
+export const formatDateTime = (
+  value: unknown,
+  timezone?: string | null,
+): string => {
+  try {
+    const local = localDateTime(value || new Date(), timezone)
+    return `${local.isoDate} ${local.hour}:${local.minute}`
+  } catch {
+    return String(value ?? '')
+  }
 }
 
-/**
- * Client-friendly date display via `toLocaleString()`.
- * Returns em-dash on falsy / invalid input.
- */
-export const formatDate = (value?: string | null): string => {
+/** Client-friendly station-local date/time display. */
+export const formatDate = (
+  value?: string | null,
+  timezone?: string | null,
+): string => {
   if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString()
+  try {
+    return localDateTime(value, timezone).displayDateTime
+  } catch {
+    return value
+  }
 }
