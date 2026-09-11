@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
 
 test('runtime timezone selection uses Site Profile or device local timezone', () => {
   const resolver = read('src/shared/time/localTimezone.ts')
+  const projection = read('src/shared/time/localDateTime.ts')
   const bootstrap = read('src/platform/bootstrap/first-boot.ts')
   const envDefaults = read('src/platform/runtime/env-defaults.cjs')
   const businessDate = read('src/shared/server/stationBusinessDate.ts')
@@ -27,6 +28,12 @@ test('runtime timezone selection uses Site Profile or device local timezone', ()
   assert.match(resolver, /resolveStationTimezoneContext/)
   assert.doesNotMatch(resolver, /Africa\/[A-Za-z_]+/)
 
+  assert.match(projection, /export function localDateTime/)
+  assert.match(projection, /displayDate/)
+  assert.match(projection, /compactDate/)
+  assert.match(projection, /timeMinutes/)
+  assert.match(projection, /localIso/)
+
   assert.match(bootstrap, /deviceLocalTimezone\(\)/)
   assert.doesNotMatch(bootstrap, /Africa\/[A-Za-z_]+/)
 
@@ -34,7 +41,8 @@ test('runtime timezone selection uses Site Profile or device local timezone', ()
   assert.doesNotMatch(envDefaults, /DEFAULT_STATION_TIMEZONE:\s*'Africa\//)
 
   assert.match(businessDate, /resolveStationTimezone\(stationId\)/)
-  assert.doesNotMatch(businessDate, /AT TIME ZONE[^\n]*'UTC'/)
+  assert.match(businessDate, /localDateTime\(new Date\(\), timezone\)\.isoDate/)
+  assert.doesNotMatch(businessDate, /Intl\.DateTimeFormat/)
 
   assert.match(dailyTotals, /resolveStationTimezone\(stationId\)/)
   assert.doesNotMatch(dailyTotals, /Africa\/Dar_es_Salaam/)
@@ -43,7 +51,7 @@ test('runtime timezone selection uses Site Profile or device local timezone', ()
   assert.doesNotMatch(fiscalTimezone, /Africa\/Dar_es_Salaam/)
 })
 
-test('dashboard clock uses the effective server-resolved timezone', () => {
+test('dashboard clock uses the effective server-resolved timezone and shared time projection', () => {
   const dashboardPage = read('app/(dashboard)/dashboard/page.tsx')
   const dashboardHome = read('components/dashboard/RoleDashboardHome.tsx')
   const clock = read('components/dashboard/FiscalClock.tsx')
@@ -53,8 +61,24 @@ test('dashboard clock uses the effective server-resolved timezone', () => {
   assert.match(dashboardPage, /timezoneSource=\{timezoneContext\.source\}/)
 
   assert.match(dashboardHome, /<FiscalClock timezone=\{timezone\} source=\{timezoneSource\} \/>/)
-  assert.match(clock, /timeZone:\s*timezone/)
+  assert.match(clock, /localDateTime\(now, timezone\)/)
+  assert.doesNotMatch(clock, /Intl\.DateTimeFormat/)
   assert.match(clock, /Receipt & report time/)
-  assert.match(clock, /This is the local time used for receipts, reports, and fiscal business-date calculations/)
+  assert.match(clock, /receipts, reports, and fiscal[\s\S]*business-date calculations/)
   assert.match(clock, /href="\/admin\/setup"/)
+})
+
+test('fiscal and receipt formatting delegate to the shared local time projection', () => {
+  const fiscalXml = read('src/modules/tanzania-fiscal/infrastructure/xml.ts')
+  const receiptDisplay = read('src/shared/receipts/receiptDateTimeDisplay.ts')
+  const schedule = read('src/modules/tanzania-fiscal/domain/dailyTotalsSchedule.ts')
+
+  assert.match(fiscalXml, /localDateTime\(value, timezone\)/)
+  assert.doesNotMatch(fiscalXml, /Intl\.DateTimeFormat/)
+
+  assert.match(receiptDisplay, /localDateTime\(input, timezone\)/)
+  assert.doesNotMatch(receiptDisplay, /getUTC(?:Date|Month|FullYear|Hours|Minutes|Seconds)/)
+
+  assert.match(schedule, /localDateTime\(args\.now, args\.timezone\)\.timeMinutes/)
+  assert.doesNotMatch(schedule, /Intl\.DateTimeFormat/)
 })
