@@ -260,10 +260,14 @@ export async function enrichTanzaniaProxyInvoice(args: {
     ? applyTanzaniaTankProjectionToInvoice(args.invoice, tankProjection)
     : args.invoice
 
+  // A fiscal receipt describes the sale, not the moment the background worker
+  // happened to submit it. Use the persisted transaction timestamp as the
+  // canonical invoice/receipt time; station timezone formatting happens in
+  // asMetadata() via isoDateTimeInTimezone().
   const transactionDate = new Date(
     args.transaction?.transaction_date_time ?? invoice.issueDateTime,
   ).toISOString()
-  const fiscalizationDate = new Date().toISOString()
+  const fiscalizationDate = transactionDate
   const assignment = await allocateAssignment({
     stationId: args.stationId,
     transactionId,
