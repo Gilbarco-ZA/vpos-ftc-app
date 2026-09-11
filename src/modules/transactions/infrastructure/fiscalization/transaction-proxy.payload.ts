@@ -52,13 +52,13 @@ function toLegacyInvoicePayload(invoice: ProxyInvoiceRequest) {
 }
 
 function toTanzaniaInvoicePayload(invoice: ProxyInvoiceRequest) {
-  const tanzaniaInvoiceDate = withoutTimezoneSuffix(
+  const localInvoiceDate = withoutTimezoneSuffix(
     invoice.tanzania?.invoiceDate ?? invoice.issueDateTime,
   )
   const tanzania = invoice.tanzania
     ? {
         ...invoice.tanzania,
-        invoiceDate: tanzaniaInvoiceDate,
+        invoiceDate: localInvoiceDate,
       }
     : undefined
 
@@ -66,10 +66,11 @@ function toTanzaniaInvoicePayload(invoice: ProxyInvoiceRequest) {
     documentId: invoice.documentId ?? null,
     documentNumber: invoice.documentNumber ?? null,
     documentType: invoice.documentType ?? null,
-    // Tanzania fiscal timestamps are local EAT wall-clock values. Do not send
-    // Z/+HH:mm suffixes to vpos-proxy, and keep the generic and Tanzania
-    // timestamp fields identical so the proxy cannot pick a different clock.
-    issueDateTime: tanzaniaInvoiceDate,
+    // Tanzania fiscal timestamps are already formatted in the effective local
+    // timezone (Site Profile override, otherwise device/runtime local time).
+    // Keep them offset-free for vpos-proxy and keep both timestamp fields
+    // identical so no downstream component can select a different clock.
+    issueDateTime: localInvoiceDate,
     currency: invoice.currency ?? null,
     createdByName: invoice.createdByName ?? 'VPOS-LITE',
     isOnline: invoice.isOnline ?? true,
