@@ -10,7 +10,7 @@ import {
   toCountrySpecificInvoicePayload,
 } from '@/src/modules/transactions/infrastructure/fiscalization/transaction-proxy.payload'
 
-test('Tanzania proxy payload retains exact sequencing and tax inputs for vpos-proxy', () => {
+test('Tanzania proxy payload retains sequencing and strips timezone suffixes', () => {
   const invoice: ProxyInvoiceRequest = {
     deviceId: 'd4ae0668-5e73-4d66-a4a3-c69fb5f03862',
     documentId: 'transaction-1',
@@ -63,7 +63,14 @@ test('Tanzania proxy payload retains exact sequencing and tax inputs for vpos-pr
   const payload = toCountrySpecificInvoicePayload(invoice) as any
   assert.equal('deviceId' in payload, false)
   assert.equal(payload.countryCode, 'TZ')
-  assert.deepEqual(payload.tanzania, invoice.tanzania)
+  assert.equal(payload.issueDateTime, '2026-08-11T13:04:16.649')
+  assert.equal(payload.tanzania.invoiceDate, '2026-08-11T13:04:16.649')
+  assert.doesNotMatch(payload.issueDateTime, /(?:Z|[+-]\d{2}:?\d{2})$/)
+  assert.doesNotMatch(payload.tanzania.invoiceDate, /(?:Z|[+-]\d{2}:?\d{2})$/)
+  assert.deepEqual(payload.tanzania, {
+    ...invoice.tanzania,
+    invoiceDate: '2026-08-11T13:04:16.649',
+  })
   assert.equal(payload.lines[0].product.priceExtension, 8325)
   assert.equal(payload.lines[0].product.netTotal, 7055.08)
   assert.deepEqual(payload.lines[0].product.fuel, {
@@ -114,6 +121,7 @@ test('non-Tanzania proxy payload retains the existing invoice contract', () => {
 
   const payload = toCountrySpecificInvoicePayload(invoice) as any
   assert.equal(payload.DocumentId, 'transaction-ke-1')
+  assert.equal(payload.issueDateTime, '2026-08-04T10:30:00.000+03:00')
   assert.ok(Array.isArray(payload.Lines))
   assert.equal(payload.Lines[0].product.description, 'Product')
   assert.deepEqual(payload.Lines[0].taxes, [{ type: 'A', rate: 16 }])
