@@ -8,6 +8,8 @@ This guide is designed to be used during site handover. It focuses on the tasks 
 
 For detailed operational reference, use the [Management Guide](MANAGEMENT_GUIDE.md).
 
+> **Screenshot convention:** placeholders in this guide identify the production screenshots still required before publication. Approved images should be stored under `docs/images/managers/` and captured/redacted according to [Documentation Screenshot Assets](../images/README.md).
+
 ## 1. What a manager is responsible for
 
 Managers are responsible for safe daily station operation inside the permissions exposed to the `manager` role. Typical access includes:
@@ -63,6 +65,9 @@ At the start of the shift:
 6. Review **Product Stock** where used by the station procedure.
 7. For Tanzania stations, review the required daily-total/fiscal status according to the station procedure.
 
+> **Screenshot placeholder — `manager-dashboard-start-shift.png`**  
+> Capture the manager Dashboard with the left navigation visible and enough station status context to orient a new manager. Use synthetic/redacted station data.
+
 If many pumps, transactions, or services appear degraded at the same time, do not start changing individual pump/tank mappings. Escalate as a station-wide issue.
 
 ## 4. Finding a transaction
@@ -75,6 +80,9 @@ Use **Transactions** to search using the information available, such as:
 - transaction status
 - fiscalization status
 - customer/search text where supported
+
+> **Screenshot placeholder — `manager-transactions-search.png`**  
+> Capture the Transactions search/filter view with transaction ID, pump, date/time, and status filters visible. Do not expose real customer data.
 
 When investigating a complaint or exception, record the existing transaction ID first.
 
@@ -93,6 +101,9 @@ Manager checks:
 5. record the transaction ID
 6. escalate if the transaction does not progress according to the station procedure
 
+> **Screenshot placeholder — `manager-non-fiscalized.png`**  
+> Capture the Non-fiscalized transaction list/detail with the transaction reference, pump, amount, timestamp, fiscal status, and any user-visible error/reference in frame. Use synthetic/redacted values.
+
 Do not repeatedly resubmit the transaction unless the approved recovery procedure explicitly instructs you to do so.
 
 ## 6. Fiscalized transactions and receipt lookup
@@ -102,6 +113,9 @@ Use:
 - **Fiscalized** to review completed fiscal transactions
 - **Receipt Viewer** to review receipt-oriented transaction information
 - **Receipt Lookup** when a known transaction/receipt reference is available
+
+> **Screenshot placeholder — `manager-receipt-lookup.png`**  
+> Capture Receipt Lookup or Receipt Viewer with the lookup field, transaction/receipt reference, and print/reprint action visible. Ensure customer/tax data is synthetic or redacted.
 
 Before reprinting, verify you have the correct transaction.
 
@@ -126,6 +140,9 @@ Check:
 - whether that pump alone is unavailable
 - whether the pump identifier matches the physical pump
 
+> **Screenshot placeholder — `manager-pumps.png`**  
+> Capture the Pumps view showing several pump states so the difference between a single-pump fault and a wider forecourt problem is visually clear. Use a safe demonstration state; do not induce a production fault for the screenshot.
+
 Escalate if the problem persists. Do not remap the pump by trial and error.
 
 ### Many/all pumps affected
@@ -137,6 +154,9 @@ Do not edit all pump settings or restart equipment without the approved support 
 ## 9. Tanks and tank levels
 
 Use **Tanks** and **Tank Levels** to review the physical tank estate and wet-stock information.
+
+> **Screenshot placeholder — `manager-tank-levels.png`**  
+> Capture Tank Levels with tank identifier, product/grade, level/volume, and freshness/timestamp context visible. Use synthetic/redacted site identifiers.
 
 If a level looks wrong:
 
@@ -172,6 +192,9 @@ Before a price change:
 - confirm the effective time
 - confirm the station's authorization/change procedure has been followed
 - coordinate any signage/price-pole requirement
+
+> **Screenshot placeholder — `manager-forecourt-pricing.png`**  
+> Capture Forecourt Pricing with product/grade, current price, proposed/new price control, and save/apply boundary visible. Use obviously synthetic values or a non-production station; never change live pricing just to create documentation.
 
 Afterward, verify the effective forecourt price according to the station procedure.
 
@@ -334,7 +357,23 @@ Use this checklist in the site handover/change record.
 **Date/time:** _________________________________  
 **Training result:** Pass ☐ / Follow-up required ☐
 
-## 20. Related documentation
+## 20. Screenshot capture checklist
+
+Before manager training documentation is considered publication-ready, replace these placeholders with approved images:
+
+| Screenshot | Purpose | Status |
+| --- | --- | --- |
+| `manager-dashboard-start-shift.png` | orientation/start-of-shift | ☐ |
+| `manager-transactions-search.png` | transaction lookup | ☐ |
+| `manager-non-fiscalized.png` | fiscal exception review | ☐ |
+| `manager-receipt-lookup.png` | receipt lookup/reprint | ☐ |
+| `manager-pumps.png` | pump-state triage | ☐ |
+| `manager-tank-levels.png` | wet-stock review | ☐ |
+| `manager-forecourt-pricing.png` | controlled pricing workflow | ☐ |
+
+Follow [Documentation Screenshot Assets](../images/README.md) for redaction and capture rules.
+
+## 21. Related documentation
 
 - [VPOS FTC Management Guide](MANAGEMENT_GUIDE.md)
 - [Technician Setup Guide](TECHNICIAN_SETUP_GUIDE.md)
