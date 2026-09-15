@@ -17,7 +17,7 @@ for (const [label, value] of [
   if (!readme.includes(value)) failures.push(`README does not mention current ${label} value: ${value}`)
 }
 
-for (const command of ['npm run format:check', 'npm run lint', 'npm run typecheck', 'npm test']) {
+for (const command of ['npx prettier --check .', 'npm run typecheck', 'npm test', 'npm run check']) {
   if (!readme.includes(command)) failures.push(`README does not document validation command: ${command}`)
 }
 
@@ -25,7 +25,7 @@ const authoritativeDocs = [
   'AGENTS.md',
   'CONTRIBUTING.md',
   'docs/README.md',
-  'docs/architecture.md',
+  'docs/ARCHITECTURE.md',
   'docs/configuration.md',
   'docs/development.md',
   'docs/startup-flow.md',
