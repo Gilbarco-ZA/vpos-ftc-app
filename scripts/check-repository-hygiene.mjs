@@ -18,6 +18,7 @@ const ROUTE_SEGMENT_CONFIG_EXPORTS = [
 ]
 const IGNORED_DIRS = new Set(['.git', '.next', 'build', 'coverage', 'node_modules', 'out'])
 const forbiddenPaths = [
+  '.env',
   'public/certs',
   'tsconfig.tsbuildinfo',
   'vpos-server.cjs',
