@@ -1,48 +1,94 @@
-# VPOS FTC Management Guide
+# VPOS FTC Manager Operations & Training Manual
 
-**Audience:** Station managers, supervisors, administrators, and operational support staff  
-**Purpose:** Operate and manage an installed VPOS FTC station safely and consistently.  
-**Documentation baseline:** reviewed against `vpos-ftc-app` `main` commit `bbd11ab2ee9d364fd96771c7f4119d0199a03923` on 2026-09-08
+**Audience:** Station managers and supervisors  
+**Purpose:** Single-file operational reference, practical training guide, and competency sign-off for day-to-day VPOS FTC use.
 
-This guide describes the current role-based VPOS interface. Some menu items are country-dependent or configuration-dependent. Tanzania fiscal functions, for example, are shown only for Tanzania stations.
+This is the primary manager-facing manual for production stations. It combines the operational reference and training content so the site does not need to switch between separate management and training documents.
 
-## 1. Roles and access
+Managers work entirely through the VPOS application. They do not require access to the DOMS operating system, terminal, package files, `.env` files, or technical runtime internals.
 
-VPOS currently uses three application roles:
+## 1. Manager role and responsibility
 
-| Role            | Primary responsibility                          | Typical access                                                                                                                                                                                                            |
-| --------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tenant`        | Daily POS operation                             | Dashboard, POS, transactions, receipts, customers, and TIN Allocation when configured                                                                                                                                     |
-| `manager`       | Station operations and controlled configuration | Tenant functions plus reports, stock, transaction review, pumps, tanks, tank levels, forecourt setup, tank/pump configuration, and pricing                                                                                |
-| `administrator` | Technical and security administration           | Manager functions plus fiscal inbox, diagnostics, device status, print jobs, users, runtime control, maintenance, proxy/fiscal settings, setup wizard, products, station configuration, languages, datasets, and branding |
+Managers are responsible for safe daily station operation inside the permissions exposed to the `manager` role.
 
-Use the least-privileged role required for the task. Do not share administrator accounts for routine cashier or manager work.
+Typical manager access includes:
 
-## 2. Main navigation
+- Dashboard
+- POS-related transaction review
+- Transactions
+- Receipts
+- Reports
+- Product Stock
+- Pumps
+- Tanks
+- Tank Levels
+- Forecourt Setup
+- Pump Settings
+- Tank Settings
+- Tank Grades
+- Forecourt Pricing
 
-The current application groups work into the following sections.
+Managers are not expected to perform administrator-only technical functions such as:
+
+- package installation or rollback
+- runtime service management
+- proxy/fiscal endpoint administration
+- user administration outside approved processes
+- diagnostics/maintenance controls reserved for administrators
+- TLS/certificate administration
+- DOMS package-management operations
+- operating-system, shell, terminal, or SSH actions
+
+If an issue requires administrator action, escalate instead of sharing or borrowing administrator credentials.
+
+## 2. Production operating model
+
+VPOS FTC runs as a secure packaged application on the DOMS controller. Daily operational settings are maintained through the application where the manager has permission.
+
+Managers should understand these boundaries:
+
+- no terminal or SSH access is required for normal operation
+- no `.env` file is used to make station adjustments
+- settings such as forecourt mappings, tank configuration, pricing, and other manager-accessible parameters are maintained through VPOS screens
+- package/runtime faults that cannot be resolved through the approved application workflow are escalated to technical support
+
+## 3. Training outcome
+
+A manager is ready for production handover when they can demonstrate all of the following without prompting:
+
+1. sign in and navigate the manager menu
+2. perform start-of-shift checks
+3. find a transaction by time, pump, or reference
+4. identify whether a transaction is non-fiscalized or fiscalized
+5. find and reprint a receipt without creating unnecessary duplicate requests
+6. identify whether a pump issue affects one pump or the whole forecourt
+7. review tank levels and recognize stale/unexpected information
+8. review product stock
+9. explain the authorization boundary for pricing and mapping changes
+10. perform end-of-shift exception handover
+11. capture the evidence technical support needs when escalating an issue
+
+## 4. Main navigation
 
 ### Daily Operations
 
-- **POS** — station sales/transaction operations.
-- **TIN Allocation** — shown when TIN capture is configured before the transaction.
+- **POS** — station sales and transaction operations.
+- **TIN Allocation** — appears where TIN capture is configured before the transaction.
 - **Transactions** — search and review transaction records.
 - **Receipts** — access receipt records and output workflows.
-- **Reports** — operational reporting; available to managers and administrators.
-- **Daily Totals** — Tanzania-specific daily totals when the station country is Tanzania.
-- **Customers** — maintain/use customer records.
+- **Reports** — management reporting.
+- **Daily Totals** — Tanzania-specific daily totals where applicable.
+- **Customers** — customer records.
 - **Product Stock** — stock view and stock operations for management roles.
 
 ### Transaction Review
 
-Managers and administrators have dedicated views for:
+Managers have dedicated views for:
 
-- non-fiscalized transactions
-- fiscalized transactions
-- receipt viewing
-- receipt lookup
-
-Administrators also have **Fiscal Inbox** for fiscal processing visibility.
+- Non-fiscalized
+- Fiscalized
+- Receipt Viewer
+- Receipt Lookup
 
 ### Forecourt
 
@@ -51,13 +97,6 @@ Managers can access:
 - Pumps
 - Tanks
 - Tank Levels
-
-Administrators additionally have:
-
-- Forecourt Monitor
-- Device Status
-- Print Jobs
-- Diagnostics
 
 ### Setup & Configuration
 
@@ -69,365 +108,377 @@ Managers can access operational forecourt configuration including:
 - Forecourt Setup
 - Forecourt Pricing
 
-Administrators can also access:
+These screens can affect live station behavior. Use them only with approved source information and the applicable change process.
 
-- Setup Wizard
-- Products
-- Product Categories
-- Pump Mode
-- Station Settings
-- Station Config
-- Printers
-- Country Datasets
-- Languages
-- Branding
+## 5. Start-of-shift routine
 
-### Fiscal Services and Administration
-
-Administrators have:
-
-- Tanzania Fiscal, on Tanzania stations
-- Proxy Settings
-- Users
-- Runtime Control
-- Maintenance
-
-## 3. Start-of-shift management checks
-
-Before normal trading, a manager should confirm that the station is operationally consistent.
-
-Recommended sequence:
+At the start of the shift:
 
 1. Sign in and open **Dashboard**.
-2. Check **Pumps** for expected forecourt availability and stale/offline state.
-3. Check **Tank Levels** where wet-stock integration is in use.
-4. Check **Transactions → Non-fiscalized** for unresolved transactions carried over from the prior shift.
-5. Confirm receipt printing is available by reviewing recent receipts or, for administrators, **Print Jobs**.
-6. For Tanzania stations, review the Tanzania fiscal status and prior daily totals as required by the site's operating procedure.
-7. If an administrator is present, inspect **Diagnostics** when the dashboard or forecourt shows degraded state rather than restarting services immediately.
+2. Open **Pumps** and confirm the expected forecourt is visible and not broadly stale or offline.
+3. Open **Tank Levels** if wet-stock integration is used and confirm values look current and plausible.
+4. Open **Transactions → Non-fiscalized** and review unresolved items carried from the previous shift.
+5. Confirm a recent receipt exists and that printing is generally available.
+6. Review **Product Stock** where used by the station procedure.
+7. For Tanzania stations, review the required daily-total/fiscal status according to the station procedure.
 
-Where the station exposes operational health endpoints to the local management/support network, `/api/readyz` and `/api/healthz` provide deeper readiness/health information. These endpoints are primarily operational-support tools rather than routine cashier screens.
+If many pumps, transactions, or services appear degraded at the same time, do not start changing individual pump/tank mappings. Escalate as a station-wide issue.
 
-## 4. POS and transaction operations
+> **Screenshot placeholder — start-of-shift Dashboard**  
+> **File:** `docs/images/managers/manager-dashboard-start-shift.png`  
+> Capture: Dashboard with enough station context to show where a manager begins daily checks. Use training or redacted data.
 
-Use **POS** for normal station sales workflows. The transaction record becomes the primary management reference for later review, printing, fiscalization, and reporting.
+## 6. Finding a transaction
 
-For any disputed or failed transaction, capture the transaction ID before attempting corrective action.
+Use **Transactions** to search using the available information, such as:
 
-Avoid creating a second manual transaction merely because the first transaction is slow to appear. First determine whether the original is pending, non-fiscalized, fiscalized, or otherwise already recorded.
-
-## 5. Searching transactions
-
-Open **Transactions** to find a transaction by the available filters and search controls. The underlying transaction service supports filtering by items including:
-
-- transaction status
-- fiscalization scope
-- transaction ID
+- transaction ID/reference
 - pump number
-- free-text search
 - date/time range
+- transaction status
+- fiscalization status
+- customer/search text where supported
 
-The dedicated review links make the most common management filters easier to access:
+When investigating a complaint or exception, record the existing transaction ID first.
 
-- **Non-fiscalized** — transactions that still require investigation or fiscal processing.
-- **Fiscalized** — completed fiscal records.
-- **Receipt Viewer** — receipt-oriented view of fiscalized transactions.
-- **Receipt Lookup** — manager lookup workflow for a known receipt/transaction reference.
+Do not create a new manual transaction merely because the original transaction is slow to appear.
 
-When investigating an exception, work from the existing transaction record rather than re-keying the sale unless the approved recovery procedure explicitly requires it.
+> **Screenshot placeholder — transaction search**  
+> **File:** `docs/images/managers/manager-transactions-search.png`  
+> Capture: Transactions page showing search/filter controls and one synthetic/redacted example result.
 
-## 6. Non-fiscalized transactions
+## 7. Non-fiscalized transactions
 
-A non-fiscalized transaction is not automatically evidence that the forecourt sale failed. It indicates that the fiscal lifecycle has not reached the expected completed state.
+A non-fiscalized transaction means the fiscal lifecycle is incomplete. It does not automatically mean the fuel sale failed.
 
-Before taking corrective action:
+Manager checks:
 
 1. open the transaction
-2. verify station, pump, amount, product, and timestamp
-3. determine whether the fiscal/proxy service is healthy
-4. check whether the transaction is still pending or queued
-5. review any visible error/reference information
-6. use administrator diagnostics when required
+2. confirm pump, product, amount, and timestamp
+3. note any visible error or reference
+4. determine whether the issue affects one transaction or many
+5. record the transaction ID
+6. escalate if the transaction does not progress according to the station procedure
 
-Do not repeatedly resubmit or duplicate a fiscal request without understanding the prior state. Escalate persistent failures with the transaction ID and any request/error reference shown by the system.
+Do not repeatedly resubmit the transaction unless the approved recovery procedure explicitly requires it.
 
-For Tanzania stations, a delayed transaction can retain its original transaction-date invoice/daily-counter scope even when its first receipt/fiscal assignment happens on a later date. That is expected. Do not treat a difference between the invoice-number date and Z-number/invoice date as corruption by itself.
+> **Screenshot placeholder — non-fiscalized queue**  
+> **File:** `docs/images/managers/manager-non-fiscalized.png`  
+> Capture: Non-fiscalized view with transaction status, ID/reference, and time visible using synthetic/redacted data.
 
-## 7. Fiscalized transactions and receipt lookup
+## 8. Fiscalized transactions and receipt lookup
 
-Use **Fiscalized** and **Receipt Viewer** to confirm that completed transactions have the expected fiscal and receipt information.
+Use:
 
-Use **Receipt Lookup** when a customer or auditor supplies a known transaction/receipt reference.
+- **Fiscalized** to review completed fiscal transactions
+- **Receipt Viewer** to review receipt-oriented transaction information
+- **Receipt Lookup** when a known transaction/receipt reference is available
 
-Managers and administrators can request a receipt print from the transaction workflow. If printing fails, verify the print job rather than repeatedly issuing print requests.
+Before reprinting, verify you have the correct transaction.
 
-## 8. Receipts and printing
+> **Screenshot placeholder — receipt lookup**  
+> **File:** `docs/images/managers/manager-receipt-lookup.png`  
+> Capture: Receipt Lookup or Receipt Viewer showing the search/reference area and a synthetic/redacted result.
 
-Use **Receipts** for normal receipt access. Administrators can use **Print Jobs** for printer troubleshooting and queue visibility.
-
-For stations configured to print before fiscalization, opening a receipt preview can reserve/persist receipt identity. In Tanzania this may allocate the receipt verification identity, global counter, transaction-date daily counter, fiscal-date Z number, and invoice date before fiscalization completes. Reopening or retrying the same transaction is expected to reuse that persisted identity rather than generate a new one.
+## 9. Receipt printing
 
 If a receipt does not print:
 
-1. confirm that the transaction exists and has the expected receipt data
-2. check whether a print job was created
-3. check printer connectivity and paper/device status
-4. retry only after establishing whether the first job failed or remains queued
+1. confirm the correct transaction/receipt exists
+2. retry only once after confirming the first request did not complete
+3. check basic printer condition: power, paper, obvious offline/fault state
+4. if printing still fails, capture the transaction ID and time and escalate
 
-If a receipt preview itself returns an internal error, record the transaction ID and `requestId` before retrying. Do not delete or recreate the customer or transaction as the first troubleshooting step.
+Administrators can inspect **Print Jobs**. Managers should not change printer IP/port configuration as the first response to a single failed print.
 
-Printer configuration is an administrator function under **Printers** and should not be changed as a first response to a single failed print.
+## 10. Reports
 
-## 9. Reports
+Use **Reports** with the correct station date/time period.
 
-Managers and administrators can use **Reports** for station reporting.
-
-Use the station's agreed reporting period and timezone. If report totals and transaction searches differ, first verify:
+If report totals differ from a transaction search, first check:
 
 - date/time filters
-- timezone
-- fiscalization status filter
-- whether the report covers all transactions or only a subset/state
+- station timezone
+- transaction/fiscalization status filters
+- whether the report covers the same transaction population
 
-Do not alter station timezone to force a report to match an expected period. A timezone change affects wider station behavior and requires controlled configuration management.
+Do not change station timezone to force a report to match.
 
-## 10. Tanzania Daily Totals
+## 11. Tanzania Daily Totals
 
-For Tanzania stations, **Daily Totals** is available in Daily Operations and Tanzania fiscal administration is available to administrators.
+For Tanzania stations, **Daily Totals** is available in Daily Operations.
 
-Use these functions according to the station's fiscal operating procedure. Treat any discrepancy between local transaction totals, fiscal totals, and TRA-facing records as an exception requiring investigation.
+Follow the approved fiscal operating procedure for daily totals and exceptions.
 
-The Tanzania receipt daily counter is scoped to the originating transaction business date, while the Z number and invoice date are scoped to the first fiscalization/pre-fiscalization assignment date. Delayed transactions can therefore legitimately show the same daily-counter value under a later Z number when their originating dates differ.
+Delayed transactions can legitimately show:
 
-Do not manually change receipt-verification, daily/global counter, or fiscal device settings to correct a single transaction discrepancy. Current deployments include migration `1320_tanzania_assignment_counter_scope.sql`, which removes the obsolete database uniqueness rule that incorrectly rejected this valid cross-date case.
+- invoice number/daily-counter date from the original transaction date
+- a later Z-number/invoice date from fiscal assignment
 
-## 11. Customer management
+Do not manually change counters, Z numbers, invoice numbers, or fiscal device values to resolve an individual transaction discrepancy.
+
+## 12. Customer management
 
 Use **Customers** to locate and maintain customer records used by station operations.
 
-Before creating a duplicate customer, search by the known customer identifiers. Where tax/TIN information is captured, verify the value against the source supplied by the customer or the applicable station process.
+Before creating a duplicate customer, search by the known customer identifiers.
+
+Where tax/TIN information is captured, verify it against the source supplied by the customer or the applicable station process.
 
 Do not repurpose one customer's record for another customer merely to complete a transaction.
 
-If a receipt problem appears only when a customer is assigned, preserve the customer association and capture the receipt/API error details first. Customer data may change the receipt content, but it does not define Tanzania counter allocation or sequencing.
+## 13. Product stock
 
-## 12. Product stock
+Use **Product Stock** according to the station's stock-control procedure.
 
-Managers and administrators can access **Product Stock**.
+When values differ from expectation, consider:
 
-Use it to monitor the station's product inventory according to the site's stock-control procedure. Stock information should be reconciled with physical stock/wet-stock sources as applicable.
-
-If stock appears incorrect, identify whether the difference originates from:
-
-- transaction activity
-- delivery activity
-- tank/wet-stock data
+- recent transactions
+- deliveries
+- tank/wet-stock state
 - product/tank mapping
-- a manual stock operation
+- previous manual stock operations
 
-Do not compensate for a mapping problem by entering an arbitrary stock adjustment.
+Escalate unexplained differences rather than forcing the balance to an expected number.
 
-## 13. Pump operations
+## 14. Pump operations
 
 Open **Pumps** to review current pump state.
 
 A manager should distinguish between:
 
-- an individual dispenser/nozzle issue
+- one dispenser/nozzle problem
 - a VPOS mapping issue
-- a DOMS/JPL communication issue
-- a station-wide connectivity issue
+- a DOMS/JPL communication problem affecting many devices
+- a station-wide connectivity problem
 
-If several pumps become stale or unavailable at once, investigate forecourt connectivity before editing individual pump configuration.
+### One pump/nozzle affected
 
-Administrators can use **Forecourt Monitor**, **Device Status**, and **Diagnostics** for deeper investigation.
+Check:
 
-## 14. Tank operations and tank levels
+- physical dispenser/nozzle condition
+- whether only that pump is unavailable
+- whether the pump identifier matches the physical pump
 
-Use **Tanks** and **Tank Levels** to review the configured tank estate and current wet-stock information where available.
+Escalate if the problem persists. Do not remap the pump by trial and error.
 
-Tank configuration must reflect the physical site and DOMS/PSS topology. If a tank is renamed, replaced, remapped, or assigned a different grade, follow the site's configuration/change process rather than making an unrecorded UI change during live trading.
+### Many/all pumps affected
 
-## 15. Forecourt setup and nozzle-to-tank mapping
+Treat this as a station-wide forecourt communication issue. Capture the time the problem began and escalate.
 
-Managers and administrators can access **Forecourt Setup**, **Pump Settings**, **Tank Settings**, and **Tank Grades**.
+Do not edit all pump settings or restart technical services without the approved support procedure.
 
-These screens affect how VPOS interprets the physical forecourt. Changes must be based on confirmed site/PSS information.
+> **Screenshot placeholder — Pumps**  
+> **File:** `docs/images/managers/manager-pumps.png`  
+> Capture: Pumps page showing healthy versus unavailable/stale status examples where safe to demonstrate.
 
-Before saving a mapping change:
+## 15. Tanks and tank levels
 
-1. identify the physical pump/nozzle/tank involved
-2. verify the DOMS/PSS identifiers
-3. confirm the correct product/grade relationship
-4. assess whether live transactions are in progress
-5. record the reason for the change under the site's change-control process
+Use **Tanks** and **Tank Levels** to review the physical tank estate and wet-stock information.
 
-Do not use trial-and-error mapping on a live production forecourt.
+If a level looks wrong:
 
-## 16. Forecourt pricing
+- compare against the site's known physical/wet-stock information
+- check whether one tank or all tanks are affected
+- note when the value was last known to be correct
+- escalate before applying any stock correction
 
-Use **Forecourt Pricing** only under the station's approved price-change process.
+Do not use an arbitrary stock adjustment to hide a mapping or ATG problem.
 
-Before applying a price change:
+> **Screenshot placeholder — Tank Levels**  
+> **File:** `docs/images/managers/manager-tank-levels.png`  
+> Capture: Tank Levels with representative tank identifiers, timestamps/state, and synthetic/redacted values.
 
-- verify the effective product/grade
-- verify the approved new price
-- verify timing/effective date requirements
-- confirm the forecourt is in a suitable state for the change
-- ensure any required signage/price-pole process is coordinated
+## 16. Forecourt setup and configuration
 
-After a change, confirm the displayed/effective price on the forecourt and verify the next controlled transaction if required by the operating procedure.
+Manager-accessible configuration screens can affect how VPOS interprets the physical forecourt.
 
-Do not make a price change merely to test DOMS/JPL write connectivity.
+Before changing:
 
-## 17. User administration
+- Pump Settings
+- Tank Settings
+- Tank Grades
+- Forecourt Setup
 
-Administrators manage users under **Administration → Users**.
+confirm:
 
-Use role assignment deliberately:
+1. the physical pump/nozzle/tank involved
+2. the approved DOMS/PSS identifier
+3. the correct product/grade relationship
+4. whether live transactions are in progress
+5. the reason and authorization for the change
 
-- assign `tenant` for routine POS users
-- assign `manager` only where the user is responsible for station management functions
-- assign `administrator` only to trusted personnel who require technical/configuration control
+Do not use trial-and-error configuration during live trading.
 
-When a user leaves the station or should no longer have access, disable/deactivate the user promptly according to organizational policy.
+## 17. Forecourt pricing
 
-Do not share named credentials. Password and session issues should be handled through the supported user administration flow rather than by creating shared fallback accounts.
+Managers may have access to **Forecourt Pricing**, but pricing is a controlled operational change.
 
-## 18. Runtime Control and Maintenance
+Before a price change:
 
-**Runtime Control** and **Maintenance** are administrator functions. They can affect active station services and forecourt behavior.
+- confirm the approved new price
+- confirm the correct product/grade
+- confirm the effective time
+- confirm the station's authorization/change procedure has been followed
+- coordinate any signage/price-pole requirement
 
-Use them only when:
+Afterward, verify the effective forecourt price according to the station procedure.
 
-- the action is understood
-- the reason has been established
-- active station operations have been considered
-- the site's support/change procedure permits the action
+Do not make a price change as a test of connectivity.
 
-Restarting a process should not be the default response to an unexplained transaction or forecourt problem. Capture diagnostics first whenever practical.
+> **Screenshot placeholder — Forecourt Pricing**  
+> **File:** `docs/images/managers/manager-forecourt-pricing.png`  
+> Capture: pricing screen with grade/product labels and synthetic/redacted prices. Do not expose a live confidential price-change instruction.
 
-Production maintenance or dispense-control actions require the applicable site and organizational approval.
+## 18. End-of-shift handover
 
-## 19. Diagnostics and Device Status
+Before handover:
 
-Administrators should use **Diagnostics** and **Device Status** to gather evidence before escalating an issue.
+- review unresolved non-fiscalized transactions
+- note disputed/customer transactions still requiring action
+- complete required reports/daily totals
+- review significant stock/tank exceptions
+- record pump/tank faults
+- record failed receipt/printing issues
+- record any authorized price/configuration changes
+- hand over transaction IDs and support references for open incidents
 
-Useful evidence normally includes:
+An unresolved issue must be handed over with enough detail for the next manager/support person to continue without starting from zero.
 
-- affected station and time window
-- transaction ID(s)
-- pump/nozzle/tank identifiers
-- whether the issue is isolated or station-wide
-- current DOMS/JPL connectivity state
-- printer/print-job state when relevant
-- fiscal/proxy state when relevant
-- exact error text and request/reference IDs
+## 19. What to capture before escalating
 
-For API errors that include a `requestId`, preserve that value. Support can use it to correlate the visible failure with station-side logs, including database details that are intentionally not exposed to the browser.
-
-Avoid screenshots that omit timestamps, transaction IDs, or the affected device when those details are available.
-
-## 20. Proxy and fiscal services
-
-**Proxy Settings** is an administrator function. `vpos-ftc-app` is the station application; cloud fiscal delivery/routing is handled by `vpos-proxy`.
-
-When fiscalization is degraded, determine whether the failure is:
-
-- local transaction/receipt generation
-- station-to-proxy connectivity/configuration
-- proxy/cloud processing
-- country fiscal service/device processing
-
-For Tanzania receipt-preview failures, distinguish a local assignment/database failure from a proxy/cloud failure. Receipt preview may allocate the persisted Tanzania receipt identity locally before proxy fiscal delivery begins.
-
-Do not alter proxy URLs, credentials, fiscal device values, Tanzania verification settings, or counter values as a generic troubleshooting step.
-
-## 21. Station Settings, Station Config, datasets, languages, and branding
-
-These administrator pages control durable station configuration rather than daily transaction processing.
-
-Use them under change control. In particular:
-
-- **Station Settings / Station Config** — affects station behavior and integration settings.
-- **Country Datasets** — country-specific configuration/data; do not substitute another country's dataset to bypass validation.
-- **Languages** — user-facing language resources.
-- **Branding** — station display name/logo presentation.
-
-Configuration changes should be tested and recorded, and changes affecting forecourt/fiscal behavior should be scheduled appropriately.
-
-## 22. Setup Wizard after commissioning
-
-The **Setup Wizard** is primarily a commissioning/reconfiguration tool. It includes site profile, products, forecourt connection, PSS verification, pump mapping, printer checks, and finalization.
-
-Do not rerun or alter setup steps on a stable production station without a defined reason. If site hardware or topology changes, use the wizard as part of the approved recommissioning process.
-
-## 23. End-of-day / shift-handover checks
-
-A manager should hand over unresolved operational exceptions rather than allowing them to disappear between shifts.
-
-Recommended checks:
-
-- review non-fiscalized transactions
-- verify any pending disputed/customer transactions
-- confirm required reports/daily totals
-- review stock/wet-stock exceptions
-- confirm significant pump/tank faults are logged
-- confirm failed print jobs requiring action are known
-- for Tanzania stations, complete the required fiscal daily procedure
-- identify delayed Tanzania transactions that remain non-fiscalized and preserve their transaction IDs for follow-up
-- record any configuration or price changes made during the shift
-- provide transaction IDs and diagnostic/request references for open support cases
-
-## 24. Troubleshooting decision guide
-
-| Symptom                                                                     | First management action                                                     | Administrator/support action                                                                                                           |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| One transaction missing/incorrect                                           | Search by transaction ID/pump/time and check status                         | Inspect diagnostics/fiscal state before recovery action                                                                                |
-| Many transactions not fiscalizing                                           | Check Non-fiscalized view and establish start time                          | Check proxy/fiscal status and logs/diagnostics                                                                                         |
-| Tanzania receipt preview returns internal error                             | Record transaction ID and `requestId`; do not recreate customer/transaction | Correlate request ID with server logs; verify current package/migrations, especially migration 1320 for the retired Z/daily constraint |
-| Delayed Tanzania receipt shows older invoice-number date than Z-number date | Treat as potentially expected and verify transaction origin date            | Confirm persisted assignment uses transaction-date daily counter and fiscal-date Z/invoice date                                        |
-| One pump unavailable                                                        | Check pump state and physical forecourt condition                           | Check device/JPL details and mapping                                                                                                   |
-| All/many pumps stale                                                        | Treat as forecourt connectivity issue                                       | Inspect Forecourt Monitor/Diagnostics and JPL session                                                                                  |
-| Receipt not printed                                                         | Confirm transaction/receipt and avoid duplicate prints                      | Check Print Jobs and printer connectivity                                                                                              |
-| Tank value unexpected                                                       | Compare with physical/site wet-stock evidence                               | Check DOMS data and tank mapping                                                                                                       |
-| Price mismatch                                                              | Stop and verify approved price source                                       | Reconcile VPOS/PSS pricing configuration under change control                                                                          |
-| UI available but station degraded                                           | Do not assume all integrations are healthy                                  | Use health/readiness and diagnostics                                                                                                   |
-
-## 25. Escalation information
-
-When escalating to technical support, provide enough information to reproduce the event without asking support to infer the station state:
+For any support case, capture:
 
 - station name/identifier
-- local date/time and timezone
-- affected user role
-- exact menu/workflow
-- transaction, pump, nozzle, tank, receipt, or print-job reference as applicable
+- local time and timezone
+- exact screen/workflow
+- transaction ID if applicable
+- pump/nozzle/tank identifier if applicable
+- receipt/print reference if applicable
 - exact error message
-- API `requestId` where present
-- whether the transaction has an assigned customer/TIN where relevant to reproduction
-- whether the issue affects one item or the whole station
+- request/reference ID if shown
+- whether one item or the whole station is affected
 - last known successful time
-- whether the transaction originated on an earlier business date
-- whether any configuration/restart/change was made immediately beforehand
+- any recent package upgrade, restart, price, PSS, printer, network, or configuration change
 
-## 26. Operating principles
+A screenshot is useful only if it includes the relevant identifiers and context.
 
-- Preserve the original transaction record when investigating exceptions.
-- Prefer diagnosis over repeated retry/restart actions.
-- Keep VPOS configuration consistent with the physical site and DOMS/PSS configuration.
-- Apply pricing, topology, fiscal, and runtime changes only under the appropriate authority.
-- For Tanzania, do not manually normalize invoice-number, daily-counter, Z-number, or invoice-date values across delayed transactions; their date scopes are intentionally different.
-- Use administrator access sparingly.
+## 20. Actions a manager should not take without approval
+
+Do not:
+
+- share administrator credentials
+- attempt SSH or terminal access to the DOMS
+- request changes to `.env` files
+- change package files or runtime internals
+- change proxy/fiscal endpoints
+- change TLS/certificate settings
+- change station timezone as a reporting workaround
+- repeatedly restart technical services to clear unexplained faults
+- remap pumps/tanks by trial and error
+- apply arbitrary stock adjustments to hide mapping faults
+- duplicate transactions to compensate for slow processing
+- repeatedly resubmit fiscalization without checking state
+- change pricing as a connectivity test
+- alter Tanzania counters/receipt identifiers manually
+
+## 21. Practical training exercises
+
+The trainer should ask the manager to demonstrate these tasks using the approved training/test context available at the site.
+
+### Exercise A — start-of-shift
+
+- open Dashboard
+- check Pumps
+- check Tank Levels
+- review Non-fiscalized transactions
+
+**Pass condition:** manager can explain what would trigger escalation.
+
+### Exercise B — transaction lookup
+
+Provide a known transaction time/pump/reference and ask the manager to find it.
+
+**Pass condition:** correct record found without creating a new transaction.
+
+### Exercise C — receipt recovery
+
+Ask the manager to find a known receipt/transaction and explain the reprint process.
+
+**Pass condition:** correct transaction is confirmed before any print/reprint action.
+
+### Exercise D — pump fault scenario
+
+Describe a one-pump failure, then an all-pumps-stale failure.
+
+**Pass condition:** manager distinguishes local device issue from station-wide connectivity issue and does not propose trial-and-error remapping.
+
+### Exercise E — price change boundary
+
+Provide a hypothetical approved price change.
+
+**Pass condition:** manager states authorization, product/grade, effective time, and verification steps before changing pricing.
+
+### Exercise F — support escalation
+
+Give a sample error and ask what information should be captured.
+
+**Pass condition:** manager captures station/time, IDs, error text, scope, and recent changes.
+
+## 22. Manager competency sign-off
+
+Use this checklist in the site handover/change record.
+
+| Competency | Demonstrated | Notes |
+| --- | --- | --- |
+| Sign-in and navigation | ☐ | |
+| Start-of-shift checks | ☐ | |
+| Transaction lookup | ☐ | |
+| Non-fiscalized review | ☐ | |
+| Fiscalized/receipt lookup | ☐ | |
+| Receipt/reprint workflow | ☐ | |
+| Pump issue triage | ☐ | |
+| Tank-level review | ☐ | |
+| Product stock review | ☐ | |
+| Pricing/change-control boundary | ☐ | |
+| Forecourt configuration boundary | ☐ | |
+| End-of-shift handover | ☐ | |
+| Support escalation evidence | ☐ | |
+| Administrator/technical boundary understood | ☐ | |
+| Tanzania-specific workflow where applicable | ☐ | |
+
+**Manager name:** ______________________________  
+**Trainer/technician:** _________________________  
+**Station:** ___________________________________  
+**Date/time:** _________________________________  
+**Training result:** Pass ☐ / Follow-up required ☐
+
+## 23. Screenshot completion checklist
+
+Before publishing the final training manual, replace each placeholder with an approved screenshot:
+
+- Dashboard/start-of-shift
+- Transactions search
+- Non-fiscalized transactions
+- Receipt Lookup/Viewer
+- Pumps
+- Tank Levels
+- Forecourt Pricing
+
+Screenshot rules:
+
+- use a training/demo station where possible
+- redact customer and infrastructure-sensitive information
+- keep page title, relevant identifiers, and workflow controls visible
+- do not capture passwords, tokens, certificate material, or other secrets
+- use synthetic transaction/customer values for training wherever possible
+
+## 24. Manager operating principles
+
+- Preserve the original transaction when investigating an exception.
+- Diagnose before retrying repeatedly.
+- Keep VPOS configuration consistent with the physical site and approved DOMS/PSS configuration.
+- Apply pricing and topology changes only under the appropriate authority.
+- Use manager access for manager tasks; administrator access remains a technical boundary.
+- No DOMS shell, SSH, `.env`, or code-level action is part of manager operation.
 - Record unresolved exceptions at shift handover.
-
-## 27. Related documentation
-
-- [Technician Setup Guide](TECHNICIAN_SETUP_GUIDE.md)
-- [API Guide](API_GUIDE.md)
-- [Configuration](../configuration.md)
-- [Forecourt and DOMS/JPL](../domains/forecourt.md)
-- [Transactions and fiscalization](../domains/transactions.md)
-- [Tanzania fiscalization](../domains/tanzania-fiscalization.md)
-- [Forecourt recovery](../runbooks/forecourt-recovery.md)
-- [Production debugging](../runbooks/production-debugging.md)
