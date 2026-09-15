@@ -10,13 +10,24 @@ This directory separates current guidance from historical evidence.
 - [Configuration](configuration.md)
 - [Startup flow](startup-flow.md)
 
-## Manuals
+## Production field manuals
 
-- [Technician Setup Guide](manuals/TECHNICIAN_SETUP_GUIDE.md)
-- [Management Guide](manuals/MANAGEMENT_GUIDE.md)
-- [Manager Training Guide](manuals/MANAGER_TRAINING_GUIDE.md) — on-site training exercises, screenshot placeholders, and competency sign-off for station managers/supervisors
+The production rollout uses two primary manuals:
+
+1. [VPOS FTC Field Support, Installation & Commissioning Manual](manuals/TECHNICIAN_SETUP_GUIDE.md) — package installation on DOMS, in-app configuration, commissioning, troubleshooting, screenshots, acceptance, and handover.
+2. [VPOS FTC Manager Operations & Training Manual](manuals/MANAGEMENT_GUIDE.md) — daily operation, manager configuration boundaries, screenshots, training exercises, escalation, and competency sign-off.
+
+The field manuals assume the production application is delivered as one of the approved Node.js 22 DOMS packages:
+
+- CPB-579: `cpb-579-node22.pkg`
+- CPB-539: `cpb-539-node-22.pkg`
+
+Production field support does not require or permit SSH, terminal/shell access, source checkout, npm commands, SQL commands, filesystem edits, or production `.env` editing. Site-specific adjustments are made through supported VPOS application screens and approved DOMS/PSS administration tools.
+
+## Developer/API manuals
+
 - [API Guide for Third-Party Developers](manuals/API_GUIDE.md)
-- [Installed-Package API Wire Contract Reference](manuals/API_WIRE_CONTRACTS.md) — concrete request/response DTOs, envelopes, enums, aliases, pagination, content types, and compatibility boundaries for developers who do not have source access
+- [Installed-Package API Wire Contract Reference](manuals/API_WIRE_CONTRACTS.md)
 
 ## Domains
 
@@ -28,10 +39,11 @@ This directory separates current guidance from historical evidence.
 
 ## Runbooks
 
-- [Production installation and upgrade](runbooks/production-installation.md) — field installation, startup validation, acceptance, restart check, and rollback triggers
-- [Commissioning](runbooks/commissioning.md) — production release/site go-no-go checklist and handover evidence
-- [Production debugging](runbooks/production-debugging.md) — on-site triage, safe diagnostics, decision tree, and escalation package
-- [Production support screenshot guide](runbooks/support-screenshot-guide.md) — screenshot placeholders and capture/redaction requirements for field support documentation
+The production runbook entry points below intentionally redirect field staff to the consolidated support manual so procedures are not duplicated or allowed to drift:
+
+- [Production installation and upgrade](runbooks/production-installation.md)
+- [Commissioning](runbooks/commissioning.md)
+- [Production debugging](runbooks/production-debugging.md)
 - [Forecourt recovery](runbooks/forecourt-recovery.md)
 - [Storage retirement](runbooks/storage-retirement.md)
 - [Secure artifacts](runbooks/secure-artifacts.md)
@@ -39,21 +51,16 @@ This directory separates current guidance from historical evidence.
 
 ## Screenshot assets
 
-- [Documentation Screenshot Assets](images/README.md) — approved folder convention, filenames, redaction rules, and placeholder replacement instructions for support and manager screenshots
+- [Documentation Screenshot Assets](images/README.md) — approved folder convention, filenames, and redaction rules for support and manager screenshots.
 
 ## Production handover set
 
-For a release to a live site, the minimum documentation set is:
+For release to a live site, provide:
 
-1. [Production installation and upgrade](runbooks/production-installation.md)
-2. [Commissioning](runbooks/commissioning.md)
-3. [Production debugging](runbooks/production-debugging.md)
-4. [Technician Setup Guide](manuals/TECHNICIAN_SETUP_GUIDE.md)
-5. [Management Guide](manuals/MANAGEMENT_GUIDE.md)
-6. [Manager Training Guide](manuals/MANAGER_TRAINING_GUIDE.md)
-7. [Production support screenshot guide](runbooks/support-screenshot-guide.md)
+1. [Field Support, Installation & Commissioning Manual](manuals/TECHNICIAN_SETUP_GUIDE.md)
+2. [Manager Operations & Training Manual](manuals/MANAGEMENT_GUIDE.md)
 
-The deployment ticket/change record should hold the site-specific package version, rollback reference, test evidence, approvals, and sign-off. Do not put production secrets or raw customer data in repository documentation.
+The deployment/change record should hold the site-specific package version, rollback reference, acceptance evidence, approvals, and sign-off. Do not put production secrets or raw customer data in repository documentation.
 
 ## Architectural decisions
 
@@ -62,8 +69,8 @@ The deployment ticket/change record should hold the site-specific package versio
 
 ## Archive
 
-`archive/` contains superseded implementation notes, validation evidence, historical TODOs, and previous documentation snapshots. Archived files are not agent guidance and may describe behavior that no longer exists.
+`archive/` contains superseded implementation notes, validation evidence, historical TODOs, and previous documentation snapshots. Archived files are not field guidance and may describe behavior that no longer exists.
 
 ## Documentation policy
 
-Update an existing authoritative document rather than creating a new pass-specific note. Operator procedures belong in runbooks. Durable architectural choices belong in ADRs. Generated evidence should be stored outside the repository; retain only a digest or external reference when required.
+Update the applicable authoritative document rather than creating a new pass-specific note. Production field procedures belong in the consolidated field-support manual. Manager operating/training procedures belong in the consolidated manager manual. Durable architectural choices belong in ADRs.
