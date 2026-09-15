@@ -48,7 +48,6 @@ VPOS FTC runs as a secure packaged application on the DOMS controller. Daily ope
 Managers should understand these boundaries:
 
 - no terminal or SSH access is required for normal operation
-- no `.env` file is used to make station adjustments
 - settings such as forecourt mappings, tank configuration, pricing, and other manager-accessible parameters are maintained through VPOS screens
 - package/runtime faults that cannot be resolved through the approved application workflow are escalated to technical support
 
@@ -124,9 +123,7 @@ At the start of the shift:
 
 If many pumps, transactions, or services appear degraded at the same time, do not start changing individual pump/tank mappings. Escalate as a station-wide issue.
 
-> **Screenshot placeholder — start-of-shift Dashboard**  
-> **File:** `docs/images/managers/manager-dashboard-start-shift.png`  
-> Capture: Dashboard with enough station context to show where a manager begins daily checks. Use training or redacted data.
+> ![Manager Dashboard](../images/managers/manager-dashboard-start-shift.png)
 
 ## 6. Finding a transaction
 
@@ -143,9 +140,7 @@ When investigating a complaint or exception, record the existing transaction ID 
 
 Do not create a new manual transaction merely because the original transaction is slow to appear.
 
-> **Screenshot placeholder — transaction search**  
-> **File:** `docs/images/managers/manager-transactions-search.png`  
-> Capture: Transactions page showing search/filter controls and one synthetic/redacted example result.
+> ![Transaction Search](../images/managers/manager-transactions-search.png)
 
 ## 7. Non-fiscalized transactions
 
@@ -162,9 +157,8 @@ Manager checks:
 
 Do not repeatedly resubmit the transaction unless the approved recovery procedure explicitly requires it.
 
-> **Screenshot placeholder — non-fiscalized queue**  
-> **File:** `docs/images/managers/manager-non-fiscalized.png`  
-> Capture: Non-fiscalized view with transaction status, ID/reference, and time visible using synthetic/redacted data.
+> ![Transaction Search](../images/managers/manager-non-fiscalized.png)
+
 
 ## 8. Fiscalized transactions and receipt lookup
 
@@ -176,9 +170,7 @@ Use:
 
 Before reprinting, verify you have the correct transaction.
 
-> **Screenshot placeholder — receipt lookup**  
-> **File:** `docs/images/managers/manager-receipt-lookup.png`  
-> Capture: Receipt Lookup or Receipt Viewer showing the search/reference area and a synthetic/redacted result.
+> ![Transaction Search](../images/managers/manager-receipt-lookup.png)
 
 ## 9. Receipt printing
 
@@ -268,9 +260,7 @@ Treat this as a station-wide forecourt communication issue. Capture the time the
 
 Do not edit all pump settings or restart technical services without the approved support procedure.
 
-> **Screenshot placeholder — Pumps**  
-> **File:** `docs/images/managers/manager-pumps.png`  
-> Capture: Pumps page showing healthy versus unavailable/stale status examples where safe to demonstrate.
+> ![Transaction Search](../images/managers/manager-pumps.png)
 
 ## 15. Tanks and tank levels
 
@@ -285,9 +275,7 @@ If a level looks wrong:
 
 Do not use an arbitrary stock adjustment to hide a mapping or ATG problem.
 
-> **Screenshot placeholder — Tank Levels**  
-> **File:** `docs/images/managers/manager-tank-levels.png`  
-> Capture: Tank Levels with representative tank identifiers, timestamps/state, and synthetic/redacted values.
+> ![Transaction Search](../images/managers/manager-tank-levels.png)
 
 ## 16. Forecourt setup and configuration
 
@@ -326,9 +314,7 @@ Afterward, verify the effective forecourt price according to the station procedu
 
 Do not make a price change as a test of connectivity.
 
-> **Screenshot placeholder — Forecourt Pricing**  
-> **File:** `docs/images/managers/manager-forecourt-pricing.png`  
-> Capture: pricing screen with grade/product labels and synthetic/redacted prices. Do not expose a live confidential price-change instruction.
+> ![Transaction Search](../images/managers/manager-forecourt-pricing.png)
 
 ## 18. End-of-shift handover
 
@@ -452,33 +438,3 @@ Use this checklist in the site handover/change record.
 **Station:** ___________________________________  
 **Date/time:** _________________________________  
 **Training result:** Pass ☐ / Follow-up required ☐
-
-## 23. Screenshot completion checklist
-
-Before publishing the final training manual, replace each placeholder with an approved screenshot:
-
-- Dashboard/start-of-shift
-- Transactions search
-- Non-fiscalized transactions
-- Receipt Lookup/Viewer
-- Pumps
-- Tank Levels
-- Forecourt Pricing
-
-Screenshot rules:
-
-- use a training/demo station where possible
-- redact customer and infrastructure-sensitive information
-- keep page title, relevant identifiers, and workflow controls visible
-- do not capture passwords, tokens, certificate material, or other secrets
-- use synthetic transaction/customer values for training wherever possible
-
-## 24. Manager operating principles
-
-- Preserve the original transaction when investigating an exception.
-- Diagnose before retrying repeatedly.
-- Keep VPOS configuration consistent with the physical site and approved DOMS/PSS configuration.
-- Apply pricing and topology changes only under the appropriate authority.
-- Use manager access for manager tasks; administrator access remains a technical boundary.
-- No DOMS shell, SSH, `.env`, or code-level action is part of manager operation.
-- Record unresolved exceptions at shift handover.
