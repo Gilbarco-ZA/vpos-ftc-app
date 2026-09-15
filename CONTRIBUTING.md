@@ -16,14 +16,23 @@ Keep pull requests focused on one operational concern. Separate repository hygie
 npm run check
 ```
 
-Formatting and linting are separate:
+For a non-mutating formatting check, use:
 
 ```bash
-npm run format
-npm run format:check
-npm run lint
-npm run typecheck
+npx prettier --check .
 ```
+
+Additional focused validation:
+
+```bash
+npm run typecheck
+npm test
+npm run check:architecture
+npm run check:hygiene
+npm run check:docs
+```
+
+`npm run lint` currently runs Prettier in write mode. Use it only when you intend to apply formatting changes.
 
 ## Commit hygiene
 
@@ -36,6 +45,8 @@ Route handlers should remain thin and delegate to module application services. A
 ## Documentation
 
 Update current documents when behavior or ownership changes. Put completed pass notes and superseded procedures in `docs/archive/`; do not use historical notes as current instructions.
+
+Changes that affect production installation, support diagnostics, commissioning, manager workflows, or role boundaries must update the applicable production handover documents in `docs/runbooks/` and `docs/manuals/`.
 
 ## Review notes
 
