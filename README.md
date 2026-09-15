@@ -9,9 +9,12 @@ The repository combines a Next.js web application, server-side API routes, a cus
 - [Agent and repository rules](AGENTS.md)
 - [Contributor workflow](CONTRIBUTING.md)
 - [Documentation map](docs/README.md)
-- [Architecture](docs/architecture.md)
+- [Architecture](docs/ARCHITECTURE.md)
 - [Development setup](docs/development.md)
 - [Testing](docs/testing.md)
+- [Production installation](docs/runbooks/production-installation.md)
+- [Technician setup](docs/manuals/TECHNICIAN_SETUP_GUIDE.md)
+- [Manager training](docs/manuals/MANAGER_TRAINING_GUIDE.md)
 
 ## Runtime responsibilities
 
@@ -89,6 +92,8 @@ npm start
 
 `npm run build` creates the Next.js output and generates `vpos-server.cjs`. The bundle is generated output and is not committed.
 
+Production controllers should use the approved architecture-specific CI artifact rather than a source checkout. See [Production installation and upgrade](docs/runbooks/production-installation.md).
+
 ## HTTPS development
 
 HTTPS is disabled by default. When `VPOS_USE_HTTPS=1`, both certificate paths are mandatory:
@@ -106,12 +111,13 @@ Keep certificates under the ignored `.certs/` directory or another secure extern
 Run focused checks while developing, then the full validation command before handoff:
 
 ```bash
-npm run format:check
-npm run lint
+npx prettier --check .
 npm run typecheck
 npm test
 npm run check
 ```
+
+`npm run lint` currently runs Prettier in write mode, so use `npx prettier --check .` when you need a non-mutating formatting check.
 
 Useful additional checks:
 
@@ -148,6 +154,17 @@ The application exposes health and operational endpoints including:
 - `GET /api/startup/status`
 
 Deployment security must explicitly control access to operational endpoints that expose runtime information.
+
+## Production handover documentation
+
+For a production deployment, use these documents together:
+
+- [Production installation and upgrade](docs/runbooks/production-installation.md) — package installation, startup validation, acceptance, and rollback triggers.
+- [Commissioning](docs/runbooks/commissioning.md) — release/site go-no-go gates and evidence.
+- [Production debugging](docs/runbooks/production-debugging.md) — field triage and escalation evidence.
+- [Technician Setup Guide](docs/manuals/TECHNICIAN_SETUP_GUIDE.md) — site configuration and commissioning workflow.
+- [Management Guide](docs/manuals/MANAGEMENT_GUIDE.md) — detailed station operating reference.
+- [Manager Training Guide](docs/manuals/MANAGER_TRAINING_GUIDE.md) — on-site competency training and sign-off.
 
 ## Packaging targets
 
