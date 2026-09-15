@@ -14,7 +14,7 @@ This directory separates current guidance from historical evidence.
 
 - [Technician Setup Guide](manuals/TECHNICIAN_SETUP_GUIDE.md)
 - [Management Guide](manuals/MANAGEMENT_GUIDE.md)
-- [Manager Training Guide](manuals/MANAGER_TRAINING_GUIDE.md) — on-site training exercises and competency sign-off for station managers/supervisors
+- [Manager Training Guide](manuals/MANAGER_TRAINING_GUIDE.md) — on-site training exercises, screenshot placeholders, and competency sign-off for station managers/supervisors
 - [API Guide for Third-Party Developers](manuals/API_GUIDE.md)
 - [Installed-Package API Wire Contract Reference](manuals/API_WIRE_CONTRACTS.md) — concrete request/response DTOs, envelopes, enums, aliases, pagination, content types, and compatibility boundaries for developers who do not have source access
 
@@ -31,10 +31,15 @@ This directory separates current guidance from historical evidence.
 - [Production installation and upgrade](runbooks/production-installation.md) — field installation, startup validation, acceptance, restart check, and rollback triggers
 - [Commissioning](runbooks/commissioning.md) — production release/site go-no-go checklist and handover evidence
 - [Production debugging](runbooks/production-debugging.md) — on-site triage, safe diagnostics, decision tree, and escalation package
+- [Production support screenshot guide](runbooks/support-screenshot-guide.md) — screenshot placeholders and capture/redaction requirements for field support documentation
 - [Forecourt recovery](runbooks/forecourt-recovery.md)
 - [Storage retirement](runbooks/storage-retirement.md)
 - [Secure artifacts](runbooks/secure-artifacts.md)
 - [Tanzania cutover](runbooks/tanzania-cutover.md)
+
+## Screenshot assets
+
+- [Documentation Screenshot Assets](images/README.md) — approved folder convention, filenames, redaction rules, and placeholder replacement instructions for support and manager screenshots
 
 ## Production handover set
 
@@ -46,6 +51,7 @@ For a release to a live site, the minimum documentation set is:
 4. [Technician Setup Guide](manuals/TECHNICIAN_SETUP_GUIDE.md)
 5. [Management Guide](manuals/MANAGEMENT_GUIDE.md)
 6. [Manager Training Guide](manuals/MANAGER_TRAINING_GUIDE.md)
+7. [Production support screenshot guide](runbooks/support-screenshot-guide.md)
 
 The deployment ticket/change record should hold the site-specific package version, rollback reference, test evidence, approvals, and sign-off. Do not put production secrets or raw customer data in repository documentation.
 
