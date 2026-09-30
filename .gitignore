@@ -14,7 +14,6 @@ next-env.d.ts
 /lcks/
 
 # Local environment and credentials
-.env
 .env.local
 /.certs/
 /public/certs/

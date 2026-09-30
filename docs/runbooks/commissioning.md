@@ -1,23 +1,13 @@
 # Commissioning
 
-Production commissioning, acceptance, and site handover are maintained in the single field-support manual:
+**Type:** runbook
 
-- [VPOS FTC Field Support, Installation & Commissioning Manual](../manuals/TECHNICIAN_SETUP_GUIDE.md)
+1. Verify database connectivity, station identity, and current configuration hashes.
+2. Run the repository test and vendor contract gates for the release candidate.
+3. Validate DOMS/JPL connectivity in read-only mode before enabling writes.
+4. Confirm pump, tank, pricing, transaction, alarm, and reconciliation mappings.
+5. Verify TLS and secure artifact paths outside the public web root.
+6. Capture startup, readiness, worker heartbeat, and support-bundle evidence.
+7. Obtain site and organizational approval before enabling production maintenance or dispense-control actions.
 
-The commissioning model assumes VPOS is delivered as the approved CPB package, installed on the DOMS through the authorized package-management workflow, and configured through the VPOS application.
-
-No SSH, terminal, shell, source checkout, npm script, SQL command, or production `.env` editing is part of the site commissioning process.
-
-Use the consolidated manual for:
-
-- package selection and installation
-- in-app station configuration
-- DOMS/JPL verification
-- pump/tank/product mapping
-- pricing verification
-- printer and proxy/fiscal acceptance
-- Tanzania-specific checks
-- controlled restart/persistence validation
-- production troubleshooting
-- manager handover/training gate
-- commissioning sign-off
+Use the archived first-site and release-gate documents only as evidence templates; current acceptance criteria must be recorded in the deployment process.

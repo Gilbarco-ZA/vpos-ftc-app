@@ -17,7 +17,10 @@ function timeInput(value: unknown) {
   return value
 }
 
-export const formatReceiptDate = (value?: unknown, timezone?: string | null) => {
+export const formatReceiptDate = (
+  value?: unknown,
+  timezone?: string | null,
+) => {
   const input = dateInput(value)
   if (input == null) return ''
   try {
@@ -27,7 +30,10 @@ export const formatReceiptDate = (value?: unknown, timezone?: string | null) => 
   }
 }
 
-export const formatReceiptTime = (value?: unknown, timezone?: string | null) => {
+export const formatReceiptTime = (
+  value?: unknown,
+  timezone?: string | null,
+) => {
   const input = timeInput(value)
   if (input == null) return ''
   try {

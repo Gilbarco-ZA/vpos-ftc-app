@@ -9,11 +9,9 @@ The repository combines a Next.js web application, server-side API routes, a cus
 - [Agent and repository rules](AGENTS.md)
 - [Contributor workflow](CONTRIBUTING.md)
 - [Documentation map](docs/README.md)
-- [Architecture](docs/ARCHITECTURE.md)
+- [Architecture](docs/architecture.md)
 - [Development setup](docs/development.md)
 - [Testing](docs/testing.md)
-- [Field Support, Installation & Commissioning Manual](docs/manuals/TECHNICIAN_SETUP_GUIDE.md)
-- [Manager Operations & Training Manual](docs/manuals/MANAGEMENT_GUIDE.md)
 
 ## Runtime responsibilities
 
@@ -34,7 +32,7 @@ app/components -> module application/presentation -> module domain -> infrastruc
 
 Route handlers should deal with HTTP concerns and delegate business behavior to application services. New code must not add feature dependencies from `src/shared/` back into `src/modules/`.
 
-## Development prerequisites
+## Prerequisites
 
 - Node.js 22.15 or newer within Node 22
 - npm 10.9.2
@@ -42,7 +40,7 @@ Route handlers should deal with HTTP concerns and delegate business behavior to 
 - Access to the configured Gilbarco AFS Azure Artifacts npm feed
 - Integration endpoints only when testing the relevant forecourt, fiscalization, or device workflow
 
-## Development setup
+## Install
 
 Authenticate to the private npm feed configured in `.npmrc`, then install from the lockfile:
 
@@ -50,7 +48,7 @@ Authenticate to the private npm feed configured in `.npmrc`, then install from t
 npm ci
 ```
 
-Copy the development environment template:
+Copy the environment template:
 
 ```bash
 cp .env.example .env.local
@@ -66,15 +64,15 @@ HOST=0.0.0.0
 NEXT_PUBLIC_BASE_URL=http://localhost:3080
 ```
 
-These instructions are for developer workstations only. Production DOMS controllers do not use a field-managed `.env` file.
+Production defaults are defined in `src/platform/runtime/env-defaults.cjs`. Explicit process environment values have the highest precedence.
 
-## Run locally
+## Run
 
 ```bash
 npm run dev
 ```
 
-Additional developer/runtime commands:
+Additional runtime commands:
 
 ```bash
 npm run dev:forecourt
@@ -82,32 +80,18 @@ npm run worker
 npm run fiscal:stub
 ```
 
-The production application is built by CI and packaged for the supported DOMS targets. Field technicians do not build or start production from source.
+The production package is built and started with:
 
-## Production deployment model
+```bash
+npm run build
+npm start
+```
 
-Production is delivered as an approved package installed directly on the DOMS:
-
-- CPB-579: `cpb-579-node22.pkg`
-- CPB-539: `cpb-539-node-22.pkg`
-
-The production field model is deliberately locked down:
-
-- no SSH access
-- no terminal/shell access
-- no source checkout on the DOMS
-- no npm/Node commands executed by field staff
-- no manual SQL execution
-- no application-file edits
-- no production `.env` editing
-
-The package runs as a managed secure DOMS application. Station-specific adjustments are made through supported VPOS configuration screens and approved DOMS/PSS administration workflows.
-
-See the [Field Support, Installation & Commissioning Manual](docs/manuals/TECHNICIAN_SETUP_GUIDE.md).
+`npm run build` creates the Next.js output and generates `vpos-server.cjs`. The bundle is generated output and is not committed.
 
 ## HTTPS development
 
-HTTPS is disabled by default in development. When `VPOS_USE_HTTPS=1`, both certificate paths are mandatory:
+HTTPS is disabled by default. When `VPOS_USE_HTTPS=1`, both certificate paths are mandatory:
 
 ```env
 VPOS_USE_HTTPS=1
@@ -122,13 +106,12 @@ Keep certificates under the ignored `.certs/` directory or another secure extern
 Run focused checks while developing, then the full validation command before handoff:
 
 ```bash
-npx prettier --check .
+npm run format:check
+npm run lint
 npm run typecheck
 npm test
 npm run check
 ```
-
-`npm run lint` currently runs Prettier in write mode, so use `npx prettier --check .` when you need a non-mutating formatting check.
 
 Useful additional checks:
 
@@ -164,20 +147,13 @@ The application exposes health and operational endpoints including:
 - `GET /api/metrics`
 - `GET /api/startup/status`
 
-Deployment security must explicitly control access to operational endpoints that expose runtime information. These are implementation/runtime interfaces and are not a substitute for the field-support UI workflow documented in the production manual.
-
-## Production handover documentation
-
-Production handover uses two primary files:
-
-- [Field Support, Installation & Commissioning Manual](docs/manuals/TECHNICIAN_SETUP_GUIDE.md) — DOMS package deployment, application configuration, commissioning, troubleshooting, screenshots, acceptance, and support sign-off.
-- [Manager Operations & Training Manual](docs/manuals/MANAGEMENT_GUIDE.md) — daily operations, controlled manager configuration, training exercises, screenshots, escalation, and competency sign-off.
+Deployment security must explicitly control access to operational endpoints that expose runtime information.
 
 ## Packaging targets
 
 The Azure pipeline packages the application for the supported Node.js 22 controller targets:
 
-- CPB-539 ARMv7l
-- CPB-579 ARM64
+- CPB539 ARMv7l
+- CPB579 ARM64
 
 The generated server bundle remains a required package artifact, but it is produced by CI rather than stored as source.

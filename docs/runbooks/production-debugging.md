@@ -1,14 +1,15 @@
 # Production Debugging
 
-Production field troubleshooting is maintained in the single field-support manual:
+**Type:** runbook
 
-- [VPOS FTC Field Support, Installation & Commissioning Manual](../manuals/TECHNICIAN_SETUP_GUIDE.md)
+Start with non-invasive evidence:
 
-The supported production troubleshooting model is application-first:
+1. Check `/api/livez`, `/api/readyz`, and `/api/startup/status`.
+2. Check process identity, process guard state, and worker heartbeats.
+3. Review redacted application logs around the first failure.
+4. Confirm database connectivity and migration state.
+5. Inspect queue, lease, and retry state before restarting workers.
+6. Capture a redacted support bundle when the relevant module provides one.
+7. Reproduce with simulator or read-only validation where possible.
 
-- use VPOS **Diagnostics**, **Device Status**, **Forecourt Monitor**, **Print Jobs**, transaction state, and the applicable configuration screens
-- use the approved DOMS package-management interface for package state, restart, upgrade, and rollback
-- capture evidence before changing configuration or restarting
-- escalate when the required corrective action is not exposed safely through VPOS or the approved DOMS/PSS administration workflow
-
-Do not use SSH, terminal commands, Node/npm scripts, SQL commands, filesystem edits, or `.env` changes as field troubleshooting steps.
+Do not dump the full environment, raw connection strings, session cookies, fiscal credentials, customer records, or private artifacts into tickets or chat systems.

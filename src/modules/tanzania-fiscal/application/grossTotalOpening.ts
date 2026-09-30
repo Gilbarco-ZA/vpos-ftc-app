@@ -20,8 +20,8 @@ import {
   resolveTanzaniaReceiptVerificationPrefix,
   resolveTanzaniaReceiptVerificationUrlBase,
 } from '../domain/receiptVerificationPrefix'
-import { getRegisteredTanzaniaReceiptCode } from './registeredReceiptCode'
 import { resolveTanzaniaFiscalTimezone } from '../infrastructure/timezone'
+import { getRegisteredTanzaniaReceiptCode } from './registeredReceiptCode'
 
 type GrossTotalRow = {
   opening_gross_total: string | number | null
@@ -248,7 +248,8 @@ export async function setTanzaniaFiscalOpeningValues(
        ) AS exists`,
       [stationId],
     )
-    if (!station.rows?.[0]?.exists) throw new Error(`Station ${stationId} not found`)
+    if (!station.rows?.[0]?.exists)
+      throw new Error(`Station ${stationId} not found`)
 
     await txQuery(
       client,

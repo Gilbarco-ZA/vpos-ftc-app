@@ -20,17 +20,21 @@ export type LocalDateTimeParts = {
   displayDateTime: string
 }
 
-const OFFSETLESS_LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,3}))?$/
+const OFFSETLESS_LOCAL_RE =
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,3}))?$/
 
-function buildResult(timezone: string, parts: {
-  year: string
-  month: string
-  day: string
-  hour: string
-  minute: string
-  second: string
-  millisecond: string
-}): LocalDateTimeParts {
+function buildResult(
+  timezone: string,
+  parts: {
+    year: string
+    month: string
+    day: string
+    hour: string
+    minute: string
+    second: string
+    millisecond: string
+  },
+): LocalDateTimeParts {
   const isoDate = `${parts.year}-${parts.month}-${parts.day}`
   const displayDate = `${parts.day}-${parts.month}-${parts.year}`
   const time = `${parts.hour}:${parts.minute}:${parts.second}`
@@ -77,7 +81,8 @@ export function localDateTime(
   const literal = offsetlessLocalParts(value)
   if (literal) return buildResult(effectiveTimezone, literal)
 
-  const date = value instanceof Date ? value : new Date(String(value ?? Date.now()))
+  const date =
+    value instanceof Date ? value : new Date(String(value ?? Date.now()))
   if (!Number.isFinite(date.getTime())) throw new Error('Invalid date value')
 
   const formatter = new Intl.DateTimeFormat('en-CA', {

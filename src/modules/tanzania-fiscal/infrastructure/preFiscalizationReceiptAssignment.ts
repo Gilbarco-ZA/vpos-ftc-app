@@ -2,8 +2,8 @@ import { queryOne, txQuery, withTransaction } from '@/src/platform/db/postgres'
 
 import { getRegisteredTanzaniaReceiptCode } from '@/src/modules/tanzania-fiscal/application/registeredReceiptCode'
 import { resolveTanzaniaReceiptVerificationPrefix } from '@/src/modules/tanzania-fiscal/domain/receiptVerificationPrefix'
-import { dateParts } from '@/src/modules/tanzania-fiscal/infrastructure/xml'
 import { resolveTanzaniaFiscalTimezone } from '@/src/modules/tanzania-fiscal/infrastructure/timezone'
+import { dateParts } from '@/src/modules/tanzania-fiscal/infrastructure/xml'
 
 export type TanzaniaPreFiscalizationReceiptAssignment = {
   invoice_number: string

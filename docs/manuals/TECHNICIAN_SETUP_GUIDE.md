@@ -1,577 +1,492 @@
-# VPOS FTC Field Support, Installation & Commissioning Manual
+# VPOS FTC Technician Setup Guide
 
-**Audience:** Gilbarco/authorized field technicians, commissioning engineers, and production support  
-**Purpose:** Single-file production manual for installing, configuring, commissioning, supporting, and handing over VPOS FTC on a DOMS controller.  
-**Production model:** Secure packaged application installed on DOMS; no SSH, shell, source checkout, terminal, or field command execution is required or supported.
+**Audience:** Gilbarco/authorized field technicians and commissioning engineers  
+**Purpose:** Install and commission the packaged `vpos-ftc-app` on a production DOMS/PSS site.  
+**Documentation baseline:** reviewed against `vpos-ftc-app` `main` commit `bbd11ab2ee9d364fd96771c7f4119d0199a03923` on 2026-09-08  
+**Applies to:** packaged CPB-539 (`armv7l`) and CPB-579 (`arm64`) targets built by the production pipeline.
 
-This is the primary on-site support manual. It is intentionally self-contained so a technician can complete installation, configuration, commissioning, first-line diagnosis, and handover without relying on repository scripts or terminal access.
-
-> **Field operating rule**
+> **Safety and change-control boundary**
 >
-> Production adjustments are made through the VPOS application and approved DOMS package-management workflow. Do not attempt to create or edit `.env` files, execute application scripts, access the controller filesystem, run database commands, or use SSH as part of normal installation or support.
+> This guide assumes an approved production deployment window. Validate DOMS/JPL connectivity in read-only mode before enabling operational writes. Do not change dispenser, PSS Configurator, TLS, pricing, or production-maintenance settings without the site's approved change procedure.
 
-## 1. Production deployment model
+## 1. What the packaged application contains
 
-VPOS FTC is delivered as an approved Node.js 22 package for the target DOMS controller.
+The production build generates a standalone Node entry point, `vpos-server.cjs`. The package runtime requires:
 
-| DOMS controller | Production package | Architecture |
-| --- | --- | --- |
-| CPB-579 | `cpb-579-node22.pkg` | ARM64 |
-| CPB-539 | `cpb-539-node-22.pkg` | ARMv7l |
+- `start.cjs`
+- `vpos-server.cjs`
+- `src/platform/runtime/env-defaults.cjs`
+- the Next.js runtime produced by the CI package process
+- Node.js 22.15.0 for the target CPB architecture
 
-The package contains the application runtime and the required production defaults. It is installed on the DOMS using the approved DOMS package installation mechanism and runs as a managed, secured application.
+The production CI currently creates packages for:
 
-The field support model therefore assumes:
+| Target  | Architecture | Runtime      |
+| ------- | ------------ | ------------ |
+| CPB-539 | `armv7l`     | Node 22.15.0 |
+| CPB-579 | `arm64`      | Node 22.15.0 |
 
-- no SSH access to the DOMS
-- no terminal or command-line access
-- no source-code checkout on the DOMS
-- no `npm`, Node, SQL, or operating-system commands executed by the technician
-- no manual file copying into the installed application
-- no production `.env` file
-- no requirement for a technician to inspect application files
-- configuration changes are made from supported VPOS administration screens
-- package start, stop, upgrade, and rollback use the approved DOMS package-management controls
+Do **not** perform a source checkout and `npm install` on a production controller. Install the approved package produced by the deployment pipeline using the site's approved FCC/DOMS application-package procedure.
 
-If a production issue appears to require shell access, manual database manipulation, or application-file modification, stop and escalate to engineering. That is outside the supported field procedure.
+## 2. Responsibility boundaries
 
-## 2. Configuration model
+`vpos-ftc-app` owns the station-local PostgreSQL-backed application state and forecourt runtime. Cloud delivery and endpoint routing are owned by `vpos-proxy`.
 
-VPOS is designed so station-specific operational configuration can be maintained from the application rather than from environment files.
+The VPOS setup UI can persist FTC/JPL connection settings and map discovered forecourt entities. It does not replace PSS Configurator. Configuration that belongs to DOMS/PSS must be completed and approved there first.
 
-Field-adjustable configuration includes the applicable station settings for:
+## 3. Information to collect before arriving on site
 
-- site identity, country, currency, and timezone
-- products and grades
-- tanks and tank-grade relationships
-- pumps, nozzles, and nozzle-to-tank mappings
-- DOMS/JPL connection settings
-- forecourt operating settings
-- approved forecourt pricing
-- printer configuration
-- proxy/fiscal configuration
-- Tanzania fiscal settings where applicable
-- ATG/tank polling settings
-- other administrator-owned station configuration exposed by the application
+Record the following in the commissioning work order before changing the station:
 
-Production packages contain safe runtime defaults for values that do not require site-specific adjustment. The application persists supported site-specific configuration in its station data model.
+### Site identity
 
-`.env` files are a development convenience only. They are not a field configuration mechanism and must not be requested, created, edited, or deployed on a production DOMS.
+- station/site name
+- physical address
+- country
+- currency
+- timezone
+- station tax number/TIN where applicable
+- approved VPOS software/package version
+- target controller model: CPB-539 or CPB-579
 
-Some security material, such as certificates or secure credentials, may be provisioned by the approved package/deployment process. Field staff should manage only the application settings and references exposed through authorized VPOS screens.
+### DOMS/PSS connection
 
-## 3. Roles and access required on site
+- production DOMS/PSS host or IP address
+- JPL TCP port; the application default is `8888`
+- JPL POS ID; the application default is `01`, but use the site-assigned value
+- operation mode: `unsupervised` or `supervised`
+- `FcAccessCode`; production commissioning expects the access required by the approved integration scope
+- JPL country code
+- expected JPL/PSS version; application minimum default is `470-02-1.07`
+- whether TLS is required and, if so, server name and approved certificate/CA/key paths
+- site-specific unsolicited subscription flags if they differ from the approved defaults
 
-The technician should have an authorized `administrator` account for commissioning and technical support.
-
-Administrator functions include the additional controls required for installation validation and diagnosis, such as:
-
-- Setup Wizard
-- Forecourt Monitor
-- Device Status
-- Diagnostics
-- Print Jobs
-- Proxy Settings
-- Tanzania Fiscal where applicable
-- Runtime Control
-- Maintenance
-- Station Settings / Station Config
-- Printers
-- Products and Product Categories
-- Users where approved
-
-Do not use or share another person's administrator credentials. Managers should continue to use manager accounts for daily operations.
-
-## 4. Information required before installation
-
-The deployment/change record should contain the following before work begins.
-
-### Package and site
-
-- station/site name and identifier
-- DOMS controller model: CPB-579 or CPB-539
-- currently installed VPOS version/package where replacing an existing version
-- approved target package and version
-- approved rollback package/version
-- maintenance window/change reference
-- country, currency, and timezone
-- local site contact and escalation contact
-
-### DOMS/PSS/JPL
-
-- production DOMS/PSS host or address as presented to VPOS
-- approved JPL TCP port; default is normally `8888`
-- site-assigned JPL POS ID
-- approved operation mode: supervised or unsupervised
-- approved access-code/capability expectations
-- country code and expected JPL/PSS version where required
-- TLS requirements where enabled
-
-### Forecourt
+### Forecourt mapping
 
 - pump identifiers
-- nozzle identifiers
+- nozzle identifiers per pump
 - tank identifiers
-- products/grades
-- nozzle-to-tank relationships
-- approved forecourt prices
+- grade/product assignments
+- current approved forecourt prices
+- tank/product relationships
 
-### Peripherals and fiscal services
+### Peripheral and fiscal information
 
-- approved printer endpoint/details
-- approved proxy configuration
-- country-specific fiscal prerequisites
-- Tanzania fiscal/device information where applicable
+- receipt/report printer IP and port
+- fiscal country requirements
+- Tanzania TRA device/proxy details when commissioning a Tanzania station
+- approved `vpos-proxy` target and connectivity information
 
-Do not discover production configuration by trial and error when the information should already exist in the commissioning record or approved PSS configuration.
+## 4. Pre-installation checks
 
-## 5. Pre-installation checks
+1. Confirm the package matches the controller architecture.
+2. Confirm the controller date, time, and timezone are correct.
+3. Confirm the controller has IP reachability to the production DOMS/PSS host.
+4. Confirm the configured JPL TCP port is reachable under the site's network policy.
+5. Confirm PostgreSQL is available to the packaged application according to the deployment environment.
+6. Confirm required TLS files, when used, are stored outside the public web root and have the correct permissions.
+7. Record the currently installed VPOS version and retain the approved rollback package.
+8. Do not disconnect or restart DOMS/PSS solely to install VPOS unless the approved site procedure requires it.
 
-Before changing the station:
+## 5. Install the approved package
 
-1. Confirm the DOMS controller model.
-2. Confirm the package matches that controller exactly.
-3. Confirm the controller's date, time, and timezone are correct.
-4. Confirm the current station is in a safe state for the maintenance window.
-5. Record the currently installed VPOS package/version where applicable.
-6. Record known pre-existing faults so they are not attributed to the new release later.
-7. Confirm the rollback package is available through the approved DOMS package process.
-8. Confirm the station has the approved network path to DOMS/PSS, printer, and proxy/fiscal services.
-9. Confirm the site configuration and physical forecourt information are available.
-10. Confirm any required database backup/recovery step in the release procedure has been completed by the responsible platform process.
+Use the standard deployment/package mechanism supplied for the site controller. The exact package-manager commands are owned by the packaging/deployment system rather than this repository.
 
-## 6. Install or upgrade the package on DOMS
+After deployment, verify that the application directory contains the packaged runtime, including `start.cjs` and `vpos-server.cjs`.
 
-Use the approved DOMS package-management process.
+Start or restart the VPOS package using the site-standard application supervisor.
 
-### CPB-579
+### First-boot behavior
 
-Install the approved `cpb-579-node22.pkg` package.
+On startup, VPOS performs bootstrap work including database availability checks and ordered PostgreSQL migrations. Migrations are transaction-protected and recorded in `schema_migrations`.
 
-### CPB-539
+Do not manually edit migration state or run SQL migrations by hand as part of normal commissioning.
 
-Install the approved `cpb-539-node-22.pkg` package.
+If startup fails during a migration, capture the complete error and resolve the migration/database problem before continuing setup.
 
-### Installation sequence
+Current Tanzania deployments must include migration `1320_tanzania_assignment_counter_scope.sql`. It removes a legacy uniqueness rule that incorrectly coupled fiscal-date Z numbers to transaction-date daily counters for delayed transactions. Do not re-create that removed constraint in production.
 
-1. Put the site into the approved maintenance state.
-2. Record the old package/version if upgrading.
-3. Select the correct approved package for the DOMS controller.
-4. Install or upgrade the package using the authorized DOMS package installer.
-5. Start/enable the VPOS package through the same approved package-management interface if it is not started automatically.
-6. Record the installation/start time.
-7. Open VPOS from an authorized browser/client and confirm that the application is reachable.
-8. Sign in with the authorized administrator account.
-9. Continue with startup validation and in-app configuration.
+## 6. Confirm process health before configuration
 
-Do not copy individual runtime files, modify package contents, or attempt to repair an installation by changing files on the DOMS.
+From an authorized station-network client, verify the following endpoints on the installed VPOS base URL:
 
-## 7. First startup expectations
+```text
+GET /api/livez
+GET /api/readyz
+GET /api/healthz
+```
 
-The package performs its own startup/bootstrap work. This includes the application database bootstrap, ordered schema migrations, HTTP service startup, runtime initialization, forecourt connection initialization, and worker startup.
+Interpret them as follows:
 
-A technician does not manually run database migrations.
+- `/api/livez` — the HTTP process is running and responding. It intentionally does not prove database or integration health.
+- `/api/readyz` — deeper application readiness.
+- `/api/healthz` — station runtime health information.
 
-During first startup or upgrade:
+Do not proceed merely because `/api/livez` succeeds. Resolve readiness/health failures first.
 
-- allow the application to complete startup before changing configuration repeatedly
-- use the VPOS UI and administrator diagnostics to determine whether startup is healthy
-- if the application reports a migration/bootstrap failure, capture the visible error and escalation details rather than attempting SQL repair
-- if an upgrade cannot reach a stable application state inside the change window, follow the approved package rollback procedure
+## 7. Sign in and open the Setup Wizard
 
-## 8. Initial application checks
+Sign in with an authorized administrator account and open:
 
-After the package starts:
+**Setup & Configuration → Setup Wizard** (`/admin/setup`)
 
-1. Confirm the login page loads normally.
-2. Sign in as administrator.
-3. Confirm the Dashboard renders without a global startup failure.
-4. Open **Diagnostics** and note any critical application/runtime failure.
-5. Open **Device Status** and identify any configured dependency that is unavailable.
-6. Open **Forecourt Monitor** and determine whether the DOMS/JPL session is disconnected, connecting, stable, or repeatedly reconnecting.
-7. Open **Print Jobs** only if printer testing or troubleshooting is required.
-8. Confirm the application can navigate between administration pages without repeated server errors.
+The current setup flow is designed around:
 
-Do not treat a single loaded page as proof that forecourt, printing, database, proxy, and fiscal functions are all healthy.
+1. site profile
+2. products
+3. forecourt/pump mapping
+4. printer
+5. finalization
 
-> **Screenshot placeholder — application health / diagnostics**  
-> **File:** `docs/images/support/support-diagnostics.png`  
-> Capture: Diagnostics with the overall status, relevant component state, timestamp/context, and no secrets or customer data.
+The Setup Wizard also includes the JPL forecourt settings and PSS configuration verification used during commissioning.
 
-## 9. Setup Wizard
+## 8. Configure the site profile
 
-For a new station, approved recommissioning, or configuration recovery, open:
-
-**Setup & Configuration → Setup Wizard**
-
-Use the wizard to complete and verify the station configuration.
-
-For an upgrade of a working commissioned station, do not overwrite existing values simply because the wizard is available. Confirm that the previously approved configuration has been retained.
-
-## 10. Site profile
-
-Configure and verify:
+In the Setup Wizard, enter and save:
 
 - site name
-- tax number where applicable
+- tax number
 - address
 - country
 - currency
 - timezone
 
-Country and timezone are operational settings. Incorrect values can affect fiscal behavior, reporting, daily totals, and transaction date interpretation.
+Use the correct country dataset. Country selection controls country-specific behavior, including Tanzania fiscal functions where applicable.
 
-## 11. DOMS/JPL forecourt connection
+Verify the saved values before proceeding. A wrong timezone or country is a commissioning defect, not a cosmetic setting.
 
-In the Setup Wizard/forecourt connection section, configure the production DOMS/JPL values provided by the site commissioning record.
+## 9. Configure the production DOMS/JPL connection
 
-Typical fields include:
+In **Setup Wizard → Imports & forecourt settings → Forecourt connection**, configure the production JPL connection.
 
-| Setting | Guidance |
-| --- | --- |
-| JPL host | Use the approved production DOMS/PSS host. |
-| JPL port | Use the approved site port; the normal default is `8888`. |
-| POS ID | Use the unique site-assigned POS ID. |
-| Operation mode | Must match the approved site model. |
-| Access code/capabilities | Must match the approved integration scope. |
-| Country code | Use the approved site/vendor value. |
-| POS/JPL version expectations | Keep aligned with the approved DOMS/PSS version. |
-| Heartbeat/dead-connection settings | Change only where the approved integration requires it. |
-| Unsolicited subscriptions | Keep the required station subscriptions enabled. |
-| TLS settings | Use the approved security configuration where TLS is required. |
+The supported forecourt runtime is `jpl_tcp`.
 
-Use the in-app **Test JPL settings** function before enabling production operations.
+### Required core fields
 
-Do not use price changes, maintenance actions, or dispenser controls merely to test connectivity.
+| UI field                 | Runtime key                | Guidance                                                                                                        |
+| ------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| JPL TCP host             | `JPL_TCP_HOST`             | Set to the production DOMS/PSS host. Do not use loopback for a remote production PSS.                           |
+| JPL TCP port             | `JPL_TCP_PORT`             | Default `8888`; use the approved site port.                                                                     |
+| JPL POS ID               | `JPL_POS_ID`               | Default `01`; use the unique site-assigned POS ID.                                                              |
+| Operation mode           | `JPL_OPERATION_MODE`       | `unsupervised` or `supervised`; must match the approved site model.                                             |
+| JPL access code          | `JPL_FC_ACCESS_CODE`       | Default is `POS`; field acceptance may require additional approved flags such as diagnostic/reject information. |
+| JPL country code         | `JPL_COUNTRY_CODE`         | Default `1`; use the site/vendor value.                                                                         |
+| POS version ID           | `JPL_POS_VERSION_ID`       | Application default `470-02-1.08`.                                                                              |
+| Expected minimum version | `JPL_EXPECTED_MIN_VERSION` | Application default `470-02-1.07`.                                                                              |
 
-> **Screenshot placeholder — JPL setup**  
-> **File:** `docs/images/support/support-setup-jpl.png`  
-> Capture: Forecourt connection card showing field labels, connection/test status, and non-sensitive values only. Redact real infrastructure details where required.
+### Connection timing defaults
 
-## 12. Forecourt Monitor and connection acceptance
+| Setting                 |    Default | Commissioning note                                              |
+| ----------------------- | ---------: | --------------------------------------------------------------- |
+| Unsolicited DR seconds  |      `5` s | Keep aligned with approved JPL behavior.                        |
+| Heartbeat interval      | `15000` ms | UI guidance requires 15 seconds or less.                        |
+| Dead connection timeout | `30000` ms | Must be greater than the heartbeat interval.                    |
+| Status update code      |        `3` | Change only when required by the approved integration contract. |
+| Bootstrap snapshot      |    enabled | Leave enabled unless an approved site exception exists.         |
 
-Open **Forecourt Monitor** and confirm:
+### Default unsolicited subscriptions
 
-- the JPL session establishes successfully
-- the session remains stable rather than reconnecting repeatedly
-- expected pump state is visible
-- transaction-buffer/state information is current
-- tank/wet-stock information is visible where configured
-- no persistent protocol/authentication rejection is shown
+The application defaults are:
 
-If the connection is unstable, correct the approved settings through the application. Do not attempt network or process troubleshooting through the DOMS shell because no shell access is part of the production support model.
+```text
+UNSO_INSTSTA_1,UNSO_TRBUFSTA_3,UNSO_TGSTA_1,UNSO_DELIVSTA_1,UNSO_PRISTA_1
+```
 
-> **Screenshot placeholder — Forecourt Monitor**  
-> **File:** `docs/images/support/support-forecourt-monitor.png`  
-> Capture: session/connection state plus enough pump/device context to distinguish healthy, disconnected, and reconnecting states.
+Default MFDR subscription:
 
-## 13. Reconcile VPOS with PSS configuration
+```text
+UNSO_FPSTA_3
+```
 
-Use the application's PSS configuration verification/reconciliation capability where available.
+Do not remove subscriptions simply to make commissioning appear healthy. Reconcile required flags against the site's DOMS/PSS configuration and the approved JPL contract.
 
-Confirm that VPOS and the physical/PSS configuration agree on:
+### Saving connection settings
 
-- pumps
-- nozzles
-- tanks
-- products/grades
-- mappings
-- applicable forecourt settings
+Production forecourt settings saved by the setup UI are persisted as station configuration and override runtime defaults. After saving connection changes, restart the FTC server/package process when prompted so the live connection is recreated with the new values.
 
-If the PSS itself is wrong, correct it through the approved PSS Configurator process and then rerun VPOS verification. Do not create a deliberately incorrect VPOS mapping to compensate for a PSS configuration defect.
+## 10. TLS configuration
 
-> **Screenshot placeholder — configuration reconciliation**  
-> **File:** `docs/images/support/support-reconciliation.png`  
-> Capture: reconciliation result showing matched/mismatched status without exposing sensitive host or credential details.
+If the DOMS/JPL connection is secured, verify the approved values for:
 
-## 14. Products, tanks, and grades
+- `JPL_TLS_REQUIRED`
+- `JPL_TLS_REJECT_UNAUTHORIZED`
+- `JPL_TLS_SERVERNAME`
+- `JPL_TLS_CA_PATH`
+- `JPL_TLS_CLIENT_CERT_PATH`
+- `JPL_TLS_CLIENT_KEY_PATH`
+- `JPL_TLS_MIN_VERSION` (`TLSv1.2` or `TLSv1.3`)
 
-Use the supported configuration pages to confirm:
+Certificate and key material must not be placed in the public web root. Do not disable certificate verification as a permanent workaround for certificate errors.
 
-- each active fuel grade has the correct product record
-- each physical tank exists and is active where appropriate
-- each tank is assigned the correct grade/product
-- tank identifiers match the approved site/PSS topology
-- ATG polling settings are correct where wet-stock integration is used
+## 11. Test JPL settings before enabling production operations
 
-Do not apply arbitrary stock adjustments to hide a mapping or ATG issue.
+Use the **Test JPL settings** action in the forecourt setup card before proceeding.
 
-## 15. Pumps and nozzle-to-tank mapping
+For release/field validation where repository tooling is available in the approved engineering environment, the project also provides a live read-only validator. Typical usage is:
 
-Use Setup Wizard, **Pumps**, **Pump Settings**, and **Forecourt Setup** as appropriate.
+```bash
+npm run doms:jpl-live:validate -- \
+  --host <pss-host> \
+  --port 8888 \
+  --profile full-readonly
+```
 
-For every active nozzle:
+The validation phase must be read-only. Do not use a production dispenser-control or maintenance action merely as a connectivity test.
 
-1. identify the physical pump/nozzle
-2. match it to the DOMS/PSS identifier
-3. select the physical tank supplying that nozzle
-4. verify the corresponding product/grade
-5. save only after the mapping is confirmed
-6. recheck the forecourt view after saving
+Acceptance requires more than a TCP socket opening. Confirm:
 
-Do not use trial-and-error mapping on a live station.
+- expected JPL version
+- valid POS identity/session
+- required access-code capabilities
+- unsolicited subscriptions
+- heartbeat/dead-connection timing
+- pump state visibility
+- tank/wet-stock visibility where in scope
+- transaction-buffer visibility
+- no repeated reconnect loop or protocol rejection
 
-## 16. Forecourt pricing
+## 12. Verify PSS configuration and topology
 
-Open **Forecourt Pricing** and confirm that displayed grades/products and prices match the approved site price set.
+Use the Setup Wizard's PSS configuration verification/reconciliation capability to compare the FTC configuration with what the PSS reports.
 
-A price change is a controlled operational action. Use the site's approved authorization and verification process.
+Any mismatch between VPOS and the live PSS must be resolved deliberately. Do not silently remap VPOS to compensate for an incorrectly configured PSS.
 
-Do not change a price as a connectivity test.
+Where PSS configuration must change, make that change through the approved PSS Configurator process, then rerun verification.
 
-## 17. Printer configuration
+## 13. Configure products and tanks
 
-Use the Setup Wizard or **Setup & Configuration → Printers**.
+Before mapping nozzles, ensure the station has the correct product and tank records.
 
-Configure the approved printer and perform the in-app tests available for:
+Use the relevant setup/configuration pages:
 
-- printer connectivity
-- transaction receipt output
-- report output
+- **Products**
+- **Tank Settings**
+- **Tank Grades**
 
-Confirm physical output, paper/layout, station identity, and required fiscal content.
+Verify:
 
-For troubleshooting, administrators can use **Print Jobs** to see whether a print request is queued, processing, failed, or completed.
+- every active fuel grade has a product record
+- every physical tank used by a nozzle exists and is active
+- the tank grade/product relationship matches the physical site
+- identifiers can be traced back to the DOMS/PSS configuration
 
-> **Screenshot placeholder — Print Jobs**  
-> **File:** `docs/images/support/support-print-jobs.png`  
-> Capture: one representative job with status and time; use synthetic/redacted transaction data.
+## 14. Map pumps and nozzles
 
-## 18. Proxy and fiscal services
+Refresh live pump data in the Setup Wizard. VPOS uses discovered pump/nozzle state and stores nozzle-to-tank mappings.
 
-Open **Fiscal Services → Proxy Settings** and verify the approved configuration/status.
+For every pump and nozzle:
 
-Determine whether fiscal failures are:
+1. identify the live DOMS/PSS pump/nozzle
+2. select the physical tank supplying that nozzle
+3. review any automatic mapping suggestion
+4. save only after every active nozzle is mapped
 
-- local transaction/receipt generation
-- station-to-proxy connectivity/configuration
-- proxy/cloud processing
-- country fiscal service/device processing
+The Setup Wizard blocks save when nozzles remain unmapped.
 
-Do not repeatedly resubmit the same transaction without understanding its current state.
+Verify the resulting configuration again under:
 
-## 19. Tanzania stations
+- **Pumps**
+- **Pump Settings**
+- **Forecourt Setup**
 
-For Tanzania, complete the administrator setup under **Tanzania Fiscal** and the applicable daily-total workflow.
+Never infer a tank mapping solely from a similar product name when site drawings/PSS configuration disagree.
 
-Important operating semantics:
+## 15. Configure and validate pricing
 
-- the invoice number/daily counter can be scoped to the originating transaction date
-- the Z number/invoice date can be scoped to the first fiscalization or pre-fiscalization assignment date
-- a delayed transaction can therefore legitimately contain two different business/fiscal dates
-- opening a receipt preview may persist the receipt identity where pre-fiscalization printing is enabled
-- retries should reuse the persisted identity rather than create a new one
+Open **Setup & Configuration → Forecourt Pricing**.
 
-Do not manually alter invoice numbers, daily counters, Z numbers, fiscal identifiers, or database state to resolve a single transaction discrepancy.
+Confirm that displayed grades/products and prices match the approved site price set. Follow the site's price-change authorization process for any production write.
 
-## 20. Final setup verification
+Do not use a price change as an installation connectivity test.
 
-Before finalizing setup, confirm:
+## 16. Configure the printer
 
-- site profile correct
-- correct country/currency/timezone
-- JPL settings tested successfully
-- Forecourt Monitor stable
-- PSS/VPOS reconciliation accepted
-- products/grades correct
-- tanks correct
-- every active nozzle mapped correctly
-- approved prices correct
-- printer configured and tested
-- proxy/fiscal status accepted where required
-- Tanzania configuration complete where applicable
+Open the printer setup in the wizard or **Setup & Configuration → Printers**.
 
-Only finalize after the configuration represents the physical site.
+Configure the approved printer endpoint and run, in order:
 
-## 21. Production acceptance test
+1. printer connectivity test
+2. transaction print test
+3. report print test
 
-Perform the site-approved controlled acceptance workflow.
+Confirm physical output, paper width/layout, station identity, and fiscal information where applicable.
 
-Minimum acceptance evidence:
+## 17. Configure proxy/fiscal services
 
-- application login and Dashboard healthy
-- Diagnostics has no unresolved critical startup failure
-- Forecourt Monitor shows a stable DOMS/JPL session
-- expected pumps/nozzles/tanks are visible
-- pump status changes are reflected correctly
-- transaction ingestion is visible in VPOS
-- a known transaction can be located
-- receipt preview/generation works
-- physical printing works
-- fiscal/proxy flow works where applicable
-- tank level/wet-stock information is plausible where configured
-- approved prices are correct
-- no unexplained repeated reconnect, queue, or runtime failure is present
+The station application and `vpos-proxy` are separate responsibilities.
 
-If a controlled fuel transaction is required, follow the station test-sale procedure and reconcile it afterward.
+Open **Fiscal Services → Proxy Settings** and verify the approved proxy configuration and status.
 
-## 22. Controlled restart and persistence check
+For Tanzania stations, also complete the current Tanzania fiscal commissioning workflow under **Fiscal Services → Tanzania Fiscal** and follow [Tanzania cutover](../runbooks/tanzania-cutover.md).
 
-If the release procedure requires a restart, use only the approved DOMS application/package control or the authorized in-app runtime control provided for that purpose.
+Do not bypass device registration, receipt-code, TRA verification, or fiscal cutover checks merely to complete station setup.
 
-After restart verify:
+### Tanzania receipt identity and delayed transactions
 
-- VPOS becomes reachable again
-- administrator sign-in works
-- saved station configuration remains present
-- the JPL session reconnects and stabilizes
-- pumps/tanks return to current state
-- printer remains usable
-- proxy/fiscal status returns to normal
-- no new startup/migration error is visible in Diagnostics
+When receipt workflow is configured to print before fiscalization, opening a receipt in preview mode can persist the pre-fiscalization receipt identity. That is expected behavior and is not a read-only rendering operation.
 
-Do not accept a deployment that works only until the first controlled restart.
+The current Tanzania identity model intentionally uses two date scopes:
 
-## 23. Troubleshooting model
+- `invoiceNumber` and `dailyCounter` are tied to the originating transaction date in the station timezone.
+- `zNumber` and `invoiceDate` are tied to the first fiscalization/pre-fiscalization assignment date.
 
-Field diagnosis should begin in the application. Preserve evidence before restarting or changing configuration.
+For a delayed transaction, those dates can legitimately differ. A `dailyCounter` value may therefore appear under a later `zNumber` even when another originating business date used the same daily-counter value. Migration `1320_tanzania_assignment_counter_scope.sql` removes the obsolete database rule that rejected this valid case.
 
-### Application cannot be opened
+Receipt identity is persisted and reused by later preview/fiscalization attempts. Do not manually renumber a delayed transaction merely because its invoice-number date differs from its Z-number date.
 
-Check the DOMS package-management interface first:
+## 18. Finalize setup
 
-- correct package installed for the controller
-- package is enabled/running according to DOMS
-- installation did not report an error
-- no rollback or failed-upgrade state is shown
+The Setup Wizard considers the core setup ready to finalize when it has, at minimum:
 
-If the package cannot start and the approved UI does not provide enough evidence, escalate. Do not seek shell access as the next field step.
+- a site profile
+- configured tank grades/active tanks
+- products
+- pump configuration
+- a configured printer
 
-### Application opens but station is degraded
+Before selecting **Finalize**:
 
-Use **Diagnostics** and **Device Status** to identify the affected component. Determine whether the issue is database/startup, forecourt, printer, proxy/fiscal, or another configured dependency.
+- refresh the setup state
+- ensure live pump data is fresh
+- confirm there are no unmapped active nozzles
+- confirm printer tests pass
+- confirm JPL/PSS verification is accepted
+- confirm proxy/fiscal readiness where required
 
-### Many/all pumps stale
+Finalize only after the commissioning checklist is complete.
 
-Use **Forecourt Monitor** and **Diagnostics**. Check the configured JPL host/port/POS ID/operation mode/TLS values through the application. Look for reconnect churn or an authentication/protocol rejection.
+## 19. Production acceptance test
 
-Do not remap every pump when the entire forecourt connection is failing.
+Perform a controlled acceptance test under site authorization.
 
-### One pump/nozzle wrong
+Minimum evidence:
 
-Compare the physical dispenser, PSS identifier, VPOS pump/nozzle, tank mapping, and product/grade. Correct only the confirmed configuration error through the appropriate VPOS or PSS configuration tool.
+- `/api/livez`, `/api/readyz`, and `/api/healthz` healthy
+- stable DOMS/JPL connection for the observation period
+- correct pump/nozzle/tank topology
+- live pump state updates
+- correct product/grade relationships
+- correct approved prices
+- transaction ingestion from the forecourt
+- transaction visible in VPOS
+- receipt generation/printing
+- fiscalization/proxy flow where applicable
+- tank-level/wet-stock visibility where configured
+- no unresolved alarms or repeated protocol/session errors
 
-### Fiscalization failures
+For Tanzania stations using pre-fiscalization receipt printing, include a controlled receipt-preview check. Verify customer-assigned and non-customer transactions render correctly. Where approved test data includes a delayed/non-fiscalized transaction from an earlier business date, verify that its receipt can be previewed without a counter-collision error and that later retries reuse the same persisted Tanzania receipt identity.
 
-Use the transaction state plus **Proxy Settings** and country fiscal screens. Determine whether one transaction or many transactions are affected. Preserve the transaction ID and visible error/reference.
+Where a fuel transaction is required for acceptance, use the site's controlled test procedure and reconcile the test sale afterward.
 
-### Receipt exists but does not print
+## 20. Reboot/recovery check
 
-Use **Print Jobs** and printer status. Establish whether the first print is queued, failed, or complete before retrying.
+After the initial acceptance test, perform a controlled restart of the VPOS package if the deployment procedure requires it.
 
-### Tank data stale or implausible
+Verify that:
 
-Check whether the forecourt/JPL connection is healthy first, then confirm tank identifiers, mappings, ATG polling state, and current physical/site evidence.
+- the process returns on `/api/livez`
+- readiness returns without manual database intervention
+- persisted JPL settings are retained
+- the JPL session reconnects
+- pump/tank state resumes
+- workers recover
+- no migrations fail
 
-### Reports or dates appear wrong
+Do not accept a station that works only until the next package restart.
 
-Check the station timezone and report filters in the application. Do not change timezone merely to make a report total align.
+## 21. Troubleshooting
 
-## 24. Support evidence and escalation
+### VPOS process is not live
 
-Capture the following before escalation:
+- capture package/supervisor logs
+- verify the correct CPB architecture package was installed
+- verify required runtime files are present
+- check the startup error before changing configuration
 
-- station identifier
-- DOMS controller model
-- installed VPOS package/version
-- local time and timezone
-- first failure time and last known good time
-- exact application page/workflow
-- affected pump/nozzle/tank/transaction/receipt/print-job identifier
-- visible error text and request/reference ID where shown
-- whether one item or the whole station is affected
-- screenshots of relevant Diagnostics, Forecourt Monitor, Device Status, Print Jobs, or transaction state
-- recent package upgrade, restart, price change, PSS change, network change, printer change, or configuration change
-- actions already taken and whether they changed the symptom
+### `/api/livez` works but `/api/readyz` or `/api/healthz` does not
 
-Do not include passwords, certificates/private keys, full credentials, unredacted customer data, or other secrets in screenshots or support tickets.
+- investigate database, worker, forecourt, proxy, or other reported dependencies
+- do not treat the station as commissioned
 
-## 25. Screenshot capture set for support training
+### Migration error on startup
 
-These placeholders are intentionally embedded in this single manual. Replace them with approved screenshots from a training/demo station or carefully redacted production context.
+- capture the complete PostgreSQL error including SQLSTATE and constraint name
+- verify the package contains the current migrations
+- do not modify `schema_migrations` manually unless directed by an approved recovery procedure
 
-### A. Diagnostics / startup state
+### Tanzania receipt preview returns `500`
 
-> **Screenshot placeholder — Diagnostics / startup state**  
-> **File:** `docs/images/support/support-diagnostics.png`  
-> Show: component state, relevant warning/error, and visible context.
+1. Record the transaction ID, station-local time, user workflow, and API `requestId` shown in the error response.
+2. Inspect station/server logs using the same `requestId` and record PostgreSQL `pgCode`, `pgDetail`, and `pgConstraint` when present.
+3. If the error references `tanzania_proxy_invoice_assign_station_id_z_number_daily_cou_key`, verify the installed package includes migration `1320_tanzania_assignment_counter_scope.sql` and that migrations completed successfully.
+4. Upgrade/apply the approved current package rather than editing receipt assignments or counters by hand.
+5. Retry the same receipt after the migration is present. A failed assignment attempt is transaction-protected; do not create a replacement transaction merely to obtain a new counter.
 
-### B. Forecourt Monitor
+Customer assignment changes what customer data appears on the receipt, but it does not define Tanzania counter scope. If a failure occurs only when a customer is assigned, still diagnose the logged server/database error before modifying customer data.
 
-> **Screenshot placeholder — Forecourt Monitor**  
-> **File:** `docs/images/support/support-forecourt-monitor.png`  
-> Show: connection/session state and representative pump status.
+### JPL test cannot connect
 
-### C. Device Status
+- verify the production PSS host and port
+- verify network routing/firewall policy from the controller
+- verify TLS requirements
+- verify the PSS is listening on the expected interface
 
-> **Screenshot placeholder — Device Status**  
-> **File:** `docs/images/support/support-readiness-health.png`  
-> Show: configured dependency status with no credentials.
+### JPL connects then repeatedly disconnects
 
-### D. JPL setup
+- verify unique POS ID; a POS ID already leased by another physical client is invalid
+- verify heartbeat and dead-connection timeout
+- inspect access-code/protocol rejection details
+- verify JPL version compatibility
 
-> **Screenshot placeholder — JPL setup**  
-> **File:** `docs/images/support/support-setup-jpl.png`  
-> Show: field labels, test action, and test result. Redact real host/address data when required.
+### Pumps are visible but mappings are wrong
 
-### E. PSS/VPOS reconciliation
+- compare live DOMS/PSS topology with station drawings and PSS Configurator
+- correct the source configuration or VPOS mapping deliberately
+- rerun reconciliation
 
-> **Screenshot placeholder — reconciliation**  
-> **File:** `docs/images/support/support-reconciliation.png`  
-> Show: matched/mismatched result and enough topology context to train the technician.
+### No live pump data
 
-### F. Print Jobs
+- check JPL session health and unsolicited subscriptions
+- confirm required status flags are enabled
+- use diagnostics rather than repeatedly restarting the package
 
-> **Screenshot placeholder — Print Jobs**  
-> **File:** `docs/images/support/support-print-jobs.png`  
-> Show: representative queued/failed/completed status using synthetic or redacted transaction information.
+### Printing fails
 
-## 26. Commissioning sign-off
+- test network reachability to the printer
+- verify printer IP/port
+- inspect **Print Jobs** and **Diagnostics**
 
-Record the following in the deployment/change record before leaving site:
+## 22. Handover checklist
 
-| Item | Pass | Notes |
-| --- | --- | --- |
-| Correct package for DOMS controller | ☐ | |
-| Package installed through approved DOMS process | ☐ | |
-| Application reachable and administrator login successful | ☐ | |
-| Site profile verified | ☐ | |
-| JPL settings tested | ☐ | |
-| Forecourt Monitor stable | ☐ | |
-| PSS/VPOS reconciliation accepted | ☐ | |
-| Pumps/nozzles/tanks mapped correctly | ☐ | |
-| Approved pricing verified | ☐ | |
-| Printer tested | ☐ | |
-| Proxy/fiscal path verified | ☐ | |
-| Tanzania setup verified where applicable | ☐ | |
-| Controlled transaction/receipt accepted | ☐ | |
-| Controlled restart/persistence accepted | ☐ | |
-| Manager training completed | ☐ | |
-| Rollback package confirmed | ☐ | |
-| Open issues documented | ☐ | |
+Record and hand over:
 
-**Technician:** ______________________________  
-**Station:** __________________________________  
-**DOMS controller:** CPB-579 ☐ / CPB-539 ☐  
-**Installed package/version:** __________________  
-**Date/time:** _________________________________  
-**Site representative:** ________________________
+- [ ] installed package/version and controller architecture
+- [ ] station identity/country/timezone verified
+- [ ] DOMS/PSS host and JPL port verified
+- [ ] unique POS ID verified
+- [ ] JPL access code/version/subscriptions accepted
+- [ ] TLS validation accepted where enabled
+- [ ] pumps/nozzles/tanks reconciled
+- [ ] products and prices checked
+- [ ] printer tests passed
+- [ ] proxy/fiscal checks passed where applicable
+- [ ] Tanzania receipt-preview/delayed-transaction behavior checked where applicable
+- [ ] controlled transaction/receipt test completed
+- [ ] restart/recovery check completed
+- [ ] diagnostics/support evidence captured
+- [ ] unresolved exceptions documented
+- [ ] site/organizational acceptance obtained
 
-## 27. Field support boundaries
+## 23. Related repository documentation
 
-On a production DOMS, do not:
+- [Configuration](../configuration.md)
+- [Startup flow](../startup-flow.md)
+- [Forecourt and DOMS/JPL](../domains/forecourt.md)
+- [Tanzania fiscalization](../domains/tanzania-fiscalization.md)
+- [Commissioning runbook](../runbooks/commissioning.md)
+- [Forecourt recovery](../runbooks/forecourt-recovery.md)
+- [Secure artifacts](../runbooks/secure-artifacts.md)
+- [Production debugging](../runbooks/production-debugging.md)
+- [Tanzania cutover](../runbooks/tanzania-cutover.md)
 
-- request or use SSH as part of the normal support process
-- open a terminal on the controller
-- execute Node/npm scripts
-- execute SQL manually
-- edit package files
-- create or edit `.env` files
-- change operating-system service definitions
-- disable TLS verification as a troubleshooting shortcut
-- change prices as a connectivity test
-- remap pumps/tanks by trial and error
-- manipulate fiscal counters or receipt identifiers
-- expose secrets in screenshots or support tickets
-
-Use the VPOS configuration and diagnostic screens first. If the required correction is not exposed safely through the application or approved DOMS package-management workflow, escalate it as an engineering/deployment issue rather than bypassing the secure operating model.
+When this guide conflicts with an approved site-specific DOMS/PSS commissioning procedure, stop and resolve the discrepancy through change control rather than guessing.

@@ -1,4 +1,5 @@
 import { localDateTime } from '@/src/shared/time/localDateTime'
+
 import { signXmlSha1Base64 } from './certificates'
 
 export function xmlEscape(value: unknown): string {

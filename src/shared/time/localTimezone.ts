@@ -45,6 +45,8 @@ export async function resolveStationTimezoneContext(
   }
 }
 
-export async function resolveStationTimezone(stationId: string): Promise<string> {
+export async function resolveStationTimezone(
+  stationId: string,
+): Promise<string> {
   return (await resolveStationTimezoneContext(stationId)).timezone
 }

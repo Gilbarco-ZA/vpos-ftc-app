@@ -78,7 +78,9 @@ const runFirstBoot = async (
   const client = await pool.connect()
 
   const name = (process.env.DEFAULT_STATION_NAME || 'Default Station').trim()
-  const configuredTimezone = String(process.env.DEFAULT_STATION_TIMEZONE || '').trim()
+  const configuredTimezone = String(
+    process.env.DEFAULT_STATION_TIMEZONE || '',
+  ).trim()
   const tz = configuredTimezone || deviceLocalTimezone()
 
   try {
