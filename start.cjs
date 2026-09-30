@@ -217,5 +217,10 @@ if (process.env.VPOS_TRACE_NET === "1") {
   require("./scripts/trace-net.cjs");
 }
 
-// Start main server
+// Next.js App Router modules expect the Node runtime environment bootstrap
+// to install globals such as AsyncLocalStorage before they are imported.
+// vpos-server.cjs is an esbuild bundle, so preload Next's Node environment
+// explicitly before requiring the generated server bundle.
+require('next/dist/server/node-environment');
+
 require('./vpos-server.cjs');
