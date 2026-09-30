@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { requireAuth } from '@/src/shared/auth'
@@ -31,50 +30,6 @@ const readParam = (params: SearchParams, key: string) => {
   const value = params[key]
   if (Array.isArray(value)) return value[0] ?? ''
   return value ?? ''
-}
-
-const authHeaders = async () => {
-  const store = await cookies()
-  const cookie = store.toString()
-  return cookie ? { cookie } : undefined
-}
-
-const loadManagerTransactions = async (opts: {
-  page?: number
-  pageSize?: number
-  search?: string
-  startDate?: string
-  endDate?: string
-}) => {
-  const params = new URLSearchParams()
-  params.set('page', String(opts.page ?? 1))
-  params.set('pageSize', String(opts.pageSize ?? 50))
-  params.set('status', 'FISCALIZED')
-  params.set('includeCustomer', '1')
-  if (opts.search) params.set('search', opts.search)
-  if (opts.startDate) params.set('startDate', opts.startDate)
-  if (opts.endDate) params.set('endDate', opts.endDate)
-
-  const res = await fetch(`/api/transactions?${params.toString()}`, {
-    cache: 'no-store',
-    headers: await authHeaders(),
-  })
-  if (!res.ok) return { items: [], total: 0, page: 1, pageSize: 50 }
-  const body = await res.json().catch(() => ({}))
-  const payload = body?.data ?? body
-  const items = Array.isArray(payload?.items)
-    ? payload.items
-    : Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : []
-  return {
-    items,
-    total: Number(payload?.total ?? items.length),
-    page: Number(payload?.page ?? 1),
-    pageSize: Number((payload?.pageSize ?? items.length) || 50),
-  }
 }
 
 const normalizeAdminRows = (items: any[]): FiscalizedTransactionListItem[] => {
@@ -204,16 +159,17 @@ const ManagerFiscalizedView = async ({
   )
   const { startDate, endDate, preset } = dateFilter
 
-  const data = await loadManagerTransactions({
+  const data = await listTransactions(user.stationId, {
     page,
     pageSize: 50,
+    status: 'FISCALIZED',
     search: q || undefined,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
   })
 
-  const rows: TxnRow[] = data.items || data || []
-  const total = data.total ?? rows.length
+  const rows: TxnRow[] = Array.isArray(data?.items) ? data.items : []
+  const total = Number(data?.total ?? rows.length)
 
   const nextPage = page + 1
   const prevPage = Math.max(1, page - 1)
