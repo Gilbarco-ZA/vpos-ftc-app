@@ -43,7 +43,7 @@ describe('fuel price change worker mapping', () => {
     assert.equal(resolveDomsGradeIdFromRows(rows, change()), '02')
   })
 
-  it('uses external product id when product code is absent', () => {
+  it('uses external product id only when product code is absent', () => {
     const rows = [
       {
         ext_product_code: null,
@@ -94,7 +94,8 @@ describe('fuel price change DOMS payload', () => {
       buildDomsPriceChangePayload(
         change({ effectiveAt: '2026-09-30T12:00:00Z' }),
         '02',
-        Date.parse('2026-09-30T13:00:00Z'),
+        'Africa/Johannesburg',
+        new Date('2026-09-30T13:00:00Z'),
       ),
       {
         entries: [{ gradeId: '02', price: 20.25 }],
@@ -109,12 +110,13 @@ describe('fuel price change DOMS payload', () => {
       buildDomsPriceChangePayload(
         change({ effectiveAt: '2026-10-01T00:00:00Z' }),
         '02',
-        Date.parse('2026-09-30T13:00:00Z'),
+        'Africa/Johannesburg',
+        new Date('2026-09-30T13:00:00Z'),
       ),
       {
         entries: [{ gradeId: '02', price: 20.25 }],
         requestedBy: 'vpos-cloud-fuel-price-change',
-        effectiveAt: '2026-10-01T00:00:00.000Z',
+        effectiveAt: '2026-10-01T00:00:00',
       },
     )
   })
