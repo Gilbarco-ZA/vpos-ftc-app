@@ -12,11 +12,11 @@ const change = (
 ): FuelPriceChangeDto => ({
   id: 101,
   fiscalDeviceId: 1,
-  productId: 7001,
-  productCode: 'ULP95',
-  productName: 'ULP 95',
-  previousPrice: 20,
-  newPrice: 20.25,
+  productId: 9994,
+  productCode: 'G3',
+  productName: 'Petrol R',
+  previousPrice: 21.4,
+  newPrice: 25.4,
   effectiveAt: '2026-09-30T12:00:00Z',
   ...overrides,
 })
@@ -25,17 +25,17 @@ describe('fuel price change worker mapping', () => {
   it('resolves external product code to one DOMS grade across multiple pumps', () => {
     const rows = [
       {
-        ext_product_code: 'ULP95',
-        product_code: '95',
-        ext_product_id: '7001',
-        product_id: 'local-1',
+        ext_product_code: null,
+        product_code: 'G3',
+        ext_product_id: null,
+        product_id: '3',
         doms_grade_id: '02',
       },
       {
-        ext_product_code: 'ULP95',
-        product_code: '95',
-        ext_product_id: '7001',
-        product_id: 'local-1',
+        ext_product_code: null,
+        product_code: 'G3',
+        ext_product_id: null,
+        product_id: '3',
         doms_grade_id: '02',
       },
     ] as any
@@ -47,9 +47,9 @@ describe('fuel price change worker mapping', () => {
     const rows = [
       {
         ext_product_code: null,
-        product_code: '95',
-        ext_product_id: '7001',
-        product_id: 'local-1',
+        product_code: 'G3',
+        ext_product_id: '9994',
+        product_id: '3',
         doms_grade_id: '03',
       },
     ] as any
@@ -57,7 +57,7 @@ describe('fuel price change worker mapping', () => {
     assert.equal(
       resolveDomsGradeIdFromRows(
         rows,
-        change({ productCode: null, productId: 7001 }),
+        change({ productCode: null, productId: 9994 }),
       ),
       '03',
     )
@@ -66,17 +66,17 @@ describe('fuel price change worker mapping', () => {
   it('rejects ambiguous product-to-grade mappings', () => {
     const rows = [
       {
-        ext_product_code: 'ULP95',
-        product_code: '95',
-        ext_product_id: '7001',
-        product_id: 'local-1',
+        ext_product_code: null,
+        product_code: 'G3',
+        ext_product_id: null,
+        product_id: '3',
         doms_grade_id: '02',
       },
       {
-        ext_product_code: 'ULP95',
-        product_code: '95',
-        ext_product_id: '7001',
-        product_id: 'local-1',
+        ext_product_code: null,
+        product_code: 'G3',
+        ext_product_id: null,
+        product_id: '3',
         doms_grade_id: '03',
       },
     ] as any
@@ -98,7 +98,7 @@ describe('fuel price change DOMS payload', () => {
         new Date('2026-09-30T13:00:00Z'),
       ),
       {
-        entries: [{ gradeId: '02', price: 20.25 }],
+        entries: [{ gradeId: '02', price: 25.4 }],
         requestedBy: 'vpos-cloud-fuel-price-change',
         applyNow: true,
       },
@@ -114,7 +114,7 @@ describe('fuel price change DOMS payload', () => {
         new Date('2026-09-30T13:00:00Z'),
       ),
       {
-        entries: [{ gradeId: '02', price: 20.25 }],
+        entries: [{ gradeId: '02', price: 25.4 }],
         requestedBy: 'vpos-cloud-fuel-price-change',
         effectiveAt: '2026-10-01T00:00:00',
       },
