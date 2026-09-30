@@ -652,7 +652,12 @@ export type FuelPriceChangeDto = {
   mode?: string | null
   status?: string | null
   reason?: string | null
+  appliedAt?: string | null
+  collectedAt?: string | null
+  collectedBy?: string | null
+  failureMessage?: string | null
   createdAt?: string | null
+  createdBy?: string | null
   updatedAt?: string | null
   updatedBy?: string | null
 }
