@@ -108,7 +108,7 @@ describe('fuel price change DOMS payload', () => {
   it('schedules a future-effective change on DOMS', () => {
     assert.deepEqual(
       buildDomsPriceChangePayload(
-        change({ effectiveAt: '2026-10-01T00:00:00Z' }),
+        change({ effectiveAt: '2026-10-01T00:01:00' }),
         '02',
         'Africa/Johannesburg',
         new Date('2026-09-30T13:00:00Z'),
@@ -116,7 +116,7 @@ describe('fuel price change DOMS payload', () => {
       {
         entries: [{ gradeId: '02', price: 25.4 }],
         requestedBy: 'vpos-cloud-fuel-price-change',
-        effectiveAt: '2026-10-01T00:00:00',
+        effectiveAt: '2026-10-01T00:01:00',
       },
     )
   })
