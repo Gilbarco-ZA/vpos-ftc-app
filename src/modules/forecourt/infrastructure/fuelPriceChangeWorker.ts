@@ -20,11 +20,10 @@ const normalize = (value: unknown) =>
 
 const appliedKey = (changeId: number) => `fuelPriceChange.applied.${changeId}`
 
-async function resolveDomsGradeId(
-  stationId: string,
+export function resolveDomsGradeIdFromRows(
+  rows: Awaited<ReturnType<typeof pumpMappingsRepo.listRowsByStationId>>,
   change: FuelPriceChangeDto,
-): Promise<string> {
-  const rows = await pumpMappingsRepo.listRowsByStationId(stationId)
+): string {
   const productCode = normalize(change.productCode)
   const productId = normalize(change.productId)
 
@@ -64,15 +63,19 @@ async function resolveDomsGradeId(
   return gradeIds[0]
 }
 
-async function applyFuelPriceChange(
+async function resolveDomsGradeId(
   stationId: string,
   change: FuelPriceChangeDto,
-) {
-  const existing = await kvGet(stationId, appliedKey(change.id))
-  if (existing) {
-    return { applied: false, skipped: true, reason: 'already_applied' }
-  }
+): Promise<string> {
+  const rows = await pumpMappingsRepo.listRowsByStationId(stationId)
+  return resolveDomsGradeIdFromRows(rows, change)
+}
 
+export function buildDomsPriceChangePayload(
+  change: FuelPriceChangeDto,
+  gradeId: string,
+  nowMs = Date.now(),
+): Record<string, unknown> {
   const newPrice = Number(change.newPrice)
   if (!Number.isFinite(newPrice) || newPrice < 0) {
     throw new Error(
@@ -80,7 +83,6 @@ async function applyFuelPriceChange(
     )
   }
 
-  const gradeId = await resolveDomsGradeId(stationId, change)
   const effectiveAt = new Date(change.effectiveAt)
   if (Number.isNaN(effectiveAt.getTime())) {
     throw new Error(
@@ -93,11 +95,27 @@ async function applyFuelPriceChange(
     requestedBy: 'vpos-cloud-fuel-price-change',
   }
 
-  if (effectiveAt.getTime() <= Date.now()) {
+  if (effectiveAt.getTime() <= nowMs) {
     payload.applyNow = true
   } else {
     payload.effectiveAt = effectiveAt.toISOString()
   }
+
+  return payload
+}
+
+async function applyFuelPriceChange(
+  stationId: string,
+  change: FuelPriceChangeDto,
+) {
+  const existing = await kvGet(stationId, appliedKey(change.id))
+  if (existing) {
+    return { applied: false, skipped: true, reason: 'already_applied' }
+  }
+
+  const gradeId = await resolveDomsGradeId(stationId, change)
+  const payload = buildDomsPriceChangePayload(change, gradeId)
+  const newPrice = Number(change.newPrice)
 
   const response = await runPosDomsCommand(
     stationId,
