@@ -638,3 +638,39 @@ export const refreshIdentityViaProxy = async (
     fallbackPath: '/api/registration/refresh-identity',
   })
 }
+
+
+export type FuelPriceChangeDto = {
+  id: number
+  fiscalDeviceId: number
+  productId?: number | null
+  productCode?: string | null
+  productName?: string | null
+  previousPrice: number
+  newPrice: number
+  effectiveAt: string
+  mode?: string | null
+  status?: string | null
+  reason?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  updatedBy?: string | null
+}
+
+export type FuelPriceChangeResponse = {
+  responseCode?: string | null
+  message?: string | null
+  error: boolean
+  fuelPriceChanges?: FuelPriceChangeDto[] | null
+}
+
+export const getFuelPriceChangesViaProxy = async (
+  stationId: string | undefined,
+) => {
+  return proxyRequest(stationId, {
+    method: 'GET',
+    path: '/api/vpos/fuelPriceChange',
+    fallbackPath: '/api/vpos/fuelPriceChange',
+    timeoutMs: 15_000,
+  }) as Promise<ProxyRequestResult & { data: FuelPriceChangeResponse }>
+}
