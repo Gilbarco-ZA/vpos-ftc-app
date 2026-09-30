@@ -9,7 +9,7 @@ import {
   getFuelPriceChangesViaProxy,
 } from '@/src/shared/proxy/client'
 
-import { runPosDomsCommand } from '@/src/modules/pos/application/runPosDomsCommand'
+import { executePosDomsCommand } from '@/src/modules/pos/application/executePosDomsCommand'
 import { pumpMappingsRepo } from '@/src/modules/forecourt/infrastructure/repositories/pumpMappingsRepo'
 
 const WORKER_NAME = 'fuelPriceChangeWorker'
@@ -183,14 +183,13 @@ async function applyFuelPriceChange(
   const payload = buildDomsPriceChangePayload(change, gradeId, timezone)
   const newPrice = Number(change.newPrice)
 
-  const response = await runPosDomsCommand(
+  const result = await executePosDomsCommand(
     stationId,
     'changeGradePrices',
     payload,
   )
-  const result = await response.json()
 
-  if (!result?.success) {
+  if (!result.success) {
     throw new Error(
       String(
         result?.message ??
