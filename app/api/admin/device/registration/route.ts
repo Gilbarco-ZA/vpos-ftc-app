@@ -28,7 +28,7 @@ export const runtime = 'nodejs'
 export const GET = async () => {
   let user: SessionUser | null = null
   try {
-    user = await requireAuth(['administrator'])
+    user = await requireAuth(['manager', 'administrator'])
     const [result, cached] = await Promise.all([
       getRegistrationStatusViaProxy(user.stationId).catch((error: unknown) => ({
         ok: false,
