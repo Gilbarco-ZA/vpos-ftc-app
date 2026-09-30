@@ -1,6 +1,7 @@
 import { startPssXmlSyncWorker as startLegacyPssXmlSyncWorker } from '@/src/platform/integrations/pssXml/watcherWorker'
 
 import { startAtgPollingWorker as startCanonicalAtgPollingWorker } from '@/src/modules/forecourt/infrastructure/atgPollingWorker'
+import { startFuelPriceChangeWorker as startCanonicalFuelPriceChangeWorker } from '@/src/modules/forecourt/infrastructure/fuelPriceChangeWorker'
 import { startForecourtConfigSyncWorker as startLegacyForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
 import { startPosCommandsWorker as startCanonicalPosCommandsWorker } from '@/src/modules/pos/infrastructure/posCommandsWorker'
 import { startPrinterConnectivityWorker as startCanonicalPrinterConnectivityWorker } from '@/src/modules/printing/infrastructure/printerConnectivityWorker'
@@ -30,6 +31,13 @@ export function startAtgPollingRuntimeWorker(opts: { stationId: string }) {
 
 export function startAtgHistoryRuntimeWorker(opts: { stationId: string }) {
   return startAtgPollingRuntimeWorker(opts)
+}
+
+export function startFuelPriceChangeRuntimeWorker(opts: {
+  stationId: string
+  pollMs?: number
+}) {
+  return startCanonicalFuelPriceChangeWorker(opts)
 }
 
 export function startForecourtConfigSyncRuntimeWorker(opts?: {
