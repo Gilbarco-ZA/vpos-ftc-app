@@ -1,16 +1,15 @@
+import type { FuelPriceChangeDto } from '@/src/shared/proxy/client'
+
 import { query } from '@/src/platform/db/postgres'
+import { getFuelPriceChangesViaProxy } from '@/src/shared/proxy/client'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
-import { logger } from '@/src/shared/utils/logger'
 import { localDateTime } from '@/src/shared/time/localDateTime'
 import { resolveStationTimezone } from '@/src/shared/time/localTimezone'
-import {
-  type FuelPriceChangeDto,
-  getFuelPriceChangesViaProxy,
-} from '@/src/shared/proxy/client'
+import { logger } from '@/src/shared/utils/logger'
 
-import { executePosDomsCommand } from '@/src/modules/pos/application/executePosDomsCommand'
 import { pumpMappingsRepo } from '@/src/modules/forecourt/infrastructure/repositories/pumpMappingsRepo'
+import { executePosDomsCommand } from '@/src/modules/pos/application/executePosDomsCommand'
 
 const WORKER_NAME = 'fuelPriceChangeWorker'
 const DEFAULT_POLL_MS = 60 * 60_000
@@ -37,10 +36,7 @@ export function resolveDomsGradeIdFromRows(
       )
     }
 
-    return (
-      Boolean(productId) &&
-      normalize(row.ext_product_id) === productId
-    )
+    return Boolean(productId) && normalize(row.ext_product_id) === productId
   })
 
   const gradeIds = Array.from(
@@ -88,7 +84,10 @@ export function buildDomsPriceChangePayload(
 
   let effectiveAtLocal: string
   try {
-    effectiveAtLocal = localDateTime(change.effectiveAt, timezone).localIsoSeconds
+    effectiveAtLocal = localDateTime(
+      change.effectiveAt,
+      timezone,
+    ).localIsoSeconds
   } catch {
     throw new Error(
       `Fuel price change ${change.id} has invalid effectiveAt=${String(change.effectiveAt)}`,
@@ -241,7 +240,9 @@ export async function pollFuelPriceChangesOnce(stationId: string) {
 
   if (response.data?.error) {
     throw new Error(
-      String(response.data.message ?? 'Fuel price change response reported an error'),
+      String(
+        response.data.message ?? 'Fuel price change response reported an error',
+      ),
     )
   }
 

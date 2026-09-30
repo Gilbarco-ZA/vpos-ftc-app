@@ -639,7 +639,6 @@ export const refreshIdentityViaProxy = async (
   })
 }
 
-
 export type FuelPriceChangeDto = {
   id: number
   fiscalDeviceId: number
