@@ -1,6 +1,9 @@
+import { query } from '@/src/platform/db/postgres'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 import { logger } from '@/src/shared/utils/logger'
+import { localDateTime } from '@/src/shared/time/localDateTime'
+import { resolveStationTimezone } from '@/src/shared/time/localTimezone'
 import {
   type FuelPriceChangeDto,
   getFuelPriceChangesViaProxy,
@@ -28,17 +31,16 @@ export function resolveDomsGradeIdFromRows(
   const productId = normalize(change.productId)
 
   const matches = rows.filter((row) => {
-    const codeMatches =
-      Boolean(productCode) &&
-      [row.ext_product_code, row.product_code].some(
+    if (productCode) {
+      return [row.product_code, row.ext_product_code].some(
         (value) => normalize(value) === productCode,
       )
-    const idMatches =
+    }
+
+    return (
       Boolean(productId) &&
-      [row.ext_product_id, row.product_id].some(
-        (value) => normalize(value) === productId,
-      )
-    return codeMatches || idMatches
+      normalize(row.ext_product_id) === productId
+    )
   })
 
   const gradeIds = Array.from(
@@ -74,7 +76,8 @@ async function resolveDomsGradeId(
 export function buildDomsPriceChangePayload(
   change: FuelPriceChangeDto,
   gradeId: string,
-  nowMs = Date.now(),
+  timezone: string,
+  now: Date = new Date(),
 ): Record<string, unknown> {
   const newPrice = Number(change.newPrice)
   if (!Number.isFinite(newPrice) || newPrice < 0) {
@@ -83,38 +86,101 @@ export function buildDomsPriceChangePayload(
     )
   }
 
-  const effectiveAt = new Date(change.effectiveAt)
-  if (Number.isNaN(effectiveAt.getTime())) {
+  let effectiveAtLocal: string
+  try {
+    effectiveAtLocal = localDateTime(change.effectiveAt, timezone).localIsoSeconds
+  } catch {
     throw new Error(
       `Fuel price change ${change.id} has invalid effectiveAt=${String(change.effectiveAt)}`,
     )
   }
 
+  const nowLocal = localDateTime(now, timezone).localIsoSeconds
   const payload: Record<string, unknown> = {
     entries: [{ gradeId, price: newPrice }],
     requestedBy: 'vpos-cloud-fuel-price-change',
   }
 
-  if (effectiveAt.getTime() <= nowMs) {
+  if (effectiveAtLocal <= nowLocal) {
     payload.applyNow = true
   } else {
-    payload.effectiveAt = effectiveAt.toISOString()
+    payload.effectiveAt = effectiveAtLocal
   }
 
   return payload
+}
+
+async function syncLocalProductPrice(
+  stationId: string,
+  change: FuelPriceChangeDto,
+) {
+  const productCode = String(change.productCode ?? '').trim()
+  if (!productCode) {
+    throw new Error(
+      `Fuel price change ${change.id} cannot update products.unit_price without productCode`,
+    )
+  }
+
+  const result = await query(
+    `UPDATE products
+        SET unit_price = $3,
+            updated_at = NOW()
+      WHERE station_id = $1
+        AND (
+          UPPER(BTRIM(product_code)) = UPPER(BTRIM($2))
+          OR UPPER(BTRIM(COALESCE(ext_product_code, ''))) = UPPER(BTRIM($2))
+        )`,
+    [stationId, productCode, Number(change.newPrice)],
+  )
+
+  if ((result.rowCount ?? 0) < 1) {
+    throw new Error(
+      `No local product row found for fuel price change ${change.id} productCode=${productCode}`,
+    )
+  }
+}
+
+function isEffectiveNow(
+  change: FuelPriceChangeDto,
+  timezone: string,
+  now: Date = new Date(),
+) {
+  const effectiveAtLocal = localDateTime(
+    change.effectiveAt,
+    timezone,
+  ).localIsoSeconds
+  const nowLocal = localDateTime(now, timezone).localIsoSeconds
+  return effectiveAtLocal <= nowLocal
 }
 
 async function applyFuelPriceChange(
   stationId: string,
   change: FuelPriceChangeDto,
 ) {
-  const existing = await kvGet(stationId, appliedKey(change.id))
+  const timezone = await resolveStationTimezone(stationId)
+  const existing = await kvGet<Record<string, any>>(
+    stationId,
+    appliedKey(change.id),
+  )
   if (existing) {
+    if (!existing.localPriceSyncedAt && isEffectiveNow(change, timezone)) {
+      await syncLocalProductPrice(stationId, change)
+      const localPriceSyncedAt = new Date().toISOString()
+      await kvSet(stationId, appliedKey(change.id), {
+        ...existing,
+        localPriceSyncedAt,
+      })
+      return {
+        applied: false,
+        skipped: true,
+        reason: 'already_applied_local_price_synced',
+      }
+    }
     return { applied: false, skipped: true, reason: 'already_applied' }
   }
 
   const gradeId = await resolveDomsGradeId(stationId, change)
-  const payload = buildDomsPriceChangePayload(change, gradeId)
+  const payload = buildDomsPriceChangePayload(change, gradeId, timezone)
   const newPrice = Number(change.newPrice)
 
   const response = await runPosDomsCommand(
@@ -134,6 +200,14 @@ async function applyFuelPriceChange(
     )
   }
 
+  const appliedAt = new Date().toISOString()
+  const effectiveNow = isEffectiveNow(change, timezone)
+  let localPriceSyncedAt: string | null = null
+  if (effectiveNow) {
+    await syncLocalProductPrice(stationId, change)
+    localPriceSyncedAt = new Date().toISOString()
+  }
+
   await kvSet(stationId, appliedKey(change.id), {
     changeId: change.id,
     productId: change.productId ?? null,
@@ -141,7 +215,8 @@ async function applyFuelPriceChange(
     gradeId,
     newPrice,
     effectiveAt: change.effectiveAt,
-    appliedAt: new Date().toISOString(),
+    appliedAt,
+    localPriceSyncedAt,
   })
 
   return {
@@ -176,9 +251,9 @@ export async function pollFuelPriceChangesOnce(stationId: string) {
     : []
 
   changes.sort((a, b) => {
-    const at = new Date(a.effectiveAt).getTime()
-    const bt = new Date(b.effectiveAt).getTime()
-    if (at !== bt) return at - bt
+    const at = String(a.effectiveAt ?? '')
+    const bt = String(b.effectiveAt ?? '')
+    if (at !== bt) return at.localeCompare(bt)
     return Number(a.id) - Number(b.id)
   })
 
