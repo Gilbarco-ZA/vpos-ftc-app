@@ -16,7 +16,7 @@ export const GET = async (
 ) => {
   let user: SessionUser | null = null
   try {
-    user = await requireAuth(['administrator', 'manager'])
+    user = await requireAuth(['administrator'])
     if (!user) {
       return await serverError('User not found')
     }
@@ -49,7 +49,7 @@ export const DELETE = async (
 ) => {
   let user: SessionUser | null = null
   try {
-    user = await requireAuth(['administrator', 'manager'])
+    user = await requireAuth(['administrator'])
     if (!user) {
       return await serverError('User not found')
     }
