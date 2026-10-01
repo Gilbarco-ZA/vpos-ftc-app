@@ -7,7 +7,6 @@ import { serializeError } from '@/src/shared/utils/serializeError'
 
 import { startAtgPollingWorker } from '@/src/modules/forecourt/infrastructure/atgPollingWorker'
 import { startForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
-import { startFuelPriceChangeWorker } from '@/src/modules/forecourt/infrastructure/fuelPriceChangeWorker'
 import { startPosCommandsWorker } from '@/src/modules/pos/infrastructure/posCommandsWorker'
 import { startPrinterConnectivityWorker } from '@/src/modules/printing/infrastructure/printerConnectivityWorker'
 import { startPrintJobsWorker } from '@/src/modules/printing/infrastructure/printJobsWorker'
@@ -140,16 +139,6 @@ export function startInProcessRuntime(
         }),
       staleMs: 60_000,
       backoffMs: 5_000,
-    },
-    {
-      name: 'fuelPriceChangeWorker',
-      start: () =>
-        startFuelPriceChangeWorker({
-          stationId,
-          pollMs: 60 * 60_000,
-        }),
-      staleMs: 2 * 60 * 60_000,
-      backoffMs: 10_000,
     },
     {
       name: 'forecourtConfigSyncWorker',
