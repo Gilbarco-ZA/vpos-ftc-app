@@ -192,7 +192,7 @@ const ManagerCustomersView = async ({
 
       <Card className="overflow-hidden">
         <div className="border-b border-border px-4 py-3 text-sm text-[var(--text-secondary)]">
-          Showing {rows.length} customers (max 200)
+          Showing {rows.length} customers (max 100)
         </div>
         <Table>
           <TableHeader>
