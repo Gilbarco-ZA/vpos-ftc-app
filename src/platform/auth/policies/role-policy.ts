@@ -18,5 +18,5 @@ export const hasAnyRole = (
   userRole: UserRole,
   requiredRoles: UserRole[],
 ): boolean => {
-  return requiredRoles.some((role) => hasRole(userRole, role))
+  return requiredRoles.includes(userRole)
 }
