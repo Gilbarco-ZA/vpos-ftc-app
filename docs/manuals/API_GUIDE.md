@@ -86,6 +86,7 @@ Some compatibility adapters explicitly disable CSRF, notably the `/api/pos/doms/
 | `T/M/A`    | tenant, manager, or administrator                                                   |
 | `M/A`      | manager or administrator                                                            |
 | `A`        | administrator only                                                                  |
+| `FE`       | field engineer only; specialized commissioning/maintenance access                    |
 | `Setup`    | bootstrap/setup context; authorization depends on whether station setup is complete |
 | `Internal` | compatibility/runtime route; inspect deployment policy before use                   |
 
