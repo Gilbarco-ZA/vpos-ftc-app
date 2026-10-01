@@ -8,13 +8,14 @@ This guide describes the current role-based VPOS interface. Some menu items are 
 
 ## 1. Roles and access
 
-VPOS currently uses three application roles:
+VPOS currently uses four application roles:
 
 | Role            | Primary responsibility                          | Typical access                                                                                                                                                                                                            |
 | --------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tenant`        | Daily POS operation                             | Dashboard, POS, transactions, receipts, customers, and TIN Allocation when configured                                                                                                                                     |
 | `manager`       | Station operations and controlled configuration | Tenant functions plus reports, stock, transaction review, pumps, tanks, tank levels, forecourt setup, tank/pump configuration, and pricing                                                                                |
 | `administrator` | Technical and security administration           | Manager functions plus fiscal inbox, diagnostics, device status, print jobs, users, runtime control, maintenance, proxy/fiscal settings, setup wizard, products, station configuration, languages, datasets, and branding |
+| `field_engineer` | Controlled technical maintenance                | Dedicated technical role for explicitly authorized commissioning and protected DOMS/PSS maintenance operations; it does not inherit administrator access |
 
 Use the least-privileged role required for the task. Do not share administrator accounts for routine cashier or manager work.
 
