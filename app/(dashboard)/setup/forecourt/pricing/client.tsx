@@ -314,7 +314,7 @@ export default function ForecourtPricingClient() {
       })
       setSubmitMessage(
         body?.data?.enabled
-          ? 'Automatic fuel price checks enabled. Pricing will be checked on each enabled ATG polling cycle.'
+          ? 'Automatic fuel price checks enabled. Pricing will run on the shared polling cadence even when ATG capture is disabled.'
           : 'Automatic fuel price checks disabled.',
       )
     } catch (err) {
@@ -433,9 +433,9 @@ export default function ForecourtPricingClient() {
         <CardHeader>
           <CardTitle>Automatic fuel price updates</CardTitle>
           <CardDescription>
-            Check the cloud fuel-price-change endpoint during each enabled ATG
-            polling cycle. This setting does not create a separate worker or
-            interval.
+            Check the cloud fuel-price-change endpoint on the shared forecourt
+            polling cadence. This setting does not create a separate worker or
+            interval and can run even when ATG capture is disabled.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -453,9 +453,9 @@ export default function ForecourtPricingClient() {
                 Enable automatic fuel price checks
               </span>
               <span className="block text-xs text-[var(--text-muted)]">
-                Disabled by default. When enabled, the existing ATG polling
-                worker also checks for cloud price changes using the same
-                configured ATG interval.
+                Disabled by default. When enabled, cloud price changes are
+                checked using the configured ATG interval as the shared cadence,
+                even if automatic ATG capture itself is disabled.
               </span>
             </span>
           </label>
