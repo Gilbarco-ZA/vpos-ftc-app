@@ -5,6 +5,7 @@ import { logger } from '@/src/shared/utils/logger'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
 import { serializeError } from '@/src/shared/utils/serializeError'
 
+import { getFuelPricePollingSettings } from '@/src/modules/forecourt/application/fuelPricePollingSettings'
 import { startAtgPollingWorker } from '@/src/modules/forecourt/infrastructure/atgPollingWorker'
 import { pollFuelPriceChangesOnce } from '@/src/modules/forecourt/infrastructure/fuelPriceChangeWorker'
 import { startForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
@@ -137,6 +138,7 @@ export function startInProcessRuntime(
         startAtgPollingWorker({
           stationId,
           publishSnapshot: publishLatestTanzaniaTankInventories,
+          getFuelPricePollingSettings,
           pollFuelPriceChanges: pollFuelPriceChangesOnce,
         }),
       staleMs: 60_000,
