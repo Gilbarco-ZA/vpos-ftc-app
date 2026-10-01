@@ -296,6 +296,7 @@ test('ATG storage keeps latest state plus bounded projection evidence', () => {
 
 test('ATG proxy publication failure does not increase the configured DOMS polling rate', async () => {
   let stopped = false
+  let priceChecks = 0
   const heartbeats: Array<{
     status?: unknown
     connected?: unknown
@@ -310,6 +311,7 @@ test('ATG proxy publication failure does not increase the configured DOMS pollin
     deps: {
       acquireLock: async () => ({ release: async () => {} }),
       getSettings: async () => ({ enabled: true, intervalMinutes: 10 }),
+      getFuelPricePollingSettings: async () => ({ enabled: true }),
       captureSnapshot: async () => ({
         ok: true as const,
         recordedAt: '2026-08-07T12:00:00.000Z',
@@ -328,6 +330,10 @@ test('ATG proxy publication failure does not increase the configured DOMS pollin
       publishSnapshot: async () => {
         throw new Error('proxy unavailable')
       },
+      pollFuelPriceChanges: async () => {
+        priceChecks += 1
+        return { fetched: 0, applied: 0, skipped: 0 }
+      },
       heartbeat: async (value) => {
         heartbeats.push(value as (typeof heartbeats)[number])
       },
@@ -338,6 +344,7 @@ test('ATG proxy publication failure does not increase the configured DOMS pollin
     },
   })
 
+  assert.equal(priceChecks, 1)
   assert.equal(heartbeats[0]?.status, 'degraded')
   assert.equal(heartbeats[0]?.connected, true)
   assert.equal(heartbeats[0]?.metrics?.phase, 'publish')
