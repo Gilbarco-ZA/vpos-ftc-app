@@ -4,7 +4,7 @@ import test from 'node:test'
 
 import { runAtgPollingWorkerLoop } from '@/src/modules/forecourt/infrastructure/atgPollingWorker'
 
-test('ATG polling worker remains idle while disabled', async () => {
+test('shared forecourt polling worker remains idle while ATG and pricing are disabled', async () => {
   let stopped = false
   let captures = 0
   let publications = 0
@@ -43,6 +43,67 @@ test('ATG polling worker remains idle while disabled', async () => {
   assert.equal(publications, 0)
   assert.equal(heartbeats[0]?.status, 'disabled')
   assert.equal(unlocked, true)
+})
+
+test('fuel price polling runs when ATG polling is disabled', async () => {
+  let stopped = false
+  let captures = 0
+  let publications = 0
+  let priceChecks = 0
+  const heartbeats: Array<{
+    status?: unknown
+    metrics?: Record<string, unknown>
+  }> = []
+  const now = Date.parse('2026-08-07T12:00:00.000Z')
+
+  await runAtgPollingWorkerLoop('station-1', {
+    isStopped: () => stopped,
+    settingsRefreshMs: 1_000,
+    deps: {
+      acquireLock: async () => ({ release: async () => {} }),
+      getSettings: async () => ({ enabled: false, intervalMinutes: 10 }),
+      getFuelPricePollingSettings: async () => ({ enabled: true }),
+      captureSnapshot: async () => {
+        captures += 1
+        throw new Error('ATG capture should be skipped')
+      },
+      publishSnapshot: async () => {
+        publications += 1
+        throw new Error('ATG publication should be skipped')
+      },
+      pollFuelPriceChanges: async () => {
+        priceChecks += 1
+        return { fetched: 1, applied: 1, skipped: 0 }
+      },
+      heartbeat: async (value) => {
+        heartbeats.push(value as (typeof heartbeats)[number])
+      },
+      now: () => now,
+      sleep: async () => {
+        stopped = true
+      },
+    },
+  })
+
+  assert.equal(captures, 0)
+  assert.equal(publications, 0)
+  assert.equal(priceChecks, 1)
+  assert.equal(heartbeats[0]?.status, 'OK')
+  assert.equal(heartbeats[0]?.metrics?.atgPollingEnabled, false)
+  assert.equal(heartbeats[0]?.metrics?.fuelPricePollingEnabled, true)
+  assert.deepEqual(heartbeats[0]?.metrics?.publication, {
+    skipped: true,
+    reason: 'atg_polling_disabled',
+  })
+  assert.deepEqual(heartbeats[0]?.metrics?.fuelPriceChanges, {
+    fetched: 1,
+    applied: 1,
+    skipped: 0,
+  })
+  assert.equal(
+    heartbeats[0]?.metrics?.nextPollAt,
+    '2026-08-07T12:10:00.000Z',
+  )
 })
 
 test('ATG polling worker captures once and schedules the configured interval', async () => {
