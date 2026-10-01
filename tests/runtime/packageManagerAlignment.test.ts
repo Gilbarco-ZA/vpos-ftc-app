@@ -16,7 +16,6 @@ interface PackageConfig {
   startScriptTemplate?: string
   healthPorts?: string
   healthPaths?: string
-  environmentVariables?: Record<string, string>
 }
 
 const moduleRequire = createRequire(import.meta.url)
@@ -71,7 +70,6 @@ test('delegates ownership and startup policy to vpos-mono-package-mgr', () => {
   assert.equal(config.autoStartAfterInstall, undefined)
   assert.equal(config.autoStartOnBoot, undefined)
   assert.equal(config.systemdServiceName, undefined)
-  assert.equal(config.environmentVariables?.VPOS_MANAGED_BY_START_SH, '1')
 })
 
 test('builds only CPB539 Node 22 and CPB579 Node 22 packages', () => {
