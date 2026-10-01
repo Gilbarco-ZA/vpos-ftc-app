@@ -128,6 +128,11 @@ async function writeHeartbeat(filePath, extra = {}) {
   }
 }
 
+function isRecoverablePostgresTransportError(error) {
+  const message = String(error?.message || error || '');
+  return /connection terminated unexpectedly/i.test(message);
+}
+
 function installProcessDiagnostics() {
   const t0 = Date.now();
 
@@ -142,6 +147,10 @@ function installProcessDiagnostics() {
 
   process.on('uncaughtException', (e) => {
     err('[diag] uncaughtException:', e?.stack || e);
+    if (isRecoverablePostgresTransportError(e)) {
+      warn('[diag] PostgreSQL connection dropped; keeping process alive so the request can fail without taking down VPOS');
+      return;
+    }
     // ensure stderr flush; then exit non-zero
     try { process.stderr.write(''); } catch {}
     process.exit(1);
