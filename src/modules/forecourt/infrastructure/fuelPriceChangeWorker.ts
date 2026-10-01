@@ -2,18 +2,12 @@ import type { FuelPriceChangeDto } from '@/src/shared/proxy/client'
 
 import { query } from '@/src/platform/db/postgres'
 import { getFuelPriceChangesViaProxy } from '@/src/shared/proxy/client'
-import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 import { localDateTime } from '@/src/shared/time/localDateTime'
 import { resolveStationTimezone } from '@/src/shared/time/localTimezone'
-import { logger } from '@/src/shared/utils/logger'
 
 import { pumpMappingsRepo } from '@/src/modules/forecourt/infrastructure/repositories/pumpMappingsRepo'
 import { executePosDomsCommand } from '@/src/modules/pos/application/executePosDomsCommand'
-
-const WORKER_NAME = 'fuelPriceChangeWorker'
-const DEFAULT_POLL_MS = 60 * 60_000
-const MIN_POLL_MS = 60_000
 
 const normalize = (value: unknown) =>
   String(value ?? '')
@@ -270,79 +264,5 @@ export async function pollFuelPriceChangesOnce(stationId: string) {
     applied: results.filter((item) => item.applied).length,
     skipped: results.filter((item) => item.skipped).length,
     results,
-  }
-}
-
-export function startFuelPriceChangeWorker(input: {
-  stationId: string
-  pollMs?: number
-}) {
-  const configured = Number(input.pollMs ?? DEFAULT_POLL_MS)
-  const pollMs =
-    Number.isFinite(configured) && configured >= MIN_POLL_MS
-      ? configured
-      : DEFAULT_POLL_MS
-  let stopped = false
-  let timer: NodeJS.Timeout | null = null
-  let running = false
-
-  const schedule = () => {
-    if (stopped) return
-    timer = setTimeout(() => {
-      void tick()
-    }, pollMs)
-    timer.unref?.()
-  }
-
-  const tick = async () => {
-    if (stopped || running) return
-    running = true
-    try {
-      const result = await pollFuelPriceChangesOnce(input.stationId)
-      await upsertProcessHeartbeat({
-        stationId: input.stationId,
-        processName: WORKER_NAME,
-        status: 'OK',
-        connected: true,
-        metrics: {
-          pollMs,
-          fetched: result.fetched,
-          applied: result.applied,
-          skipped: result.skipped,
-          lastSuccessAt: new Date().toISOString(),
-        },
-        lastError: null,
-      }).catch(() => {})
-    } catch (error: any) {
-      const message = String(error?.message || error)
-      logger.error('[fuel-price-change-worker]', {
-        msg: 'fuel price change poll failed',
-        error: message,
-      })
-      await upsertProcessHeartbeat({
-        stationId: input.stationId,
-        processName: WORKER_NAME,
-        status: 'ERROR',
-        connected: false,
-        metrics: {
-          pollMs,
-          lastAttemptAt: new Date().toISOString(),
-        },
-        lastError: message,
-      }).catch(() => {})
-    } finally {
-      running = false
-      schedule()
-    }
-  }
-
-  void tick()
-
-  return {
-    stop: () => {
-      stopped = true
-      if (timer) clearTimeout(timer)
-      timer = null
-    },
   }
 }
