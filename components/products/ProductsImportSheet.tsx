@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Download, Upload } from 'lucide-react'
 
 import { Alert } from '@/components/ui/alert'
@@ -48,14 +48,15 @@ export function ProductsImportSheet({
   const [error, setError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
-  useEffect(() => {
-    if (!isOpen) {
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
       setFile(null)
       setError(null)
       setValidationErrors([])
       setIsImporting(false)
     }
-  }, [isOpen])
+    onOpenChange(open)
+  }
 
   const submit = async () => {
     if (!file) {
@@ -91,7 +92,7 @@ export function ProductsImportSheet({
 
       const result = body?.data as ImportResult
       onImported(result)
-      onOpenChange(false)
+      handleOpenChange(false)
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : 'Product import failed.',
@@ -102,7 +103,7 @@ export function ProductsImportSheet({
   }
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Import products and stock</SheetTitle>
@@ -155,11 +156,14 @@ export function ProductsImportSheet({
               <label className="text-sm font-medium text-[var(--text-primary)]">
                 CSV template
               </label>
-              <Button asChild type="button" variant="secondary" size="sm">
-                <a href="/api/products/import">
-                  <Download className="mr-2 h-4 w-4" />
-                  Download template
-                </a>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => window.location.assign('/api/products/import')}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download template
               </Button>
             </div>
             <p className="text-xs text-[var(--text-muted)]">
@@ -202,7 +206,7 @@ export function ProductsImportSheet({
             type="button"
             variant="secondary"
             disabled={isImporting}
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             Cancel
           </Button>
