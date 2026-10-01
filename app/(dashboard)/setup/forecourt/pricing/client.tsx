@@ -6,10 +6,18 @@ import Link from 'next/link'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
 import { PageHeader } from '@/components/layout/page-header'
+import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 import PssConfigurationVerification from '@/components/setup/PssConfigurationVerification'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorDetails } from '@/components/ui/error-details'
 import { Input } from '@/components/ui/input'
@@ -135,6 +143,7 @@ function getCurrentPriceBank(data?: PriceSetResponseData | null) {
 }
 
 export default function ForecourtPricingClient() {
+  const [csrfToken, setCsrfToken] = useState('')
   const [products, setProducts] = useState<ProductItem[]>([])
   const [rows, setRows] = useState<EntryRow[]>([makeRow()])
   const [applyMode, setApplyMode] = useState<ApplyMode>('now')
@@ -142,6 +151,11 @@ export default function ForecourtPricingClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSavingFuelPricePolling, setIsSavingFuelPricePolling] =
+    useState(false)
+  const [fuelPricePolling, setFuelPricePolling] = useState({
+    enabled: false,
+  })
   const [error, setError] = useState<unknown>(null)
   const [priceStateError, setPriceStateError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -169,6 +183,24 @@ export default function ForecourtPricingClient() {
         productCode: item.productCode ? String(item.productCode) : undefined,
       })),
     )
+  }, [])
+
+  const loadFuelPricePolling = useCallback(async () => {
+    const res = await fetch(
+      '/api/setup/forecourt/pricing/fuel-price-polling',
+      { cache: 'no-store' },
+    )
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || body?.ok === false || body?.success === false) {
+      throw new Error(
+        body?.error?.message ??
+          body?.message ??
+          'Unable to load fuel price polling settings',
+      )
+    }
+    setFuelPricePolling({
+      enabled: body?.data?.enabled === true,
+    })
   }, [])
 
   const refreshPriceState = useCallback(async () => {
@@ -201,13 +233,17 @@ export default function ForecourtPricingClient() {
     setIsLoading(true)
     setError(null)
     try {
-      await Promise.all([loadProducts(), refreshPriceState()])
+      await Promise.all([
+        loadProducts(),
+        refreshPriceState(),
+        loadFuelPricePolling(),
+      ])
     } catch (err) {
       setError(err)
     } finally {
       setIsLoading(false)
     }
-  }, [loadProducts, refreshPriceState])
+  }, [loadFuelPricePolling, loadProducts, refreshPriceState])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -244,6 +280,53 @@ export default function ForecourtPricingClient() {
     if (applyMode === 'scheduled' && !effectiveAt) return false
     return rows.some((row) => row.productId && row.price.trim())
   }, [applyMode, effectiveAt, rows])
+
+  const saveFuelPricePolling = useCallback(async () => {
+    setSubmitError(null)
+    setSubmitMessage(null)
+    setIsSavingFuelPricePolling(true)
+    try {
+      const res = await fetch(
+        '/api/setup/forecourt/pricing/fuel-price-polling',
+        {
+          method: 'PUT',
+          headers: {
+            'content-type': 'application/json',
+            'x-csrf-token': csrfToken,
+          },
+          body: JSON.stringify({
+            data: { enabled: fuelPricePolling.enabled },
+            csrf_token: csrfToken,
+          }),
+        },
+      )
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || body?.ok === false || body?.success === false) {
+        throw new Error(
+          body?.error?.message ??
+            body?.message ??
+            'Failed to save fuel price polling settings',
+        )
+      }
+
+      setFuelPricePolling({
+        enabled: body?.data?.enabled === true,
+      })
+      setSubmitMessage(
+        body?.data?.enabled
+          ? 'Automatic fuel price checks enabled. Pricing will be checked on each enabled ATG polling cycle.'
+          : 'Automatic fuel price checks disabled.',
+      )
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to save fuel price polling settings',
+      )
+    } finally {
+      setIsSavingFuelPricePolling(false)
+    }
+  }, [csrfToken, fuelPricePolling.enabled])
 
   const handleSubmit = useCallback(async () => {
     setSubmitError(null)
@@ -324,6 +407,8 @@ export default function ForecourtPricingClient() {
 
   return (
     <div className="space-y-4">
+      <CsrfBootstrap onToken={setCsrfToken} />
+
       <PageHeader
         title="Forecourt Pricing"
         description="Apply DOMS price changes immediately or schedule a future activation. Price changes are submitted as a complete DOMS price bank."
@@ -344,6 +429,48 @@ export default function ForecourtPricingClient() {
       />
 
       <PssConfigurationVerification compact />
+      <Card>
+        <CardHeader>
+          <CardTitle>Automatic fuel price updates</CardTitle>
+          <CardDescription>
+            Check the cloud fuel-price-change endpoint during each enabled ATG
+            polling cycle. This setting does not create a separate worker or
+            interval.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-start gap-3 rounded-lg border border-border p-3">
+            <Checkbox
+              checked={fuelPricePolling.enabled}
+              onChange={(event) =>
+                setFuelPricePolling({
+                  enabled: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <span className="block text-sm font-medium text-[var(--text-primary)]">
+                Enable automatic fuel price checks
+              </span>
+              <span className="block text-xs text-[var(--text-muted)]">
+                Disabled by default. When enabled, the existing ATG polling
+                worker also checks for cloud price changes using the same
+                configured ATG interval.
+              </span>
+            </span>
+          </label>
+
+          <div className="flex justify-end">
+            <Button
+              variant="primary"
+              onClick={saveFuelPricePolling}
+              disabled={isSavingFuelPricePolling || !csrfToken}
+            >
+              {isSavingFuelPricePolling ? 'Saving…' : 'Save pricing polling'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
       {isLoading ? (
         <Card>
           <CardContent className="space-y-3">
