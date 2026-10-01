@@ -47,6 +47,10 @@ export const getNavSections = (
     ],
   }
 
+  if (role === 'field_engineer') {
+    return [dashboard]
+  }
+
   if (role === 'tenant') {
     const allowed = [
       '/pos',
