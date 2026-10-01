@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic'
 export const GET = async () => {
   let user: SessionUser | null = null
   try {
-    user = await requireAuth(['administrator', 'manager'])
+    user = await requireAuth(['administrator'])
     if (!user) {
       return await serverError('User not found')
     }
@@ -36,7 +36,7 @@ export const GET = async () => {
 export const POST = async (req: Request) => {
   let user: SessionUser | null = null
   try {
-    user = await requireAuth(['administrator', 'manager'])
+    user = await requireAuth(['administrator'])
     if (!user) {
       return await serverError('User not found')
     }
@@ -76,7 +76,7 @@ export const POST = async (req: Request) => {
 export const PATCH = async (req: Request) => {
   let user: SessionUser | null = null
   try {
-    user = await requireAuth(['administrator', 'manager'])
+    user = await requireAuth(['administrator'])
     if (!user) {
       return await serverError('User not found')
     }
