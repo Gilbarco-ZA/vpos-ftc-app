@@ -152,16 +152,24 @@ export async function getCustomerForStationRepo(params: {
 }
 
 export async function setCustomerDeletedRepo(params: {
+  stationId: string
   customerId: string
   restore: boolean
 }) {
-  await query(
-    `UPDATE customers
+  const result = await query(
+    `UPDATE customers c
        SET deleted_at = ${params.restore ? 'NULL' : 'NOW()'},
            updated_at = NOW()
-     WHERE id = $1`,
-    [params.customerId],
+     WHERE c.id = $1
+       AND EXISTS (
+         SELECT 1
+           FROM customer_stations cs
+          WHERE cs.customer_id = c.id
+            AND cs.station_id = $2
+       )`,
+    [params.customerId, params.stationId],
   )
+  return (result.rowCount ?? 0) > 0
 }
 
 export async function updateCustomerRepo(params: {
