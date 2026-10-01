@@ -87,11 +87,6 @@ const selectSql = `
   ${fromSql}
 `
 
-const countSql = `
-  SELECT COUNT(*)::text AS count
-  ${fromSql}
-`
-
 function buildFilter(
   stationId: string,
   opts: ListTransactionsRepoOptions = {},
