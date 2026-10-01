@@ -5,7 +5,6 @@ import { logger } from '@/src/shared/utils/logger'
 
 import { getAtgPollingSettings } from '@/src/modules/forecourt/application/atgPollingSettings'
 import { captureAtgSnapshot } from '@/src/modules/forecourt/application/captureAtgSnapshot'
-import { pollFuelPriceChangesOnce } from '@/src/modules/forecourt/infrastructure/fuelPriceChangeWorker'
 import { acquireAtgPollingWorkerLock } from '@/src/modules/forecourt/infrastructure/atgPollingWorkerLock'
 
 const WORKER_NAME = 'atgPollingWorker'
@@ -32,7 +31,10 @@ const defaultDeps: AtgPollingWorkerDeps = {
   getSettings: getAtgPollingSettings,
   captureSnapshot: captureAtgSnapshot,
   publishSnapshot: async () => ({ skipped: true, reason: 'no_publisher' }),
-  pollFuelPriceChanges: pollFuelPriceChangesOnce,
+  pollFuelPriceChanges: async () => ({
+    skipped: true,
+    reason: 'no_fuel_price_checker',
+  }),
   heartbeat: upsertProcessHeartbeat,
   acquireLock: acquireAtgPollingWorkerLock,
   now: () => Date.now(),
@@ -258,15 +260,24 @@ export function startAtgPollingWorker(input: {
   stationId: string
   settingsRefreshMs?: number
   publishSnapshot?: AtgPollingWorkerDeps['publishSnapshot']
+  pollFuelPriceChanges?: AtgPollingWorkerDeps['pollFuelPriceChanges']
 }) {
   let stopped = false
 
   void runAtgPollingWorkerLoop(input.stationId, {
     isStopped: () => stopped,
     settingsRefreshMs: input.settingsRefreshMs,
-    deps: input.publishSnapshot
-      ? { publishSnapshot: input.publishSnapshot }
-      : undefined,
+    deps:
+      input.publishSnapshot || input.pollFuelPriceChanges
+        ? {
+            ...(input.publishSnapshot
+              ? { publishSnapshot: input.publishSnapshot }
+              : {}),
+            ...(input.pollFuelPriceChanges
+              ? { pollFuelPriceChanges: input.pollFuelPriceChanges }
+              : {}),
+          }
+        : undefined,
   }).catch((error) => {
     logger.error('[atg-polling-worker]', {
       msg: 'worker loop stopped unexpectedly',
