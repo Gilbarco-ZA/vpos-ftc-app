@@ -118,7 +118,9 @@ export default function TinAllocationClient({
   }
 
   useEffect(() => {
-    void refresh()
+    queueMicrotask(() => {
+      void refresh()
+    })
     const id = window.setInterval(() => void refresh(), 5000)
     return () => window.clearInterval(id)
   }, [])
