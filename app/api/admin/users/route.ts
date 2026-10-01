@@ -11,7 +11,7 @@ import {
   defineGetRoute,
   defineMutationRoute,
 } from '@/src/shared/http/defineRoute'
-import { listUsers } from '@/src/shared/server/users'
+import { listUsers, userExists } from '@/src/shared/server/users'
 import {
   createUserSchema,
   updateUserSchema,
@@ -83,6 +83,9 @@ export const PUT = defineMutationRoute<Record<string, any>>({
     try {
       const userId = String(body.userId || '').trim()
       if (!userId) return fail('userId is required', 400)
+
+      const existing = await userExists(userId, user.stationId)
+      if (!existing) return fail('User not found', 404)
 
       const hasProfileUpdate =
         body.username !== undefined ||
