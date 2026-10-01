@@ -114,6 +114,117 @@ test('ATG polling worker captures once and schedules the configured interval', a
   })
 })
 
+test('ATG polling worker skips fuel price checks when pricing polling is disabled', async () => {
+  let stopped = false
+  let priceChecks = 0
+  const heartbeats: Array<{
+    status?: unknown
+    metrics?: Record<string, unknown>
+  }> = []
+  const now = Date.parse('2026-08-07T12:00:00.000Z')
+
+  await runAtgPollingWorkerLoop('station-1', {
+    isStopped: () => stopped,
+    settingsRefreshMs: 1_000,
+    deps: {
+      acquireLock: async () => ({ release: async () => {} }),
+      getSettings: async () => ({ enabled: true, intervalMinutes: 10 }),
+      getFuelPricePollingSettings: async () => ({ enabled: false }),
+      captureSnapshot: async () => ({
+        ok: true as const,
+        recordedAt: '2026-08-07T12:00:00.000Z',
+        requestedTgIds: ['01'],
+        controllerErrors: [],
+        updated: 1,
+        snapshotsSaved: 1,
+        tanks: [],
+        liveData: {
+          requestedTgIds: ['01'],
+          responses: [],
+          normalized: [],
+          errors: [],
+        },
+      }),
+      publishSnapshot: async () => ({ ok: true, tankCount: 1 }),
+      pollFuelPriceChanges: async () => {
+        priceChecks += 1
+        return { fetched: 1 }
+      },
+      heartbeat: async (value) => {
+        heartbeats.push(value as (typeof heartbeats)[number])
+      },
+      now: () => now,
+      sleep: async () => {
+        stopped = true
+      },
+    },
+  })
+
+  assert.equal(priceChecks, 0)
+  assert.equal(heartbeats[0]?.status, 'OK')
+  assert.equal(heartbeats[0]?.metrics?.fuelPricePollingEnabled, false)
+  assert.deepEqual(heartbeats[0]?.metrics?.fuelPriceChanges, {
+    skipped: true,
+    reason: 'fuel_price_polling_disabled',
+  })
+})
+
+test('ATG polling worker checks fuel prices when pricing polling is enabled', async () => {
+  let stopped = false
+  let priceChecks = 0
+  const heartbeats: Array<{
+    status?: unknown
+    metrics?: Record<string, unknown>
+  }> = []
+  const now = Date.parse('2026-08-07T12:00:00.000Z')
+
+  await runAtgPollingWorkerLoop('station-1', {
+    isStopped: () => stopped,
+    settingsRefreshMs: 1_000,
+    deps: {
+      acquireLock: async () => ({ release: async () => {} }),
+      getSettings: async () => ({ enabled: true, intervalMinutes: 10 }),
+      getFuelPricePollingSettings: async () => ({ enabled: true }),
+      captureSnapshot: async () => ({
+        ok: true as const,
+        recordedAt: '2026-08-07T12:00:00.000Z',
+        requestedTgIds: ['01'],
+        controllerErrors: [],
+        updated: 1,
+        snapshotsSaved: 1,
+        tanks: [],
+        liveData: {
+          requestedTgIds: ['01'],
+          responses: [],
+          normalized: [],
+          errors: [],
+        },
+      }),
+      publishSnapshot: async () => ({ ok: true, tankCount: 1 }),
+      pollFuelPriceChanges: async () => {
+        priceChecks += 1
+        return { fetched: 1, applied: 1, skipped: 0 }
+      },
+      heartbeat: async (value) => {
+        heartbeats.push(value as (typeof heartbeats)[number])
+      },
+      now: () => now,
+      sleep: async () => {
+        stopped = true
+      },
+    },
+  })
+
+  assert.equal(priceChecks, 1)
+  assert.equal(heartbeats[0]?.status, 'OK')
+  assert.equal(heartbeats[0]?.metrics?.fuelPricePollingEnabled, true)
+  assert.deepEqual(heartbeats[0]?.metrics?.fuelPriceChanges, {
+    fetched: 1,
+    applied: 1,
+    skipped: 0,
+  })
+})
+
 test('ATG storage keeps latest state plus bounded projection evidence', () => {
   const settingsMigration = readFileSync(
     'scripts/migrations/postgres/1274_atg_history_worker.sql',
