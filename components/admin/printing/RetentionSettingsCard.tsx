@@ -186,7 +186,9 @@ export function RetentionSettingsCard() {
   }, [])
 
   useEffect(() => {
-    void load()
+    queueMicrotask(() => {
+      void load()
+    })
   }, [load])
 
   const save = async () => {
