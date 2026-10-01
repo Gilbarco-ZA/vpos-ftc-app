@@ -15,7 +15,7 @@
     "test": "node scripts/run-tests.mjs",
     "typescript": "npm run typecheck",
     "worker": "tsx scripts/worker.ts",
-    "lint": "prettier --check . && eslint .",
+    "lint": "eslint .",
     "fiscal:stub": "tsx scripts/fiscal-worker-stub.ts",
     "server:gen": "esbuild server.ts --bundle --platform=node --format=cjs --target=node22 --outfile=vpos-server.cjs --external:next",
     "proxy-sender-worker": "tsx scripts/proxy-sender-worker.ts",
@@ -57,7 +57,8 @@
     "check:page-boundaries": "node scripts/check-page-boundaries.mjs",
     "check:module-boundaries": "node scripts/check-module-boundaries.mjs",
     "format": "prettier --write .",
-    "clean:tsbuildinfo": "node -e \"require('fs').rmSync('tsconfig.tsbuildinfo',{force:true})\""
+    "clean:tsbuildinfo": "node -e \"require('fs').rmSync('tsconfig.tsbuildinfo',{force:true})\"",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@gilbarcoafs/doms-pos-jpl": "^1.1.16",
