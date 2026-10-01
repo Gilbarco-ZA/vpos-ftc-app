@@ -11,6 +11,7 @@ export const GET = async () => {
       { value: 'administrator', label: 'Administrator' },
       { value: 'manager', label: 'Manager' },
       { value: 'tenant', label: 'Tenant' },
+      { value: 'field_engineer', label: 'Field Engineer' },
     ],
   })
 }
