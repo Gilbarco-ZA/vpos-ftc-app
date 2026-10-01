@@ -130,7 +130,11 @@ export default function TenantTransactionsClient(props: {
   }
 
   useEffect(() => {
-    void refreshPreFuelState().catch(() => setCaptureOrder('after_transaction'))
+    queueMicrotask(() => {
+      void refreshPreFuelState().catch(() =>
+        setCaptureOrder('after_transaction'),
+      )
+    })
   }, [])
 
   useEffect(() => {
