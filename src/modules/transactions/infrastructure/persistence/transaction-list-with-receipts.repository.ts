@@ -3,6 +3,9 @@ import { queryAll, queryPaginated } from '@/src/platform/db/postgres'
 import type { ListTransactionsRepoOptions } from './transaction.types'
 
 const receiptNumberJoinSql = `
+  LEFT JOIN fiscalization_events latest_fe
+    ON latest_fe.id = t.latest_fiscal_event_id
+   AND latest_fe.station_id = t.station_id
   LEFT JOIN LATERAL (
     SELECT COALESCE(
       (
@@ -12,6 +15,26 @@ const receiptNumberJoinSql = `
            AND r.transaction_id = t.id
          ORDER BY r.generated_at DESC
          LIMIT 1
+      ),
+      COALESCE(
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{details,receipt,receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{details,receipt,ReceiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{details,receipt,receipt_number}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{details,receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{details,ReceiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{receipt,receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{receipt,ReceiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{receipt,receipt_number}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{ReceiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{final,details,receipt,receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{final,details,receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{submission,details,receipt,receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.response_payload #>> '{submission,details,receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.request_payload #>> '{tra,receiptNo}'), ''),
+        NULLIF(BTRIM(latest_fe.request_payload #>> '{tra,globalCount}'), ''),
+        NULLIF(BTRIM(latest_fe.request_payload #>> '{tanzania,receiptNumber}'), ''),
+        NULLIF(BTRIM(latest_fe.request_payload #>> '{tanzania,globalCounter}'), '')
       ),
       (
         SELECT COALESCE(
