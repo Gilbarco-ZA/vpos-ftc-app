@@ -174,7 +174,9 @@ export async function listTransactionsWithReceiptNumbersRepo(
 ) {
   const { params, where, orderBy } = buildFilter(stationId, opts)
   const baseQuery = `${selectSql}\n${where}\n${orderBy}`
-  const baseCount = `${countSql}\n${where}`
+  const hasSearch = Boolean(String(opts.search || '').trim())
+  const countFromSql = hasSearch ? fromSql : 'FROM transactions t'
+  const baseCount = `SELECT COUNT(*)::text AS count\n${countFromSql}\n${where}`
 
   if (opts.page || opts.pageSize) {
     const page = Math.max(1, Number(opts.page || 1))
