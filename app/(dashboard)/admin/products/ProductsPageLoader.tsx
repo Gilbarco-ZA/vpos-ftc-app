@@ -61,7 +61,9 @@ export function ProductsPageLoader() {
 
   useEffect(() => {
     const controller = new AbortController()
-    void loadPageData(controller.signal)
+    queueMicrotask(() => {
+      void loadPageData(controller.signal)
+    })
 
     return () => controller.abort()
   }, [loadPageData])
