@@ -1,5 +1,6 @@
 import { startPssXmlSyncWorker as startLegacyPssXmlSyncWorker } from '@/src/platform/integrations/pssXml/watcherWorker'
 
+import { getFuelPricePollingSettings } from '@/src/modules/forecourt/application/fuelPricePollingSettings'
 import { startAtgPollingWorker as startCanonicalAtgPollingWorker } from '@/src/modules/forecourt/infrastructure/atgPollingWorker'
 import { pollFuelPriceChangesOnce } from '@/src/modules/forecourt/infrastructure/fuelPriceChangeWorker'
 import { startForecourtConfigSyncWorker as startLegacyForecourtConfigSyncWorker } from '@/src/modules/forecourt/infrastructure/configSync/worker'
@@ -26,6 +27,7 @@ export function startAtgPollingRuntimeWorker(opts: { stationId: string }) {
   return startCanonicalAtgPollingWorker({
     ...opts,
     publishSnapshot: publishLatestTanzaniaTankInventories,
+    getFuelPricePollingSettings,
     pollFuelPriceChanges: pollFuelPriceChangesOnce,
   })
 }
