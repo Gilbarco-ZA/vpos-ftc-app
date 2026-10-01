@@ -151,41 +151,16 @@ export async function runAtgPollingWorkerLoop(
         const result = await deps.captureSnapshot(stationId)
         lastSnapshotsSaved = Number(result.snapshotsSaved ?? 0)
 
-        let publication: unknown
+        let publication: unknown = null
+        let publicationError: string | null = null
         try {
           publication = await deps.publishSnapshot(stationId, result)
         } catch (error: any) {
-          const message = String(error?.message || error)
-          nextPollAt = deps.now() + intervalMs
-
+          publicationError = String(error?.message || error)
           logger.error('[atg-polling-worker]', {
             msg: 'ATG snapshot persisted but proxy publication failed',
-            error: message,
+            error: publicationError,
           })
-
-          await deps
-            .heartbeat({
-              stationId,
-              processName: WORKER_NAME,
-              status: 'degraded',
-              connected: true,
-              metrics: {
-                enabled: true,
-                phase: 'publish',
-                intervalMinutes: settings.intervalMinutes,
-                capturedAt: result.recordedAt,
-                lastSuccessAt,
-                lastSnapshotsSaved,
-                updated: Number(result.updated ?? 0),
-                controllerErrorCount: result.controllerErrors.length,
-                nextPollAt: new Date(nextPollAt).toISOString(),
-              },
-              lastError: message,
-            })
-            .catch(() => {})
-
-          await deps.sleep(settingsRefreshMs)
-          continue
         }
 
         let fuelPriceChanges: unknown = {
@@ -212,11 +187,15 @@ export async function runAtgPollingWorkerLoop(
         lastSuccessAt = result.recordedAt
         nextPollAt = deps.now() + intervalMs
 
+        const cycleErrors = [publicationError, fuelPriceError].filter(
+          (value): value is string => Boolean(value),
+        )
+
         await deps
           .heartbeat({
             stationId,
             processName: WORKER_NAME,
-            status: fuelPriceError ? 'degraded' : 'OK',
+            status: cycleErrors.length ? 'degraded' : 'OK',
             connected: true,
             metrics: {
               enabled: true,
@@ -226,11 +205,12 @@ export async function runAtgPollingWorkerLoop(
               updated: Number(result.updated ?? 0),
               controllerErrorCount: result.controllerErrors.length,
               publication,
+              publicationError,
               fuelPricePollingEnabled,
               fuelPriceChanges,
               nextPollAt: new Date(nextPollAt).toISOString(),
             },
-            lastError: fuelPriceError,
+            lastError: cycleErrors.length ? cycleErrors.join('; ') : null,
           })
           .catch(() => {})
       } catch (error: any) {
