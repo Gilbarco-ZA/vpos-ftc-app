@@ -20,6 +20,9 @@ export type AtgPollingWorkerDeps = {
     stationId: string,
     result: AtgSnapshotResult,
   ) => Promise<unknown>
+  getFuelPricePollingSettings: (
+    stationId: string,
+  ) => Promise<{ enabled: boolean }>
   pollFuelPriceChanges: (stationId: string) => Promise<unknown>
   heartbeat: typeof upsertProcessHeartbeat
   acquireLock: (stationId: string) => Promise<AtgPollingWorkerLock | null>
@@ -31,6 +34,7 @@ const defaultDeps: AtgPollingWorkerDeps = {
   getSettings: getAtgPollingSettings,
   captureSnapshot: captureAtgSnapshot,
   publishSnapshot: async () => ({ skipped: true, reason: 'no_publisher' }),
+  getFuelPricePollingSettings: async () => ({ enabled: false }),
   pollFuelPriceChanges: async () => ({
     skipped: true,
     reason: 'no_fuel_price_checker',
@@ -184,10 +188,19 @@ export async function runAtgPollingWorkerLoop(
           continue
         }
 
-        let fuelPriceChanges: unknown = null
+        let fuelPriceChanges: unknown = {
+          skipped: true,
+          reason: 'fuel_price_polling_disabled',
+        }
         let fuelPriceError: string | null = null
+        let fuelPricePollingEnabled = false
         try {
-          fuelPriceChanges = await deps.pollFuelPriceChanges(stationId)
+          const fuelPriceSettings =
+            await deps.getFuelPricePollingSettings(stationId)
+          fuelPricePollingEnabled = fuelPriceSettings.enabled
+          if (fuelPricePollingEnabled) {
+            fuelPriceChanges = await deps.pollFuelPriceChanges(stationId)
+          }
         } catch (error: any) {
           fuelPriceError = String(error?.message || error)
           logger.error('[atg-polling-worker]', {
@@ -213,6 +226,7 @@ export async function runAtgPollingWorkerLoop(
               updated: Number(result.updated ?? 0),
               controllerErrorCount: result.controllerErrors.length,
               publication,
+              fuelPricePollingEnabled,
               fuelPriceChanges,
               nextPollAt: new Date(nextPollAt).toISOString(),
             },
@@ -260,6 +274,7 @@ export function startAtgPollingWorker(input: {
   stationId: string
   settingsRefreshMs?: number
   publishSnapshot?: AtgPollingWorkerDeps['publishSnapshot']
+  getFuelPricePollingSettings?: AtgPollingWorkerDeps['getFuelPricePollingSettings']
   pollFuelPriceChanges?: AtgPollingWorkerDeps['pollFuelPriceChanges']
 }) {
   let stopped = false
@@ -268,10 +283,18 @@ export function startAtgPollingWorker(input: {
     isStopped: () => stopped,
     settingsRefreshMs: input.settingsRefreshMs,
     deps:
-      input.publishSnapshot || input.pollFuelPriceChanges
+      input.publishSnapshot ||
+      input.getFuelPricePollingSettings ||
+      input.pollFuelPriceChanges
         ? {
             ...(input.publishSnapshot
               ? { publishSnapshot: input.publishSnapshot }
+              : {}),
+            ...(input.getFuelPricePollingSettings
+              ? {
+                  getFuelPricePollingSettings:
+                    input.getFuelPricePollingSettings,
+                }
               : {}),
             ...(input.pollFuelPriceChanges
               ? { pollFuelPriceChanges: input.pollFuelPriceChanges }
