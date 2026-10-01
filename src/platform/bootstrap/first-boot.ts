@@ -50,15 +50,13 @@ export const ensureFirstBoot = async (
 
   const globals = firstBootGlobals()
   if (!globals.__vposFirstBootPromise) {
-    const promise: Promise<FirstBootResult> = runFirstBoot(
-      runtimeStationId,
-    ).catch((error) => {
+    const promise = runFirstBoot(runtimeStationId)
+    globals.__vposFirstBootPromise = promise
+    void promise.catch(() => {
       if (globals.__vposFirstBootPromise === promise) {
         globals.__vposFirstBootPromise = undefined
       }
-      throw error
     })
-    globals.__vposFirstBootPromise = promise
   }
   return globals.__vposFirstBootPromise
 }
