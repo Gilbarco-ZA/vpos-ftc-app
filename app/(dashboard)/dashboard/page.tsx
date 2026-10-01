@@ -13,16 +13,9 @@ const DashboardHome = async () => {
     resolveStationTimezoneContext(user.stationId),
   ])
 
-  const role =
-    user.role === 'administrator'
-      ? 'administrator'
-      : user.role === 'manager'
-        ? 'manager'
-        : 'tenant'
-
   return (
     <RoleDashboardHome
-      role={role}
+      role={user.role}
       stationName={user.station.name}
       stationCode={user.station.code}
       logoPath={(branding as any)?.logo_path ?? null}
