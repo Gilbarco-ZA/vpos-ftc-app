@@ -11,6 +11,9 @@ export const hasRole = (
   userRole: UserRole,
   requiredRole: UserRole,
 ): boolean => {
+  if (userRole === 'field_engineer' || requiredRole === 'field_engineer') {
+    return userRole === requiredRole
+  }
   return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole]
 }
 
