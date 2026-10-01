@@ -26,6 +26,12 @@ test('launcher signal diagnostics include actual signal, pid, and memory', () =>
   assert.doesNotMatch(launcher, /received  \(pid=\)/)
 })
 
+test('launcher keeps VPOS alive for a transient PostgreSQL connection drop', () => {
+  assert.match(launcher, /isRecoverablePostgresTransportError/)
+  assert.match(launcher, /connection terminated unexpectedly/i)
+  assert.match(launcher, /PostgreSQL connection dropped; keeping process alive/)
+})
+
 test('structured errors survive JSON logging and Tanzania configuration noise is rate-limited', () => {
   assert.match(serializer, /export function serializeError/)
   assert.match(serializer, /stack:/)
