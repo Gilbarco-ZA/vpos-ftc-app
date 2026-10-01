@@ -5,6 +5,7 @@ import { logger } from '@/src/shared/utils/logger'
 
 import { getAtgPollingSettings } from '@/src/modules/forecourt/application/atgPollingSettings'
 import { captureAtgSnapshot } from '@/src/modules/forecourt/application/captureAtgSnapshot'
+import { pollFuelPriceChangesOnce } from '@/src/modules/forecourt/infrastructure/fuelPriceChangeWorker'
 import { acquireAtgPollingWorkerLock } from '@/src/modules/forecourt/infrastructure/atgPollingWorkerLock'
 
 const WORKER_NAME = 'atgPollingWorker'
@@ -20,6 +21,7 @@ export type AtgPollingWorkerDeps = {
     stationId: string,
     result: AtgSnapshotResult,
   ) => Promise<unknown>
+  pollFuelPriceChanges: (stationId: string) => Promise<unknown>
   heartbeat: typeof upsertProcessHeartbeat
   acquireLock: (stationId: string) => Promise<AtgPollingWorkerLock | null>
   now: () => number
@@ -30,6 +32,7 @@ const defaultDeps: AtgPollingWorkerDeps = {
   getSettings: getAtgPollingSettings,
   captureSnapshot: captureAtgSnapshot,
   publishSnapshot: async () => ({ skipped: true, reason: 'no_publisher' }),
+  pollFuelPriceChanges: pollFuelPriceChangesOnce,
   heartbeat: upsertProcessHeartbeat,
   acquireLock: acquireAtgPollingWorkerLock,
   now: () => Date.now(),
@@ -179,6 +182,18 @@ export async function runAtgPollingWorkerLoop(
           continue
         }
 
+        let fuelPriceChanges: unknown = null
+        let fuelPriceError: string | null = null
+        try {
+          fuelPriceChanges = await deps.pollFuelPriceChanges(stationId)
+        } catch (error: any) {
+          fuelPriceError = String(error?.message || error)
+          logger.error('[atg-polling-worker]', {
+            msg: 'fuel price change check failed',
+            error: fuelPriceError,
+          })
+        }
+
         lastSuccessAt = result.recordedAt
         nextPollAt = deps.now() + intervalMs
 
@@ -186,7 +201,7 @@ export async function runAtgPollingWorkerLoop(
           .heartbeat({
             stationId,
             processName: WORKER_NAME,
-            status: 'OK',
+            status: fuelPriceError ? 'degraded' : 'OK',
             connected: true,
             metrics: {
               enabled: true,
@@ -196,9 +211,10 @@ export async function runAtgPollingWorkerLoop(
               updated: Number(result.updated ?? 0),
               controllerErrorCount: result.controllerErrors.length,
               publication,
+              fuelPriceChanges,
               nextPollAt: new Date(nextPollAt).toISOString(),
             },
-            lastError: null,
+            lastError: fuelPriceError,
           })
           .catch(() => {})
       } catch (error: any) {
