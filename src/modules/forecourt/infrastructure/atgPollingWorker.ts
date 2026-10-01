@@ -136,11 +136,6 @@ export async function runAtgPollingWorkerLoop(
             connected: true,
             metrics: {
               enabled: true,
-              phase: publicationError
-                ? 'publish'
-                : fuelPriceError
-                  ? 'fuel-price'
-                  : undefined,
               intervalMinutes: settings.intervalMinutes,
               nextPollAt: new Date(nextPollAt).toISOString(),
               lastSuccessAt,
@@ -204,6 +199,11 @@ export async function runAtgPollingWorkerLoop(
             connected: true,
             metrics: {
               enabled: true,
+              phase: publicationError
+                ? 'publish'
+                : fuelPriceError
+                  ? 'fuel-price'
+                  : undefined,
               intervalMinutes: settings.intervalMinutes,
               lastSuccessAt,
               lastSnapshotsSaved,
