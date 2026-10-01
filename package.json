@@ -15,7 +15,7 @@
     "test": "node scripts/run-tests.mjs",
     "typescript": "npm run typecheck",
     "worker": "tsx scripts/worker.ts",
-    "lint": "prettier --write .",
+    "lint": "prettier --check . && eslint .",
     "fiscal:stub": "tsx scripts/fiscal-worker-stub.ts",
     "server:gen": "esbuild server.ts --bundle --platform=node --format=cjs --target=node22 --outfile=vpos-server.cjs --external:next",
     "proxy-sender-worker": "tsx scripts/proxy-sender-worker.ts",
@@ -48,14 +48,16 @@
     "typecheck": "tsc --noEmit",
     "check:hygiene": "node scripts/check-repository-hygiene.mjs",
     "check:docs": "node scripts/check-docs-consistency.mjs",
-    "check": "npm run lint && npm run typecheck && del tsconfig.tsbuildinfo && npm run check:architecture && npm run check:hygiene && npm run check:docs && npm test",
+    "check": "npm run lint && npm run typecheck && npm run clean:tsbuildinfo && npm run check:architecture && npm run check:hygiene && npm run check:docs && npm test",
     "agent:manifest": "node scripts/generate-agent-manifest.mjs",
     "agent:find": "node scripts/agent-context.mjs find",
     "agent:deps": "node scripts/agent-context.mjs deps",
     "agent:impact": "node scripts/agent-context.mjs impact",
     "agent:tests": "node scripts/agent-context.mjs tests",
     "check:page-boundaries": "node scripts/check-page-boundaries.mjs",
-    "check:module-boundaries": "node scripts/check-module-boundaries.mjs"
+    "check:module-boundaries": "node scripts/check-module-boundaries.mjs",
+    "format": "prettier --write .",
+    "clean:tsbuildinfo": "node -e \"require('fs').rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "dependencies": {
     "@gilbarcoafs/doms-pos-jpl": "^1.1.16",
