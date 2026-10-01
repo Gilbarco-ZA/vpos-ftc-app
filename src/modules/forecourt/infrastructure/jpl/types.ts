@@ -1,8 +1,4 @@
-import type {
-  BufferHealthState,
-  BufferMode,
-  PumpBufferHealth,
-} from '@/src/shared/forecourt/bufferHealthTypes'
+import type { BufferMode } from '@/src/shared/forecourt/bufferHealthTypes'
 
 export type AdapterState = {
   connected: boolean
