@@ -36,8 +36,9 @@ export const PATCH = defineMutationRoute<Record<string, any>, { id: string }>({
 
 export const DELETE = defineMutationRoute<Record<string, any>, { id: string }>({
   roles: ['tenant', 'manager', 'administrator'],
-  handler: async (_req, { body, params }) => {
+  handler: async (_req, { user, body, params }) => {
     const result = await deleteOrRestoreCustomer({
+      stationId: user.stationId,
       customerId: params.id,
       restore: Boolean(body?.restore),
     })
