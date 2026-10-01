@@ -1,9 +1,10 @@
 import type { CustomerListResult } from '@/src/modules/customers/application/customerTypes'
 import { redirect } from 'next/navigation'
 
-import { api } from '@/src/shared/api/fetch'
 import { requireAuth } from '@/src/shared/auth'
 import { applyDateRangeParams } from '@/src/shared/crud/filters'
+
+import { listCustomers } from '@/src/modules/customers/application/listCustomers'
 
 import { ListToolbar } from '@/components/crud/ListToolbar'
 import CustomersPageClient, {
@@ -56,29 +57,46 @@ const normalizeContact = (row: CustomerListRow) =>
   row.contactPhone ||
   '-'
 
-const loadCustomers = async (opts: {
-  q?: string
-  startDate?: string
-  endDate?: string
-}) => {
+const loadCustomers = async (
+  stationId: string,
+  opts: {
+    q?: string
+    startDate?: string
+    endDate?: string
+  },
+) => {
   const params = new URLSearchParams()
   if (opts.q) params.set('q', opts.q)
-  // Manager view expects a flat list; backend returns paged results.
-  // Pull the first 200 rows to match the UI label.
   params.set('page', '1')
-  params.set('pageSize', '200')
+  params.set('pageSize', '100')
   applyDateRangeParams(params, {
     startDate: opts.startDate,
     endDate: opts.endDate,
   })
 
-  const res = await api(`/api/customers?${params.toString()}`)
-  return res
+  return await listCustomers({
+    stationId,
+    q: params.get('q') || undefined,
+    page: 1,
+    pageSize: 100,
+  })
 }
 
-const loadAdminCustomers = async (params: URLSearchParams) => {
-  const res = await api(`/api/customers?${params.toString()}`)
-  return res
+const loadCustomerPage = async (
+  stationId: string,
+  params: URLSearchParams,
+) => {
+  return await listCustomers({
+    stationId,
+    q: params.get('q') || undefined,
+    country: params.get('country') || undefined,
+    buyerType: params.get('buyerType') || undefined,
+    includeDeleted: ['true', '1', 'yes'].includes(
+      String(params.get('includeDeleted') || '').toLowerCase(),
+    ),
+    page: Number(params.get('page') || 1),
+    pageSize: Number(params.get('pageSize') || 20),
+  })
 }
 
 const TenantCustomersView = async ({
@@ -110,11 +128,7 @@ const TenantCustomersView = async ({
     if (searchParams.pageSize)
       params.set('pageSize', String(searchParams.pageSize))
 
-    const payload = await loadAdminCustomers(params)
-    if (!payload?.success) {
-      throw new Error(payload?.error ?? 'Failed to load customers')
-    }
-    initialData = payload?.data ?? initialData
+    initialData = await loadCustomerPage(user.stationId, params)
   } catch (err: any) {
     error = err?.message ?? 'Failed to load customers'
   }
@@ -147,15 +161,15 @@ const ManagerCustomersView = async ({
   const endDate = readParam(searchParams, 'endDate').trim()
   const preset = readParam(searchParams, 'preset').trim()
 
-  const customers = await loadCustomers({
+  const customers = await loadCustomers(user.stationId, {
     q: q || undefined,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
   })
 
-  // /api/customers returns a CustomerListResult (paged) in ApiResult.data.
-  const list = customers?.success ? (customers.data as any) : null
-  const rows: CustomerListRow[] = Array.isArray(list?.rows) ? list.rows : []
+  const rows: CustomerListRow[] = Array.isArray(customers?.rows)
+    ? customers.rows
+    : []
 
   return (
     <div className="space-y-4">
@@ -255,11 +269,7 @@ const AdminCustomersView = async ({
     if (searchParams.pageSize)
       params.set('pageSize', String(searchParams.pageSize))
 
-    const payload = await loadAdminCustomers(params)
-    if (!payload?.success) {
-      throw new Error(payload?.error ?? 'Failed to load customers')
-    }
-    initialData = payload?.data ?? initialData
+    initialData = await loadCustomerPage(user.stationId, params)
   } catch (err: any) {
     error = err?.message ?? 'Failed to load customers'
   }
