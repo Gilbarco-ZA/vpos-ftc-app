@@ -26,7 +26,7 @@ interface ProductCategory {
 
 ### `GET /api/product-categories`
 
-**Access:** tenant, manager, administrator.
+**Access:** manager, administrator.
 
 Query:
 
@@ -225,7 +225,7 @@ Invalid input returns HTTP `400` with `error.message = "Invalid stock movement p
 
 ### `GET /api/reports`
 
-**Access:** tenant, manager, administrator.
+**Access:** manager, administrator.
 
 Query:
 
