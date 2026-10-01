@@ -1,4 +1,7 @@
-import type { CustomerListResult } from '@/src/modules/customers/application/customerTypes'
+import type {
+  CustomerListResult,
+  CustomerSummary,
+} from '@/src/modules/customers/application/customerTypes'
 import { redirect } from 'next/navigation'
 
 import { requireAuth } from '@/src/shared/auth'
@@ -26,19 +29,12 @@ export type CustomersRole = 'tenant' | 'manager' | 'administrator'
 
 type SearchParams = Record<string, string | string[] | undefined>
 
-type CustomerListRow = {
-  id?: string
-  buyer_name?: string
-  buyerName?: string
-  tin?: string
-  contact_email?: string
-  contactEmail?: string
-  contact_phone?: string
-  contactPhone?: string
-  city?: string
-  country?: string
-  last_seen_at?: string
-  lastSeenAt?: string
+type CustomerListRow = CustomerSummary & {
+  buyer_name?: string | null
+  contact_email?: string | null
+  contact_phone?: string | null
+  city?: string | null
+  last_seen_at?: string | null
 }
 
 const readParam = (params: SearchParams, key: string) => {
