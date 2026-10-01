@@ -59,3 +59,24 @@ test('field engineer is available through the administrator role selector', () =
   const route = read('app/api/config/user-roles/route.ts')
   assert.match(route, /value: 'field_engineer'/)
 })
+
+test('tenant daily-operation APIs explicitly retain tenant access', () => {
+  const paths = [
+    'app/api/dashboard/summary/route.ts',
+    'app/api/pos/catalog/route.ts',
+    'app/api/transactions/route.ts',
+    'app/api/receipts/route.ts',
+    'app/api/customers/route.ts',
+    'app/api/transactions/fuel-options/route.ts',
+    'app/api/transactions/pre-fuel-customer/route.ts',
+  ]
+
+  for (const path of paths) {
+    const source = read(path)
+    assert.match(
+      source,
+      /['"]tenant['"]/,
+      `Expected tenant authorization in ${path}`,
+    )
+  }
+})
