@@ -98,7 +98,9 @@ export default function PrintJobsPage() {
   }, [search, status, type])
 
   useEffect(() => {
-    void load()
+    queueMicrotask(() => {
+      void load()
+    })
   }, [load])
 
   const mutateJob = async (jobId: string, action: 'retry' | 'clear') => {
