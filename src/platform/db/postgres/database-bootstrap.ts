@@ -77,15 +77,13 @@ const createDatabaseIfMissing = async (): Promise<void> => {
 export const ensurePostgresDatabase = async (): Promise<void> => {
   const globals = databaseBootstrapGlobals()
   if (!globals.__vposDatabaseBootstrapPromise) {
-    const promise: Promise<void> = createDatabaseIfMissing().catch(
-      (error) => {
+    const promise = createDatabaseIfMissing()
+    globals.__vposDatabaseBootstrapPromise = promise
+    void promise.catch(() => {
       if (globals.__vposDatabaseBootstrapPromise === promise) {
         globals.__vposDatabaseBootstrapPromise = undefined
       }
-        throw error
-      },
-    )
-    globals.__vposDatabaseBootstrapPromise = promise
+    })
   }
   return globals.__vposDatabaseBootstrapPromise
 }
