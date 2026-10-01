@@ -21,4 +21,7 @@ test('hierarchical role checks remain explicit through hasRole', () => {
   assert.equal(hasRole('administrator', 'manager'), true)
   assert.equal(hasRole('manager', 'tenant'), true)
   assert.equal(hasRole('tenant', 'manager'), false)
+  assert.equal(hasRole('field_engineer', 'administrator'), false)
+  assert.equal(hasRole('administrator', 'field_engineer'), false)
+  assert.equal(hasRole('field_engineer', 'field_engineer'), true)
 })
