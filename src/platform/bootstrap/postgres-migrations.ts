@@ -42,8 +42,7 @@ const migrationGlobals = () => globalThis as MigrationGlobals
 export const ensurePostgresMigrations = async (): Promise<void> => {
   const globals = migrationGlobals()
   if (!globals.__vposPostgresMigrationsPromise) {
-    let promise: Promise<void>
-    promise = runMigrations().catch((error) => {
+    const promise: Promise<void> = runMigrations().catch((error) => {
       if (globals.__vposPostgresMigrationsPromise === promise) {
         globals.__vposPostgresMigrationsPromise = undefined
       }
