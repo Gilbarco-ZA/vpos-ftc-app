@@ -24,6 +24,7 @@ const nodeVersionDir =
 const environmentVariables = {
   NODE_ENV: 'production',
   PROD: 'true',
+  VPOS_MANAGED_BY_START_SH: '1',
   PORT: '3080',
   HOST: '0.0.0.0',
   NEXT_PUBLIC_BASE_URL: 'http://127.0.0.1:3080',
