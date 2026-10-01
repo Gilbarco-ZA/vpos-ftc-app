@@ -47,8 +47,9 @@ The application roles are:
 - `tenant`
 - `manager`
 - `administrator`
+- `field_engineer`
 
-Individual routes may allow one, two, or all three roles.
+Role lists on routes are exact. `field_engineer` is a specialized maintenance/commissioning role and does not inherit administrator access.
 
 There is currently no repository-wide external contract for:
 
@@ -708,8 +709,8 @@ Expected response family:
 
 | Endpoint          | Aim                                                | Access | Request                                                  | Expected response |
 | ----------------- | -------------------------------------------------- | ------ | -------------------------------------------------------- | ----------------- |
-| `/api/users`      | List/create/update station users under role rules. | M/A    | GET; POST `B<user create>`; PATCH `B<user update>`       | `OK<users/user>`  |
-| `/api/users/[id]` | Read/delete one user under role rules.             | M/A    | `P{id}`; DELETE with confirmation/context where required | `OK<user/result>` |
+| `/api/users`      | List/create/update station users under role rules. | A    | GET; POST `B<user create>`; PATCH `B<user update>`       | `OK<users/user>`  |
+| `/api/users/[id]` | Read/delete one user under role rules.             | A    | `P{id}`; DELETE with confirmation/context where required | `OK<user/result>` |
 
 Do not expose password hashes or session tokens through integrations. Manager actions remain bounded by application role rules even where the route itself permits manager access.
 
