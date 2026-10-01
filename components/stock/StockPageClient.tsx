@@ -63,7 +63,9 @@ export default function StockPageClient() {
   }, [])
 
   useEffect(() => {
-    void loadData()
+    queueMicrotask(() => {
+      void loadData()
+    })
   }, [loadData])
 
   const filteredProducts = useMemo(() => {
