@@ -3,7 +3,11 @@ import { DashboardSummary } from '@/components/dashboard/DashboardSummary'
 import { FiscalClock } from '@/components/dashboard/FiscalClock'
 import { DashboardHero } from '@/components/hero/dashboard-hero'
 
-export type DashboardRole = 'tenant' | 'manager' | 'administrator'
+export type DashboardRole =
+  | 'tenant'
+  | 'manager'
+  | 'administrator'
+  | 'field_engineer'
 
 type RoleConfig = {
   tagline: string
@@ -26,6 +30,14 @@ const getRoleConfig = (role: DashboardRole): RoleConfig => {
       tagline: 'Monitor transactions, devices, and station performance.',
       summaryTitle: 'Activity Summary',
       roleLabel: 'Manager workspace',
+    }
+  }
+
+  if (role === 'field_engineer') {
+    return {
+      tagline: 'Technical forecourt maintenance and commissioning workspace.',
+      summaryTitle: 'Activity Summary',
+      roleLabel: 'Field engineer workspace',
     }
   }
 
@@ -69,12 +81,16 @@ export const RoleDashboardHome = ({
 
       <FiscalClock timezone={timezone} source={timezoneSource} />
 
-      <div className="glass-panel rounded-2xl p-1 shadow-card">
-        <DashboardSummary title={config.summaryTitle} initialPreset="today" />
-      </div>
-      <div className="glass-panel rounded-2xl p-1 shadow-card">
-        <DeviceStatusPanel />
-      </div>
+      {role !== 'field_engineer' ? (
+        <div className="glass-panel rounded-2xl p-1 shadow-card">
+          <DashboardSummary title={config.summaryTitle} initialPreset="today" />
+        </div>
+      ) : null}
+      {role === 'manager' || role === 'administrator' ? (
+        <div className="glass-panel rounded-2xl p-1 shadow-card">
+          <DeviceStatusPanel />
+        </div>
+      ) : null}
     </div>
   )
 }
