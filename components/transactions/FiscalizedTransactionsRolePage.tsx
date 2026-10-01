@@ -17,7 +17,6 @@ import FiscalizedTransactionsPageClient, {
   FiscalizedTransactionListItem,
 } from '@/components/transactions/FiscalizedTransactionsPageClient'
 import { TransactionsStatusToggle } from '@/components/transactions/TransactionsStatusToggle'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
 export type FiscalizedRole = 'manager' | 'administrator'
