@@ -9,7 +9,6 @@ import { acquireAtgPollingWorkerLock } from '@/src/modules/forecourt/infrastruct
 
 const WORKER_NAME = 'atgPollingWorker'
 const SETTINGS_REFRESH_MS = 10_000
-const ERROR_RETRY_MAX_MS = 60_000
 
 export type AtgSnapshotResult = Awaited<ReturnType<typeof captureAtgSnapshot>>
 
