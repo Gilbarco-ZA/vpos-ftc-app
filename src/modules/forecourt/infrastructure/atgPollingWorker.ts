@@ -70,8 +70,12 @@ export async function runAtgPollingWorkerLoop(
   try {
     while (!options.isStopped()) {
       let settings: { enabled: boolean; intervalMinutes: number }
+      let fuelPriceSettings: { enabled: boolean }
       try {
-        settings = await deps.getSettings(stationId)
+        ;[settings, fuelPriceSettings] = await Promise.all([
+          deps.getSettings(stationId),
+          deps.getFuelPricePollingSettings(stationId),
+        ])
       } catch (error: any) {
         const message = String(error?.message || error)
         await deps
@@ -90,9 +94,10 @@ export async function runAtgPollingWorkerLoop(
 
       const intervalMs = settings.intervalMinutes * 60_000
       const now = deps.now()
+      const anyEnabled = settings.enabled || fuelPriceSettings.enabled
 
       if (
-        settings.enabled &&
+        anyEnabled &&
         previousEnabled === true &&
         previousIntervalMinutes !== null &&
         previousIntervalMinutes !== settings.intervalMinutes
@@ -100,14 +105,14 @@ export async function runAtgPollingWorkerLoop(
         nextPollAt = now + intervalMs
       }
 
-      if (settings.enabled && previousEnabled === false) {
+      if (anyEnabled && previousEnabled === false) {
         nextPollAt = 0
       }
 
-      previousEnabled = settings.enabled
+      previousEnabled = anyEnabled
       previousIntervalMinutes = settings.intervalMinutes
 
-      if (!settings.enabled) {
+      if (!anyEnabled) {
         nextPollAt = 0
         await deps
           .heartbeat({
@@ -117,6 +122,8 @@ export async function runAtgPollingWorkerLoop(
             connected: true,
             metrics: {
               enabled: false,
+              atgPollingEnabled: false,
+              fuelPricePollingEnabled: false,
               intervalMinutes: settings.intervalMinutes,
               lastSuccessAt,
               lastSnapshotsSaved,
@@ -147,35 +154,46 @@ export async function runAtgPollingWorkerLoop(
         continue
       }
 
-      try {
-        const result = await deps.captureSnapshot(stationId)
-        lastSnapshotsSaved = Number(result.snapshotsSaved ?? 0)
+      let captureResult: AtgSnapshotResult | null = null
+      let captureError: string | null = null
+      let publication: unknown = {
+        skipped: true,
+        reason: 'atg_polling_disabled',
+      }
+      let publicationError: string | null = null
 
-        let publication: unknown = null
-        let publicationError: string | null = null
+      if (settings.enabled) {
         try {
-          publication = await deps.publishSnapshot(stationId, result)
+          captureResult = await deps.captureSnapshot(stationId)
+          lastSnapshotsSaved = Number(captureResult.snapshotsSaved ?? 0)
+
+          try {
+            publication = await deps.publishSnapshot(stationId, captureResult)
+          } catch (error: any) {
+            publicationError = String(error?.message || error)
+            logger.error('[atg-polling-worker]', {
+              msg: 'ATG snapshot persisted but proxy publication failed',
+              error: publicationError,
+            })
+          }
         } catch (error: any) {
-          publicationError = String(error?.message || error)
+          captureError = String(error?.message || error)
           logger.error('[atg-polling-worker]', {
-            msg: 'ATG snapshot persisted but proxy publication failed',
-            error: publicationError,
+            msg: 'ATG snapshot capture failed',
+            error: captureError,
           })
         }
+      }
 
-        let fuelPriceChanges: unknown = {
-          skipped: true,
-          reason: 'fuel_price_polling_disabled',
-        }
-        let fuelPriceError: string | null = null
-        let fuelPricePollingEnabled = false
+      let fuelPriceChanges: unknown = {
+        skipped: true,
+        reason: 'fuel_price_polling_disabled',
+      }
+      let fuelPriceError: string | null = null
+
+      if (fuelPriceSettings.enabled) {
         try {
-          const fuelPriceSettings =
-            await deps.getFuelPricePollingSettings(stationId)
-          fuelPricePollingEnabled = fuelPriceSettings.enabled
-          if (fuelPricePollingEnabled) {
-            fuelPriceChanges = await deps.pollFuelPriceChanges(stationId)
-          }
+          fuelPriceChanges = await deps.pollFuelPriceChanges(stationId)
         } catch (error: any) {
           fuelPriceError = String(error?.message || error)
           logger.error('[atg-polling-worker]', {
@@ -183,68 +201,52 @@ export async function runAtgPollingWorkerLoop(
             error: fuelPriceError,
           })
         }
+      }
 
-        lastSuccessAt = result.recordedAt
-        nextPollAt = deps.now() + intervalMs
+      if (captureResult) {
+        lastSuccessAt = captureResult.recordedAt
+      } else if (!settings.enabled && !fuelPriceError) {
+        lastSuccessAt = new Date(deps.now()).toISOString()
+      }
+      nextPollAt = deps.now() + intervalMs
 
-        const cycleErrors = [publicationError, fuelPriceError].filter(
-          (value): value is string => Boolean(value),
-        )
+      const cycleErrors = [
+        captureError,
+        publicationError,
+        fuelPriceError,
+      ].filter((value): value is string => Boolean(value))
 
-        await deps
-          .heartbeat({
-            stationId,
-            processName: WORKER_NAME,
-            status: cycleErrors.length ? 'degraded' : 'OK',
-            connected: true,
-            metrics: {
-              enabled: true,
-              phase: publicationError
+      await deps
+        .heartbeat({
+          stationId,
+          processName: WORKER_NAME,
+          status: cycleErrors.length ? 'degraded' : 'OK',
+          connected: true,
+          metrics: {
+            enabled: true,
+            atgPollingEnabled: settings.enabled,
+            fuelPricePollingEnabled: fuelPriceSettings.enabled,
+            phase: captureError
+              ? 'capture'
+              : publicationError
                 ? 'publish'
                 : fuelPriceError
                   ? 'fuel-price'
                   : undefined,
-              intervalMinutes: settings.intervalMinutes,
-              lastSuccessAt,
-              lastSnapshotsSaved,
-              updated: Number(result.updated ?? 0),
-              controllerErrorCount: result.controllerErrors.length,
-              publication,
-              publicationError,
-              fuelPricePollingEnabled,
-              fuelPriceChanges,
-              nextPollAt: new Date(nextPollAt).toISOString(),
-            },
-            lastError: cycleErrors.length ? cycleErrors.join('; ') : null,
-          })
-          .catch(() => {})
-      } catch (error: any) {
-        const message = String(error?.message || error)
-        nextPollAt = deps.now() + Math.min(intervalMs, ERROR_RETRY_MAX_MS)
-
-        logger.error('[atg-polling-worker]', {
-          msg: 'ATG snapshot capture failed',
-          error: message,
+            intervalMinutes: settings.intervalMinutes,
+            lastSuccessAt,
+            lastSnapshotsSaved,
+            updated: Number(captureResult?.updated ?? 0),
+            controllerErrorCount:
+              captureResult?.controllerErrors.length ?? 0,
+            publication,
+            publicationError,
+            fuelPriceChanges,
+            nextPollAt: new Date(nextPollAt).toISOString(),
+          },
+          lastError: cycleErrors.length ? cycleErrors.join('; ') : null,
         })
-
-        await deps
-          .heartbeat({
-            stationId,
-            processName: WORKER_NAME,
-            status: 'ERROR',
-            connected: false,
-            metrics: {
-              enabled: true,
-              phase: 'capture',
-              intervalMinutes: settings.intervalMinutes,
-              lastSuccessAt,
-              lastSnapshotsSaved,
-              nextPollAt: new Date(nextPollAt).toISOString(),
-            },
-            lastError: message,
-          })
-          .catch(() => {})
-      }
+        .catch(() => {})
 
       await deps.sleep(settingsRefreshMs)
     }
