@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { logServerError } from '@/src/platform/observability/errorLogger'
+import { isRecoverablePostgresTransportError } from '@/src/platform/db/postgres/errors'
 import { AuthError } from '@/src/shared/auth'
 import { randomBytesAsync } from '@/src/shared/crypto/randomBytes'
 
@@ -93,6 +94,43 @@ export async function serverError(
   const message = err instanceof Error ? err.message : String(err)
   const stack = err instanceof Error ? err.stack : undefined
   const anyErr = err as any
+
+  if (isRecoverablePostgresTransportError(err)) {
+    await logServerError({
+      stationId: opts?.stationId,
+      requestId,
+      message,
+      stack,
+      meta: {
+        method: opts?.req?.method ?? null,
+        url: opts?.req ? new URL(opts.req.url).pathname : null,
+        pgCode: anyErr?.code ?? null,
+        retryable: true,
+      },
+    })
+
+    return NextResponse.json(
+      {
+        ok: false,
+        success: false,
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Database temporarily unavailable. Please retry shortly.',
+          details: exposeDebugDetails
+            ? {
+                originalMessage: message,
+                pgCode: anyErr?.code ?? null,
+              }
+            : null,
+          requestId,
+        },
+      },
+      {
+        status: 503,
+        headers: { 'retry-after': '2' },
+      },
+    )
+  }
   const pg = anyErr
     ? {
         pgCode: anyErr.code ?? null,
