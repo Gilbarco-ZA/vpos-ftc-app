@@ -16,7 +16,6 @@ interface PackageConfig {
   startScriptTemplate?: string
   healthPorts?: string
   healthPaths?: string
-  legacyOpkgPackages?: string[]
 }
 
 const moduleRequire = createRequire(import.meta.url)
@@ -61,14 +60,6 @@ test('uses the selected Node 22 runtime for both supported controllers', () => {
     assert.match(config.dependencies ?? '', /(?:^|,)90005102(?:,|$)/)
     assert.doesNotMatch(config.dependencies ?? '', /(?:^|,)90005101(?:,|$)/)
   }
-})
-
-test('declares legacy versioned opkg packages for one-time upgrade replacement', () => {
-  const config = loadConfig('node-v22.15.0-linux-arm64')
-
-  assert.ok(config.legacyOpkgPackages?.includes('472-22-0.01t037'))
-  assert.ok(config.legacyOpkgPackages?.includes('472-22-0.01t039'))
-  assert.equal(config.legacyOpkgPackages?.at(-1), '472-22-0.01t040')
 })
 
 test('delegates ownership and startup policy to vpos-mono-package-mgr', () => {
