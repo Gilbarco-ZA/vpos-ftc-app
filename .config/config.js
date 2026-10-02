@@ -14,17 +14,12 @@ const healthPaths = '/api/livez'
 const healthProbeTimeoutSeconds = '5'
 const startupTimeoutSeconds = '180'
 const dependencies = '90005102,79961133,46701120'
-const legacyOpkgPackages = Array.from(
-  { length: 40 },
-  (_, index) => `472-22-0.01t${String(index + 1).padStart(3, '0')}`,
-)
 
 const startScriptTemplate = 'node-web'
 // The pipeline supplies this per package target. The fallback represents the
 // local CPB539 Node 22 package-rendering target.
 const nodeVersionDir =
   process.env.FNEZ_NODE_VERSION_DIR || 'node-v22.15.0-linux-armv7l'
-const opkgArchitecture = process.env.FNEZ_OPKG_ARCHITECTURE
 
 const environmentVariables = {
   NODE_ENV: 'production',
@@ -121,7 +116,6 @@ const config = {
   healthProbeTimeoutSeconds,
   startupTimeoutSeconds,
   dependencies,
-  legacyOpkgPackages,
   description,
   descriptionSml,
   limitations,
@@ -133,7 +127,6 @@ const config = {
   environmentVariables,
   startScriptTemplate,
   nodeVersionDir,
-  opkgArchitecture,
   installationSteps,
   exclude,
 }
