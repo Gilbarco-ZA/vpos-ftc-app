@@ -1,6 +1,7 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 
 import { getPostgresPoolConfig } from '@/src/platform/config/app-config'
+import { isRecoverablePostgresTransportError } from '@/src/platform/db/postgres/errors'
 import { logDbQuery } from '@/src/platform/db/observability/dbDebug'
 import { logSlowQuery } from '@/src/platform/db/observability/slow-query-logger'
 import { logger } from '@/src/shared/utils/logger'
@@ -39,6 +40,13 @@ const isPoolPressureError = (error: unknown) => {
     message,
   )
 }
+
+const isReadOnlyQuery = (text: string) => /^\s*SELECT\b/i.test(text)
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
 
 export type TransactionCallback<T> = (client: PoolClient) => Promise<T>
 
@@ -145,7 +153,24 @@ async function executeQuery<T extends QueryResultRow>(
   const observe = options?.observe !== false
 
   try {
-    const result = await runner(activePool, text, params)
+    let result: QueryResult<T>
+    try {
+      result = await runner(activePool, text, params)
+    } catch (err) {
+      if (
+        isReadOnlyQuery(text) &&
+        isRecoverablePostgresTransportError(err)
+      ) {
+        logger.warn('[postgres] retrying read after transient transport failure', {
+          error: serializeError(err),
+          pool: getPostgresPoolDiagnostics(),
+        })
+        await sleep(150)
+        result = await runner(getPool(), text, params)
+      } else {
+        throw err
+      }
+    }
     const duration = Date.now() - start
 
     if (observe) {
