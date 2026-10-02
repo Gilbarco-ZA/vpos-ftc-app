@@ -12,7 +12,7 @@ test('transient PostgreSQL transport errors are classified centrally', () => {
 })
 
 test('only read-only SELECT queries receive a bounded transport retry', () => {
-  assert.match(core, /const isReadOnlyQuery = \(text: string\) => \^\\s\*SELECT\\b/i)
+  assert.ok(core.includes("const isReadOnlyQuery = (text: string) => /^\\s*SELECT\\b/i.test(text)"))
   assert.match(core, /isReadOnlyQuery\(text\)[\s\S]*isRecoverablePostgresTransportError\(err\)/)
   assert.match(core, /await sleep\(150\)/)
   assert.match(core, /retrying read after transient transport failure/)
