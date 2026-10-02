@@ -27,6 +27,7 @@ test('reporting pagination counts skip receipt joins unless search needs them', 
 test('non-search report previews limit transactions before receipt enrichment', () => {
   assert.match(repository, /FROM \(\s*SELECT t\.\*[\s\S]*LIMIT \$\{limitParam\}[\s\S]*\) t/)
   assert.match(repository, /if \(!hasSearch\)/)
+  assert.ok(repository.includes("const limitParam = `${params.length + 1}`"))
 })
 
 test('reporting migration covers station date scans and latest receipt lookup', () => {
