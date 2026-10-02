@@ -158,6 +158,10 @@ function installProcessDiagnostics() {
 
   process.on('unhandledRejection', (reason) => {
     err('[diag] unhandledRejection:', reason?.stack || reason);
+    if (isRecoverablePostgresTransportError(reason)) {
+      warn('[diag] PostgreSQL connection dropped in unhandled rejection; keeping process alive');
+      return;
+    }
     // make this loud; don't silently continue
     try { process.stderr.write(''); } catch {}
     process.exit(1);
