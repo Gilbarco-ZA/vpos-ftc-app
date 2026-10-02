@@ -9,6 +9,10 @@ const tanzania = readFileSync(
   'src/modules/tanzania-fiscal/infrastructure/proxyDailyTotalsWorker.ts',
   'utf8',
 )
+const pssXmlWorker = readFileSync(
+  'src/platform/integrations/pssXml/watcherWorker.ts',
+  'utf8',
+)
 
 test('runtime diagnostics expose memory, PostgreSQL pressure, and forecourt queue pressure', () => {
   assert.match(server, /\[diag\] runtime health/)
@@ -38,6 +42,11 @@ test('launcher also survives transient PostgreSQL unhandled rejections', () => {
     launcher,
     /process\.on\('unhandledRejection'[\s\S]*isRecoverablePostgresTransportError\(reason\)/,
   )
+})
+
+test('PSS XML polling contains transient database failures inside the worker', () => {
+  assert.match(pssXmlWorker, /tick failed; will retry on next poll/)
+  assert.match(pssXmlWorker, /catch \(e: any\)[\s\S]*finally/)
 })
 
 test('structured errors survive JSON logging and Tanzania configuration noise is rate-limited', () => {
