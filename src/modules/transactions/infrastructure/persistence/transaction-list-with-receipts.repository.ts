@@ -221,7 +221,7 @@ export async function listTransactionsWithReceiptNumbersRepo(
   const limit = Math.min(500, Math.max(1, Number(opts.limit || 200)))
 
   if (!hasSearch) {
-    const limitParam = `${params.length + 1}`
+    const limitParam = `$${params.length + 1}`
     const limitedFromSql = `
       FROM (
         SELECT t.*
@@ -246,7 +246,7 @@ export async function listTransactionsWithReceiptNumbersRepo(
     }
   }
 
-  const rows = await queryAll<any>(`${baseQuery} LIMIT ${params.length + 1}`, [
+  const rows = await queryAll<any>(`${baseQuery} LIMIT $${params.length + 1}`, [
     ...params,
     limit,
   ])
