@@ -158,6 +158,11 @@ export const startPssXmlSyncWorker = (opts: PssXmlSyncWorkerOpts) => {
           // keep request key so the user can retry after fixing env/permissions
         }
       }
+    } catch (e: any) {
+      logger.warn('pss-xml', {
+        message: 'tick failed; will retry on next poll',
+        error: String(e?.message || e),
+      })
     } finally {
       busy = false
     }
