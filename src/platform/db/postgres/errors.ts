@@ -23,6 +23,14 @@ export function isPostgresError(error: unknown): error is PostgresError {
   return !!error && typeof error === 'object' && 'code' in error
 }
 
+export function isRecoverablePostgresTransportError(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : String(error ?? '')
+  return /connection terminated unexpectedly|connection terminated due to connection timeout|ECONNRESET|EPIPE|socket hang up/i.test(
+    message,
+  )
+}
+
 export function getPostgresErrorMeta(error: unknown) {
   if (!isPostgresError(error)) return null
 
