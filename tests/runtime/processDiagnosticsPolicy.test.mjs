@@ -32,6 +32,14 @@ test('launcher keeps VPOS alive for a transient PostgreSQL connection drop', () 
   assert.match(launcher, /PostgreSQL connection dropped; keeping process alive/)
 })
 
+test('launcher also survives transient PostgreSQL unhandled rejections', () => {
+  assert.match(launcher, /PostgreSQL connection dropped in unhandled rejection/)
+  assert.match(
+    launcher,
+    /process\.on\('unhandledRejection'[\s\S]*isRecoverablePostgresTransportError\(reason\)/,
+  )
+})
+
 test('structured errors survive JSON logging and Tanzania configuration noise is rate-limited', () => {
   assert.match(serializer, /export function serializeError/)
   assert.match(serializer, /stack:/)
