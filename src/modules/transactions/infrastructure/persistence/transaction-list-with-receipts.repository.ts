@@ -75,7 +75,7 @@ const fromSql = `
   ${receiptNumberJoinSql}
 `
 
-const selectSql = `
+const selectColumnsSql = `
   SELECT
     t.*,
     receipt_info.receipt_number,
@@ -84,6 +84,9 @@ const selectSql = `
     c.buyer_name AS customer_buyer_name,
     c.tin AS customer_tin,
     c.buyer_type AS customer_buyer_type
+`
+
+const selectSql = `${selectColumnsSql}
   ${fromSql}
 `
 
@@ -216,7 +219,34 @@ export async function listTransactionsWithReceiptNumbersRepo(
   }
 
   const limit = Math.min(500, Math.max(1, Number(opts.limit || 200)))
-  const rows = await queryAll<any>(`${baseQuery} LIMIT $${params.length + 1}`, [
+
+  if (!hasSearch) {
+    const limitParam = `${params.length + 1}`
+    const limitedFromSql = `
+      FROM (
+        SELECT t.*
+          FROM transactions t
+          ${where}
+          ${orderBy}
+          LIMIT ${limitParam}
+      ) t
+      LEFT JOIN customers c ON c.id = t.customer_id
+      ${receiptNumberJoinSql}
+    `
+    const rows = await queryAll<any>(
+      `${selectColumnsSql}\n${limitedFromSql}\n${orderBy}`,
+      [...params, limit],
+    )
+    return {
+      items: rows,
+      total: rows.length,
+      page: 1,
+      pageSize: limit,
+      totalPages: 1,
+    }
+  }
+
+  const rows = await queryAll<any>(`${baseQuery} LIMIT ${params.length + 1}`, [
     ...params,
     limit,
   ])
