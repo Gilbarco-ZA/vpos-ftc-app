@@ -14,6 +14,10 @@ const healthPaths = '/api/livez'
 const healthProbeTimeoutSeconds = '5'
 const startupTimeoutSeconds = '180'
 const dependencies = '90005102,79961133,46701120'
+const legacyOpkgPackages = Array.from(
+  { length: 40 },
+  (_, index) => `472-22-0.01t${String(index + 1).padStart(3, '0')}`,
+)
 
 const startScriptTemplate = 'node-web'
 // The pipeline supplies this per package target. The fallback represents the
@@ -116,6 +120,7 @@ const config = {
   healthProbeTimeoutSeconds,
   startupTimeoutSeconds,
   dependencies,
+  legacyOpkgPackages,
   description,
   descriptionSml,
   limitations,
