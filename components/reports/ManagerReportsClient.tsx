@@ -135,18 +135,21 @@ export function ManagerReportsClient({
     setLoading(true)
     setErr(null)
     try {
-      const params = new URLSearchParams()
+      const summaryParams = new URLSearchParams()
       applyDateRangeParams(
-        params,
+        summaryParams,
         { startDate, endDate },
         { fromKey: 'start', toKey: 'end' },
       )
 
+      const transactionParams = new URLSearchParams({ limit: '50' })
+      applyDateRangeParams(transactionParams, { startDate, endDate })
+
       const [sRes, tRes] = await Promise.all([
-        fetch(`/api/dashboard/summary?${params.toString()}`, {
+        fetch(`/api/dashboard/summary?${summaryParams.toString()}`, {
           cache: 'no-store',
         }),
-        fetch(`/api/transactions?${params.toString()}&limit=50`, {
+        fetch(`/api/transactions?${transactionParams.toString()}`, {
           cache: 'no-store',
         }),
       ])
