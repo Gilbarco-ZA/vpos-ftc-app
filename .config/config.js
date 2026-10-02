@@ -24,6 +24,7 @@ const startScriptTemplate = 'node-web'
 // local CPB539 Node 22 package-rendering target.
 const nodeVersionDir =
   process.env.FNEZ_NODE_VERSION_DIR || 'node-v22.15.0-linux-armv7l'
+const opkgArchitecture = process.env.FNEZ_OPKG_ARCHITECTURE
 
 const environmentVariables = {
   NODE_ENV: 'production',
@@ -132,6 +133,7 @@ const config = {
   environmentVariables,
   startScriptTemplate,
   nodeVersionDir,
+  opkgArchitecture,
   installationSteps,
   exclude,
 }
