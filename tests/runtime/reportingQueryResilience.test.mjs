@@ -105,3 +105,36 @@ test('receipt viewer lists receipts directly instead of routing through transact
   assert.match(receiptQuery, /FROM receipts r/)
   assert.match(receiptQuery, /JOIN transactions t/)
 })
+
+test('fiscalized transaction pages keep search and date filters in the server query', () => {
+  const rolePage = readFileSync(
+    'components/transactions/FiscalizedTransactionsRolePage.tsx',
+    'utf8',
+  )
+  const client = readFileSync(
+    'components/transactions/FiscalizedTransactionsPageClient.tsx',
+    'utf8',
+  )
+
+  assert.match(rolePage, /const q = readParam\(searchParams, 'q'\)\.trim\(\)/)
+  assert.match(rolePage, /scope: 'fiscalized'/)
+  assert.match(rolePage, /search: q \|\| undefined/)
+  assert.match(rolePage, /limit: 100/)
+  assert.match(rolePage, /initialSearch=\{q\}/)
+  assert.match(client, /useState\(initialSearch\)/)
+  assert.match(
+    client,
+    /new URLSearchParams\(\{ scope: 'fiscalized', limit: '100' \}\)/,
+  )
+  assert.match(client, /params\.set\('search', search\.trim\(\)\)/)
+  assert.match(client, /params\.set\('startDate', startDate\)/)
+  assert.match(client, /params\.set\('endDate', endDate\)/)
+})
+
+test('exact transaction status filters use index-friendly equality predicates', () => {
+  assert.match(repository, /conditions\.push\(`t\.status = \$\{addParam\(status\)\}`\)/)
+  assert.doesNotMatch(
+    repository,
+    /UPPER\(COALESCE\(t\.status, ''\)\) = \$\{addParam\(status\)\}/,
+  )
+})
