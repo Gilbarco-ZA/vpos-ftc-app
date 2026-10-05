@@ -45,7 +45,15 @@ export const GET = async (req: Request) => {
       return NextResponse.json(result.payload)
     }
 
-    return ok(await listReceiptRouteRows(user.stationId, transactionId))
+    return ok(
+      await listReceiptRouteRows(user.stationId, {
+        transactionId,
+        search: searchParams.get('search') || searchParams.get('q') || '',
+        startDate: searchParams.get('startDate') || '',
+        endDate: searchParams.get('endDate') || '',
+        limit: Number(searchParams.get('limit') || 100),
+      }),
+    )
   } catch (err) {
     return await serverError(err, { req, stationId: user?.stationId })
   }
