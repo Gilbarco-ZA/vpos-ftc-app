@@ -18,7 +18,7 @@ import {
 export const GET = async (req: Request) => {
   let user: SessionUser | null = null
   try {
-    user = await requireAuth(['tenant', 'manager', 'administrator'])
+    user = await requireAuth(['tenant', 'manager', 'administrator', 'field_engineer'])
     if (!user) return await serverError('User not found')
 
     const { searchParams } = new URL(req.url)
