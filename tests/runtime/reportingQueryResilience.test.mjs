@@ -78,3 +78,23 @@ test('scope=fiscalized uses fiscalized_at directly so the partial index remains 
     /scope === 'fiscalized'[\s\S]{0,250}fiscalized_at IS NOT NULL OR/,
   )
 })
+
+test('receipt viewer lists receipts directly instead of routing through transaction listing', () => {
+  const viewer = readFileSync(
+    'components/receipts/ReceiptViewerClient.tsx',
+    'utf8',
+  )
+  const receiptQuery = readFileSync(
+    'src/modules/transactions/application/queries/get-receipt-route-data.ts',
+    'utf8',
+  )
+
+  assert.match(viewer, /fetch\(\`\/api\/receipts\?\$\{params\.toString\(\)\}\`/)
+  assert.doesNotMatch(
+    viewer,
+    /fetch\(\`\/api\/transactions\?\$\{params\.toString\(\)\}\`/,
+  )
+  assert.match(receiptQuery, /FROM receipts r/)
+  assert.match(receiptQuery, /JOIN transactions t/)
+  assert.doesNotMatch(receiptQuery, /FROM fiscalization_events fe/)
+})
