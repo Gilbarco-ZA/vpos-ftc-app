@@ -20,7 +20,7 @@ test('admin pages are protected by one administrator layout boundary', () => {
 test('field engineer gets scoped transaction and receipt navigation without inheriting administrator navigation', () => {
   const sidebar = read('components/layout/sidebar.tsx')
   assert.match(sidebar, /if \(role === 'field_engineer'\)/)
-  assert.match(sidebar, /allowed = \['\/transactions', '\/receipts'\]/)
+  assert.match(sidebar, /allowed = \['\/transactions', '\/receipts', '\/reports'\]/)
   assert.match(sidebar, /Non-fiscalized/)
   assert.match(sidebar, /Fiscalized/)
   assert.doesNotMatch(
@@ -99,6 +99,10 @@ test('field engineer has scoped transaction and receipt workflow access', () => 
     'app/api/transactions/[id]/retry/route.ts',
     'app/api/transactions/[id]/fiscalize/route.ts',
     'app/api/transactions/[id]/cancel-fiscalization/route.ts',
+    'app/(dashboard)/reports/page.tsx',
+    'app/api/reports/route.ts',
+    'app/api/settings/tanks/sync-volumes/route.ts',
+    'app/(dashboard)/settings/tanks/page.tsx',
   ]
 
   for (const path of paths) {
