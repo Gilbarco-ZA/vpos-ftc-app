@@ -16,7 +16,7 @@ export const POST = defineMutationRoute<
   { csrf_token?: string },
   { id: string }
 >({
-  roles: ['manager', 'administrator', 'tenant'],
+  roles: ['manager', 'administrator', 'tenant', 'field_engineer'],
   handler: async (req, { user, params }) => {
     const transactionId = String(params.id || '').trim()
 
