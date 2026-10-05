@@ -11,14 +11,14 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = defineGetRoute({
-  roles: ['administrator', 'manager'],
+  roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user }) => {
     return ok(await getTankCloudSettings(user.stationId))
   },
 })
 
 export const POST = defineMutationRoute({
-  roles: ['administrator', 'manager'],
+  roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     return await saveTankCloudSettings(user, body)
   },
