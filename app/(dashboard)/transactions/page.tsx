@@ -9,7 +9,7 @@ const TransactionsPage = async (props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) => {
   const searchParams = await props.searchParams
-  const user = await requireAuth(['tenant', 'manager', 'administrator'])
+  const user = await requireAuth(['tenant', 'manager', 'administrator', 'field_engineer'])
 
   const statusParam = searchParams.status
   const status = Array.isArray(statusParam) ? statusParam[0] : statusParam
