@@ -17,6 +17,17 @@ export const POST = defineMutationRoute<SyncTankVolumesBody>({
     const result = await syncTankVolumes(user.stationId)
     if (body.publishTanzaniaInventory !== true) return ok(result)
 
+    if (result.capture.available === false || result.capture.snapshotsSaved <= 0) {
+      return ok({
+        ...result,
+        publication: {
+          ok: false,
+          skipped: true,
+          reason: 'atg_unavailable',
+        },
+      })
+    }
+
     const publication = await publishTanzaniaTankInventoriesForCapture(
       user.stationId,
       result.capture,
