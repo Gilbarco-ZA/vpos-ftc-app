@@ -60,6 +60,7 @@ type FiscalizedTransactionsPageClientProps = {
   initialTransactions: FiscalizedTransactionListItem[]
   error?: string | null
   decimals: DecimalSettings
+  initialSearch?: string
   initialStartDate?: string
   initialEndDate?: string
   businessDate?: string
@@ -244,6 +245,7 @@ const FiscalizedTransactionsPageClient = ({
   initialTransactions,
   error,
   decimals,
+  initialSearch = '',
   initialStartDate = '',
   initialEndDate = '',
   businessDate = '',
@@ -259,7 +261,7 @@ const FiscalizedTransactionsPageClient = ({
   const [loadError, setLoadError] = useState<unknown>(error ?? null)
   const [loading, setLoading] = useState(false)
   const [csrfToken, setCsrfToken] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialSearch)
   const [customer, setCustomer] = useState('')
   const [fuelType, setFuelType] = useState('')
   const [startDate, setStartDate] = useState(initialStartDate)
@@ -315,7 +317,7 @@ const FiscalizedTransactionsPageClient = ({
     setLoading(true)
     setLoadError(null)
     try {
-      const params = new URLSearchParams({ scope: 'fiscalized', limit: '200' })
+      const params = new URLSearchParams({ scope: 'fiscalized', limit: '100' })
       if (search.trim()) params.set('search', search.trim())
       if (customer.trim()) params.set('customer', customer.trim())
       if (fuelType) params.set('fuel', fuelType)
