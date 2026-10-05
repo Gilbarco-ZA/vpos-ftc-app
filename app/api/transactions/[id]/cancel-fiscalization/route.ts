@@ -14,7 +14,7 @@ export const POST = defineMutationRoute<
   { csrf_token?: string },
   { id: string }
 >({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (req, { user, params }) => {
     const transactionId = String(params.id || '').trim()
     const result = await cancelStuckTransactionFiscalization(
