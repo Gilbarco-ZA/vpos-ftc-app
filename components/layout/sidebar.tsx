@@ -48,7 +48,30 @@ export const getNavSections = (
   }
 
   if (role === 'field_engineer') {
-    return [dashboard]
+    const allowed = ['/transactions', '/receipts']
+    return [
+      dashboard,
+      {
+        ...dailyOperations,
+        items: dailyOperations.items.filter((item) =>
+          allowed.includes(item.href),
+        ),
+      },
+      {
+        label: 'Transaction Review',
+        items: [
+          {
+            label: 'Non-fiscalized',
+            href: '/transactions?status=non-fiscalized',
+          },
+          { label: 'Fiscalized', href: '/transactions?status=fiscalized' },
+          {
+            label: 'Receipt Viewer',
+            href: '/transactions?status=fiscalized&view=receipt',
+          },
+        ],
+      },
+    ]
   }
 
   if (role === 'tenant') {
