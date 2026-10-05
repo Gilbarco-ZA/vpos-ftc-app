@@ -489,7 +489,7 @@ Customer assignment changes what customer data appears on the receipt, but it do
 
 ### Field-engineer transaction recovery access
 
-The `field_engineer` role has scoped access to Transactions and Receipts for operational troubleshooting and recovery. It can review fiscalized/non-fiscalized lists, preview/print receipts, edit/allocate eligible transactions, retry/reset failed transactions, cancel a stuck fiscalization attempt, and use the related recovery actions exposed by those screens. It does not inherit unrelated administrator areas such as Users, Runtime Control, or general Maintenance. Use this role instead of sharing administrator credentials with field support.
+The `field_engineer` role has scoped access to Transactions, Receipts, Reports, Tanks/Tank Settings, and ATG sync for operational troubleshooting and recovery. It can review fiscalized/non-fiscalized lists, preview/print receipts, edit/allocate eligible transactions, retry/reset failed transactions, cancel a stuck fiscalization attempt, inspect/report bounded operational data, and validate/recover ATG tank readings. It does not inherit unrelated administrator areas such as Users, Runtime Control, or general Maintenance. Use this role instead of sharing administrator credentials with field support.
 
 ## 22. Handover checklist
 
@@ -510,7 +510,7 @@ Record and hand over:
 - [ ] restart/recovery check completed
 - [ ] PostgreSQL/reporting read-path migrations 1340/1341 applied and list queries remain responsive
 - [ ] ATG disconnect test preserves last-valid tank readings where ATG integration is enabled
-- [ ] field-engineer scoped Transactions/Receipts access verified where that role is commissioned
+- [ ] field-engineer scoped Transactions/Receipts/Reports/Tanks access verified where that role is commissioned
 - [ ] diagnostics/support evidence captured
 - [ ] unresolved exceptions documented
 - [ ] site/organizational acceptance obtained
