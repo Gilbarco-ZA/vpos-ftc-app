@@ -83,6 +83,7 @@ test('manual tank sync uses the ATG capture path and updates /tanks levels by Tg
     recordedAt: '2026-08-11T10:25:58.000Z',
     requestedTgIds: ['01', '02', '03', '04'],
     snapshotsSaved: 4,
+    available: true,
   })
   assert.equal(saved.length, 1)
   assert.deepEqual(result.liveData, liveData)
