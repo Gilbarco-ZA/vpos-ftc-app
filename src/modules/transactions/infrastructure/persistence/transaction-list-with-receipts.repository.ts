@@ -118,7 +118,7 @@ function buildFilter(
   const endDate = String(opts.endDate || '').trim()
 
   if (status) {
-    conditions.push(`UPPER(COALESCE(t.status, '')) = ${addParam(status)}`)
+    conditions.push(`t.status = ${addParam(status)}`)
   } else if (scope === 'fiscalized') {
     conditions.push(
       `t.fiscalized_at IS NOT NULL`,
@@ -130,9 +130,7 @@ function buildFilter(
   }
 
   if (excludeStatus) {
-    conditions.push(
-      `UPPER(COALESCE(t.status, '')) <> ${addParam(excludeStatus)}`,
-    )
+    conditions.push(`t.status <> ${addParam(excludeStatus)}`)
   }
 
   if (transactionId) {
