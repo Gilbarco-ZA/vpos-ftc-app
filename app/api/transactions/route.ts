@@ -24,7 +24,7 @@ const parseNumeric = (value: string | null) => {
 }
 
 export const GET = defineGetRoute({
-  roles: ['tenant', 'manager', 'administrator'],
+  roles: ['tenant', 'manager', 'administrator', 'field_engineer'],
   handler: async (req, { user }) => {
     const { searchParams } = new URL(req.url)
     const rows = await listTransactions(user.stationId, {
@@ -54,7 +54,7 @@ export const GET = defineGetRoute({
 })
 
 export const POST = defineMutationRoute<PrintBody>({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     const transactionId = String(
       body?.transactionId || body?.filename || '',
