@@ -61,7 +61,7 @@ const parseFuelSelection = (value: FuelSelectionPayload | null | undefined) => {
 }
 
 export const GET = defineGetRoute<{ id: string }>({
-  roles: ['tenant', 'manager', 'administrator'],
+  roles: ['tenant', 'manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, params }) => {
     const transactionId = String(params?.id || '').trim()
     const transaction = await getTransactionDetails(
@@ -111,7 +111,7 @@ export const GET = defineGetRoute<{ id: string }>({
 })
 
 export const POST = defineMutationRoute<UpdateLinesBody, { id: string }>({
-  roles: ['tenant', 'manager', 'administrator'],
+  roles: ['tenant', 'manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, params, body }) => {
     const result = await replaceTransactionLines(
       user.stationId,
