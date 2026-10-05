@@ -1,19 +1,13 @@
 'use client'
 
-import type { NormalizedReceipt } from '@/src/shared/receipts/normalizeReceipt'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { printReceiptAndWait } from '@/src/shared/receipts/printReceiptClient'
-import { STATUS_VARIANT } from '@/src/shared/status/ui'
 import { formatDate } from '@/src/shared/utils/dates'
 import { formatNumber } from '@/src/shared/utils/format'
 
 import { PageHeader } from '@/components/layout/page-header'
-import Receipt80mm from '@/components/receipts/Receipt80mm'
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
-import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -26,6 +20,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorDetails } from '@/components/ui/error-details'
 import { Input } from '@/components/ui/input'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
+import TransactionReceiptSheet from '@/components/transactions/TransactionReceiptSheet'
 import {
   Table,
   TableBody,
@@ -83,17 +78,9 @@ const ReceiptViewerClient = ({
   const [selectedId, setSelectedId] = useState<string | null>(
     initialTransactionId || null,
   )
-  const [receipt, setReceipt] = useState<NormalizedReceipt | null>(null)
-  const [receiptLoading, setReceiptLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
-  const [receiptError, setReceiptError] = useState<unknown>(null)
   const [csrfToken, setCsrfToken] = useState('')
-  const [printing, setPrinting] = useState(false)
-  const [printError, setPrintError] = useState<unknown>(null)
-  const [printSuccess, setPrintSuccess] = useState(false)
-  const autoPrintStartedFor = useRef<string | null>(null)
-  const [voided, setVoided] = useState(false)
 
   const fetchResults = useCallback(async () => {
     setLoading(true)
@@ -142,97 +129,12 @@ const ReceiptViewerClient = ({
     }
   }, [search, fromDate, toDate])
 
-  const fetchReceipt = useCallback(
-    async (transactionId: string, refresh?: boolean) => {
-      if (!transactionId) return
-      setReceiptError(null)
-      setReceipt(null)
-      setReceiptLoading(true)
-      setVoided(false)
-
-      try {
-        const params = new URLSearchParams({ transactionId })
-        if (refresh) params.set('refresh', '1')
-        const res = await fetch(`/api/receipts?${params.toString()}`, {
-          cache: 'no-store',
-        })
-        const body = await res.json().catch(() => ({}))
-        if (!res.ok || body?.ok === false) {
-          setReceiptError(res.ok ? body : { status: res.status, body })
-          return
-        }
-        setReceipt(body?.receipt ?? null)
-        setVoided(!!body?.voided)
-      } catch (err: unknown) {
-        setReceiptError(err)
-      } finally {
-        setReceiptLoading(false)
-      }
-    },
-    [],
-  )
-
-  const printReceipt = useCallback(
-    async (transactionId: string, isReprint = true) => {
-      if (!csrfToken) {
-        setPrintError({ message: 'Security token not ready' })
-        setPrintSuccess(false)
-        return false
-      }
-
-      setPrinting(true)
-      setPrintError(null)
-      setPrintSuccess(false)
-      try {
-        const result = await printReceiptAndWait({
-          csrfToken,
-          transactionId,
-          isReprint,
-        })
-        if (!result.success) {
-          setPrintError(result.error ?? { message: 'Receipt print failed' })
-          return false
-        }
-        setPrintSuccess(true)
-        window.setTimeout(() => setPrintSuccess(false), 3000)
-        return true
-      } catch (err: unknown) {
-        setPrintError(err)
-        return false
-      } finally {
-        setPrinting(false)
-      }
-    },
-    [csrfToken],
-  )
-
   useEffect(() => {
     queueMicrotask(() => {
       fetchResults()
     })
   }, [fetchResults])
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      if (selectedId) {
-        fetchReceipt(selectedId)
-      }
-    })
-  }, [selectedId, fetchReceipt])
-
-  useEffect(() => {
-    if (!autoPrint || !receipt || !selectedId || !csrfToken) return
-    if (autoPrintStartedFor.current === selectedId) return
-    autoPrintStartedFor.current = selectedId
-    queueMicrotask(() => {
-      void printReceipt(selectedId, true)
-    })
-  }, [autoPrint, receipt, selectedId, csrfToken, printReceipt])
-
-  const selected = useMemo(
-    () => results.find((row) => row.id === selectedId) || null,
-    [results, selectedId],
-  )
   const showInitialResultsLoading = loading && results.length === 0
   const shouldShowResultsList =
     results.length > 0 && (alwaysShowResultsList || results.length > 1)
@@ -365,95 +267,16 @@ const ReceiptViewerClient = ({
         </div>
       ) : null}
 
-      {selectedId && (
-        <div className="space-y-4">
-          <div className="no-print flex flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="primary"
-              onClick={() => void printReceipt(selectedId, true)}
-              disabled={!csrfToken || printing}
-              title={!csrfToken ? 'Loading security token…' : undefined}
-            >
-              {printing ? 'Printing…' : 'Print via JPL'}
-            </Button>
-          </div>
+      <TransactionReceiptSheet
+        open={Boolean(selectedId)}
+        transactionId={selectedId}
+        autoPrint={autoPrint}
+        csrfToken={csrfToken}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null)
+        }}
+      />
 
-          {printSuccess ? (
-            <Alert
-              variant={STATUS_VARIANT.SUCCESS}
-              title="Receipt printed successfully"
-            >
-              The printer confirmed the receipt print job completed.
-            </Alert>
-          ) : null}
-
-          {printError ? (
-            <Alert variant={STATUS_VARIANT.ERROR} title="Receipt print failed">
-              The receipt print job did not complete successfully. Review the{' '}
-              <Link href="/admin/config/printers">
-                station printer settings
-              </Link>{' '}
-              and the print runtime.
-            </Alert>
-          ) : null}
-
-          {receiptError ? (
-            <Card className="p-6">
-              <ErrorDetails
-                title="Receipt unavailable"
-                message="The receipt could not be loaded. Try refreshing it or re-fetching the fiscal response."
-                error={receiptError}
-              />
-            </Card>
-          ) : receipt ? (
-            <div className="space-y-3">
-              {voided && (
-                <Alert variant={STATUS_VARIANT.ERROR} title="VOIDED">
-                  This receipt has been voided by a credit note.
-                </Alert>
-              )}
-              {receipt.meta.offlinePending ? (
-                <Alert
-                  variant={STATUS_VARIANT.WARN}
-                  title="Offline receipt / pending fiscalization"
-                >
-                  This transaction has not been fiscalized yet. Print only as an
-                  offline acknowledgement and retry fiscalization when the proxy
-                  or internet connection is available.
-                </Alert>
-              ) : null}
-              <div className="no-print">
-                <div className="text-sm text-[var(--text-muted)]">
-                  Receipt #{receipt.meta.receiptNumber ?? '—'} •{' '}
-                  {selected?.receiptNumber ?? selectedId}
-                </div>
-              </div>
-              <Receipt80mm receipt={receipt} />
-            </div>
-          ) : receiptLoading ? (
-            <Card className="p-6">
-              <div className="space-y-3">
-                <div className="h-4 w-32 animate-pulse rounded-xl bg-gray-200" />
-                <div className="h-4 w-48 animate-pulse rounded-xl bg-gray-200" />
-                <div className="space-y-2 rounded-card border border-border bg-surface-card p-4">
-                  {Array.from({ length: 8 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="h-4 animate-pulse rounded-xl bg-gray-200"
-                    />
-                  ))}
-                </div>
-              </div>
-            </Card>
-          ) : (
-            <Card className="p-6">
-              <div className="text-sm text-[var(--text-muted)]">
-                Select a receipt to preview.
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
     </div>
   )
 }
