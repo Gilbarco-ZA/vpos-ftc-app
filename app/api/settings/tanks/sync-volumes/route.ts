@@ -12,7 +12,7 @@ type SyncTankVolumesBody = {
 }
 
 export const POST = defineMutationRoute<SyncTankVolumesBody>({
-  roles: ['administrator', 'manager'],
+  roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     const result = await syncTankVolumes(user.stationId)
     if (body.publishTanzaniaInventory !== true) return ok(result)
