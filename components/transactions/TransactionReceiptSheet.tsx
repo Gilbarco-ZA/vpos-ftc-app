@@ -282,7 +282,7 @@ export const TransactionReceiptSheet = ({
                           !csrfToken ? 'Loading security token…' : undefined
                         }
                       >
-                        {printing ? 'Printing…' : 'Print via JPL'}
+                        {printing ? 'Printing…' : 'Print Receipt'}
                       </Button>
                     ) : null}
                   </div>
