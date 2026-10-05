@@ -138,3 +138,18 @@ test('exact transaction status filters use index-friendly equality predicates', 
     /UPPER\(COALESCE\(t\.status, ''\)\) = \$\{addParam\(status\)\}/,
   )
 })
+
+test('receipt viewer uses the shared transaction receipt sheet instead of inline receipt rendering', () => {
+  const viewer = readFileSync(
+    'components/receipts/ReceiptViewerClient.tsx',
+    'utf8',
+  )
+
+  assert.match(
+    viewer,
+    /import TransactionReceiptSheet from '@\/components\/transactions\/TransactionReceiptSheet'/,
+  )
+  assert.match(viewer, /<TransactionReceiptSheet/)
+  assert.match(viewer, /transactionId=\{selectedId\}/)
+  assert.doesNotMatch(viewer, /<Receipt80mm/)
+})
