@@ -15,14 +15,14 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = defineGetRoute({
-  roles: ['administrator', 'manager'],
+  roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user }) => {
     return ok(await getTankSettings(user.stationId))
   },
 })
 
 export const POST = defineMutationRoute({
-  roles: ['administrator', 'manager'],
+  roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     const result = await createTankSetting(user, body)
     return result instanceof Response ? result : ok(result)
@@ -30,7 +30,7 @@ export const POST = defineMutationRoute({
 })
 
 export const PUT = defineMutationRoute({
-  roles: ['administrator', 'manager'],
+  roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     const result = await updateTankSetting(user, body)
     return result instanceof Response ? result : ok(result)
@@ -38,7 +38,7 @@ export const PUT = defineMutationRoute({
 })
 
 export const DELETE = defineMutationRoute({
-  roles: ['administrator', 'manager'],
+  roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (req, { user, body }) => {
     try {
       const result = await deleteTankSetting(user.stationId, body)
