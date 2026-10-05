@@ -24,7 +24,7 @@ type FiscalizeBody = {
 }
 
 export const POST = defineMutationRoute<FiscalizeBody, { id: string }>({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, params, body }) => {
     const transactionId = String(params.id || '').trim()
     const providedCustomerId = String(body.customer?.id ?? '').trim()
