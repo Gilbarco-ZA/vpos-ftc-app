@@ -63,7 +63,7 @@ test('stuck FISCALIZING transactions can cancel only the attempt and become retr
     'components/transactions/ManagerNonFiscalizedTable.tsx',
   )
 
-  assert.match(route, /roles: \['manager', 'administrator'\]/)
+  assert.match(route, /roles: \['manager', 'administrator', 'field_engineer'\]/)
   assert.match(route, /cancelStuckTransactionFiscalization/)
   assert.match(repository, /status !== 'FISCALIZING'/)
   assert.match(repository, /SET status = 'FAILED'/)
