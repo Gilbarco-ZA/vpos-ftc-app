@@ -4,6 +4,8 @@ import test from 'node:test'
 
 import { renderEscpos } from '@/src/shared/printers/escposRenderer'
 
+import { printJobsSql } from '@/src/modules/printing/infrastructure/printJobs.sql'
+
 import {
   buildReferencePrintJobPayload,
   extractEmbeddedPrintable,
@@ -265,17 +267,28 @@ test('print persistence claims both references and writers avoid duplicate recei
 })
 
 test('reference print source SQL resolves canonical receipt and report rows', () => {
-  const sql = readFileSync(
-    'src/modules/printing/infrastructure/printJobs.sql.ts',
-    'utf8',
+  assert.equal(
+    printJobsSql.selectReceiptPrintSource.includes('FROM receipts r'),
+    true,
   )
-
-  assert.match(sql, /selectReceiptPrintSource/)
-  assert.match(sql, /FROM\s+receipts\s+r\b/i)
-  assert.match(sql, /r\.transaction_id = \$2/)
-  assert.match(sql, /selectReportPrintSource/)
-  assert.match(sql, /FROM\s+reports\b/i)
-  assert.match(sql, /WHERE station_id = \$1/)
-  assert.match(sql, /AND id = \$2::uuid/)
+  assert.equal(
+    printJobsSql.selectReceiptPrintSource.includes(
+      'r.transaction_id = $2::uuid',
+    ),
+    true,
+  )
+  assert.equal(
+    printJobsSql.selectReportPrintSource.includes('FROM reports'),
+    true,
+  )
+  assert.equal(
+    printJobsSql.selectReportPrintSource.includes('WHERE station_id = $1'),
+    true,
+  )
+  assert.equal(
+    printJobsSql.selectReportPrintSource.includes('AND id = $2::uuid'),
+    true,
+  )
 })
+
 
