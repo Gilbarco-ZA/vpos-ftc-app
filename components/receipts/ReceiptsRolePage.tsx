@@ -26,7 +26,7 @@ export const ReceiptsRolePage = async ({
   searchParams: SearchParams
 }) => {
   const allowedRoles: UserRole[] =
-    role === 'manager' ? ['manager', 'administrator'] : [role]
+    role === 'manager' ? ['manager', 'administrator', 'field_engineer'] : [role]
   const user = await requireAuth(allowedRoles)
   if (!allowedRoles.includes(user.role)) redirect('/dashboard')
   const businessDate = await getStationCurrentBusinessDate(user.stationId)
