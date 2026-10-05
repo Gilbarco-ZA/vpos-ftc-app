@@ -99,12 +99,12 @@ const ReceiptViewerClient = ({
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ scope: 'fiscalized', limit: '100' })
+      const params = new URLSearchParams({ list: '1', limit: '100' })
       if (search.trim()) params.set('search', search.trim())
       if (fromDate) params.set('startDate', fromDate)
       if (toDate) params.set('endDate', toDate)
 
-      const res = await fetch(`/api/transactions?${params.toString()}`, {
+      const res = await fetch(`/api/receipts?${params.toString()}`, {
         cache: 'no-store',
       })
       const body = await res.json().catch(() => ({}))
@@ -113,9 +113,13 @@ const ReceiptViewerClient = ({
         return
       }
       const payload = body?.data ?? body
-      const items = Array.isArray(payload?.items) ? payload.items : []
+      const items = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : []
       const mapped = items.map((item: any) => ({
-        id: String(item?.id ?? ''),
+        id: String(item?.transaction_id ?? item?.transactionId ?? ''),
         receiptNumber: item?.receipt_number ?? item?.receiptNumber ?? null,
         cloudTransactionId:
           item?.cloud_transaction_id ?? item?.cloudTransactionId ?? null,
