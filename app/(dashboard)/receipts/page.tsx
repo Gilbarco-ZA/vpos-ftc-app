@@ -15,7 +15,7 @@ const ReceiptsPage = async (props: {
   }>
 }) => {
   const searchParams = await props.searchParams
-  const user = await requireAuth(['tenant', 'manager', 'administrator'])
+  const user = await requireAuth(['tenant', 'manager', 'administrator', 'field_engineer'])
 
   return (
     <ReceiptsRolePage
