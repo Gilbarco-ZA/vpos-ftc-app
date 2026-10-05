@@ -14,7 +14,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const POST = defineMutationRoute<Body>({
-  roles: ['manager', 'administrator', 'tenant'],
+  roles: ['manager', 'administrator', 'tenant', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     const transactionIds = Array.from(
       new Set(
