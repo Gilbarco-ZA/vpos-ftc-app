@@ -14,6 +14,10 @@ const fiscalizedBrowseMigration = readFileSync(
   'scripts/migrations/postgres/1341_fiscalized_reporting_browse_indexes.sql',
   'utf8',
 )
+const receiptBrowseMigration = readFileSync(
+  'scripts/migrations/postgres/1342_receipt_browse_index.sql',
+  'utf8',
+)
 
 test('reporting reads prefer the transaction latest fiscal event pointer', () => {
   assert.match(repository, /LEFT JOIN fiscalization_events latest_fe/)
@@ -66,12 +70,16 @@ test('fiscalized report browsing has dedicated indexes for all-date and date-ran
     fiscalizedBrowseMigration,
     /fiscalized_at IS NOT NULL[\s\S]*UPPER\(COALESCE\(status, ''\)\) = 'FISCALIZED'/,
   )
-  assert.match(
+  assert.doesNotMatch(
     fiscalizedBrowseMigration,
     /idx_receipts_station_generated_desc/,
   )
+})
+
+test('receipt browsing has its own station newest-first index migration', () => {
+  assert.match(receiptBrowseMigration, /idx_receipts_station_generated_desc/)
   assert.match(
-    fiscalizedBrowseMigration,
+    receiptBrowseMigration,
     /ON receipts \(station_id, generated_at DESC\)/,
   )
 })
