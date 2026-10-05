@@ -220,6 +220,9 @@ const positiveNumberOrNull = (value: unknown): number | null => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
+const hasUsableInventoryReading = (item: NormalizedTgData) =>
+  item.gaugeOnline && item.inventoryDataReady
+
 async function persistTankGaugeSnapshot(
   stationId: string,
   items: NormalizedTgData[],
@@ -259,6 +262,12 @@ async function persistTankGaugeSnapshot(
     gross: number | null
     water: number | null
     updatedAt: string | null
+  }> = []
+  const skippedInvalidReadings: Array<{
+    tankId: string
+    tgId: string
+    gaugeOnline: boolean
+    inventoryDataReady: boolean
   }> = []
 
   const recordedAt = options.recordedAt ?? new Date().toISOString()
@@ -301,6 +310,40 @@ async function persistTankGaugeSnapshot(
         gaugeErrorActive: item.gaugeErrorActive,
         sourcePayload: item.sourcePayload,
       })
+
+      if (!hasUsableInventoryReading(item)) {
+        await txQuery(
+          client,
+          `UPDATE tanks
+              SET last_tg_diagnostics = $3::jsonb,
+                  last_tg_payload_hash = $4,
+                  last_tg_payload = NULL,
+                  last_tg_payload_cleared_at = CASE
+                    WHEN last_tg_payload IS NOT NULL THEN NOW()
+                    ELSE last_tg_payload_cleared_at
+                  END,
+                  last_tg_payload_clear_reason = CASE
+                    WHEN last_tg_payload IS NOT NULL THEN 'replaced_by_compact_diagnostics'
+                    ELSE last_tg_payload_clear_reason
+                  END,
+                  updated_at = NOW()
+            WHERE station_id = $1 AND id = $2`,
+          [
+            stationId,
+            tank.id,
+            JSON.stringify(diagnostics),
+            diagnostics.sourcePayloadHash,
+          ],
+        )
+
+        skippedInvalidReadings.push({
+          tankId: tank.id,
+          tgId,
+          gaugeOnline: item.gaugeOnline,
+          inventoryDataReady: item.inventoryDataReady,
+        })
+        continue
+      }
 
       await txQuery(
         client,
@@ -552,6 +595,8 @@ async function persistTankGaugeSnapshot(
     ok: true,
     updated: updates.length,
     snapshotsSaved: updates.length,
+    skippedInvalidReadings: skippedInvalidReadings.length,
+    skippedTanks: skippedInvalidReadings,
     tanks: updates,
   }
 }
