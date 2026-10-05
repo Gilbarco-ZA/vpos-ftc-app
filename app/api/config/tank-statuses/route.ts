@@ -8,6 +8,6 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = async () => {
-  await requireAuth(['administrator', 'manager'])
+  await requireAuth(['administrator', 'manager', 'field_engineer'])
   return ok({ options: ACTIVE_INACTIVE_STATUS_OPTIONS })
 }
