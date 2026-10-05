@@ -163,6 +163,31 @@ test('manual tank sync does not create new /tanks topology for unknown gauge ids
   assert.deepEqual(result.config.tankLevels, config.tankLevels)
 })
 
+
+test('manual tank sync preserves existing levels and returns degraded status when ATG is unavailable', async () => {
+  let saves = 0
+  const result = await syncTankVolumes('station-1', {
+    captureAtgSnapshot: async () => {
+      throw new Error('Timed out requesting tank gauge data for tank 01')
+    },
+    getTankConfig: async () => config,
+    saveTankConfig: async () => {
+      saves += 1
+    },
+  })
+
+  assert.equal(result.capture.available, false)
+  assert.equal(result.capture.snapshotsSaved, 0)
+  assert.equal(result.synced.count, 0)
+  assert.equal(result.synced.tankLevelUpdates, 0)
+  assert.equal(result.synced.degraded, true)
+  assert.deepEqual(result.config.tankLevels, config.tankLevels)
+  assert.equal(saves, 0)
+  assert.deepEqual(result.synced.controllerErrors, [
+    { error: 'Timed out requesting tank gauge data for tank 01' },
+  ])
+})
+
 test('manual tank sync stays inert without a station id', async () => {
   let captures = 0
   const result = await syncTankVolumes('', {
