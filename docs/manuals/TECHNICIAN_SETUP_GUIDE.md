@@ -106,6 +106,8 @@ If startup fails during a migration, capture the complete error and resolve the 
 
 Current Tanzania deployments must include migration `1320_tanzania_assignment_counter_scope.sql`. It removes a legacy uniqueness rule that incorrectly coupled fiscal-date Z numbers to transaction-date daily counters for delayed transactions. Do not re-create that removed constraint in production.
 
+Current deployments must also include the reporting/receipt read-path migrations, including `1340_reporting_read_path_indexes.sql` and `1341_fiscalized_reporting_browse_indexes.sql`. These indexes protect broad fiscalized-transaction, report, and receipt browsing from full-history scans on constrained site controllers.
+
 ## 6. Confirm process health before configuration
 
 From an authorized station-network client, verify the following endpoints on the installed VPOS base URL:
@@ -123,6 +125,8 @@ Interpret them as follows:
 - `/api/healthz` — station runtime health information.
 
 Do not proceed merely because `/api/livez` succeeds. Resolve readiness/health failures first.
+
+Known transient PostgreSQL transport and pool-pressure failures are treated as recoverable by the production launcher. A single heavy/failed database request must not terminate the VPOS process or deliberately drop the DOMS/JPL session. If a browser receives `SERVICE_UNAVAILABLE` while a direct PostgreSQL connection still works, investigate query shape, pool pressure, and indexes before restarting the application.
 
 ## 7. Sign in and open the Setup Wizard
 
@@ -257,6 +261,8 @@ Where PSS configuration must change, make that change through the approved PSS C
 
 Before mapping nozzles, ensure the station has the correct product and tank records.
 
+Where ATG integration is present, verify normal online inventory-ready readings and then verify degraded behavior according to the approved test procedure. VPOS must preserve the last valid tank reading when the ATG is offline or inventory data is not ready; an offline response must not overwrite the tank volume with zero. Manual tank-volume sync should report a degraded/unavailable capture while leaving the last valid operational reading intact.
+
 Use the relevant setup/configuration pages:
 
 - **Products**
@@ -310,6 +316,8 @@ Configure the approved printer endpoint and run, in order:
 3. report print test
 
 Confirm physical output, paper width/layout, station identity, and fiscal information where applicable.
+
+The transaction and receipts screens use the shared side-panel receipt preview. The user-facing print action is **Print Receipt**. For non-fiscalized/offline-capable workflows, preview must render the full canonical pre-fiscal receipt rather than a brief summary, including configured header/footer information and the generated verification QR where the country workflow provides one.
 
 ## 17. Configure proxy/fiscal services
 
@@ -374,7 +382,9 @@ Minimum evidence:
 - tank-level/wet-stock visibility where configured
 - no unresolved alarms or repeated protocol/session errors
 
-For Tanzania stations using pre-fiscalization receipt printing, include a controlled receipt-preview check. Verify customer-assigned and non-customer transactions render correctly. Where approved test data includes a delayed/non-fiscalized transaction from an earlier business date, verify that its receipt can be previewed without a counter-collision error and that later retries reuse the same persisted Tanzania receipt identity.
+For Tanzania stations using pre-fiscalization/offline receipt printing, include a controlled receipt-preview check. Verify customer-assigned and non-customer transactions render the complete receipt, including TRA header/footer presentation, verification identity, and QR code. Where approved test data includes a delayed/non-fiscalized transaction from an earlier business date, verify that its receipt can be previewed without a counter-collision error and that later retries reuse the same persisted Tanzania receipt identity.
+
+Also verify transaction/receipt list performance using the default business-day filter and a representative month/search query. The Receipts page should list from stored receipt records directly, while fiscalized transaction browsing should remain responsive without exhausting the PostgreSQL pool.
 
 Where a fuel transaction is required for acceptance, use the site's controlled test procedure and reconcile the test sale afterward.
 
@@ -391,6 +401,8 @@ Verify that:
 - pump/tank state resumes
 - workers recover
 - no migrations fail
+- a recoverable PostgreSQL query/pool failure does not terminate the VPOS service
+- an ATG outage leaves the last valid tank readings in place and fresh readings resume after reconnect
 
 Do not accept a station that works only until the next package restart.
 
@@ -413,6 +425,23 @@ Do not accept a station that works only until the next package restart.
 - capture the complete PostgreSQL error including SQLSTATE and constraint name
 - verify the package contains the current migrations
 - do not modify `schema_migrations` manually unless directed by an approved recovery procedure
+
+### Transactions/receipts return `SERVICE_UNAVAILABLE` while PostgreSQL itself is reachable
+
+1. Capture the affected URL, filters, local time, and API `requestId`.
+2. Confirm `/api/livez` still responds and verify the VPOS process/JPL session remains up.
+3. Check PostgreSQL pool diagnostics and slow-query logs for waiting clients, connection timeouts, or broad scans.
+4. Verify migrations `1340_reporting_read_path_indexes.sql` and `1341_fiscalized_reporting_browse_indexes.sql` are applied.
+5. Reproduce with a bounded business-date/month filter and a search term. Receipts should be read through `/api/receipts?list=1`, not by using the enriched transaction list solely to populate the receipt browser.
+6. Do not restart DOMS/JPL simply because one report/list query failed; correct the database/query pressure first.
+
+### ATG offline or inventory data unavailable
+
+- confirm the gauge/offline diagnostics rather than interpreting a returned numeric zero as physical stock
+- verify the last valid tank volume remains stored/displayed
+- verify no invalid offline snapshot advances fiscalization tank evidence
+- restore ATG connectivity and confirm an online, inventory-ready response resumes normal updates
+- if manual sync is used during the outage, expect a degraded result rather than an internal server error or zero overwrite
 
 ### Tanzania receipt preview returns `500`
 
@@ -455,6 +484,12 @@ Customer assignment changes what customer data appears on the receipt, but it do
 - test network reachability to the printer
 - verify printer IP/port
 - inspect **Print Jobs** and **Diagnostics**
+- confirm the receipt can be opened in the shared side-panel preview before repeating the print
+- for non-fiscalized Tanzania/offline workflows, confirm the preview contains the expected verification QR and full header/footer before testing physical output
+
+### Field-engineer transaction recovery access
+
+The `field_engineer` role has scoped access to Transactions and Receipts for operational troubleshooting and recovery. It can review fiscalized/non-fiscalized lists, preview/print receipts, edit/allocate eligible transactions, retry/reset failed transactions, cancel a stuck fiscalization attempt, and use the related recovery actions exposed by those screens. It does not inherit unrelated administrator areas such as Users, Runtime Control, or general Maintenance. Use this role instead of sharing administrator credentials with field support.
 
 ## 22. Handover checklist
 
@@ -473,6 +508,9 @@ Record and hand over:
 - [ ] Tanzania receipt-preview/delayed-transaction behavior checked where applicable
 - [ ] controlled transaction/receipt test completed
 - [ ] restart/recovery check completed
+- [ ] PostgreSQL/reporting read-path migrations 1340/1341 applied and list queries remain responsive
+- [ ] ATG disconnect test preserves last-valid tank readings where ATG integration is enabled
+- [ ] field-engineer scoped Transactions/Receipts access verified where that role is commissioned
 - [ ] diagnostics/support evidence captured
 - [ ] unresolved exceptions documented
 - [ ] site/organizational acceptance obtained
