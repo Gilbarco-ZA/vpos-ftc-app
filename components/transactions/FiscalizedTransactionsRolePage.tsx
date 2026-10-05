@@ -59,7 +59,7 @@ const ReceiptViewerView = async ({
   searchParams: SearchParams
 }) => {
   const user = await requireAuth(['manager', 'administrator', 'field_engineer'])
-  if (!['administrator', 'manager'].includes(user.role)) redirect('/dashboard')
+  if (!['administrator', 'manager', 'field_engineer'].includes(user.role)) redirect('/dashboard')
 
   const initialQuery = readParam(searchParams, 'q').trim()
   const initialTransactionId = readParam(searchParams, 'transactionId').trim()
@@ -92,7 +92,7 @@ const AdminFiscalizedView = async ({
   searchParams: SearchParams
 }) => {
   const user = await requireAuth(['manager', 'administrator'])
-  if (!['administrator', 'manager'].includes(user.role)) redirect('/dashboard')
+  if (!['administrator', 'manager', 'field_engineer'].includes(user.role)) redirect('/dashboard')
 
   let rows: FiscalizedTransactionListItem[] = []
   let error: string | null = null
@@ -142,7 +142,7 @@ const ManagerFiscalizedView = async ({
   searchParams: SearchParams
 }) => {
   const user = await requireAuth(['manager', 'administrator'])
-  if (user.role !== 'manager' && user.role !== 'administrator')
+  if (!['manager', 'administrator', 'field_engineer'].includes(user.role))
     redirect('/dashboard')
 
   const page = Number(readParam(searchParams, 'page') || '1') || 1
