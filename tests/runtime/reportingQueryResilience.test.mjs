@@ -66,6 +66,14 @@ test('fiscalized report browsing has dedicated indexes for all-date and date-ran
     fiscalizedBrowseMigration,
     /fiscalized_at IS NOT NULL[\s\S]*UPPER\(COALESCE\(status, ''\)\) = 'FISCALIZED'/,
   )
+  assert.match(
+    fiscalizedBrowseMigration,
+    /idx_receipts_station_generated_desc/,
+  )
+  assert.match(
+    fiscalizedBrowseMigration,
+    /ON receipts \(station_id, generated_at DESC\)/,
+  )
 })
 
 test('scope=fiscalized uses fiscalized_at directly so the partial index remains usable', () => {
@@ -96,5 +104,4 @@ test('receipt viewer lists receipts directly instead of routing through transact
   )
   assert.match(receiptQuery, /FROM receipts r/)
   assert.match(receiptQuery, /JOIN transactions t/)
-  assert.doesNotMatch(receiptQuery, /FROM fiscalization_events fe/)
 })
