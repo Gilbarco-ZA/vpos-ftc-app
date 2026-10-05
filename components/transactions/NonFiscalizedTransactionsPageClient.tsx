@@ -37,6 +37,7 @@ import {
 } from '@/src/modules/transactions/domain/transaction-editability'
 
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
+import BulkRetryFailedTransactionsButton from '@/components/transactions/BulkRetryFailedTransactionsButton'
 import NonFiscalizedDetailsSheet from '@/components/transactions/non-fiscalized/NonFiscalizedDetailsSheet'
 import NonFiscalizedErrorState from '@/components/transactions/non-fiscalized/NonFiscalizedErrorState'
 import NonFiscalizedFiltersRow from '@/components/transactions/non-fiscalized/NonFiscalizedFiltersRow'
@@ -443,6 +444,22 @@ const NonFiscalizedTransactionsPageClient = ({
           todayDisabled={!businessDate}
           onRefresh={refresh}
         />
+        <div className="flex justify-end">
+          <BulkRetryFailedTransactionsButton
+            transactionIds={transactions
+              .filter((row) => String(row.status || '').toUpperCase() === 'FAILED')
+              .map((row) => row.id)}
+            csrfToken={csrfToken}
+            onCompleted={async (result) => {
+              showToast(
+                result.skipped > 0 ? 'warning' : 'success',
+                `Reset ${result.retried} failed transaction${result.retried === 1 ? '' : 's'}${result.skipped > 0 ? `; ${result.skipped} skipped` : ''}`,
+              )
+              await refresh()
+            }}
+          />
+        </div>
+
 
         {loadError ? (
           <NonFiscalizedErrorState error={loadError} onRetry={refresh} />
