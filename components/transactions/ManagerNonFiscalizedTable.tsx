@@ -15,6 +15,7 @@ import {
 
 import { CsrfHiddenInput } from '@/components/security/CsrfHiddenInput'
 import { AllocateTransactionModalForm } from '@/components/transactions/allocate/AllocateTransactionModalForm'
+import BulkRetryFailedTransactionsButton from '@/components/transactions/BulkRetryFailedTransactionsButton'
 import TransactionLinesEditorSheet from '@/components/transactions/TransactionLinesEditorSheet'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -109,6 +110,17 @@ export function ManagerNonFiscalizedTable(props: {
 
   return (
     <>
+      <div className="flex justify-end border-b border-border px-4 py-3">
+        <BulkRetryFailedTransactionsButton
+          transactionIds={tableRows
+            .filter((row) => String(row?.status || '').toUpperCase() === 'FAILED')
+            .map((row) => String(row?.id || ''))}
+          csrfToken={csrfToken}
+          onCompleted={() => {
+            router.refresh()
+          }}
+        />
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
