@@ -130,7 +130,13 @@ async function writeHeartbeat(filePath, extra = {}) {
 
 function isRecoverablePostgresTransportError(error) {
   const message = String(error?.message || error || '');
-  return /connection terminated unexpectedly/i.test(message);
+  const code = String(error?.code || '');
+  return (
+    code === '57P03' ||
+    /connection terminated unexpectedly|connection terminated due to connection timeout|timeout expired|remaining connection slots|too many clients|ECONNRESET|EPIPE|socket hang up|database system is in recovery mode/i.test(
+      message,
+    )
+  );
 }
 
 function installProcessDiagnostics() {
