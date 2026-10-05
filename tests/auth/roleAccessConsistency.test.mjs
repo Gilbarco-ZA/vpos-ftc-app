@@ -32,9 +32,9 @@ test('field engineer gets scoped transaction and receipt navigation without inhe
 test('reports page and API share the same management role policy', () => {
   const page = read('app/(dashboard)/reports/page.tsx')
   const api = read('app/api/reports/route.ts')
-  assert.match(page, /requireAuth\(\['manager', 'administrator'\]\)/)
+  assert.match(page, /requireAuth\(\['manager', 'administrator', 'field_engineer'\]\)/)
   assert.doesNotMatch(api, /'tenant'/)
-  assert.match(api, /roles: \['manager', 'administrator'\]/)
+  assert.match(api, /roles: \['manager', 'administrator', 'field_engineer'\]/)
 })
 
 test('legacy user management APIs are administrator only', () => {
