@@ -48,7 +48,7 @@ export const getNavSections = (
   }
 
   if (role === 'field_engineer') {
-    const allowed = ['/transactions', '/receipts']
+    const allowed = ['/transactions', '/receipts', '/reports']
     return [
       dashboard,
       {
@@ -70,6 +70,14 @@ export const getNavSections = (
             href: '/transactions?status=fiscalized&view=receipt',
           },
         ],
+      },
+      {
+        label: 'Forecourt',
+        items: [{ label: 'Tanks', href: '/tanks' }],
+      },
+      {
+        label: 'Setup & Configuration',
+        items: [{ label: 'Tank Settings', href: '/settings/tanks' }],
       },
     ]
   }
