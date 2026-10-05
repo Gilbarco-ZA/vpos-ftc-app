@@ -67,3 +67,14 @@ test('fiscalized report browsing has dedicated indexes for all-date and date-ran
     /fiscalized_at IS NOT NULL[\s\S]*UPPER\(COALESCE\(status, ''\)\) = 'FISCALIZED'/,
   )
 })
+
+test('scope=fiscalized uses fiscalized_at directly so the partial index remains usable', () => {
+  assert.match(
+    repository,
+    /scope === 'fiscalized'[\s\S]*conditions\.push\(\s*`t\.fiscalized_at IS NOT NULL`/,
+  )
+  assert.doesNotMatch(
+    repository,
+    /scope === 'fiscalized'[\s\S]{0,250}fiscalized_at IS NOT NULL OR/,
+  )
+})
