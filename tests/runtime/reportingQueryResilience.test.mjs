@@ -10,6 +10,10 @@ const migration = readFileSync(
   'scripts/migrations/postgres/1340_reporting_read_path_indexes.sql',
   'utf8',
 )
+const fiscalizedBrowseMigration = readFileSync(
+  'scripts/migrations/postgres/1341_fiscalized_reporting_browse_indexes.sql',
+  'utf8',
+)
 
 test('reporting reads prefer the transaction latest fiscal event pointer', () => {
   assert.match(repository, /LEFT JOIN fiscalization_events latest_fe/)
@@ -38,5 +42,28 @@ test('reporting migration covers station date scans and latest receipt lookup', 
   assert.match(
     migration,
     /ON receipts \(station_id, transaction_id, generated_at DESC\)/,
+  )
+})
+
+test('fiscalized report browsing has dedicated indexes for all-date and date-range reads', () => {
+  assert.match(
+    fiscalizedBrowseMigration,
+    /idx_transactions_station_fiscalized_browse_active/,
+  )
+  assert.match(
+    fiscalizedBrowseMigration,
+    /station_id,\s*fiscalized_at DESC NULLS LAST,\s*transaction_date_time DESC/,
+  )
+  assert.match(
+    fiscalizedBrowseMigration,
+    /idx_transactions_station_date_fiscalized_browse_active/,
+  )
+  assert.match(
+    fiscalizedBrowseMigration,
+    /station_id,\s*transaction_date_time DESC,\s*fiscalized_at DESC NULLS LAST/,
+  )
+  assert.match(
+    fiscalizedBrowseMigration,
+    /fiscalized_at IS NOT NULL[\s\S]*UPPER\(COALESCE\(status, ''\)\) = 'FISCALIZED'/,
   )
 })
