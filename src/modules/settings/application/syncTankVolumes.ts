@@ -43,11 +43,41 @@ export async function syncTankVolumes(
   const getTankConfig = dependencyOverrides.getTankConfig ?? getTankConfigRepo
   const saveTankConfig =
     dependencyOverrides.saveTankConfig ?? saveTankConfigRepo
-  const result = await capture(stationId)
-
   const existing = normalizeTankConfig(
     (await getTankConfig(stationId)) ?? defaultTankConfig,
   )
+
+  let result: Awaited<ReturnType<typeof captureAtgSnapshot>>
+  try {
+    result = await capture(stationId)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error ?? 'ATG unavailable')
+
+    return {
+      capture: {
+        recordedAt: '',
+        requestedTgIds: [],
+        snapshotsSaved: 0,
+        available: false,
+      },
+      synced: {
+        count: 0,
+        requested: 0,
+        controllerErrors: [{ error: message }],
+        tankLevelUpdates: 0,
+        degraded: true,
+      },
+      tanks: [],
+      config: existing,
+      liveData: {
+        requestedTgIds: [],
+        responses: [],
+        normalized: [],
+        errors: [{ error: message }],
+      },
+    }
+  }
   const tankLevels = [...(existing.tankLevels ?? [])]
   let tankLevelUpdates = 0
 
@@ -83,6 +113,7 @@ export async function syncTankVolumes(
         ? result.requestedTgIds
         : [],
       snapshotsSaved: Number(result.snapshotsSaved ?? 0),
+      available: true,
     },
     synced: {
       count: Number(result.updated ?? 0),
