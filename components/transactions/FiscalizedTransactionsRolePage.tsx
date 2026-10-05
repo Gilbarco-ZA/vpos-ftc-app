@@ -96,6 +96,7 @@ const AdminFiscalizedView = async ({
 
   let rows: FiscalizedTransactionListItem[] = []
   let error: string | null = null
+  const q = readParam(searchParams, 'q').trim()
   const [decimals, businessDate] = await Promise.all([
     getStationDecimalSettings(user.stationId),
     getStationCurrentBusinessDate(user.stationId),
@@ -112,7 +113,8 @@ const AdminFiscalizedView = async ({
   try {
     const list = await listTransactions(user.stationId, {
       scope: 'fiscalized',
-      limit: 200,
+      limit: 100,
+      search: q || undefined,
       startDate: dateFilter.startDate || undefined,
       endDate: dateFilter.endDate || undefined,
     })
@@ -126,6 +128,7 @@ const AdminFiscalizedView = async ({
       initialTransactions={rows}
       error={error}
       decimals={decimals}
+      initialSearch={q}
       initialStartDate={dateFilter.startDate}
       initialEndDate={dateFilter.endDate}
       businessDate={businessDate}
@@ -161,7 +164,7 @@ const ManagerFiscalizedView = async ({
   const data = await listTransactions(user.stationId, {
     page,
     pageSize: 50,
-    status: 'FISCALIZED',
+    scope: 'fiscalized',
     search: q || undefined,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
