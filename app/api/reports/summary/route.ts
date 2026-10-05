@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = defineGetRoute({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (req, { user }) => {
     const { searchParams } = new URL(req.url)
     const summary = await getReportSummary(
