@@ -15,7 +15,7 @@ VPOS currently uses four application roles:
 | `tenant`        | Daily POS operation                             | Dashboard, POS, transactions, receipts, customers, and TIN Allocation when configured                                                                                                                                     |
 | `manager`       | Station operations and controlled configuration | Tenant functions plus reports, stock, transaction review, pumps, tanks, tank levels, forecourt setup, tank/pump configuration, and pricing                                                                                |
 | `administrator` | Technical and security administration           | Manager functions plus fiscal inbox, diagnostics, device status, print jobs, users, runtime control, maintenance, proxy/fiscal settings, setup wizard, products, station configuration, languages, datasets, and branding |
-| `field_engineer` | Controlled technical maintenance                | Dedicated technical role for explicitly authorized commissioning and protected DOMS/PSS maintenance operations; it does not inherit administrator access |
+| `field_engineer` | Controlled technical maintenance and transaction recovery | Scoped access to Transactions and Receipts, including fiscalized/non-fiscalized review, receipt preview/printing, failed-transaction retry/reset, and approved transaction recovery actions, plus explicitly authorized commissioning and protected DOMS/PSS maintenance. It does not inherit unrelated administrator access. |
 
 Use the least-privileged role required for the task. Do not share administrator accounts for routine cashier or manager work.
 
@@ -42,6 +42,8 @@ Managers and administrators have dedicated views for:
 - fiscalized transactions
 - receipt viewing
 - receipt lookup
+
+The `field_engineer` role has scoped access to non-fiscalized/fiscalized transaction review and receipt viewing/printing for troubleshooting and recovery. It does not gain unrelated administrator functions.
 
 Administrators also have **Fiscal Inbox** for fiscal processing visibility.
 
@@ -152,6 +154,10 @@ Before taking corrective action:
 
 Do not repeatedly resubmit or duplicate a fiscal request without understanding the prior state. Escalate persistent failures with the transaction ID and any request/error reference shown by the system.
 
+The default `/transactions` view is the same non-fiscalized view as `/transactions?status=non-fiscalized`. The list defaults to the current station business date unless another date preset/range is selected, and search/date filters are sent to the server to keep the query bounded.
+
+When one or more rows in the current list are `FAILED`, authorized manager, administrator, and field-engineer users can use **Reset Failed (N)**. This reuses the normal fiscalization retry workflow for the failed rows currently in scope. Rows that are no longer `FAILED` or still require a customer link are skipped rather than forced through.
+
 For Tanzania stations, a delayed transaction can retain its original transaction-date invoice/daily-counter scope even when its first receipt/fiscal assignment happens on a later date. That is expected. Do not treat a difference between the invoice-number date and Z-number/invoice date as corruption by itself.
 
 ## 7. Fiscalized transactions and receipt lookup
@@ -160,13 +166,17 @@ Use **Fiscalized** and **Receipt Viewer** to confirm that completed transactions
 
 Use **Receipt Lookup** when a customer or auditor supplies a known transaction/receipt reference.
 
-Managers and administrators can request a receipt print from the transaction workflow. If printing fails, verify the print job rather than repeatedly issuing print requests.
+Managers, administrators, and field engineers with scoped transaction access can request a receipt print from the transaction workflow. If printing fails, verify the print job rather than repeatedly issuing print requests.
 
 ## 8. Receipts and printing
 
-Use **Receipts** for normal receipt access. Administrators can use **Print Jobs** for printer troubleshooting and queue visibility.
+Use **Receipts** for normal receipt access. The receipt list reads the stored receipt records directly and applies date/search filters before loading the bounded result set. Selecting a receipt opens the same side-panel receipt preview used by Transactions, so operators can inspect or print it without scrolling away from the list. Administrators can use **Print Jobs** for printer troubleshooting and queue visibility.
 
-For stations configured to print before fiscalization, opening a receipt preview can reserve/persist receipt identity. In Tanzania this may allocate the receipt verification identity, global counter, transaction-date daily counter, fiscal-date Z number, and invoice date before fiscalization completes. Reopening or retrying the same transaction is expected to reuse that persisted identity rather than generate a new one.
+The receipt action is labelled **Print Receipt**. It still uses the configured station receipt-print workflow; the label intentionally hides the transport implementation detail from normal users.
+
+For non-fiscalized transactions, explicit receipt preview now materializes the same canonical pre-fiscal/offline receipt used by offline printing. The preview therefore shows the full receipt layout, including configured header/footer content, customer data, line items/totals, and country-specific verification/QR information where applicable.
+
+For Tanzania this preview can reserve/persist the receipt verification identity, global counter, transaction-date daily counter, fiscal-date Z number, invoice date, and verification QR before fiscalization completes. Reopening or retrying the same transaction is expected to reuse that persisted identity rather than generate a new one.
 
 If a receipt does not print:
 
@@ -181,7 +191,7 @@ Printer configuration is an administrator function under **Printers** and should
 
 ## 9. Reports
 
-Managers and administrators can use **Reports** for station reporting.
+Managers and administrators can use **Reports** for station reporting. Transaction/report reads are optimized around bounded date/search filters; prefer a specific business date, month, or search term instead of **All dates** when investigating a known record.
 
 Use the station's agreed reporting period and timezone. If report totals and transaction searches differ, first verify:
 
@@ -247,6 +257,8 @@ Administrators can use **Forecourt Monitor**, **Device Status**, and **Diagnosti
 
 Use **Tanks** and **Tank Levels** to review the configured tank estate and current wet-stock information where available.
 
+ATG loss is treated as degraded telemetry, not as a physical zero-volume reading. When the gauge is offline or inventory data is not ready, VPOS preserves the last valid tank volumes/snapshot for operational and fiscalization use while updating diagnostics. A genuine zero remains valid only when the gauge is online and the inventory reading is ready. Manual tank-volume sync returns a degraded result instead of overwriting the tank with zero or failing the whole station workflow.
+
 Tank configuration must reflect the physical site and DOMS/PSS topology. If a tank is renamed, replaced, remapped, or assigned a different grade, follow the site's configuration/change process rather than making an unrecorded UI change during live trading.
 
 ## 15. Forecourt setup and nozzle-to-tank mapping
@@ -307,6 +319,8 @@ Use them only when:
 - the site's support/change procedure permits the action
 
 Restarting a process should not be the default response to an unexplained transaction or forecourt problem. Capture diagnostics first whenever practical.
+
+Transient PostgreSQL connection/pool-pressure failures are isolated from the process-level runtime where they are recognized as recoverable. A failed report/query may return **Database temporarily unavailable** while VPOS and DOMS/JPL remain running. Treat that as a query/database-pressure problem first, not as a reason to stop forecourt connectivity.
 
 Production maintenance or dispense-control actions require the applicable site and organizational approval.
 
@@ -391,7 +405,9 @@ Recommended checks:
 | One pump unavailable                                                        | Check pump state and physical forecourt condition                           | Check device/JPL details and mapping                                                                                                   |
 | All/many pumps stale                                                        | Treat as forecourt connectivity issue                                       | Inspect Forecourt Monitor/Diagnostics and JPL session                                                                                  |
 | Receipt not printed                                                         | Confirm transaction/receipt and avoid duplicate prints                      | Check Print Jobs and printer connectivity                                                                                              |
-| Tank value unexpected                                                       | Compare with physical/site wet-stock evidence                               | Check DOMS data and tank mapping                                                                                                       |
+| Tank value unexpected                                                       | Compare with physical/site wet-stock evidence                               | Check DOMS/ATG diagnostics and mapping; an offline ATG should preserve the last valid reading rather than write zero                    |
+| Receipt/transaction query returns Database temporarily unavailable           | Narrow the date range/search and retry once                                 | Check PostgreSQL pool/query pressure and current reporting migrations; the service should remain running                              |
+| ATG offline during trading                                                   | Continue using the displayed last-valid tank reading and record the outage  | Restore ATG connectivity and confirm fresh inventory-ready readings resume before treating new values as authoritative                 |
 | Price mismatch                                                              | Stop and verify approved price source                                       | Reconcile VPOS/PSS pricing configuration under change control                                                                          |
 | UI available but station degraded                                           | Do not assume all integrations are healthy                                  | Use health/readiness and diagnostics                                                                                                   |
 
