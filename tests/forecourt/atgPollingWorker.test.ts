@@ -347,6 +347,15 @@ test('ATG storage keeps latest state plus bounded projection evidence', () => {
   assert.match(writer, /item\.tankPressure/)
   assert.match(writer, /item\.gaugeOnline/)
   assert.match(writer, /item\.inventoryDataReady/)
+  assert.match(
+    writer,
+    /item\.gaugeOnline && item\.inventoryDataReady/,
+  )
+  assert.match(writer, /skippedInvalidReadings\.push/)
+  assert.match(
+    writer,
+    /if \(!hasUsableInventoryReading\(item\)\)[\s\S]*?last_tg_diagnostics[\s\S]*?continue/,
+  )
   assert.match(writer, /positiveNumberOrNull\(item\.tankShellCapacity\)/)
   assert.match(writer, /positiveNumberOrNull\(item\.tankMaxSafeFillCapacity\)/)
   assert.match(command, /type: 'GET_ALL_TG_DATA'/)
