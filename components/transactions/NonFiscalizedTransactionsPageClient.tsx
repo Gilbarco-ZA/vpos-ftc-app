@@ -452,7 +452,7 @@ const NonFiscalizedTransactionsPageClient = ({
             csrfToken={csrfToken}
             onCompleted={async (result) => {
               showToast(
-                result.skipped > 0 ? 'warning' : 'success',
+                result.skipped > 0 ? 'info' : 'success',
                 `Reset ${result.retried} failed transaction${result.retried === 1 ? '' : 's'}${result.skipped > 0 ? `; ${result.skipped} skipped` : ''}`,
               )
               await refresh()
