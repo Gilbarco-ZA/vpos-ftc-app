@@ -271,9 +271,11 @@ test('reference print source SQL resolves canonical receipt and report rows', ()
   )
 
   assert.match(sql, /selectReceiptPrintSource/)
-  assert.match(sql, /FROM receipts r/)
+  assert.match(sql, /FROM\s+receipts\s+r\b/i)
   assert.match(sql, /r\.transaction_id = \$2/)
   assert.match(sql, /selectReportPrintSource/)
-  assert.match(sql, /FROM reports r/)
+  assert.match(sql, /FROM\s+reports\b/i)
+  assert.match(sql, /WHERE station_id = \$1/)
+  assert.match(sql, /AND id = \$2::uuid/)
 })
 
