@@ -121,7 +121,7 @@ function buildFilter(
     conditions.push(`UPPER(COALESCE(t.status, '')) = ${addParam(status)}`)
   } else if (scope === 'fiscalized') {
     conditions.push(
-      `(t.fiscalized_at IS NOT NULL OR UPPER(COALESCE(t.status, '')) = 'FISCALIZED')`,
+      `t.fiscalized_at IS NOT NULL`,
     )
   } else if (scope === 'non-fiscalized') {
     conditions.push(
