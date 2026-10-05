@@ -410,16 +410,75 @@ export async function getReceiptRoutePayload(input: {
 
 export async function listReceiptRouteRows(
   stationId: string,
-  transactionId: string,
+  options: {
+    transactionId?: string
+    search?: string
+    startDate?: string
+    endDate?: string
+    limit?: number
+  } = {},
 ) {
+  const transactionId = String(options.transactionId ?? '').trim()
+  const search = String(options.search ?? '').trim()
+  const startDate = String(options.startDate ?? '').trim()
+  const endDate = String(options.endDate ?? '').trim()
+  const limit = Math.min(200, Math.max(1, Number(options.limit ?? 100)))
+
+  const conditions = ['r.station_id = $1']
+  const params: unknown[] = [stationId]
+  const addParam = (value: unknown) => {
+    params.push(value)
+    return `${params.length}`
+  }
+
+  if (transactionId) {
+    conditions.push(`r.transaction_id = ${addParam(transactionId)}::uuid`)
+  }
+
+  if (search) {
+    const token = addParam(`%${search}%`)
+    conditions.push(`(
+      COALESCE(r.receipt_number, '') ILIKE ${token}
+      OR r.transaction_id::text ILIKE ${token}
+      OR COALESCE(t.cloud_transaction_id::text, '') ILIKE ${token}
+      OR COALESCE(t.fiscalization_reference, '') ILIKE ${token}
+      OR COALESCE(c.buyer_name, '') ILIKE ${token}
+      OR COALESCE(c.tin, '') ILIKE ${token}
+    )`)
+  }
+
+  if (startDate) {
+    conditions.push(`r.generated_at >= ${addParam(startDate)}::date`)
+  }
+  if (endDate) {
+    conditions.push(
+      `r.generated_at < (${addParam(endDate)}::date + INTERVAL '1 day')`,
+    )
+  }
+
   const rows = await queryAll<Record<string, any>>(
-    `SELECT r.*
+    `SELECT
+         r.*,
+         t.fiscalized_at,
+         t.transaction_date_time,
+         t.cloud_transaction_id,
+         t.fiscalization_reference,
+         t.total_amount,
+         t.pump_number,
+         t.fuel_type,
+         c.buyer_name,
+         c.tin
        FROM receipts r
-      WHERE r.station_id = $1
-        AND ($2 = '' OR r.transaction_id = $2::uuid)
+       JOIN transactions t
+         ON t.id = r.transaction_id
+        AND t.station_id = r.station_id
+        AND t.deleted_at IS NULL
+       LEFT JOIN customers c
+         ON c.id = t.customer_id
+      WHERE ${conditions.join(' AND ')}
       ORDER BY r.generated_at DESC
-      LIMIT 200`,
-    [stationId, transactionId],
+      LIMIT ${addParam(limit)}`,
+    params,
   )
   return rows.map((row) => resolveReceiptRowContent(row))
 }
