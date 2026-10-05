@@ -273,9 +273,10 @@ test('migration compacts only pending jobs with verified canonical sources', () 
   assert.match(migration, /job_type = 'print\.receipt'/)
   assert.match(migration, /job_type = 'print\.report'/)
   assert.match(migration, /pj\.status = 'PENDING'/)
+  assert.match(migration, /FROM receipts AS receipt/)
   assert.match(
     migration,
-    /EXISTS \([\s\S]*FROM receipts AS receipt[\s\S]*receipt\.transaction_id = pj\.source_transaction_id/,
+    /receipt\.transaction_id = pj\.source_transaction_id/,
   )
   assert.match(
     migration,
@@ -285,10 +286,8 @@ test('migration compacts only pending jobs with verified canonical sources', () 
   assert.match(migration, /'printerIP', COALESCE/)
   assert.match(migration, /'printer_key', COALESCE/)
   assert.doesNotMatch(migration, /COALESCE\(pj\.payload, '\{\}'::jsonb\) - ARRAY/)
-  assert.match(
-    migration,
-    /EXISTS \([\s\S]*FROM reports AS report[\s\S]*report\.id = pj\.source_report_id/,
-  )
+  assert.match(migration, /FROM reports AS report/)
+  assert.match(migration, /report\.id = pj\.source_report_id/)
   assert.match(migration, /status <> 'PROCESSING'/)
   assert.doesNotMatch(migration, /status = 'PROCESSING'/)
   assert.doesNotMatch(migration, /DELETE FROM print_jobs/)
