@@ -14,7 +14,7 @@ export const POST = defineMutationRoute<{
   vehicle_reg_nr?: string
   csrf_token?: string
 }>({
-  roles: ['tenant', 'manager', 'administrator'],
+  roles: ['tenant', 'manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     const result = await allocateTransaction({
       stationId: user.stationId,
