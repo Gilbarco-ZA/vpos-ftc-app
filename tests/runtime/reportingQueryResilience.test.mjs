@@ -153,3 +153,30 @@ test('receipt viewer uses the shared transaction receipt sheet instead of inline
   assert.match(viewer, /transactionId=\{selectedId\}/)
   assert.doesNotMatch(viewer, /<Receipt80mm/)
 })
+
+test('non-fiscalized transaction lists expose a bulk reset action for failed rows', () => {
+  const adminList = readFileSync(
+    'components/transactions/NonFiscalizedTransactionsPageClient.tsx',
+    'utf8',
+  )
+  const managerList = readFileSync(
+    'components/transactions/ManagerNonFiscalizedTable.tsx',
+    'utf8',
+  )
+  const bulkButton = readFileSync(
+    'components/transactions/BulkRetryFailedTransactionsButton.tsx',
+    'utf8',
+  )
+  const bulkRoute = readFileSync(
+    'app/api/transactions/retry-failed/route.ts',
+    'utf8',
+  )
+
+  assert.match(adminList, /BulkRetryFailedTransactionsButton/)
+  assert.match(managerList, /BulkRetryFailedTransactionsButton/)
+  assert.match(bulkButton, /Reset Failed/)
+  assert.match(bulkButton, /\/api\/transactions\/retry-failed/)
+  assert.match(bulkRoute, /retryFailedTransactionFiscalization/)
+  assert.match(bulkRoute, /Transaction is not FAILED/)
+  assert.match(bulkRoute, /Customer link required before fiscalization retry/)
+})
