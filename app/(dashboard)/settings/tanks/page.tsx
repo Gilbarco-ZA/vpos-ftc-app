@@ -5,7 +5,7 @@ import TankSettingsClient from './client'
 export const dynamic = 'force-dynamic'
 
 const SettingsTanksPage = async () => {
-  await requireAuth(['administrator', 'manager'])
+  await requireAuth(['administrator', 'manager', 'field_engineer'])
 
   return (
     <div className="space-y-4">
