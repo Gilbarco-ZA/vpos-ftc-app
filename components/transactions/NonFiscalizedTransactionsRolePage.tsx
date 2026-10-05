@@ -124,7 +124,7 @@ const AdminNonFiscalizedView = async ({
   searchParams: SearchParams
 }) => {
   const user = await requireAuth(['manager', 'administrator', 'field_engineer'])
-  if (!['administrator', 'manager'].includes(user.role)) redirect('/dashboard')
+  if (!['administrator', 'manager', 'field_engineer'].includes(user.role)) redirect('/dashboard')
 
   let rows: TransactionListItem[] = []
   let error: string | null = null
@@ -198,7 +198,7 @@ const ManagerNonFiscalizedView = async ({
   searchParams: SearchParams
 }) => {
   const user = await requireAuth(['manager', 'administrator'])
-  if (user.role !== 'manager' && user.role !== 'administrator')
+  if (!['manager', 'administrator', 'field_engineer'].includes(user.role))
     redirect('/dashboard')
 
   const page = Number(readParam(searchParams, 'page') || '1') || 1
