@@ -19,6 +19,8 @@ test('/tanks Refresh Tank Gauge Data persists ATG data, refreshes levels, and pu
   assert.doesNotMatch(settingsClient, /publishTanzaniaInventory/)
   assert.match(client, /sent \$\{published\} tank inventory record\(s\) to vpos-proxy/)
   assert.match(route, /body\.publishTanzaniaInventory !== true/)
+  assert.match(route, /result\.capture\.available === false/)
+  assert.match(route, /reason: 'atg_unavailable'/)
   assert.match(route, /publishTanzaniaTankInventoriesForCapture\(/)
   assert.match(route, /user\.stationId,\s*result\.capture/)
   assert.match(client, /setConfig\(normalizeTankConfig\(data\.config\)\)/)
