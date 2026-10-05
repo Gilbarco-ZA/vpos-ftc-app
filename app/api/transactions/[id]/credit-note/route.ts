@@ -12,7 +12,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = defineGetRoute<{ id: string }>({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, params }) => {
     const transactionId = String(params?.id || '').trim()
     if (!transactionId) return fail('transactionId is required', 400)
@@ -34,7 +34,7 @@ type CreditNoteBody = {
 }
 
 export const POST = defineMutationRoute<CreditNoteBody, { id: string }>({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     const transactionId = String(body?.transactionId || '').trim()
     if (!transactionId) return fail('transactionId is required', 400)
