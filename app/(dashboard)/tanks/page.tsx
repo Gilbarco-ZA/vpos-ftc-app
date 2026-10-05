@@ -5,7 +5,7 @@ import { TanksRolePage } from '@/components/tanks/TanksRolePage'
 export const dynamic = 'force-dynamic'
 
 const TanksPage = async () => {
-  const user = await requireAuth(['manager', 'administrator'])
+  const user = await requireAuth(['manager', 'administrator', 'field_engineer'])
 
   return (
     <TanksRolePage
