@@ -36,6 +36,17 @@ test('launcher keeps VPOS alive for a transient PostgreSQL connection drop', () 
   assert.match(launcher, /PostgreSQL connection dropped; keeping process alive/)
 })
 
+test('launcher treats PostgreSQL pool pressure as recoverable process noise', () => {
+  assert.match(launcher, /timeout expired/)
+  assert.match(launcher, /remaining connection slots/)
+  assert.match(launcher, /too many clients/)
+  assert.match(launcher, /connection terminated due to connection timeout/)
+  assert.match(launcher, /ECONNRESET/)
+  assert.match(launcher, /EPIPE/)
+  assert.match(launcher, /socket hang up/)
+  assert.match(launcher, /code === '57P03'/)
+})
+
 test('launcher also survives transient PostgreSQL unhandled rejections', () => {
   assert.match(launcher, /PostgreSQL connection dropped in unhandled rejection/)
   assert.match(
