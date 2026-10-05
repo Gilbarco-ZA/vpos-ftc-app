@@ -17,9 +17,16 @@ test('admin pages are protected by one administrator layout boundary', () => {
   assert.match(layout, /requireAuth\(\['administrator'\]\)/)
 })
 
-test('field engineer does not inherit administrator navigation', () => {
+test('field engineer gets scoped transaction and receipt navigation without inheriting administrator navigation', () => {
   const sidebar = read('components/layout/sidebar.tsx')
-  assert.match(sidebar, /if \(role === 'field_engineer'\) \{[\s\S]*return \[dashboard\]/)
+  assert.match(sidebar, /if \(role === 'field_engineer'\)/)
+  assert.match(sidebar, /allowed = \['\/transactions', '\/receipts'\]/)
+  assert.match(sidebar, /Non-fiscalized/)
+  assert.match(sidebar, /Fiscalized/)
+  assert.doesNotMatch(
+    sidebar.match(/if \(role === 'field_engineer'\)[\s\S]*?if \(role === 'tenant'\)/)?.[0] ?? '',
+    /Runtime Control|Maintenance|Users/,
+  )
 })
 
 test('reports page and API share the same management role policy', () => {
@@ -77,6 +84,28 @@ test('tenant daily-operation APIs explicitly retain tenant access', () => {
       source,
       /['"]tenant['"]/,
       `Expected tenant authorization in ${path}`,
+    )
+  }
+})
+
+test('field engineer has scoped transaction and receipt workflow access', () => {
+  const paths = [
+    'app/(dashboard)/transactions/page.tsx',
+    'app/(dashboard)/receipts/page.tsx',
+    'app/api/transactions/route.ts',
+    'app/api/receipts/route.ts',
+    'app/api/receipts/print/route.ts',
+    'app/api/transactions/retry-failed/route.ts',
+    'app/api/transactions/[id]/retry/route.ts',
+    'app/api/transactions/[id]/fiscalize/route.ts',
+    'app/api/transactions/[id]/cancel-fiscalization/route.ts',
+  ]
+
+  for (const path of paths) {
+    assert.match(
+      read(path),
+      /field_engineer/,
+      `Expected field_engineer authorization in ${path}`,
     )
   }
 })
