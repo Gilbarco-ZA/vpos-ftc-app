@@ -16,7 +16,7 @@ type CreditNotePrintBody = {
 }
 
 export const POST = defineMutationRoute<CreditNotePrintBody, { id: string }>({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, params, body }) => {
     try {
       const transactionId = String(params?.id || '').trim()
