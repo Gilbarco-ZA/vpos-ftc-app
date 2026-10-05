@@ -15,7 +15,7 @@ VPOS currently uses four application roles:
 | `tenant`        | Daily POS operation                             | Dashboard, POS, transactions, receipts, customers, and TIN Allocation when configured                                                                                                                                     |
 | `manager`       | Station operations and controlled configuration | Tenant functions plus reports, stock, transaction review, pumps, tanks, tank levels, forecourt setup, tank/pump configuration, and pricing                                                                                |
 | `administrator` | Technical and security administration           | Manager functions plus fiscal inbox, diagnostics, device status, print jobs, users, runtime control, maintenance, proxy/fiscal settings, setup wizard, products, station configuration, languages, datasets, and branding |
-| `field_engineer` | Controlled technical maintenance and transaction recovery | Scoped access to Transactions and Receipts, including fiscalized/non-fiscalized review, receipt preview/printing, failed-transaction retry/reset, and approved transaction recovery actions, plus explicitly authorized commissioning and protected DOMS/PSS maintenance. It does not inherit unrelated administrator access. |
+| `field_engineer` | Controlled technical maintenance and transaction recovery | Scoped access to Transactions, Receipts, Reports, Tanks/Tank Settings, ATG sync, fiscalized/non-fiscalized review, receipt preview/printing, failed-transaction retry/reset, and approved transaction recovery actions, plus explicitly authorized commissioning and protected DOMS/PSS maintenance. It does not inherit unrelated administrator access. |
 
 Use the least-privileged role required for the task. Do not share administrator accounts for routine cashier or manager work.
 
@@ -29,7 +29,7 @@ The current application groups work into the following sections.
 - **TIN Allocation** — shown when TIN capture is configured before the transaction.
 - **Transactions** — search and review transaction records.
 - **Receipts** — access receipt records and output workflows.
-- **Reports** — operational reporting; available to managers and administrators.
+- **Reports** — operational reporting; available to managers, administrators, and field engineers with scoped support access.
 - **Daily Totals** — Tanzania-specific daily totals when the station country is Tanzania.
 - **Customers** — maintain/use customer records.
 - **Product Stock** — stock view and stock operations for management roles.
@@ -43,7 +43,7 @@ Managers and administrators have dedicated views for:
 - receipt viewing
 - receipt lookup
 
-The `field_engineer` role has scoped access to non-fiscalized/fiscalized transaction review and receipt viewing/printing for troubleshooting and recovery. It does not gain unrelated administrator functions.
+The `field_engineer` role has scoped access to non-fiscalized/fiscalized transaction review, receipt viewing/printing, Reports, Tanks/Tank Settings, and ATG sync for troubleshooting and recovery. It does not gain unrelated administrator functions.
 
 Administrators also have **Fiscal Inbox** for fiscal processing visibility.
 
@@ -191,7 +191,7 @@ Printer configuration is an administrator function under **Printers** and should
 
 ## 9. Reports
 
-Managers and administrators can use **Reports** for station reporting. Transaction/report reads are optimized around bounded date/search filters; prefer a specific business date, month, or search term instead of **All dates** when investigating a known record.
+Managers, administrators, and field engineers with scoped support access can use **Reports** for station reporting. Transaction/report reads are optimized around bounded date/search filters; prefer a specific business date, month, or search term instead of **All dates** when investigating a known record.
 
 Use the station's agreed reporting period and timezone. If report totals and transaction searches differ, first verify:
 
@@ -255,7 +255,7 @@ Administrators can use **Forecourt Monitor**, **Device Status**, and **Diagnosti
 
 ## 14. Tank operations and tank levels
 
-Use **Tanks** and **Tank Levels** to review the configured tank estate and current wet-stock information where available.
+Use **Tanks** and **Tank Levels** to review the configured tank estate and current wet-stock information where available. Field engineers have scoped access to Tanks/Tank Settings and ATG volume sync for approved troubleshooting and recovery.
 
 ATG loss is treated as degraded telemetry, not as a physical zero-volume reading. When the gauge is offline or inventory data is not ready, VPOS preserves the last valid tank volumes/snapshot for operational and fiscalization use while updating diagnostics. A genuine zero remains valid only when the gauge is online and the inventory reading is ready. Manual tank-volume sync returns a degraded result instead of overwriting the tank with zero or failing the whole station workflow.
 
