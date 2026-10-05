@@ -62,8 +62,8 @@ test('all transaction receipt printing uses saved printer config and terminal pr
   assert.match(route, /markTransactionReceiptPrinted/)
   assert.match(client, /status === 'DONE'/)
   assert.match(client, /status === 'FAILED'/)
-  assert.match(viewer, /printReceiptAndWait/)
-  assert.match(viewer, /Receipt printed successfully/)
+  assert.match(viewer, /TransactionReceiptSheet/)
+  assert.match(viewer, /csrfToken=\{csrfToken\}/)
   assert.match(sheet, /printReceiptAndWait/)
   assert.match(sheet, /Receipt printed successfully/)
 
