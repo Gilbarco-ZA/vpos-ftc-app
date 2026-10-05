@@ -18,7 +18,7 @@ type PrintReportBody = {
 }
 
 export const GET = defineGetRoute({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (req, { user }) => {
     const { searchParams } = new URL(req.url)
     const limit = searchParams.get('limit')
@@ -31,7 +31,7 @@ export const GET = defineGetRoute({
 })
 
 export const POST = defineMutationRoute<PrintReportBody>({
-  roles: ['manager', 'administrator'],
+  roles: ['manager', 'administrator', 'field_engineer'],
   handler: async (_req, { user, body }) => {
     const reportId = String(body?.reportId || body?.filename || '').trim()
     const job = await enqueueReportPrint(user.stationId, reportId)
