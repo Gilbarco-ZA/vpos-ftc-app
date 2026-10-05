@@ -264,31 +264,16 @@ test('print persistence claims both references and writers avoid duplicate recei
   assert.doesNotMatch(printPayloadBlock, /plainTextContent/)
 })
 
-test('migration compacts only pending jobs with verified canonical sources', () => {
-  const migration = readFileSync(
-    'scripts/migrations/postgres/1256_reference_based_print_jobs.sql',
+test('reference print source SQL resolves canonical receipt and report rows', () => {
+  const sql = readFileSync(
+    'src/modules/printing/infrastructure/printJobs.sql.ts',
     'utf8',
   )
 
-  assert.match(migration, /job_type = 'print\.receipt'/)
-  assert.match(migration, /job_type = 'print\.report'/)
-  assert.match(migration, /pj\.status = 'PENDING'/)
-  assert.match(migration, /FROM\s+receipts\b/i)
-  assert.match(
-    migration,
-    /transaction_id\s*=\s*pj\.source_transaction_id/i,
-  )
-  assert.match(
-    migration,
-    /IN \('vpos\.transaction-receipt', 'vpos\.auto-print-receipt'\)/,
-  )
-  assert.match(migration, /receipt\.id::text = COALESCE/)
-  assert.match(migration, /'printerIP', COALESCE/)
-  assert.match(migration, /'printer_key', COALESCE/)
-  assert.doesNotMatch(migration, /COALESCE\(pj\.payload, '\{\}'::jsonb\) - ARRAY/)
-  assert.match(migration, /FROM\s+reports\b/i)
-  assert.match(migration, /id\s*=\s*pj\.source_report_id/i)
-  assert.match(migration, /status <> 'PROCESSING'/)
-  assert.doesNotMatch(migration, /status = 'PROCESSING'/)
-  assert.doesNotMatch(migration, /DELETE FROM print_jobs/)
+  assert.match(sql, /selectReceiptPrintSource/)
+  assert.match(sql, /FROM receipts r/)
+  assert.match(sql, /r\.transaction_id = \$2/)
+  assert.match(sql, /selectReportPrintSource/)
+  assert.match(sql, /FROM reports r/)
 })
+
