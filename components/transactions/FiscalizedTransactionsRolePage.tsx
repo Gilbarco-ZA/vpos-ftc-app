@@ -58,7 +58,7 @@ const ReceiptViewerView = async ({
 }: {
   searchParams: SearchParams
 }) => {
-  const user = await requireAuth(['manager', 'administrator'])
+  const user = await requireAuth(['manager', 'administrator', 'field_engineer'])
   if (!['administrator', 'manager'].includes(user.role)) redirect('/dashboard')
 
   const initialQuery = readParam(searchParams, 'q').trim()
