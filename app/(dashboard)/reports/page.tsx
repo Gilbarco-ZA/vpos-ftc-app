@@ -16,8 +16,8 @@ const ReportsPage = async (props: {
   }>
 }) => {
   const searchParams = await props.searchParams
-  const user = await requireAuth(['manager', 'administrator'])
-  if (!['manager', 'administrator'].includes(user.role)) {
+  const user = await requireAuth(['manager', 'administrator', 'field_engineer'])
+  if (!['manager', 'administrator', 'field_engineer'].includes(user.role)) {
     redirect('/dashboard')
   }
 
