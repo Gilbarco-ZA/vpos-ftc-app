@@ -63,7 +63,25 @@ type PriceSetResponseData = {
   }
 }
 
+
+type FuelPricePollStatus = {
+  lastAttemptAt: string | null
+  lastSuccessAt: string | null
+  lastFailureAt: string | null
+  status: 'never' | 'success' | 'error'
+  fetched: number
+  applied: number
+  skipped: number
+  lastError: string | null
+}
+
 type ApplyMode = 'now' | 'scheduled'
+
+function formatPollTimestamp(value?: string | null) {
+  if (!value) return 'Never'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString()
+}
 
 function makeRow(): EntryRow {
   return {
@@ -156,6 +174,18 @@ export default function ForecourtPricingClient() {
   const [fuelPricePolling, setFuelPricePolling] = useState({
     enabled: false,
   })
+  const [fuelPricePollStatus, setFuelPricePollStatus] =
+    useState<FuelPricePollStatus>({
+      lastAttemptAt: null,
+      lastSuccessAt: null,
+      lastFailureAt: null,
+      status: 'never',
+      fetched: 0,
+      applied: 0,
+      skipped: 0,
+      lastError: null,
+    })
+  const [isCheckingFuelPrices, setIsCheckingFuelPrices] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [priceStateError, setPriceStateError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -201,6 +231,9 @@ export default function ForecourtPricingClient() {
     setFuelPricePolling({
       enabled: body?.data?.enabled === true,
     })
+    if (body?.data?.lastPoll) {
+      setFuelPricePollStatus(body.data.lastPoll as FuelPricePollStatus)
+    }
   }, [])
 
   const refreshPriceState = useCallback(async () => {
@@ -327,6 +360,52 @@ export default function ForecourtPricingClient() {
       setIsSavingFuelPricePolling(false)
     }
   }, [csrfToken, fuelPricePolling.enabled])
+
+  const checkFuelPricesNow = useCallback(async () => {
+    setSubmitError(null)
+    setSubmitMessage(null)
+    setIsCheckingFuelPrices(true)
+
+    try {
+      const res = await fetch(
+        '/api/setup/forecourt/pricing/fuel-price-polling',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-csrf-token': csrfToken,
+          },
+          body: JSON.stringify({ csrf_token: csrfToken }),
+        },
+      )
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || body?.ok === false || body?.success === false) {
+        await loadFuelPricePolling().catch(() => {})
+        throw new Error(
+          body?.error?.message ??
+            body?.message ??
+            'Fuel price check through vpos-proxy failed',
+        )
+      }
+
+      const result = body?.data?.result ?? {}
+      if (body?.data?.lastPoll) {
+        setFuelPricePollStatus(body.data.lastPoll as FuelPricePollStatus)
+      }
+      setSubmitMessage(
+        `Cloud fuel price check succeeded: fetched ${Number(result.fetched ?? 0)}, applied ${Number(result.applied ?? 0)}, skipped ${Number(result.skipped ?? 0)}.`,
+      )
+      await refreshPriceState()
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : 'Fuel price check through vpos-proxy failed',
+      )
+    } finally {
+      setIsCheckingFuelPrices(false)
+    }
+  }, [csrfToken, loadFuelPricePolling, refreshPriceState])
 
   const handleSubmit = useCallback(async () => {
     setSubmitError(null)
@@ -460,7 +539,69 @@ export default function ForecourtPricingClient() {
             </span>
           </label>
 
-          <div className="flex justify-end">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-card border border-border p-3">
+              <div className="text-xs text-[var(--text-muted)]">
+                Last poll attempt
+              </div>
+              <div className="mt-1 text-sm font-medium">
+                {formatPollTimestamp(fuelPricePollStatus.lastAttemptAt)}
+              </div>
+            </div>
+            <div className="rounded-card border border-border p-3">
+              <div className="text-xs text-[var(--text-muted)]">
+                Last successful poll
+              </div>
+              <div className="mt-1 text-sm font-medium">
+                {formatPollTimestamp(fuelPricePollStatus.lastSuccessAt)}
+              </div>
+            </div>
+            <div className="rounded-card border border-border p-3">
+              <div className="text-xs text-[var(--text-muted)]">
+                Last result
+              </div>
+              <div className="mt-1">
+                <Badge
+                  variant={
+                    fuelPricePollStatus.status === 'success'
+                      ? STATUS_VARIANT.SUCCESS
+                      : fuelPricePollStatus.status === 'error'
+                        ? STATUS_VARIANT.WARN
+                        : STATUS_VARIANT.INFO
+                  }
+                >
+                  {fuelPricePollStatus.status}
+                </Badge>
+              </div>
+            </div>
+            <div className="rounded-card border border-border p-3">
+              <div className="text-xs text-[var(--text-muted)]">
+                Last fetch
+              </div>
+              <div className="mt-1 text-sm font-medium">
+                {fuelPricePollStatus.fetched} fetched ·{' '}
+                {fuelPricePollStatus.applied} applied ·{' '}
+                {fuelPricePollStatus.skipped} skipped
+              </div>
+            </div>
+          </div>
+
+          {fuelPricePollStatus.lastError ? (
+            <div className="rounded-card border border-rose-300/40 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-200">
+              Last fuel price poll error: {fuelPricePollStatus.lastError}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={checkFuelPricesNow}
+              disabled={isCheckingFuelPrices || !csrfToken}
+            >
+              {isCheckingFuelPrices
+                ? 'Checking cloud prices…'
+                : 'Check cloud prices now'}
+            </Button>
             <Button
               variant="primary"
               onClick={saveFuelPricePolling}
