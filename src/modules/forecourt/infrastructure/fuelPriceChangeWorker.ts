@@ -16,7 +16,7 @@ const normalize = (value: unknown) =>
 
 const appliedKey = (changeId: number) => `fuelPriceChange.applied.${changeId}`
 
-const FUEL_PRICE_POLL_STATUS_KEY = 'fuelPriceChange.pollStatus'
+const FUEL_PRICE_POLL_STATUS_KEY = 'forecourt.fuelPrice.pollStatus'
 
 export type FuelPricePollStatus = {
   lastAttemptAt: string | null
