@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 
 import type { FuelPriceChangeDto } from '@/src/shared/proxy/client'
@@ -121,3 +122,58 @@ describe('fuel price change DOMS payload', () => {
     )
   })
 })
+
+describe('fuel price polling support workflow', () => {
+  it('persists poll health and exposes a manual proxy check on forecourt pricing', () => {
+    const worker = readFileSync(
+      'src/modules/forecourt/infrastructure/fuelPriceChangeWorker.ts',
+      'utf8',
+    )
+    const route = readFileSync(
+      'app/api/setup/forecourt/pricing/fuel-price-polling/route.ts',
+      'utf8',
+    )
+    const page = readFileSync(
+      'app/(dashboard)/setup/forecourt/pricing/page.tsx',
+      'utf8',
+    )
+    const client = readFileSync(
+      'app/(dashboard)/setup/forecourt/pricing/client.tsx',
+      'utf8',
+    )
+
+    assert.match(worker, /fuelPriceChange\.pollStatus/)
+    assert.match(worker, /lastAttemptAt/)
+    assert.match(worker, /lastSuccessAt/)
+    assert.match(worker, /lastFailureAt/)
+    assert.match(worker, /fetched: summary\.fetched/)
+    assert.match(worker, /applied: summary\.applied/)
+    assert.match(worker, /skipped: summary\.skipped/)
+    assert.match(worker, /lastError: message/)
+
+    assert.match(route, /export const POST = defineMutationRoute/)
+    assert.match(route, /pollFuelPriceChangesOnce\(user\.stationId\)/)
+    assert.match(route, /getFuelPricePollStatus\(user\.stationId\)/)
+    assert.match(
+      route,
+      /roles: \['administrator', 'manager', 'field_engineer'\]/,
+    )
+    assert.match(
+      page,
+      /requireAuth\(\['administrator', 'manager', 'field_engineer'\]\)/,
+    )
+
+    assert.match(client, /Check cloud prices now/)
+    assert.match(client, /Last poll attempt/)
+    assert.match(client, /Last successful poll/)
+    assert.match(client, /fuelPricePollStatus\.fetched/)
+    assert.match(client, /fuelPricePollStatus\.applied/)
+    assert.match(client, /fuelPricePollStatus\.skipped/)
+    assert.match(client, /Last fuel price poll error/)
+    assert.match(
+      client,
+      /method: 'POST'[\s\S]*x-csrf-token[\s\S]*csrf_token: csrfToken/,
+    )
+  })
+})
+
