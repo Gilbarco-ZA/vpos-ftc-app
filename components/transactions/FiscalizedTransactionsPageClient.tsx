@@ -2,7 +2,7 @@
 
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import type { FiscalizedTransactionListItem } from '@/src/shared/types/transactions'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Copy, FileText } from 'lucide-react'
 
@@ -261,6 +261,7 @@ const FiscalizedTransactionsPageClient = ({
   const [loadError, setLoadError] = useState<unknown>(error ?? null)
   const [loading, setLoading] = useState(false)
   const [csrfToken, setCsrfToken] = useState('')
+  const hasMountedRef = useRef(false)
   const [search, setSearch] = useState(initialSearch)
   const [customer, setCustomer] = useState('')
   const [fuelType, setFuelType] = useState('')
@@ -366,11 +367,16 @@ const FiscalizedTransactionsPageClient = ({
   }, [search, customer, fuelType, startDate, endDate])
 
   useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      if (!error) return
+    }
+
     const t = window.setTimeout(() => {
       refresh()
     }, 400)
     return () => window.clearTimeout(t)
-  }, [refresh])
+  }, [error, refresh])
 
   const handleViewReceipt = (
     row: FiscalizedTransactionListItem,
