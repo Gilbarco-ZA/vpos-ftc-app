@@ -258,7 +258,7 @@ test('print persistence claims both references and writers avoid duplicate recei
   assert.match(worker, /Never replace those with the ordinary transaction/)
 
   const printPayloadBlock = receiptRoute.match(
-    /const printPayload = \{[\s\S]*?\n    \}\n\n    const printResult/,
+    /const printPayload = \{[\s\S]*?\r?\n    \}\r?\n\r?\n    const printResult/,
   )?.[0]
   assert.ok(printPayloadBlock)
   assert.doesNotMatch(printPayloadBlock, /htmlContent/)
