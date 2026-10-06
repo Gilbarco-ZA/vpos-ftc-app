@@ -146,7 +146,34 @@ async function loadSnapshotsForCapture(
       WHERE station_id = $1::uuid
         AND captured_at = $2::timestamptz
       ORDER BY CASE
-                 WHEN COALESCE(doms_tank_id, tg_id) ~ '^[0-9]+
+                 WHEN COALESCE(doms_tank_id, tg_id) ~ '^[0-9]+$'
+                   THEN COALESCE(doms_tank_id, tg_id)::integer
+                 ELSE 2147483647
+               END,
+               COALESCE(doms_tank_id, tg_id),
+               tank_name`,
+    [stationId, recordedAt],
+  )
+}
+
+async function loadTankPublicationMetadata(
+  stationId: string,
+): Promise<TanzaniaTankPublicationMetadataRow[]> {
+  return await queryAll<TanzaniaTankPublicationMetadataRow>(
+    `SELECT p.product_name,
+            t.name AS tank_name,
+            t.capacity_litres,
+            t.doms_tank_id,
+            COALESCE(NULLIF(t.doms_tank_id, ''), NULLIF(t.code, '')) AS tg_id
+       FROM tanks t
+  LEFT JOIN products p
+         ON p.id = t.product_id
+        AND p.station_id = t.station_id
+      WHERE t.station_id = $1::uuid
+      ORDER BY t.name ASC, t.code ASC`,
+    [stationId],
+  )
+}
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -216,24 +243,21 @@ export async function publishLatestTanzaniaTankInventories(
 
   if (freshReadings.length > 0 && deps.loadTankMetadata) {
     const metadata = await deps.loadTankMetadata(stationId)
-    const metadataByGaugeId = new Map(
-      metadata
-        .map((row) => [normalizeGaugeId(row.doms_tank_id ?? row.tg_id), row] as const)
-        .filter((entry): entry is [string, TanzaniaTankPublicationMetadataRow] =>
-          Boolean(entry[0]),
-        ),
-    )
-    const readingByGaugeId = new Map(
-      freshReadings
-        .map((reading) => [normalizeGaugeId(reading.tgId), reading] as const)
-        .filter((entry): entry is [string, AtgPublicationReading] =>
-          Boolean(entry[0]),
-        ),
-    )
+    const metadataByGaugeId = new Map<string, TanzaniaTankPublicationMetadataRow>()
+    for (const row of metadata) {
+      const gaugeId = normalizeGaugeId(row.doms_tank_id ?? row.tg_id)
+      if (gaugeId && !metadataByGaugeId.has(gaugeId)) metadataByGaugeId.set(gaugeId, row)
+    }
+
+    const readingByGaugeId = new Map<string, AtgPublicationReading>()
+    for (const reading of freshReadings) {
+      const gaugeId = normalizeGaugeId(reading.tgId)
+      if (gaugeId && !readingByGaugeId.has(gaugeId)) readingByGaugeId.set(gaugeId, reading)
+    }
 
     const orderedIds =
       requestedIds.size > 0
-        ? Array.from(requestedIds)
+        ? Array.from(requestedIds).filter((value): value is string => Boolean(value))
         : Array.from(readingByGaugeId.keys())
 
     rows = orderedIds.map((tgId) => {
@@ -246,17 +270,21 @@ export async function publishLatestTanzaniaTankInventories(
       }
 
       const configuredCapacity = Number(tank.capacity_litres)
+      const shellCapacity = Number(reading.shellCapacityLitres)
+      const maxSafeFillCapacity = Number(reading.maxSafeFillCapacityLitres)
       const capacity =
         Number.isFinite(configuredCapacity) && configuredCapacity > 0
           ? configuredCapacity
-          : Number(reading.shellCapacityLitres) > 0
-            ? reading.shellCapacityLitres
-            : reading.maxSafeFillCapacityLitres
+          : Number.isFinite(shellCapacity) && shellCapacity > 0
+            ? shellCapacity
+            : Number.isFinite(maxSafeFillCapacity) && maxSafeFillCapacity > 0
+              ? maxSafeFillCapacity
+              : null
 
       return {
         product_name: tank.product_name,
         tank_name: tank.tank_name,
-        capacity_litres: capacity ?? null,
+        capacity_litres: capacity,
         temperature_c: reading.temperatureC,
         tc_volume_litres: reading.tcVolumeLitres,
         volume_litres: reading.volumeLitres,
@@ -271,117 +299,6 @@ export async function publishLatestTanzaniaTankInventories(
   if (expectedCount <= 0 || rows.length !== expectedCount) {
     throw new Error(
       `Tanzania ATG publishing requires a complete current capture: expected ${expectedCount} tank(s), found ${rows.length} for ${capture.recordedAt}.`,
-    )
-  }
-
-  const payload = buildTanzaniaTankInventoriesRequest(rows)
-  const response = await deps.submit(stationId, payload, {
-    idempotencyKey: `${stationId}:tanzania-tank-inventories:${capture.recordedAt}`,
-  })
-
-  if (!response.ok || isBusinessFailure(response.data)) {
-    throw new Error(
-      `Tanzania tank inventory rejected: ${response.status} ${JSON.stringify(response.data)}`,
-    )
-  }
-
-  return {
-    ok: true as const,
-    tankCount: payload.data.length,
-    queued: toRecord(response.data).queued === true,
-  }
-}
-
-                   THEN COALESCE(doms_tank_id, tg_id)::integer
-                 ELSE 2147483647
-               END,
-               COALESCE(doms_tank_id, tg_id),
-               tank_name`,
-    [stationId, recordedAt],
-  )
-}
-
-async function loadTankPublicationMetadata(
-  stationId: string,
-): Promise<TanzaniaTankPublicationMetadataRow[]> {
-  return await queryAll<TanzaniaTankPublicationMetadataRow>(
-    `SELECT p.product_name,
-            t.name AS tank_name,
-            t.capacity_litres,
-            t.doms_tank_id,
-            COALESCE(NULLIF(t.doms_tank_id, ''), NULLIF(t.code, '')) AS tg_id
-       FROM tanks t
-  LEFT JOIN products p
-         ON p.id = t.product_id
-        AND p.station_id = t.station_id
-      WHERE t.station_id = $1::uuid
-      ORDER BY t.name ASC, t.code ASC`,
-    [stationId],
-  )
-}
-
-function toRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-}
-
-function isBusinessFailure(data: unknown): boolean {
-  const response = toRecord(data)
-  const status = String(response.status ?? '')
-    .trim()
-    .toUpperCase()
-  return (
-    response.error === true ||
-    response.success === false ||
-    ['FAILED', 'ERROR', 'REJECTED'].includes(status)
-  )
-}
-
-export type TanzaniaTankInventoryPublisherDeps = {
-  getCountry: (stationId: string) => Promise<string | null>
-  loadSnapshots: (
-    stationId: string,
-    recordedAt: string,
-  ) => Promise<TanzaniaAtgSnapshotRow[]>
-  submit: (
-    stationId: string,
-    payload: TanzaniaTankInventoriesRequest,
-    opts?: { signal?: AbortSignal; idempotencyKey?: string },
-  ) => Promise<{ ok: boolean; status: number; data: unknown }>
-}
-
-const defaultPublisherDeps: TanzaniaTankInventoryPublisherDeps = {
-  getCountry: getStationCountryCode,
-  loadSnapshots: loadSnapshotsForCapture,
-  submit: submitTanzaniaTankInventoriesToProxy,
-}
-
-export async function publishLatestTanzaniaTankInventories(
-  stationId: string,
-  capture: AtgSnapshotPublication,
-  deps: TanzaniaTankInventoryPublisherDeps = defaultPublisherDeps,
-) {
-  const country = await deps.getCountry(stationId)
-  if (!isTanzaniaCountry(country)) {
-    return {
-      skipped: true as const,
-      reason: 'station_country_not_tanzania' as const,
-    }
-  }
-
-  const rows = await deps.loadSnapshots(stationId, capture.recordedAt)
-  const requestedIds = new Set(
-    capture.requestedTgIds.map(normalizeGaugeId).filter(Boolean),
-  )
-  const expectedCount =
-    requestedIds.size > 0
-      ? requestedIds.size
-      : Number(capture.snapshotsSaved ?? 0)
-
-  if (expectedCount <= 0 || rows.length !== expectedCount) {
-    throw new Error(
-      `Tanzania ATG publishing requires a complete current snapshot: expected ${expectedCount} tank(s), found ${rows.length} for ${capture.recordedAt}.`,
     )
   }
 
