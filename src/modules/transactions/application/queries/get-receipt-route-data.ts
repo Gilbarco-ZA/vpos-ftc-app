@@ -428,7 +428,7 @@ export async function listReceiptRouteRows(
   const params: unknown[] = [stationId]
   const addParam = (value: unknown) => {
     params.push(value)
-    return '
+    return '$' + params.length
   }
 
   if (transactionId) {
