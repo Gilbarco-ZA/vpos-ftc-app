@@ -216,22 +216,3 @@ test('fiscalized client does not repeat the server browse query immediately on m
     /if \(!hasMountedRef\.current\)[\s\S]*hasMountedRef\.current = true[\s\S]*if \(!error\) return/,
   )
 })
-
- \+ params\.length/,
-  )
-  assert.match(receiptQuery, /LIMIT \$\{addParam\(limit\)\}/)
-})
-
-test('fiscalized client does not repeat the server browse query immediately on mount', () => {
-  const client = readFileSync(
-    'components/transactions/FiscalizedTransactionsPageClient.tsx',
-    'utf8',
-  )
-
-  assert.match(client, /const hasMountedRef = useRef\(false\)/)
-  assert.match(
-    client,
-    /if \(!hasMountedRef\.current\)[\s\S]*hasMountedRef\.current = true[\s\S]*if \(!error\) return/,
-  )
-})
-
