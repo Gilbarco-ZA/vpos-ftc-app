@@ -113,9 +113,9 @@ export async function syncTankVolumes(
         ? result.requestedTgIds
         : [],
       snapshotsSaved: Number(result.snapshotsSaved ?? 0),
-      publicationReadings: Array.isArray((result as any).publicationReadings)
-        ? (result as any).publicationReadings
-        : [],
+      ...(Array.isArray(result.publicationReadings)
+        ? { publicationReadings: result.publicationReadings }
+        : {}),
       available: true,
     },
     synced: {
