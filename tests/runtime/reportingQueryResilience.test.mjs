@@ -188,3 +188,30 @@ test('non-fiscalized transaction lists expose a bulk reset action for failed row
   assert.match(bulkRoute, /Transaction is not FAILED/)
   assert.match(bulkRoute, /Customer link required before fiscalization retry/)
 })
+
+test('receipt list query uses positional parameters instead of bare numbers', () => {
+  const receiptQuery = readFileSync(
+    'src/modules/transactions/application/queries/get-receipt-route-data.ts',
+    'utf8',
+  )
+
+  assert.match(
+    receiptQuery,
+    /const addParam = \(value: unknown\) => \{[\s\S]*return `\$\$\{params\.length\}`/,
+  )
+  assert.match(receiptQuery, /LIMIT \$\{addParam\(limit\)\}/)
+})
+
+test('fiscalized client does not repeat the server browse query immediately on mount', () => {
+  const client = readFileSync(
+    'components/transactions/FiscalizedTransactionsPageClient.tsx',
+    'utf8',
+  )
+
+  assert.match(client, /const hasMountedRef = useRef\(false\)/)
+  assert.match(
+    client,
+    /if \(!hasMountedRef\.current\)[\s\S]*hasMountedRef\.current = true[\s\S]*if \(!error\) return/,
+  )
+})
+
