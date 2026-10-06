@@ -195,9 +195,12 @@ test('receipt list query uses positional parameters instead of bare numbers', ()
     'utf8',
   )
 
-  assert.match(
-    receiptQuery,
-    /const addParam = \(value: unknown\) => \{[\s\S]*return '\
+  const addParamBlock = receiptQuery.match(
+    /const addParam = \(value: unknown\) => \{[\s\S]*?\n  \}/,
+  )?.[0]
+  assert.ok(addParamBlock)
+  assert.match(addParamBlock, /params\.push\(value\)/)
+  assert.match(addParamBlock, /params\.length/)
   assert.match(receiptQuery, /LIMIT \$\{addParam\(limit\)\}/)
 })
 
