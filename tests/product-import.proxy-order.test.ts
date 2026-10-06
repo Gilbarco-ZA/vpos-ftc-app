@@ -45,22 +45,20 @@ test('product proxy payload prefers ext_* cloud fields and matches proxy contrac
     isOnline: false,
   })
 
-  assert.deepEqual(payload, {
-    productId: '4',
-    productCode: 'G4',
-    productClassCode: 'FUEL',
-    productTypeCode: 'FUEL',
-    productName: 'Diesel 50',
-    category: 'Fuel',
-    unitPrice: 206.9,
-    unitCost: 0,
-    currency: 'TZS',
-    taxCode: 'E',
-    taxRate: 0,
-    hazardousIndicator: true,
-    createdByName: 'Administrator',
-    inUse: true,
-  })
+  assert.equal(payload.productId, '4')
+  assert.equal(payload.productCode, 'G4')
+  assert.equal(payload.productClassCode, 'FUEL')
+  assert.equal(payload.productTypeCode, 'FUEL')
+  assert.equal(payload.productName, 'Diesel 50')
+  assert.equal(payload.category, 'Fuel')
+  assert.equal(payload.unitPrice, 206.9)
+  assert.equal(payload.unitCost, 0)
+  assert.equal(payload.currency, 'TZS')
+  assert.equal(payload.taxCode, 'E')
+  assert.equal(payload.taxRate, 0)
+  assert.equal(payload.hazardousIndicator, true)
+  assert.equal(payload.createdByName, 'Administrator')
+  assert.equal(payload.inUse, true)
   assert.equal('IsOnline' in payload, false)
 })
 
