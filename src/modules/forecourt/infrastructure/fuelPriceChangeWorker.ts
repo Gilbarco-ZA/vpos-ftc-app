@@ -16,6 +16,41 @@ const normalize = (value: unknown) =>
 
 const appliedKey = (changeId: number) => `fuelPriceChange.applied.${changeId}`
 
+const FUEL_PRICE_POLL_STATUS_KEY = 'fuelPriceChange.pollStatus'
+
+export type FuelPricePollStatus = {
+  lastAttemptAt: string | null
+  lastSuccessAt: string | null
+  lastFailureAt: string | null
+  status: 'never' | 'success' | 'error'
+  fetched: number
+  applied: number
+  skipped: number
+  lastError: string | null
+}
+
+export async function getFuelPricePollStatus(
+  stationId: string,
+): Promise<FuelPricePollStatus> {
+  const stored = await kvGet<Partial<FuelPricePollStatus>>(
+    stationId,
+    FUEL_PRICE_POLL_STATUS_KEY,
+  )
+  return {
+    lastAttemptAt: stored?.lastAttemptAt ?? null,
+    lastSuccessAt: stored?.lastSuccessAt ?? null,
+    lastFailureAt: stored?.lastFailureAt ?? null,
+    status:
+      stored?.status === 'success' || stored?.status === 'error'
+        ? stored.status
+        : 'never',
+    fetched: Number(stored?.fetched ?? 0),
+    applied: Number(stored?.applied ?? 0),
+    skipped: Number(stored?.skipped ?? 0),
+    lastError: stored?.lastError ?? null,
+  }
+}
+
 export function resolveDomsGradeIdFromRows(
   rows: Awaited<ReturnType<typeof pumpMappingsRepo.listRowsByStationId>>,
   change: FuelPriceChangeDto,
@@ -221,48 +256,83 @@ async function applyFuelPriceChange(
 }
 
 export async function pollFuelPriceChangesOnce(stationId: string) {
-  const response = await getFuelPriceChangesViaProxy(stationId)
-  if (!response.ok) {
-    throw new Error(
-      String(
-        response.data?.message ??
-          response.data?.error ??
-          `vpos-proxy returned HTTP ${response.status}`,
-      ),
-    )
-  }
+  const lastAttemptAt = new Date().toISOString()
 
-  if (response.data?.error) {
-    throw new Error(
-      String(
-        response.data.message ?? 'Fuel price change response reported an error',
-      ),
-    )
-  }
+  try {
+    const response = await getFuelPriceChangesViaProxy(stationId)
+    if (!response.ok) {
+      throw new Error(
+        String(
+          response.data?.message ??
+            response.data?.error ??
+            `vpos-proxy returned HTTP ${response.status}`,
+        ),
+      )
+    }
 
-  const changes = Array.isArray(response.data?.fuelPriceChanges)
-    ? [...response.data.fuelPriceChanges]
-    : []
+    if (response.data?.error) {
+      throw new Error(
+        String(
+          response.data.message ?? 'Fuel price change response reported an error',
+        ),
+      )
+    }
 
-  changes.sort((a, b) => {
-    const at = String(a.effectiveAt ?? '')
-    const bt = String(b.effectiveAt ?? '')
-    if (at !== bt) return at.localeCompare(bt)
-    return Number(a.id) - Number(b.id)
-  })
+    const changes = Array.isArray(response.data?.fuelPriceChanges)
+      ? [...response.data.fuelPriceChanges]
+      : []
 
-  const results = []
-  for (const change of changes) {
-    results.push({
-      changeId: change.id,
-      ...(await applyFuelPriceChange(stationId, change)),
+    changes.sort((a, b) => {
+      const at = String(a.effectiveAt ?? '')
+      const bt = String(b.effectiveAt ?? '')
+      if (at !== bt) return at.localeCompare(bt)
+      return Number(a.id) - Number(b.id)
     })
-  }
 
-  return {
-    fetched: changes.length,
-    applied: results.filter((item) => item.applied).length,
-    skipped: results.filter((item) => item.skipped).length,
-    results,
+    const results = []
+    for (const change of changes) {
+      results.push({
+        changeId: change.id,
+        ...(await applyFuelPriceChange(stationId, change)),
+      })
+    }
+
+    const summary = {
+      fetched: changes.length,
+      applied: results.filter((item) => item.applied).length,
+      skipped: results.filter((item) => item.skipped).length,
+      results,
+    }
+    const lastSuccessAt = new Date().toISOString()
+
+    await kvSet(stationId, FUEL_PRICE_POLL_STATUS_KEY, {
+      lastAttemptAt,
+      lastSuccessAt,
+      lastFailureAt: null,
+      status: 'success',
+      fetched: summary.fetched,
+      applied: summary.applied,
+      skipped: summary.skipped,
+      lastError: null,
+    })
+
+    return summary
+  } catch (error) {
+    const lastFailureAt = new Date().toISOString()
+    const message =
+      error instanceof Error ? error.message : String(error ?? 'Fuel price poll failed')
+
+    await kvSet(stationId, FUEL_PRICE_POLL_STATUS_KEY, {
+      lastAttemptAt,
+      lastSuccessAt: (await getFuelPricePollStatus(stationId)).lastSuccessAt,
+      lastFailureAt,
+      status: 'error',
+      fetched: 0,
+      applied: 0,
+      skipped: 0,
+      lastError: message,
+    }).catch(() => {})
+
+    throw error
   }
 }
