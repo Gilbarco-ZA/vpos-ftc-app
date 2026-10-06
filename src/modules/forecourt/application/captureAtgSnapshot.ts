@@ -2,7 +2,48 @@ import { jplSendPosCommand } from '@/src/platform/integrations/jpl/client'
 
 import { syncTankGaugeVolumes } from '@/src/modules/forecourt/application/tankGauge'
 
-export async function captureAtgSnapshot(stationId: string) {
+
+export type AtgPublicationReading = {
+  tgId: string
+  domsTankId: string | null
+  temperatureC: number | null
+  tcVolumeLitres: number | null
+  volumeLitres: number | null
+  shellCapacityLitres: number | null
+  maxSafeFillCapacityLitres: number | null
+  gaugeOnline: boolean
+  inventoryDataReady: boolean
+  gaugeAlarmActive: boolean
+  gaugeErrorActive: boolean
+  controllerUpdatedAt: string | null
+}
+
+export type AtgSnapshotCaptureResult = {
+  ok: boolean
+  recordedAt: string
+  requestedTgIds: string[]
+  controllerErrors: unknown[]
+  updated: number
+  snapshotsSaved: number
+  tanks: Array<{
+    tankId: string
+    tgId: string
+    gross: number | null
+    water: number | null
+    updatedAt: string | null
+  }>
+  publicationReadings?: AtgPublicationReading[]
+  liveData: {
+    requestedTgIds: string[]
+    responses: unknown[]
+    normalized: unknown[]
+    errors: unknown[]
+  }
+}
+
+export async function captureAtgSnapshot(
+  stationId: string,
+): Promise<AtgSnapshotCaptureResult> {
   const result = await jplSendPosCommand(
     stationId,
     {
