@@ -5,13 +5,10 @@ import {
 } from '@/src/shared/http/defineRoute'
 
 import {
-  getFuelPricePollingSettings,
-  updateFuelPricePollingSettings,
-} from '@/src/modules/forecourt/application/fuelPricePollingSettings'
-import {
-  getFuelPricePollStatus,
-  pollFuelPriceChangesOnce,
-} from '@/src/modules/forecourt/infrastructure/fuelPriceChangeWorker'
+  checkFuelPricesNow,
+  getFuelPricePollingOverview,
+  setFuelPricePollingEnabled,
+} from '@/src/modules/forecourt/application/fuelPricePolling'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -19,11 +16,7 @@ export const dynamic = 'force-dynamic'
 export const GET = defineGetRoute({
   roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user }) => {
-    const [settings, lastPoll] = await Promise.all([
-      getFuelPricePollingSettings(user.stationId),
-      getFuelPricePollStatus(user.stationId),
-    ])
-    return ok({ ...settings, lastPoll })
+    return ok(await getFuelPricePollingOverview(user.stationId))
   },
 })
 
@@ -38,9 +31,7 @@ export const PUT = defineMutationRoute({
     }
 
     return ok(
-      await updateFuelPricePollingSettings(user.stationId, {
-        enabled: payload.enabled,
-      }),
+      await setFuelPricePollingEnabled(user.stationId, payload.enabled),
     )
   },
 })
@@ -48,8 +39,6 @@ export const PUT = defineMutationRoute({
 export const POST = defineMutationRoute({
   roles: ['administrator', 'manager', 'field_engineer'],
   handler: async (_req, { user }) => {
-    const result = await pollFuelPriceChangesOnce(user.stationId)
-    const lastPoll = await getFuelPricePollStatus(user.stationId)
-    return ok({ result, lastPoll })
+    return ok(await checkFuelPricesNow(user.stationId))
   },
 })
