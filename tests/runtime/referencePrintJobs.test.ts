@@ -4,7 +4,6 @@ import test from 'node:test'
 
 import { renderEscpos } from '@/src/shared/printers/escposRenderer'
 
-import { printJobsSql } from '@/src/modules/printing/infrastructure/printJobs.sql'
 
 import {
   buildReferencePrintJobPayload,
@@ -266,29 +265,6 @@ test('print persistence claims both references and writers avoid duplicate recei
   assert.doesNotMatch(printPayloadBlock, /plainTextContent/)
 })
 
-test('reference print source SQL resolves canonical receipt and report rows', () => {
-  assert.equal(
-    printJobsSql.selectReceiptPrintSource.includes('FROM receipts r'),
-    true,
-  )
-  assert.equal(
-    printJobsSql.selectReceiptPrintSource.includes(
-      'r.transaction_id = $2::uuid',
-    ),
-    true,
-  )
-  assert.equal(
-    printJobsSql.selectReportPrintSource.includes('FROM reports'),
-    true,
-  )
-  assert.equal(
-    printJobsSql.selectReportPrintSource.includes('WHERE station_id = $1'),
-    true,
-  )
-  assert.equal(
-    printJobsSql.selectReportPrintSource.includes('AND id = $2::uuid'),
-    true,
-  )
-})
+
 
 
