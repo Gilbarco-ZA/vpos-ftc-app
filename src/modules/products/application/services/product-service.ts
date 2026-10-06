@@ -1,5 +1,6 @@
 import type { ProductRecord } from '@/src/modules/products/infrastructure/persistence/product.repository'
 import type { ProductCreateInput } from '@/src/modules/products/infrastructure/validators/product.schemas'
+import type { ProxyProductDto } from '@/src/shared/fiscalization/proxy/contracts'
 import type {
   ProductDevFlowOverride,
   ProductSyncStatus,
@@ -314,34 +315,43 @@ export function buildProductCloudSyncInput(
   }
 }
 
+export function buildProxyProductPayload(
+  product: ProductCloudSyncInput,
+): ProxyProductDto {
+  return {
+    devFlowOverride: product.devFlowOverride ?? undefined,
+    productId: product.extProductId ?? product.productId,
+    productCode: product.extProductCode ?? product.productCode,
+    productClassCode:
+      product.extProductClassCode ?? product.productClassCode ?? null,
+    productTypeCode:
+      product.extProductTypeCode ?? product.productTypeCode ?? null,
+    productName: product.extDescription ?? product.productName,
+    category: product.category ?? null,
+    unitOfMeasure: product.extUnitOfMeasure ?? product.unitOfMeasure ?? null,
+    unitOfPackaging:
+      product.extUnitOfPackaging ?? product.unitOfPackaging ?? null,
+    packSize: product.packSize ?? null,
+    unitPrice: product.extUnitPrice ?? product.unitPrice ?? null,
+    unitCost: product.unitCost ?? null,
+    currency: product.extCurrency ?? product.currency ?? null,
+    commodityCode: product.commodityCode ?? null,
+    barcode: product.barcode ?? null,
+    taxCode: product.extTaxCode ?? product.taxCode ?? null,
+    taxRate: product.taxRate ?? null,
+    hazardousIndicator:
+      product.extHazardousIndicator ?? product.hazardousIndicator ?? false,
+    createdByName: product.createdByName ?? null,
+    inUse: true,
+  }
+}
+
 export async function syncProductsToCloudService(params: {
   stationId: string
   products: ProductCloudSyncInput[]
 }) {
   return await uploadProductsViaProxy(params.stationId, {
-    products: params.products.map((product) => ({
-      IsOnline: product.isOnline,
-      productId: product.extProductId ?? product.productId,
-      productCode: product.extProductCode ?? product.productCode,
-      productName: product.extDescription ?? product.productName,
-      productClassCode: product.extProductClassCode ?? product.productClassCode,
-      productTypeCode: product.extProductTypeCode ?? product.productTypeCode,
-      sku: product.sku,
-      barcode: product.barcode,
-      unitPrice: product.extUnitPrice ?? product.unitPrice,
-      unitCost: product.unitCost,
-      currency: product.extCurrency ?? product.currency,
-      taxRate: product.taxRate,
-      category: product.category,
-      unitOfMeasure: product.extUnitOfMeasure ?? product.unitOfMeasure,
-      unitOfPackaging: product.extUnitOfPackaging ?? product.unitOfPackaging,
-      packSize: product.packSize,
-      taxCode: product.extTaxCode ?? product.taxCode,
-      commodityCode: product.commodityCode,
-      hazardousIndicator: product.hazardousIndicator ?? false,
-      createdByName: product.createdByName,
-      devFlowOverride: product.devFlowOverride ?? undefined,
-    })),
+    products: params.products.map(buildProxyProductPayload),
   })
 }
 
