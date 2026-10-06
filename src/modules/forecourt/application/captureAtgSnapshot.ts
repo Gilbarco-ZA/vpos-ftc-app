@@ -45,6 +45,25 @@ export async function captureAtgSnapshot(stationId: string) {
     updated: persisted.updated,
     snapshotsSaved: persisted.snapshotsSaved,
     tanks: persisted.tanks,
+    publicationReadings: normalized.map((reading: any) => ({
+      tgId: reading.tgId,
+      domsTankId: reading.tankId ?? null,
+      temperatureC: reading.tankAverageTempC ?? null,
+      tcVolumeLitres:
+        reading.tankGrossStdVol ?? reading.tankAdjustedTCVolume ?? null,
+      volumeLitres:
+        reading.tankGrossObservedVol ??
+        reading.tankTotalObservedVol ??
+        reading.tankGrossStdVol ??
+        null,
+      shellCapacityLitres: reading.tankShellCapacity ?? null,
+      maxSafeFillCapacityLitres: reading.tankMaxSafeFillCapacity ?? null,
+      gaugeOnline: reading.gaugeOnline === true,
+      inventoryDataReady: reading.inventoryDataReady === true,
+      gaugeAlarmActive: reading.gaugeAlarmActive === true,
+      gaugeErrorActive: reading.gaugeErrorActive === true,
+      controllerUpdatedAt: reading.tankDataLastUpdateAt ?? null,
+    })),
     liveData: {
       requestedTgIds: Array.isArray(result.data?.requestedTgIds)
         ? result.data.requestedTgIds
