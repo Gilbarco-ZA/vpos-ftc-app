@@ -229,7 +229,9 @@ export async function publishLatestTanzaniaTankInventories(
   }
 
   const requestedIds = new Set(
-    capture.requestedTgIds.map(normalizeGaugeId).filter(Boolean),
+    capture.requestedTgIds
+      .map(normalizeGaugeId)
+      .filter((value): value is string => Boolean(value)),
   )
   const expectedCount =
     requestedIds.size > 0
@@ -257,7 +259,7 @@ export async function publishLatestTanzaniaTankInventories(
 
     const orderedIds =
       requestedIds.size > 0
-        ? Array.from(requestedIds).filter((value): value is string => Boolean(value))
+        ? Array.from(requestedIds)
         : Array.from(readingByGaugeId.keys())
 
     rows = orderedIds.map((tgId) => {
