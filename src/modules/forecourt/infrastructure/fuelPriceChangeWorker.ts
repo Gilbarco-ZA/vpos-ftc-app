@@ -257,6 +257,7 @@ async function applyFuelPriceChange(
 
 export async function pollFuelPriceChangesOnce(stationId: string) {
   const lastAttemptAt = new Date().toISOString()
+  const previousStatus = await getFuelPricePollStatus(stationId).catch(() => null)
 
   try {
     const response = await getFuelPriceChangesViaProxy(stationId)
@@ -324,7 +325,7 @@ export async function pollFuelPriceChangesOnce(stationId: string) {
 
     await kvSet(stationId, FUEL_PRICE_POLL_STATUS_KEY, {
       lastAttemptAt,
-      lastSuccessAt: (await getFuelPricePollStatus(stationId)).lastSuccessAt,
+      lastSuccessAt: previousStatus?.lastSuccessAt ?? null,
       lastFailureAt,
       status: 'error',
       fetched: 0,
