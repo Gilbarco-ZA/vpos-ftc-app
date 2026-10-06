@@ -142,7 +142,7 @@ describe('fuel price polling support workflow', () => {
       'utf8',
     )
 
-    assert.match(worker, /fuelPriceChange\.pollStatus/)
+    assert.match(worker, /forecourt\.fuelPrice\.pollStatus/)
     assert.match(worker, /lastAttemptAt/)
     assert.match(worker, /lastSuccessAt/)
     assert.match(worker, /lastFailureAt/)
