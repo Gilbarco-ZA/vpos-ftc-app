@@ -181,6 +181,71 @@ test('publishes only a complete Tanzania ATG capture without FTC-owned identity 
   )
 })
 
+test('publishes fresh controller readings even when local persistence rejects them as invalid', async () => {
+  let snapshotReads = 0
+  let submittedPayload: unknown = null
+
+  const result = await publishLatestTanzaniaTankInventories(
+    'station-1',
+    {
+      recordedAt: '2026-10-06T06:00:00.000Z',
+      requestedTgIds: ['01'],
+      snapshotsSaved: 0,
+      publicationReadings: [
+        {
+          tgId: '01',
+          domsTankId: '01',
+          temperatureC: 0,
+          tcVolumeLitres: 0,
+          volumeLitres: 0,
+          shellCapacityLitres: 50000,
+          maxSafeFillCapacityLitres: 48000,
+          gaugeOnline: false,
+          inventoryDataReady: false,
+          gaugeAlarmActive: true,
+          gaugeErrorActive: true,
+          controllerUpdatedAt: '2026-10-06T05:59:58.000Z',
+        },
+      ],
+    },
+    {
+      getCountry: async () => 'TZ',
+      loadSnapshots: async () => {
+        snapshotReads += 1
+        return []
+      },
+      loadTankMetadata: async () => [
+        {
+          product_name: 'PETROL',
+          tank_name: 'PETROL TANK 1',
+          capacity_litres: 52000,
+          doms_tank_id: '01',
+          tg_id: '01',
+        },
+      ],
+      submit: async (_stationId, payload) => {
+        submittedPayload = payload
+        return { ok: true, status: 202, data: { queued: true } }
+      },
+    },
+  )
+
+  assert.equal(snapshotReads, 0)
+  assert.deepEqual(result, { ok: true, tankCount: 1, queued: true })
+  assert.deepEqual(submittedPayload, {
+    data: [
+      {
+        product_name: 'PETROL',
+        tank_name: 'PETROL TANK 1',
+        capacity: '52000',
+        Temperature: '+0.0',
+        TC_Volume: '0.0',
+        Volume: '0.0',
+        Tank_ID: '1',
+      },
+    ],
+  })
+})
 test('rejects a partial current ATG set instead of mixing fresh and stale snapshots', async () => {
   await assert.rejects(
     () =>
@@ -210,6 +275,6 @@ test('rejects a partial current ATG set instead of mixing fresh and stale snapsh
           },
         },
       ),
-    /complete current snapshot: expected 2 tank\(s\), found 1/,
+    /complete current capture: expected 2 tank\(s\), found 1/,
   )
 })
