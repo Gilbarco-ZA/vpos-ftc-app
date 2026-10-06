@@ -151,9 +151,20 @@ describe('fuel price polling support workflow', () => {
     assert.match(worker, /skipped: summary\.skipped/)
     assert.match(worker, /lastError: message/)
 
+    const applicationPolling = readFileSync(
+      'src/modules/forecourt/application/fuelPricePolling.ts',
+      'utf8',
+    )
+
     assert.match(route, /export const POST = defineMutationRoute/)
-    assert.match(route, /pollFuelPriceChangesOnce\(user\.stationId\)/)
-    assert.match(route, /getFuelPricePollStatus\(user\.stationId\)/)
+    assert.match(route, /checkFuelPricesNow\(user\.stationId\)/)
+    assert.match(route, /getFuelPricePollingOverview\(user\.stationId\)/)
+    assert.doesNotMatch(
+      route,
+      /@\/src\/modules\/forecourt\/infrastructure\//,
+    )
+    assert.match(applicationPolling, /pollFuelPriceChangesOnce\(stationId\)/)
+    assert.match(applicationPolling, /getFuelPricePollStatus\(stationId\)/)
     assert.match(
       route,
       /roles: \['administrator', 'manager', 'field_engineer'\]/,
