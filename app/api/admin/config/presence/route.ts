@@ -43,7 +43,7 @@ export const POST = defineMutationRoute<PresenceConfigInput>({
     await createAuditLog({
       stationId: user.stationId,
       userId: user.id,
-      action: 'VPOS_PRESENCE_URL_UPDATED',
+      action: 'CONFIG_UPDATED',
       entityType: 'runtime_config',
       metadata: {
         presenceUrl,
