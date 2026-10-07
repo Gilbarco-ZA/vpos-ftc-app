@@ -153,7 +153,7 @@ describe('JPL client lifecycle', () => {
     assert.deepEqual(result, {
       ok: false,
       accepted: false,
-      error: 'APC1 client not available',
+      error: 'JPL forecourt client not available',
     })
   })
 
