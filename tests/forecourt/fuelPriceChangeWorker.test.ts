@@ -210,7 +210,7 @@ it('uses Tanzania local product id as the validated DOMS grade fallback', () => 
   )
 
   assert.match(worker, /isTanzaniaStation/)
-  assert.match(worker, /\^\\d\+\$/.source)
+  assert.match(worker, /\^\\d\+\$/)
   assert.match(worker, /return localProductId/)
   assert.match(worker, /active DOMS price bank/)
   assert.match(worker, /ext_unit_price = \$3/)
