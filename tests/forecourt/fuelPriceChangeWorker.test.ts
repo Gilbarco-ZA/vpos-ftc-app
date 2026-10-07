@@ -6,6 +6,7 @@ import type { FuelPriceChangeDto } from '@/src/shared/proxy/client'
 import {
   buildDomsPriceChangePayload,
   resolveDomsGradeIdFromRows,
+  scaleFuelPriceForDoms,
 } from '@/src/modules/forecourt/infrastructure/fuelPriceChangeWorker'
 
 const change = (
@@ -96,10 +97,11 @@ describe('fuel price change DOMS payload', () => {
         change({ effectiveAt: '2026-09-30T12:00:00Z' }),
         '02',
         'Africa/Johannesburg',
+        2,
         new Date('2026-09-30T13:00:00Z'),
       ),
       {
-        entries: [{ gradeId: '02', price: 25.4 }],
+        entries: [{ gradeId: '02', price: 2540 }],
         requestedBy: 'vpos-cloud-fuel-price-change',
         applyNow: true,
       },
@@ -112,10 +114,11 @@ describe('fuel price change DOMS payload', () => {
         change({ effectiveAt: '2026-10-01T00:01:00' }),
         '02',
         'Africa/Johannesburg',
+        2,
         new Date('2026-09-30T13:00:00Z'),
       ),
       {
-        entries: [{ gradeId: '02', price: 25.4 }],
+        entries: [{ gradeId: '02', price: 2540 }],
         requestedBy: 'vpos-cloud-fuel-price-change',
         effectiveAt: '2026-10-01T00:01:00',
       },
@@ -241,5 +244,13 @@ it('requires DOMS acceptance and effective local price sync before marking a clo
   assert.match(worker, /if \(!record \|\| !hasDomsApplied\(record\)\) return false/)
   assert.match(worker, /if \(!isEffectiveNow\(change, timezone\)\) return true/)
   assert.match(worker, /return Boolean\(record\.localPriceSyncedAt\)/)
+})
+
+it('scales cloud fuel prices using the site unit price decimal setting', () => {
+  assert.equal(scaleFuelPriceForDoms(100, 2), 10000)
+  assert.equal(scaleFuelPriceForDoms(95, 2), 9500)
+  assert.equal(scaleFuelPriceForDoms(25.4, 2), 2540)
+  assert.equal(scaleFuelPriceForDoms(100, 0), 100)
+  assert.equal(scaleFuelPriceForDoms(1.234, 3), 1234)
 })
 
