@@ -188,7 +188,7 @@ describe('fuel price polling support workflow', () => {
   })
 })
 
-test('fuel price worker falls back from cloud ext product code to local DOMS product mapping', () => {
+it('fuel price worker falls back from cloud ext product code to local DOMS product mapping', () => {
   const worker = readFileSync(
     'src/modules/forecourt/infrastructure/fuelPriceChangeWorker.ts',
     'utf8',
