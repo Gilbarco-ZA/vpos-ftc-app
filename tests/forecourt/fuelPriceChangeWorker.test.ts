@@ -203,3 +203,16 @@ it('fuel price worker falls back from cloud ext product code to local DOMS produ
   assert.match(worker, /Check tank\/nozzle product linkage and doms_grade_id/)
 })
 
+it('uses Tanzania local product id as the validated DOMS grade fallback', () => {
+  const worker = readFileSync(
+    'src/modules/forecourt/infrastructure/fuelPriceChangeWorker.ts',
+    'utf8',
+  )
+
+  assert.match(worker, /isTanzaniaStation/)
+  assert.match(worker, /\^\\d\+\$/.source)
+  assert.match(worker, /return localProductId/)
+  assert.match(worker, /active DOMS price bank/)
+  assert.match(worker, /ext_unit_price = \$3/)
+})
+
