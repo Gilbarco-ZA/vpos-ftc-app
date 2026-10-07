@@ -408,7 +408,7 @@ async function applyFuelPriceChange(
     localPriceSyncedAt = new Date().toISOString()
   }
 
-  const completedAt = effectiveNow ? localPriceSyncedAt : domsAppliedAt
+  const completedAt = effectiveNow ? localPriceSyncedAt : null
   await kvSet(stationId, appliedKey(change.id), {
     changeId: change.id,
     productId: change.productId ?? null,
@@ -420,7 +420,7 @@ async function applyFuelPriceChange(
     domsAppliedAt,
     localPriceSyncedAt,
     completedAt,
-    state: 'completed',
+    state: effectiveNow ? 'completed' : 'doms_applied',
   })
 
   return {
