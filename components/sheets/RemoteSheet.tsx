@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { SheetFooter } from '@/components/ui/sheet'
@@ -15,6 +15,11 @@ export function useRemoteResource<T>(
   const [data, setData] = useState<T | null>(null)
   const parse = options?.parse
   const auto = options?.auto ?? true
+  const buildUrlRef = useRef(buildUrl)
+  const parseRef = useRef(parse)
+
+  buildUrlRef.current = buildUrl
+  parseRef.current = parse
 
   const fetchData = useCallback(async () => {
     if (!openKey) return
@@ -22,20 +27,21 @@ export function useRemoteResource<T>(
     setError(null)
     setData(null)
     try {
-      const res = await fetch(buildUrl(openKey), { cache: 'no-store' })
+      const res = await fetch(buildUrlRef.current(openKey), { cache: 'no-store' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
         setError({ status: res.status, body })
         return
       }
-      const parsed = parse ? parse(body) : (body?.data ?? body)
+      const parser = parseRef.current
+      const parsed = parser ? parser(body) : (body?.data ?? body)
       setData(parsed as T)
     } catch (err) {
       setError(err)
     } finally {
       setLoading(false)
     }
-  }, [openKey, buildUrl, parse])
+  }, [openKey])
 
   useEffect(() => {
     if (!auto || !openKey) return

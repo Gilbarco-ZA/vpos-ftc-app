@@ -9,6 +9,7 @@ import type {
 import { isProductDevOverridesEnabled } from '@/src/platform/config/products'
 import {
   checkProxyDeviceStatus,
+  getProductStatusViaProxy,
   getTanzaniaProductsViaProxy,
   uploadProductsViaProxy,
   uploadTanzaniaProductViaProxy,
@@ -25,6 +26,7 @@ import {
 } from '@/src/modules/tanzania-fiscal/application/country'
 import { resolveProductCategoriesByIdsRepo } from '@/src/modules/products/infrastructure/persistence/product-category.repository'
 import {
+  getProductByIdRepo,
   updateProductSyncStatusRepo,
   upsertProductRepo,
 } from '@/src/modules/products/infrastructure/persistence/product.repository'
@@ -424,6 +426,63 @@ export async function syncProductsToCloudService(params: {
 
   return await uploadProductsViaProxy(params.stationId, {
     products: params.products.map(buildProxyProductPayload),
+  })
+}
+
+export async function getProductCloudStatusService(args: {
+  stationId: string
+  productId: string
+}) {
+  const product = await getProductByIdRepo(args.stationId, args.productId)
+  if (!product) {
+    return {
+      ok: false,
+      status: 404,
+      data: { error: true, message: 'Product not found locally' },
+    }
+  }
+
+  const country = await getStationCountryCode(args.stationId)
+  const externalProductId = product.extProductId ?? product.productId
+  const externalProductCode = product.extProductCode ?? product.productCode
+
+  if (isTanzaniaCountry(country)) {
+    const response = await getTanzaniaProductsViaProxy(args.stationId)
+    if (!response.ok) return response
+
+    const products = Array.isArray(response.data) ? response.data : []
+    const match = products.find(
+      (item) =>
+        String(item?.productId ?? '').trim() === String(externalProductId).trim() ||
+        String(item?.productCode ?? '').trim().toUpperCase() ===
+          String(externalProductCode).trim().toUpperCase(),
+    )
+
+    if (!match) {
+      return {
+        ok: true,
+        status: 200,
+        data: {
+          status: 'NOT_FOUND',
+          lastStatusTime: null,
+          message: 'Product is not present in the Tanzania cloud catalog.',
+        },
+      }
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      data: {
+        status: 'SYNCED',
+        lastStatusTime: match.updatedDate ?? match.createdDate ?? null,
+        message: 'Product is present in the Tanzania cloud catalog.',
+      },
+    }
+  }
+
+  return await getProductStatusViaProxy(args.stationId, {
+    ProductId: externalProductId,
   })
 }
 

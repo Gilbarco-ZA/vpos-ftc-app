@@ -11,6 +11,7 @@ export type PumpMappingRow = {
   doms_grade_option_id: number | null
   doms_grade_id: string | null
   doms_tank_id: string | null
+  product_record_id: string | null
   product_id: string | null
   product_code: string | null
   ext_product_id: string | null
@@ -31,6 +32,7 @@ export const pumpMappingsRepo = {
               n.doms_grade_option_id,
               n.doms_grade_id,
               n.doms_tank_id,
+              pr.id AS product_record_id,
               pr.product_id,
               pr.product_code,
               pr.ext_product_id,
