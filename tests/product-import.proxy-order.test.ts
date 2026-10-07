@@ -118,3 +118,32 @@ test('product sync routes Tanzania through the Tanzania proxy endpoints only', (
   assert.match(proxy, /method: 'GET'[\s\S]*path: '\/api\/tanzania\/products'/)
 })
 
+test('product status UI avoids callback-driven refetch loops and Tanzania uses catalog status', () => {
+  const remoteSheet = readFileSync('components/sheets/RemoteSheet.tsx', 'utf8')
+  const statusRoute = readFileSync(
+    'app/api/products/[productId]/status/route.ts',
+    'utf8',
+  )
+  const service = readFileSync(
+    'src/modules/products/application/services/product-service.ts',
+    'utf8',
+  )
+
+  assert.match(remoteSheet, /const buildUrlRef = useRef\(buildUrl\)/)
+  assert.match(remoteSheet, /const parseRef = useRef\(parse\)/)
+  assert.match(remoteSheet, /\}, \[openKey\]\)/)
+  assert.doesNotMatch(
+    remoteSheet,
+    /\}, \[openKey, buildUrl, parse\]\)/,
+  )
+
+  assert.match(statusRoute, /getProductCloudStatusService/)
+  assert.doesNotMatch(statusRoute, /getProductStatusViaProxy/)
+
+  assert.match(service, /if \(isTanzaniaCountry\(country\)\)/)
+  assert.match(service, /getTanzaniaProductsViaProxy\(args\.stationId\)/)
+  assert.match(service, /product\.extProductId \?\? product\.productId/)
+  assert.match(service, /status: 'SYNCED'/)
+  assert.match(service, /status: 'NOT_FOUND'/)
+})
+
