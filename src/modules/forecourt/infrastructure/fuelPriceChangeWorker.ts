@@ -91,6 +91,7 @@ export function resolveDomsGradeIdFromRows(
 }
 
 type ProductIdentityRow = {
+  id: string
   product_id: string | null
   product_code: string | null
   ext_product_id: string | null
@@ -107,7 +108,8 @@ async function resolveLocalProductIdentity(
   if (!productCode && !productId) return null
 
   const matches = await queryAll<ProductIdentityRow>(
-    `SELECT product_id,
+    `SELECT id::text AS id,
+            product_id,
             product_code,
             ext_product_id,
             ext_product_code
@@ -171,11 +173,36 @@ async function resolveDomsGradeId(
     return resolveDomsGradeIdFromRows(rows, change)
   }
 
-  return resolveDomsGradeIdFromRows(rows, {
-    ...change,
-    productCode: localProduct.product_code,
-    productId: null,
-  })
+  const productRowMatches = rows.filter(
+    (row) => String(row.product_record_id ?? '') === localProduct.id,
+  )
+  if (productRowMatches.length > 0) {
+    const gradeIds = Array.from(
+      new Set(
+        productRowMatches
+          .map((row) => String(row.doms_grade_id ?? '').trim())
+          .filter(Boolean),
+      ),
+    )
+    if (gradeIds.length === 1) return gradeIds[0]
+    if (gradeIds.length > 1) {
+      throw new Error(
+        `Fuel price change ${change.id} local product ${localProduct.product_code ?? localProduct.product_id ?? localProduct.id} maps to multiple DOMS grades: ${gradeIds.join(', ')}`,
+      )
+    }
+  }
+
+  try {
+    return resolveDomsGradeIdFromRows(rows, {
+      ...change,
+      productCode: localProduct.product_code,
+      productId: null,
+    })
+  } catch {
+    throw new Error(
+      `No DOMS grade mapping found for fuel price change ${change.id} after resolving cloud product productId=${change.productId ?? 'null'}, productCode=${change.productCode ?? 'null'} to local product id=${localProduct.product_id ?? 'null'}, code=${localProduct.product_code ?? 'null'}, row=${localProduct.id}. Check tank/nozzle product linkage and doms_grade_id.`,
+    )
+  }
 }
 
 export function buildDomsPriceChangePayload(
