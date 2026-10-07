@@ -1,4 +1,4 @@
-import { sendPosCommand } from '@/src/modules/pos/application/posControlClient'
+import { jplSendPosCommand } from '@/src/platform/integrations/jpl/client'
 
 export type PosDomsRouteCommand =
   | 'getFpGradeTotals'
@@ -77,8 +77,9 @@ export async function dispatchPosDomsCommand(
   payload?: unknown,
 ) {
   const type = getPosDomsCommandType(command)
-  return await sendPosCommand(
+  return await jplSendPosCommand(
     stationId,
     payload === undefined ? ({ type } as any) : ({ type, payload } as any),
+    { accessMode: 'forecourt' },
   )
 }

@@ -210,9 +210,20 @@ it('uses Tanzania local product id as the validated DOMS grade fallback', () => 
   )
 
   assert.match(worker, /isTanzaniaStation/)
-  assert.match(worker, /\^\\d\+\$/.source)
+  assert.match(worker, /\^\\d\+\$/)
   assert.match(worker, /return localProductId/)
   assert.match(worker, /active DOMS price bank/)
   assert.match(worker, /ext_unit_price = \$3/)
+})
+
+it('dispatches DOMS commands through JPL forecourt access instead of the POS backend gate', () => {
+  const doms = readFileSync(
+    'src/modules/pos/application/legacy/doms.ts',
+    'utf8',
+  )
+
+  assert.match(doms, /jplSendPosCommand/)
+  assert.match(doms, /accessMode: 'forecourt'/)
+  assert.doesNotMatch(doms, /posControlClient/)
 })
 
