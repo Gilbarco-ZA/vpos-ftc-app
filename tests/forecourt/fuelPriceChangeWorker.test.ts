@@ -197,7 +197,9 @@ test('fuel price worker falls back from cloud ext product code to local DOMS pro
   assert.match(worker, /resolveLocalProductIdentity/)
   assert.match(worker, /ext_product_code/)
   assert.match(worker, /ext_product_id/)
+  assert.match(worker, /product_record_id/)
+  assert.match(worker, /row\.product_record_id/)
   assert.match(worker, /productCode: localProduct\.product_code/)
-  assert.match(worker, /No DOMS grade mapping found/)
+  assert.match(worker, /Check tank\/nozzle product linkage and doms_grade_id/)
 })
 
