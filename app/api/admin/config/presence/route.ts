@@ -8,6 +8,7 @@ import { createAuditLog } from '@/src/shared/audit/log'
 import {
   getPresenceUrlFilePath,
   readPresenceUrl,
+  validatePresenceUrl,
   writePresenceUrl,
 } from '@/src/platform/runtime/presence-url'
 
@@ -33,12 +34,14 @@ export const POST = defineMutationRoute<PresenceConfigInput>({
   handler: async (_req, { user, body }) => {
     let presenceUrl: string
     try {
-      presenceUrl = await writePresenceUrl(body?.presenceUrl)
+      presenceUrl = validatePresenceUrl(body?.presenceUrl)
     } catch (error) {
       throw badRequestError(
         error instanceof Error ? error.message : 'Invalid presence URL.',
       )
     }
+
+    await writePresenceUrl(presenceUrl)
 
     await createAuditLog({
       stationId: user.stationId,
