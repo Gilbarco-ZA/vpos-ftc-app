@@ -29,4 +29,3 @@ CREATE INDEX IF NOT EXISTS idx_transactions_station_date_fiscalized_browse_activ
       fiscalized_at IS NOT NULL
       OR UPPER(COALESCE(status, '')) = 'FISCALIZED'
     );
-
