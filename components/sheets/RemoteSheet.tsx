@@ -18,8 +18,10 @@ export function useRemoteResource<T>(
   const buildUrlRef = useRef(buildUrl)
   const parseRef = useRef(parse)
 
-  buildUrlRef.current = buildUrl
-  parseRef.current = parse
+  useEffect(() => {
+    buildUrlRef.current = buildUrl
+    parseRef.current = parse
+  }, [buildUrl, parse])
 
   const fetchData = useCallback(async () => {
     if (!openKey) return
