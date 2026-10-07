@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 
 import type { JplCommandContext } from '@/src/platform/integrations/jpl/commands/contracts'
@@ -452,3 +453,15 @@ describe('JPL pricing read and scheduling modules', () => {
     assert.deepEqual(cleared, ['01:20260726090000'])
   })
 })
+
+it('constrains DOMS price-set UserId before protocol validation', () => {
+  const commands = readFileSync(
+    'src/modules/forecourt/infrastructure/jpl/protocol/commands.ts',
+    'utf8',
+  )
+
+  assert.match(commands, /const normalizeJplUserId/)
+  assert.match(commands, /slice\(0, 8\)/)
+  assert.match(commands, /normalizeJplUserId\(payload\?\.userId \?\? payload\?\.UserId\)/)
+})
+
