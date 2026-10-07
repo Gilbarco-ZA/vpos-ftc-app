@@ -188,3 +188,16 @@ describe('fuel price polling support workflow', () => {
   })
 })
 
+test('fuel price worker falls back from cloud ext product code to local DOMS product mapping', () => {
+  const worker = readFileSync(
+    'src/modules/forecourt/infrastructure/fuelPriceChangeWorker.ts',
+    'utf8',
+  )
+
+  assert.match(worker, /resolveLocalProductIdentity/)
+  assert.match(worker, /ext_product_code/)
+  assert.match(worker, /ext_product_id/)
+  assert.match(worker, /productCode: localProduct\.product_code/)
+  assert.match(worker, /No DOMS grade mapping found/)
+})
+
