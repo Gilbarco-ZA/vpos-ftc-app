@@ -9,7 +9,9 @@ import type {
 import { isProductDevOverridesEnabled } from '@/src/platform/config/products'
 import {
   checkProxyDeviceStatus,
+  getTanzaniaProductsViaProxy,
   uploadProductsViaProxy,
+  uploadTanzaniaProductViaProxy,
 } from '@/src/shared/proxy/client'
 import {
   isSupportedCountryCode,
@@ -17,6 +19,10 @@ import {
 } from '@/src/shared/server/config/countryDatasets'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import {
+  getStationCountryCode,
+  isTanzaniaCountry,
+} from '@/src/modules/tanzania-fiscal/application/country'
 import { resolveProductCategoriesByIdsRepo } from '@/src/modules/products/infrastructure/persistence/product-category.repository'
 import {
   updateProductSyncStatusRepo,
@@ -346,13 +352,87 @@ export function buildProxyProductPayload(
   }
 }
 
+export type TanzaniaProductSyncPayload = {
+  productId: string
+  productCode: string
+  productName: string
+  unitPrice: number
+  currency: string
+  category: string
+  taxCode: string
+  taxRate: number
+  inUse: boolean
+}
+
+export function buildTanzaniaProductSyncPayload(
+  product: ProductCloudSyncInput,
+): TanzaniaProductSyncPayload {
+  return {
+    productId: product.extProductId ?? product.productId,
+    productCode: product.extProductCode ?? product.productCode,
+    productName: product.extDescription ?? product.productName,
+    unitPrice: Number(product.extUnitPrice ?? product.unitPrice ?? 0),
+    currency: String(product.extCurrency ?? product.currency ?? ''),
+    category: String(product.category ?? ''),
+    taxCode: String(product.extTaxCode ?? product.taxCode ?? ''),
+    taxRate: Number(product.taxRate ?? 0),
+    inUse: true,
+  }
+}
+
 export async function syncProductsToCloudService(params: {
   stationId: string
   products: ProductCloudSyncInput[]
 }) {
+  const country = await getStationCountryCode(params.stationId)
+
+  if (isTanzaniaCountry(country)) {
+    const results = []
+    for (const product of params.products) {
+      const response = await uploadTanzaniaProductViaProxy(
+        params.stationId,
+        buildTanzaniaProductSyncPayload(product),
+      )
+      results.push(response)
+      if (!response.ok) {
+        return {
+          ok: false,
+          status: response.status,
+          data: {
+            error: response.data?.error ?? true,
+            message:
+              response.data?.message ??
+              `Tanzania product sync failed for ${product.extProductId ?? product.productId}`,
+            results,
+          },
+          url: response.url,
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      status: results.at(-1)?.status ?? 200,
+      data: {
+        error: false,
+        message: 'Tanzania products synced',
+        results,
+      },
+      url: results.at(-1)?.url ?? '',
+    }
+  }
+
   return await uploadProductsViaProxy(params.stationId, {
     products: params.products.map(buildProxyProductPayload),
   })
+}
+
+export async function fetchTanzaniaProductsForRecovery(stationId: string) {
+  const country = await getStationCountryCode(stationId)
+  if (!isTanzaniaCountry(country)) {
+    throw new Error('Tanzania product recovery is only available for Tanzania stations')
+  }
+  return await getTanzaniaProductsViaProxy(stationId)
 }
 
 export async function listProductClassCodesService(args: {

@@ -336,6 +336,56 @@ export const uploadProductsViaProxy = async (
   })
 }
 
+
+export const uploadTanzaniaProductViaProxy = async (
+  stationId: string | undefined,
+  payload: {
+    productId: string
+    productCode: string
+    productName: string
+    unitPrice: number
+    currency: string
+    category: string
+    taxCode: string
+    taxRate: number
+    inUse: boolean
+  },
+) => {
+  return proxyRequest(stationId, {
+    method: 'POST',
+    path: '/api/tanzania/products',
+    fallbackPath: '/api/tanzania/products',
+    body: payload,
+    timeoutMs: 5_000,
+  })
+}
+
+export type TanzaniaProxyProduct = {
+  id: number
+  productCode: string
+  productName: string
+  unitPrice: number
+  currency: string
+  productId: string
+  category: string
+  taxCode: string
+  taxRate: number
+  inUse: boolean
+  createdDate: string
+  updatedDate: string
+}
+
+export const getTanzaniaProductsViaProxy = async (
+  stationId: string | undefined,
+) => {
+  return proxyRequest(stationId, {
+    method: 'GET',
+    path: '/api/tanzania/products',
+    fallbackPath: '/api/tanzania/products',
+    timeoutMs: 5_000,
+  }) as Promise<ProxyRequestResult & { data: TanzaniaProxyProduct[] }>
+}
+
 export const getProductStatusViaProxy = async (
   stationId: string | undefined,
   query: Record<string, any>,
