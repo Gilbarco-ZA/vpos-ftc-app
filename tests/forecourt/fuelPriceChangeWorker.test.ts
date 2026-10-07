@@ -227,3 +227,19 @@ it('dispatches DOMS commands through JPL forecourt access instead of the POS bac
   assert.doesNotMatch(doms, /posControlClient/)
 })
 
+it('requires DOMS acceptance and effective local price sync before marking a cloud price change complete', () => {
+  const worker = readFileSync(
+    'src/modules/forecourt/infrastructure/fuelPriceChangeWorker.ts',
+    'utf8',
+  )
+
+  assert.match(worker, /type FuelPriceAppliedRecord/)
+  assert.match(worker, /domsAppliedAt/)
+  assert.match(worker, /localPriceSyncedAt/)
+  assert.match(worker, /completedAt/)
+  assert.match(worker, /state: effectiveNow \? 'completed' : 'doms_applied'/)
+  assert.match(worker, /if \(!record \|\| !hasDomsApplied\(record\)\) return false/)
+  assert.match(worker, /if \(!isEffectiveNow\(change, timezone\)\) return true/)
+  assert.match(worker, /return Boolean\(record\.localPriceSyncedAt\)/)
+})
+
