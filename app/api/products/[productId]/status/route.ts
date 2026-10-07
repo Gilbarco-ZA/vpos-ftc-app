@@ -2,7 +2,7 @@ import type { SessionUser } from '@/src/shared/types'
 
 import { fail, ok, serverError } from '@/src/platform/web/api/response'
 import { requireAuth } from '@/src/shared/auth'
-import { getProductStatusViaProxy } from '@/src/shared/proxy/client'
+import { getProductCloudStatusService } from '@/src/modules/products/application/services/product-service'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,8 +18,9 @@ export const GET = async (
     if (!user) {
       return await serverError('User not found')
     }
-    const res = await getProductStatusViaProxy(user.stationId, {
-      ProductId: params.productId,
+    const res = await getProductCloudStatusService({
+      stationId: user.stationId,
+      productId: params.productId,
     })
     const data = res.data
     if (!res.ok || data?.error === true) {
