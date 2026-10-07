@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 
 import PosIntegrationSettings from '@/components/admin/integrations/PosIntegrationSettings'
+import { PresenceSettings } from '@/components/admin/integrations/PresenceSettings'
 import { RetentionSettingsCard } from '@/components/admin/printing/RetentionSettingsCard'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -150,6 +151,8 @@ export default function AdminSettingsClient() {
       </Card>
 
       <RetentionSettingsCard />
+
+      <PresenceSettings />
 
       <PosIntegrationSettings />
     </div>
