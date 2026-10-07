@@ -2,15 +2,17 @@ import { chmod, mkdir, readFile, rename, writeFile } from 'fs/promises'
 import path from 'path'
 
 const DEFAULT_PRESENCE_URL_FILE = '/opt/fccapps/vpos-perm/vpos-presence-url'
+export const DEFAULT_PRESENCE_URL =
+  'https://ec2-13-246-19-190.af-south-1.compute.amazonaws.com/hubs/vpos-presence'
 
 export const getPresenceUrlFilePath = () =>
   String(process.env.VPOS_PRESENCE_URL_FILE || DEFAULT_PRESENCE_URL_FILE).trim()
 
 export async function readPresenceUrl(): Promise<string> {
   try {
-    return (await readFile(getPresenceUrlFilePath(), 'utf8')).trim()
+    return (await readFile(getPresenceUrlFilePath(), 'utf8')).trim() || DEFAULT_PRESENCE_URL
   } catch (error: any) {
-    if (error?.code === 'ENOENT') return ''
+    if (error?.code === 'ENOENT') return DEFAULT_PRESENCE_URL
     throw error
   }
 }
@@ -26,8 +28,8 @@ export function validatePresenceUrl(value: unknown): string {
     throw new Error('Presence URL must be a valid absolute URL.')
   }
 
-  if (parsed.protocol !== 'https:') {
-    throw new Error('Presence URL must use HTTPS.')
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Presence URL must use HTTP or HTTPS.')
   }
 
   return url
