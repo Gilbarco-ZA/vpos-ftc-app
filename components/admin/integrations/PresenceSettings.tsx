@@ -92,8 +92,8 @@ export function PresenceSettings() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-[var(--text-secondary)]">
-          Configure the HTTPS SignalR presence hub used by the VPOS remote
-          client for authenticated heartbeats.
+          Configure the HTTP or HTTPS SignalR presence hub used by the VPOS
+          remote client for authenticated heartbeats.
         </p>
 
         {error ? (
@@ -111,7 +111,7 @@ export function PresenceSettings() {
         <Input
           value={presenceUrl}
           onChange={(event) => setPresenceUrl(event.target.value)}
-          placeholder="https://your-server/hubs/vpos-presence"
+          placeholder="https://ec2-13-246-19-190.af-south-1.compute.amazonaws.com/hubs/vpos-presence"
           disabled={loading || busy}
         />
 
