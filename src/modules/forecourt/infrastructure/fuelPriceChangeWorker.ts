@@ -1,6 +1,6 @@
 import type { FuelPriceChangeDto } from '@/src/shared/proxy/client'
 
-import { query } from '@/src/platform/db/postgres'
+import { query, queryAll } from '@/src/platform/db/postgres'
 import { getFuelPriceChangesViaProxy } from '@/src/shared/proxy/client'
 import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 import { localDateTime } from '@/src/shared/time/localDateTime'
@@ -90,12 +90,92 @@ export function resolveDomsGradeIdFromRows(
   return gradeIds[0]
 }
 
+type ProductIdentityRow = {
+  product_id: string | null
+  product_code: string | null
+  ext_product_id: string | null
+  ext_product_code: string | null
+}
+
+async function resolveLocalProductIdentity(
+  stationId: string,
+  change: FuelPriceChangeDto,
+): Promise<ProductIdentityRow | null> {
+  const productCode = String(change.productCode ?? '').trim()
+  const productId = String(change.productId ?? '').trim()
+
+  if (!productCode && !productId) return null
+
+  const matches = await queryAll<ProductIdentityRow>(
+    `SELECT product_id,
+            product_code,
+            ext_product_id,
+            ext_product_code
+       FROM products
+      WHERE station_id = $1
+        AND (
+          ($2 <> '' AND (
+            UPPER(BTRIM(COALESCE(ext_product_code, ''))) = UPPER(BTRIM($2))
+            OR UPPER(BTRIM(COALESCE(product_code, ''))) = UPPER(BTRIM($2))
+          ))
+          OR
+          ($3 <> '' AND (
+            BTRIM(COALESCE(ext_product_id, '')) = BTRIM($3)
+            OR BTRIM(COALESCE(product_id, '')) = BTRIM($3)
+          ))
+        )
+      ORDER BY CASE
+                 WHEN $2 <> ''
+                  AND UPPER(BTRIM(COALESCE(ext_product_code, ''))) = UPPER(BTRIM($2))
+                   THEN 0
+                 WHEN $3 <> ''
+                  AND BTRIM(COALESCE(ext_product_id, '')) = BTRIM($3)
+                   THEN 1
+                 ELSE 2
+               END,
+               updated_at DESC
+      LIMIT 2`,
+    [stationId, productCode, productId],
+  )
+
+  if (matches.length > 1) {
+    const first = matches[0]
+    const second = matches[1]
+    const firstKey = `${first.product_id ?? ''}|${first.product_code ?? ''}`
+    const secondKey = `${second.product_id ?? ''}|${second.product_code ?? ''}`
+    if (firstKey !== secondKey) {
+      throw new Error(
+        `Fuel price change ${change.id} matches multiple local products for cloud identity productId=${change.productId ?? 'null'}, productCode=${change.productCode ?? 'null'}`,
+      )
+    }
+  }
+
+  return matches[0] ?? null
+}
+
 async function resolveDomsGradeId(
   stationId: string,
   change: FuelPriceChangeDto,
 ): Promise<string> {
   const rows = await pumpMappingsRepo.listRowsByStationId(stationId)
-  return resolveDomsGradeIdFromRows(rows, change)
+
+  try {
+    return resolveDomsGradeIdFromRows(rows, change)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!/No DOMS grade mapping found/.test(message)) throw error
+  }
+
+  const localProduct = await resolveLocalProductIdentity(stationId, change)
+  if (!localProduct) {
+    return resolveDomsGradeIdFromRows(rows, change)
+  }
+
+  return resolveDomsGradeIdFromRows(rows, {
+    ...change,
+    productCode: localProduct.product_code,
+    productId: null,
+  })
 }
 
 export function buildDomsPriceChangePayload(
