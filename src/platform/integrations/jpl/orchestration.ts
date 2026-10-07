@@ -81,12 +81,14 @@ export async function prepareJplCommandExecution(
   }
 
   if (!client) {
+    const state = runtime.getGatewayState()
+    const lastError = String(state?.lastError ?? '').trim()
     return {
       ok: false,
       result: {
         ok: false,
         accepted: false,
-        error: 'APC1 client not available',
+        error: lastError || 'JPL forecourt client not available',
       },
     }
   }
