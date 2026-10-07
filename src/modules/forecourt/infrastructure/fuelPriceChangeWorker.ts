@@ -6,6 +6,7 @@ import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 import { localDateTime } from '@/src/shared/time/localDateTime'
 import { resolveStationTimezone } from '@/src/shared/time/localTimezone'
 
+import { getAdminSettings } from '@/src/modules/admin-config/application/getAdminSettings'
 import { pumpMappingsRepo } from '@/src/modules/forecourt/infrastructure/repositories/pumpMappingsRepo'
 import { executePosDomsCommand } from '@/src/modules/pos/application/executePosDomsCommand'
 
@@ -233,18 +234,30 @@ async function resolveDomsGradeId(
   }
 }
 
+export function scaleFuelPriceForDoms(
+  value: unknown,
+  unitPriceDecimals: number,
+): number {
+  const price = Number(value)
+  if (!Number.isFinite(price) || price < 0) {
+    throw new Error(`Invalid fuel price: ${String(value)}`)
+  }
+
+  const decimals = Math.max(0, Math.min(3, Math.trunc(unitPriceDecimals)))
+  return Math.round(price * 10 ** decimals)
+}
+
 export function buildDomsPriceChangePayload(
   change: FuelPriceChangeDto,
   gradeId: string,
   timezone: string,
+  unitPriceDecimals = 2,
   now: Date = new Date(),
 ): Record<string, unknown> {
-  const newPrice = Number(change.newPrice)
-  if (!Number.isFinite(newPrice) || newPrice < 0) {
-    throw new Error(
-      `Fuel price change ${change.id} has invalid newPrice=${String(change.newPrice)}`,
-    )
-  }
+  const newPrice = scaleFuelPriceForDoms(
+    change.newPrice,
+    unitPriceDecimals,
+  )
 
   let effectiveAtLocal: string
   try {
@@ -382,7 +395,17 @@ async function applyFuelPriceChange(
   }
 
   const gradeId = await resolveDomsGradeId(stationId, change)
-  const payload = buildDomsPriceChangePayload(change, gradeId, timezone)
+  const adminSettings = await getAdminSettings(stationId)
+  const unitPriceDecimals =
+    typeof adminSettings?.unit_price_decimals === 'number'
+      ? adminSettings.unit_price_decimals
+      : 2
+  const payload = buildDomsPriceChangePayload(
+    change,
+    gradeId,
+    timezone,
+    unitPriceDecimals,
+  )
   const newPrice = Number(change.newPrice)
 
   const result = await executePosDomsCommand(
