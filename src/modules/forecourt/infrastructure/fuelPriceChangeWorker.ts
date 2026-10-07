@@ -1,6 +1,6 @@
 import type { FuelPriceChangeDto } from '@/src/shared/proxy/client'
 
-import { query, queryAll } from '@/src/platform/db/postgres'
+import { query, queryAll, queryOne } from '@/src/platform/db/postgres'
 import { getFuelPriceChangesViaProxy } from '@/src/shared/proxy/client'
 import { kvGet, kvSet } from '@/src/shared/storage/stationKv'
 import { localDateTime } from '@/src/shared/time/localDateTime'
@@ -155,6 +155,22 @@ async function resolveLocalProductIdentity(
   return matches[0] ?? null
 }
 
+async function isTanzaniaStation(stationId: string): Promise<boolean> {
+  const row = await queryOne<{ country: string | null }>(
+    `SELECT country
+       FROM fuel_stations
+      WHERE id = $1
+      LIMIT 1`,
+    [stationId],
+  )
+  const country = String(row?.country ?? '')
+    .trim()
+    .toUpperCase()
+  return ['TZ', 'TZA', 'TANZANIA', 'UNITED REPUBLIC OF TANZANIA'].includes(
+    country,
+  )
+}
+
 async function resolveDomsGradeId(
   stationId: string,
   change: FuelPriceChangeDto,
@@ -199,6 +215,18 @@ async function resolveDomsGradeId(
       productId: null,
     })
   } catch {
+    const localProductId = String(localProduct.product_id ?? '').trim()
+    if (
+      localProductId &&
+      /^\d+$/.test(localProductId) &&
+      (await isTanzaniaStation(stationId))
+    ) {
+      // Tanzania forecourt pricing uses the local product ID as the DOMS grade
+      // identifier. The JPL pricing command normalizes this to ID2 and verifies
+      // the grade is present in the active DOMS price bank before writing.
+      return localProductId
+    }
+
     throw new Error(
       `No DOMS grade mapping found for fuel price change ${change.id} after resolving cloud product productId=${change.productId ?? 'null'}, productCode=${change.productCode ?? 'null'} to local product id=${localProduct.product_id ?? 'null'}, code=${localProduct.product_code ?? 'null'}, row=${localProduct.id}. Check tank/nozzle product linkage and doms_grade_id.`,
     )
@@ -259,6 +287,7 @@ async function syncLocalProductPrice(
   const result = await query(
     `UPDATE products
         SET unit_price = $3,
+            ext_unit_price = $3,
             updated_at = NOW()
       WHERE station_id = $1
         AND (
