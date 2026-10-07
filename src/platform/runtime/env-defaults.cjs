@@ -37,6 +37,7 @@ const ENV_DEFAULTS = Object.freeze({
   VPOS_PRINTER_READY_TIMEOUT_MS: '5000',
   VPOS_MANAGED_BY_START_SH: '0',
   VPOS_APPLICATION_ROOT: '/opt/fccapps/vposftc',
+  VPOS_PRESENCE_URL_FILE: '/opt/fccapps/vpos-perm/vpos-presence-url',
 
   // Database
   POSTGRES_URL: '',
