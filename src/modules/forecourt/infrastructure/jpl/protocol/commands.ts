@@ -383,6 +383,12 @@ const buildReadPriceSetRequest = (payload: any) => {
   return validateJplOutboundMessage(request)
 }
 
+const normalizeJplUserId = (value: unknown) => {
+  const text = String(value ?? '').trim()
+  if (!text) return 'system'
+  return text.slice(0, 8)
+}
+
 const buildChangePriceSetRequest = (payload: any) => {
   const subCode = normalizeCode1(payload?.subCode ?? payload?.SubCode ?? '04H')
   const request: JplCommandRequest = {
@@ -392,7 +398,7 @@ const buildChangePriceSetRequest = (payload: any) => {
       UserId:
         subCode === '02H'
           ? undefined
-          : String(payload?.userId ?? payload?.UserId ?? '').trim(),
+          : normalizeJplUserId(payload?.userId ?? payload?.UserId),
       FcPriceSetId: padId2(
         payload?.fcPriceSetId ?? payload?.FcPriceSetId ?? payload?.priceSetId,
       ),
