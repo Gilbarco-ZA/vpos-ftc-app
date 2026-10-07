@@ -317,22 +317,59 @@ function isEffectiveNow(
   return effectiveAtLocal <= nowLocal
 }
 
+type FuelPriceAppliedRecord = {
+  changeId?: number
+  productId?: string | number | null
+  productCode?: string | null
+  gradeId?: string | null
+  newPrice?: number
+  effectiveAt?: string | null
+  appliedAt?: string | null
+  domsAppliedAt?: string | null
+  localPriceSyncedAt?: string | null
+  completedAt?: string | null
+  state?: 'doms_applied' | 'completed'
+}
+
+function hasDomsApplied(record: FuelPriceAppliedRecord | null | undefined) {
+  return Boolean(record?.domsAppliedAt ?? record?.appliedAt)
+}
+
+function isFuelPriceChangeCompleted(
+  record: FuelPriceAppliedRecord | null | undefined,
+  change: FuelPriceChangeDto,
+  timezone: string,
+) {
+  if (!record || !hasDomsApplied(record)) return false
+  if (!isEffectiveNow(change, timezone)) return true
+  return Boolean(record.localPriceSyncedAt)
+}
+
 async function applyFuelPriceChange(
   stationId: string,
   change: FuelPriceChangeDto,
 ) {
   const timezone = await resolveStationTimezone(stationId)
-  const existing = await kvGet<Record<string, any>>(
+  const existing = await kvGet<FuelPriceAppliedRecord>(
     stationId,
     appliedKey(change.id),
   )
-  if (existing) {
-    if (!existing.localPriceSyncedAt && isEffectiveNow(change, timezone)) {
+  const effectiveNow = isEffectiveNow(change, timezone)
+
+  if (isFuelPriceChangeCompleted(existing, change, timezone)) {
+    return { applied: false, skipped: true, reason: 'already_applied' }
+  }
+
+  if (existing && hasDomsApplied(existing)) {
+    if (effectiveNow && !existing.localPriceSyncedAt) {
       await syncLocalProductPrice(stationId, change)
       const localPriceSyncedAt = new Date().toISOString()
       await kvSet(stationId, appliedKey(change.id), {
         ...existing,
+        domsAppliedAt: existing.domsAppliedAt ?? existing.appliedAt ?? null,
         localPriceSyncedAt,
+        completedAt: localPriceSyncedAt,
+        state: 'completed',
       })
       return {
         applied: false,
@@ -340,6 +377,7 @@ async function applyFuelPriceChange(
         reason: 'already_applied_local_price_synced',
       }
     }
+
     return { applied: false, skipped: true, reason: 'already_applied' }
   }
 
@@ -363,14 +401,14 @@ async function applyFuelPriceChange(
     )
   }
 
-  const appliedAt = new Date().toISOString()
-  const effectiveNow = isEffectiveNow(change, timezone)
+  const domsAppliedAt = new Date().toISOString()
   let localPriceSyncedAt: string | null = null
   if (effectiveNow) {
     await syncLocalProductPrice(stationId, change)
     localPriceSyncedAt = new Date().toISOString()
   }
 
+  const completedAt = effectiveNow ? localPriceSyncedAt : domsAppliedAt
   await kvSet(stationId, appliedKey(change.id), {
     changeId: change.id,
     productId: change.productId ?? null,
@@ -378,8 +416,11 @@ async function applyFuelPriceChange(
     gradeId,
     newPrice,
     effectiveAt: change.effectiveAt,
-    appliedAt,
+    appliedAt: domsAppliedAt,
+    domsAppliedAt,
     localPriceSyncedAt,
+    completedAt,
+    state: 'completed',
   })
 
   return {
