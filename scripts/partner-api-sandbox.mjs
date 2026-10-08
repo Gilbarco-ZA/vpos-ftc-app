@@ -5,6 +5,9 @@ import { createCompatibilityApi } from './partner-api-compat.mjs'
 const host = process.env.VPOS_PARTNER_SANDBOX_HOST || '127.0.0.1'
 const port = Number(process.env.VPOS_PARTNER_SANDBOX_PORT || 3080)
 const token = process.env.VPOS_PARTNER_SANDBOX_TOKEN || 'sandbox-token'
+if (!['127.0.0.1','localhost','::1'].includes(host) && (token === 'sandbox-token' || !process.env.VPOS_PARTNER_SANDBOX_PASSWORD)) {
+  throw new Error('Non-loopback sandbox requires VPOS_PARTNER_SANDBOX_TOKEN and VPOS_PARTNER_SANDBOX_PASSWORD')
+}
 
 const stationId = '00000000-0000-4000-8000-000000000001'
 const userId = '00000000-0000-4000-8000-000000000002'
