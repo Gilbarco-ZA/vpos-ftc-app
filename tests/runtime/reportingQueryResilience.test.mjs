@@ -229,7 +229,7 @@ test('fiscalized pagination narrows the transaction projection before receipt en
   assert.doesNotMatch(projection, /t\.\*/)
   assert.doesNotMatch(projection, /doms_payload_json|fiscalization_response/)
   assert.match(repository, /if \(fiscalized && !hasSearch\)/)
-  assert.match(repository, /FROM \([\s\S]*SELECT t\.id, t\.station_id[\s\S]*LIMIT \$\{params\.length \+ 1\} OFFSET \$\{params\.length \+ 2\}/)
+  assert.match(repository, /FROM \([\s\S]*SELECT t\.id, t\.station_id[\s\S]*LIMIT \$\$\{params\.length \+ 1\} OFFSET \$\$\{params\.length \+ 2\}/)
   assert.match(repository, /const countFromSql = hasSearch \? fromSql : 'FROM transactions t'/)
 })
 
@@ -268,6 +268,6 @@ test('receipt viewer uses server pagination with 50-row default', () => {
   assert.match(viewer, /10, 25, 50, 100/)
   assert.match(viewer, /page: String\(page\), pageSize: String\(pageSize\)/)
   assert.match(route, /pageSize: Number\(searchParams\.get\('pageSize'\)/)
-  assert.match(receiptQuery, /return \{ items: rows\.map/)
+  assert.match(receiptQuery, /return\s*\{\s*items:\s*rows\.map/)
   assert.match(receiptQuery, /LIMIT \$\{addParam\(pageSize\)\} OFFSET \$\{addParam\(offset\)\}/)
 })
