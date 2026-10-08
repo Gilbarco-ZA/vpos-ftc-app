@@ -416,13 +416,18 @@ export async function listReceiptRouteRows(
     startDate?: string
     endDate?: string
     limit?: number
+    page?: number
+    pageSize?: number
   } = {},
 ) {
   const transactionId = String(options.transactionId ?? '').trim()
   const search = String(options.search ?? '').trim()
   const startDate = String(options.startDate ?? '').trim()
   const endDate = String(options.endDate ?? '').trim()
-  const limit = Math.min(200, Math.max(1, Number(options.limit ?? 100)))
+  const page = Number.isSafeInteger(options.page) && Number(options.page) > 0 ? Number(options.page) : 1
+  const requestedPageSize = Number(options.pageSize ?? options.limit ?? 50)
+  const pageSize = [10, 25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
+  const offset = (page - 1) * pageSize
 
   const conditions = ['r.station_id = $1']
   const params: unknown[] = [stationId]
@@ -456,6 +461,15 @@ export async function listReceiptRouteRows(
     )
   }
 
+  const countRows = await queryAll<{ count: string }>(
+    `SELECT COUNT(*)::text AS count
+      FROM receipts r
+      ${search ? `JOIN transactions t ON t.id = r.transaction_id AND t.station_id = r.station_id AND t.deleted_at IS NULL
+          LEFT JOIN customers c ON c.id = t.customer_id AND c.station_id = t.station_id` : ''}
+      WHERE ${conditions.join(' AND ')}`,
+    params,
+  )
+  const total = Number(countRows[0]?.count ?? 0)
   const rows = await queryAll<Record<string, any>>(
     `SELECT
          r.*,
@@ -474,11 +488,11 @@ export async function listReceiptRouteRows(
         AND t.station_id = r.station_id
         AND t.deleted_at IS NULL
        LEFT JOIN customers c
-         ON c.id = t.customer_id
+         ON c.id = t.customer_id AND c.station_id = t.station_id
       WHERE ${conditions.join(' AND ')}
-      ORDER BY r.generated_at DESC
-      LIMIT ${addParam(limit)}`,
+      ORDER BY r.generated_at DESC, r.id DESC
+      LIMIT ${addParam(pageSize)} OFFSET ${addParam(offset)}`
     params,
   )
-  return rows.map((row) => resolveReceiptRowContent(row))
+  return { items: rows.map((row) => resolveReceiptRowContent(row)), total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
 }
