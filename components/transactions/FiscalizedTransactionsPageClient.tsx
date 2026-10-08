@@ -557,18 +557,20 @@ const FiscalizedTransactionsPageClient = ({
         fuelType={fuelType}
         startDate={startDate}
         endDate={endDate}
-        onSearchChange={setSearch}
-        onCustomerChange={setCustomer}
-        onFuelTypeChange={setFuelType}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
+        onSearchChange={(value) => { setSearch(value); setPage(1) }}
+        onCustomerChange={(value) => { setCustomer(value); setPage(1) }}
+        onFuelTypeChange={(value) => { setFuelType(value); setPage(1) }}
+        onStartDateChange={(value) => { setStartDate(value); setPage(1) }}
+        onEndDateChange={(value) => { setEndDate(value); setPage(1) }}
         onToday={() => {
           setStartDate(businessDate)
           setEndDate(businessDate)
+          setPage(1)
         }}
         onAllDates={() => {
           setStartDate('')
           setEndDate('')
+          setPage(1)
         }}
         todayDisabled={!businessDate}
         onRefresh={refresh}
