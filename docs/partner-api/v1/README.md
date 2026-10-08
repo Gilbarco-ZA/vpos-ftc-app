@@ -1,152 +1,74 @@
-# VPOS FTC Partner API v1
+# VPOS FTC Sandbox — Getting started (v1 initial release)
 
-This is the supported integration boundary for third-party developers. It is intentionally narrower than the internal VPOS FTC `/api/*` surface.
+This is a standalone **synthetic** HTTP API simulator for third-party developers. It mirrors selected VPOS FTC endpoints at `/api` and does **not** contain or disclose VPOS FTC application source code.
 
-## Contract
+## Links
 
-- OpenAPI: [openapi.yaml](./openapi.yaml)
-- Version: `v1`
-- JSON property names and response shapes in the OpenAPI file are stable within v1.
-- Additive response fields may be introduced. Clients must ignore unknown response properties.
-- Breaking request/response changes require a new major partner API version.
+- [Implemented endpoint inventory](./ENDPOINTS.md) — exact method/path list
+- [Data shapes](./DATA_SHAPES.md) — fields, nullability, naming and response envelopes
+- [Worked requests](./EXAMPLES.md) — copy/paste curl flows
+- [Production API wire reference](../../manuals/API_WIRE_CONTRACTS.md) — installed production behaviour
+- Swagger UI: `http://localhost:3080/api/docs`
+- OpenAPI JSON: `http://localhost:3080/api/openapi.json`
 
-The installed-package wire reference remains useful when diagnosing internal VPOS behaviour, but third parties should build against this partner contract rather than database-shaped internal routes.
+## Run locally
 
-## Authentication
-
-Production deployments should use a dedicated partner bearer token issued per integrator/site. Do not give third parties VPOS UI credentials, database credentials, filesystem access, source repository access, fiscal signing material, or DOMS/JPL credentials.
-
-The local sandbox accepts `Authorization: Bearer sandbox-token`. `GET /v1/health` is unauthenticated.
-
-## Sandbox
-
-Run:
+Node.js 22 or newer is recommended (aligned with the packaged runner). From the repository root:
 
 ```bash
 npm run partner:sandbox
 ```
 
-Defaults:
+The default listener is `127.0.0.1:3080`; **stop the normal FTC service first** if it already occupies port 3080. For a parallel sandbox, set `VPOS_PARTNER_SANDBOX_PORT=3095`; the URL becomes `http://localhost:3095/api`.
 
-- base URL: `http://127.0.0.1:3080/api`
-- token: `sandbox-token`
-- data: synthetic, in-memory, reset whenever the process restarts
-- dependencies: none outside Node.js; it does not import application modules, connect to PostgreSQL, access fiscal keys, or connect to a forecourt controller
+Use `Authorization: Bearer sandbox-token` for local calls. For example:
 
-Environment overrides:
+```bash
+curl -H "Authorization: Bearer sandbox-token" \
+  http://127.0.0.1:3080/api/transactions
+```
+
+Alternatively, call `POST /api/auth/login` with `{"username":"sandbox","password":"sandbox"}` and save the simulated cookie; this authentication flow is not production-grade and may differ from VPOS production login. `GET /api/security/csrf` returns `csrf-disabled` in sandbox only.
+
+Open Swagger UI at `/api/docs`, press **Authorize**, and enter the sandbox token (without “Bearer”). The UI loads assets from `unpkg.com`, so an offline browser must be provisioned with local Swagger assets separately; the JSON specification itself is locally served.
+
+## External testing / distribution
+
+```bash
+npm run partner:sandbox:package
+cd dist/partner-sandbox
+npm start
+```
+
+The minimal bundle contains `server.mjs`, `partner-api-compat.mjs`, `partner-api-swagger.mjs`, `openapi.yaml`, `README.md`, `package.json`, and `Dockerfile`. It does not include FTC's application modules or dependencies. For a shared deployment:
 
 ```bash
 VPOS_PARTNER_SANDBOX_HOST=0.0.0.0 \
 VPOS_PARTNER_SANDBOX_PORT=3080 \
-VPOS_PARTNER_SANDBOX_TOKEN=replace-me \
-npm run partner:sandbox
+VPOS_PARTNER_SANDBOX_TOKEN='replace-with-random-secret' \
+VPOS_PARTNER_SANDBOX_PASSWORD='separate-strong-password' \
+npm start
 ```
 
-Example:
+Place the service behind HTTPS, a reverse proxy, rate limiting and network allowlisting. Do not publish its plain HTTP port directly. Never connect this sandbox to production data, fiscal keys, PostgreSQL or pump networks. All fixture data resets when the service restarts.
 
-```bash
-curl -H 'Authorization: Bearer sandbox-token' \
-  http://127.0.0.1:3080/api/transactions/pre-fuel-customer
-```
+## Wire behaviour and compatibility
 
+The reference source for the *running* `/api` simulator is `/api/openapi.json`, backed by `scripts/partner-api-swagger.mjs`. The historical `openapi.yaml` is the original `/v1` normalized contract and is retained only for legacy compatibility. Do not use it to generate clients targeting `/api`.
 
-## Terminology and wire conventions
+Some endpoints return camelCase DTOs; others return snake_case PostgreSQL-shaped fields, while `/settings` is direct JSON and reports can be CSV. Do not apply automatic case conversion to every response. Status codes, fields and optional/null conventions are documented in [DATA_SHAPES.md](./DATA_SHAPES.md).
 
-- **Partner API**: the stable, externally supported `/v1` contract. It is not synonymous with the internal FTC `/api/*` routes.
-- **Station**: one VPOS site/forecourt. `stationId` is a UUID identifying that site; partner data is always station-scoped.
-- **Customer**: buyer/customer identity used for transaction allocation and fiscalization. `customerId` is a UUID; `tin` is the customer's tax/customer identifier and is a string, not a numeric value.
-- **Transaction**: a sale/fuel transaction. `transactionId` is a UUID. `posReference` is an external/POS reference and must not be treated as the transaction UUID.
-- **Pump / nozzle**: `pumpNumber` and `nozzleNumber` are positive configured integers. `nozzleId` is the internal UUID for that nozzle. `displayNumber` is presentation-only.
-- **Allocation**: association between a customer and pump/nozzle. A pre-fuel allocation exists before a matching transaction arrives.
-- **Status**: lifecycle state such as `OPEN`, `FISCALIZED`, `PENDING`, or `CANCELLED`. Consumers should handle documented values and tolerate new response values where a schema is intentionally open.
-- **Timestamp**: ISO-8601/RFC-3339 date-time string with timezone/offset. Do not interpret timestamps using the client machine's local timezone unless the business rule explicitly says so.
-- **Money and volume**: partner v1 normalized DTOs use JSON numbers. Internal/raw FTC endpoints can expose PostgreSQL numeric values as strings; that is one reason partners should use the v1 adapter.
-- **Success envelope**: successful partner responses use `{ "ok": true, "success": true, "data": ... }`, except `/health`, which is a direct health object.
-- **Failure envelope**: failures use `{ "ok": false, "success": false, "error": { "code", "message", "details?" } }`. Client logic should branch on HTTP status and `error.code`, not message text.
-- **Pagination**: `page` is 1-based; `pageSize` is the requested bounded page size; `total` is the number of matching rows; transaction pages also return `totalPages`.
-- **Idempotency/retries**: a transport timeout does not prove a write failed. Do not automatically replay fiscal or allocation writes unless the endpoint explicitly defines idempotency. Read current state before retrying an ambiguous write.
-- **Synthetic sandbox data**: sandbox UUIDs, TINs, customers, transactions, amounts, and fuel options are fictitious and reset on restart. They are safe test fixtures, not production examples to copy as identifiers.
+Unsupported methods return `501` with `error.code="SANDBOX_NOT_IMPLEMENTED"`. This is a **partial compatibility simulator**, not certification that every VPOS feature, validation rule or state transition is reproduced.
 
-## Supported v1 workflows
+## First integration sequence
 
-The first v1 slice covers the most common partner-read and pre-fuel integration workflows:
+1. Check `GET /api/livez` and `GET /api/sandbox/coverage`.
+2. Authenticate with the sandbox token.
+3. Load `GET /api/transactions/fuel-options`, `GET /api/customers`, and `GET /api/transactions`.
+4. Create a pre-fuel allocation or a manual transaction, then read the resulting state.
+5. Exercise 400/401/404/501 cases and implement response content-type handling.
+6. Use the same path prefix `/api` in production, but implement real VPOS authentication, permissions, and production-specific validation based on the installed contract and deployment policy.
 
-- health/capability check;
-- list/get customers;
-- create/upsert a synthetic customer in sandbox;
-- list/get transactions;
-- list fuel/nozzle options;
-- read/create/cancel pre-fuel customer allocations.
+## Terminology
 
-The sandbox deliberately does not perform real fiscalization, printing, stock mutation, pump control, or receipt-number reservation. Those workflows require explicit partner contracts before they are exposed.
-
-## Pre-fuel allocation terminology
-
-A pre-fuel allocation means a customer is selected for a specific pump/nozzle before the forecourt transaction arrives.
-
-- `PENDING`: waiting for a matching fuel transaction.
-- `CONSUMED`: a transaction matched and consumed the allocation.
-- `CANCELLED`: cancelled manually or expired.
-- `pumpNumber`: physical pump number.
-- `nozzleNumber`: configured nozzle number used for transaction matching.
-- `displayNumber`: optional user-facing nozzle label/number.
-- `allocationId`: the allocation's UUID, used by cancellation operations.
-- `captureOrder`: `before_transaction` means pre-fuel allocation is active; `after_transaction` means customer capture occurs after the pump transaction.
-
-## Standalone distribution bundle
-
-Build a deployable bundle without the FTC application source:
-
-```bash
-npm run partner:sandbox:package
-```
-
-The command creates `dist/partner-sandbox/` containing only `server.mjs`, `openapi.yaml`, `README.md`, a minimal `package.json`, and a `Dockerfile`. Build and publish that directory/image to the sandbox environment; third-party developers only need the hosted base URL, token, and OpenAPI document.
-
-## Isolation and deployment
-
-For external testing, deploy the sandbox as its own container/service from a release artifact containing only:
-
-- the sandbox runner;
-- the OpenAPI file;
-- synthetic fixtures/documentation.
-
-Do not deploy the VPOS FTC source checkout to the integrator. Network policy should expose only the sandbox port and should prevent sandbox access to production PostgreSQL, VPOS internal APIs, fiscal certificate stores, and forecourt networks.
-
-A production partner adapter should likewise sit in front of internal VPOS APIs, translate internal/raw DTOs to this stable v1 contract, and authenticate partner tokens independently of VPOS UI sessions.
-
-
-## FTC-compatible API mirror (recommended)
-
-The sandbox now listens on `http://127.0.0.1:3080/api` by default and accepts the same path structure as FTC. It includes simulated health, authentication/session/CSRF, customer, transaction, pre-fuel allocation, fuel options, product, category, stock, reporting, settings, pump/tank and proxy-configuration endpoint families. Supported operations use the real API's response conventions, including raw snake_case transaction and allocation records, direct settings responses, nested envelopes and CSV where appropriate.
-
-Use `Authorization: Bearer sandbox-token` for synthetic test access, or log in with sandbox username/password `sandbox`/`sandbox` to obtain a mock session cookie. This is an intentionally simplified sandbox credential model; it does not assert production supports bearer authentication.
-
-**Coverage policy:** implemented simulations provide deterministic synthetic state and never call real fiscal systems, PostgreSQL, pumps or proxy. Unimplemented `/api/*` endpoints respond with HTTP `501` and `error.code=SANDBOX_NOT_IMPLEMENTED`, never a false successful result. In particular, authorization/control/fiscalization and other high-impact device operations must be explicitly simulated before clients can rely on them. The existing `/v1` compatibility aliases remain available but new partner integrations should target `/api`.
-
-The OpenAPI v1 contract covers the original subset and is **not yet a full machine-readable inventory of the expanded FTC-compatible surface**; for additional methods consult the installed-package [wire contracts](../../manuals/API_WIRE_CONTRACTS.md) until they have verified schemas.
-
-
-## Coverage discovery and deployment credentials
-
-Use `GET /api/sandbox/coverage` with sandbox authorization to inspect the simulated endpoint families. A listed family does **not** imply all its methods are implemented; unsupported routes intentionally return HTTP 501.
-
-For network-facing use, change both default credentials:
-
-```bash
-VPOS_PARTNER_SANDBOX_HOST=0.0.0.0 \\
-VPOS_PARTNER_SANDBOX_PORT=3080 \\
-VPOS_PARTNER_SANDBOX_TOKEN='a-long-random-test-token' \\
-VPOS_PARTNER_SANDBOX_PASSWORD='a-separate-strong-password' \\
-node scripts/partner-api-sandbox.mjs
-```
-
-Keep the hosted sandbox behind HTTPS, ingress authentication/rate limits and a private network or controlled allowlist. Mock login cookies are intentionally not production-grade authentication. Never publish the raw sandbox HTTP port directly to the Internet.
-
-## Swagger UI
-
-Run `npm run partner:sandbox` and open [Swagger UI](http://localhost:3080/api/docs). The machine-readable [OpenAPI JSON](http://localhost:3080/api/openapi.json) is served from the same sandbox.
-
-Swagger UI includes **Try it out** for implemented FTC-compatible `/api` operations. Click **Authorize** and supply the sandbox bearer token (`sandbox-token` on loopback, or your configured value). It uses a hosted Swagger UI 5 browser bundle from unpkg, so the viewer requires access to that CDN; the OpenAPI JSON endpoint itself does not.
-
-Only implemented simulations are included in this interactive spec. Unimplemented operations return HTTP 501 rather than appearing as successful mocks. The older `docs/partner-api/v1/openapi.yaml` describes the original normalized `/v1` subset; the live JSON is the correct contract for the expanded FTC-compatible sandbox.
+**Station**: single site; **TIN**: customer tax ID string; **pumpNumber/nozzleNumber**: physical configured numbers; **nozzleId**: UUID; **displayNumber**: UI number; **allocation**: pre-fuel customer association; **PENDING/CONSUMED/CANCELLED**: allocation lifecycle; **transactionId**: internal transaction UUID; **posReference**: POS-originated reference; **receiptNumber**: fiscal/printing reference, not interchangeable with a transaction ID.
