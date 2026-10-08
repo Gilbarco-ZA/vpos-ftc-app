@@ -15,6 +15,9 @@ copy('scripts/partner-api-compat.mjs', 'partner-api-compat.mjs')
 copy('scripts/partner-api-swagger.mjs', 'partner-api-swagger.mjs')
 copy('docs/partner-api/v1/openapi.yaml', 'openapi.yaml')
 copy('docs/partner-api/v1/README.md', 'README.md')
+copy('docs/partner-api/v1/ENDPOINTS.md', 'ENDPOINTS.md')
+copy('docs/partner-api/v1/DATA_SHAPES.md', 'DATA_SHAPES.md')
+copy('docs/partner-api/v1/EXAMPLES.md', 'EXAMPLES.md')
 
 fs.writeFileSync(
   path.join(out, 'package.json'),
@@ -37,7 +40,7 @@ fs.writeFileSync(
   [
     'FROM node:22-alpine',
     'WORKDIR /app',
-    'COPY package.json server.mjs partner-api-compat.mjs partner-api-swagger.mjs openapi.yaml README.md ./',
+    'COPY package.json server.mjs partner-api-compat.mjs partner-api-swagger.mjs openapi.yaml README.md ENDPOINTS.md DATA_SHAPES.md EXAMPLES.md ./',
     'ENV VPOS_PARTNER_SANDBOX_HOST=0.0.0.0',
     'ENV VPOS_PARTNER_SANDBOX_PORT=3080',
     'EXPOSE 3080',
