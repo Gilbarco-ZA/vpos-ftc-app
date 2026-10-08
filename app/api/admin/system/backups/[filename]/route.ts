@@ -37,8 +37,8 @@ export const GET = defineGetRoute<{ filename: string }>({
 
  
 export const DELETE = defineMutationRoute<
-  { filename: string },
-  { confirmation?: string; csrf_token?: string }
+  { confirmation?: string; csrf_token?: string },
+  { filename: string }
 >({
   roles: ['administrator'],
   handler: async (_req, { params, body, user }) => {
