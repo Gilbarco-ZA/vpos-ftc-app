@@ -6,6 +6,7 @@ import {
   Download,
   HardDriveDownload,
   Trash2,
+  RotateCcw,
 } from 'lucide-react'
 
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
@@ -46,6 +47,8 @@ export const SystemDataManagementPanel = () => {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<'database' | 'full' | 'reset' | null>(null)
   const [confirmation, setConfirmation] = useState('')
+  const [backupAction, setBackupAction] = useState<{ filename: string; action: 'delete' | 'restore' } | null>(null)
+  const [backupPhrase, setBackupPhrase] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -104,6 +107,39 @@ export const SystemDataManagementPanel = () => {
         `${kind === 'full' ? 'Full' : 'Database'} backup created${filename}`,
       )
       await loadBackups()
+    } catch (reason: any) {
+      setError(String(reason?.message || reason))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const submitBackupAction = async () => {
+    if (!backupAction || !csrfToken || busy) return
+    const { filename, action } = backupAction
+    if (backupPhrase !== `${action.toUpperCase()} ${filename}`) return
+    setBusy('reset')
+    setMessage(null)
+    setError(null)
+    try {
+      const response = await fetch(
+        `/api/admin/system/backups/${encodeURIComponent(filename)}${action === 'restore' ? '/restore' : ''}`,
+        {
+          method: action === 'delete' ? 'DELETE' : 'POST',
+          headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+          body: JSON.stringify({ csrf_token: csrfToken, confirmation: backupPhrase }),
+        },
+      )
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok || body?.ok === false) {
+        throw new Error(readError(body, `Backup ${action} failed.`))
+      }
+      setMessage(action === 'restore'
+        ? 'Database restored; application restart requested.'
+        : `Deleted backup ${filename}.`)
+      setBackupAction(null)
+      setBackupPhrase('')
+      if (action === 'delete') await loadBackups()
     } catch (reason: any) {
       setError(String(reason?.message || reason))
     } finally {
@@ -204,11 +240,11 @@ export const SystemDataManagementPanel = () => {
                 <th className="p-2">Type</th>
                 <th className="p-2">Filename</th>
                 <th className="p-2">Size</th>
-                <th className="p-2 text-right">Download</th>
+                <th className="p-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {backups.map((backup) => (
+              {backups.map((backup, index) => (
                 <tr
                   key={backup.filename}
                   className="border-b border-border last:border-b-0"
@@ -231,6 +267,17 @@ export const SystemDataManagementPanel = () => {
                         <Download className="mr-2 h-4 w-4" aria-hidden="true" />
                         Download
                       </a>
+                    </Button>
+                    {backup.kind !== 'full' ? (
+                      <Button variant="ghost" size="sm" disabled={!csrfToken || Boolean(busy)}
+                        onClick={() => { setBackupAction({ filename: backup.filename, action: 'restore' }); setBackupPhrase('') }}>
+                        <RotateCcw className="mr-1 h-4 w-4" aria-hidden="true" />Restore
+                      </Button>
+                    ) : null}
+                    <Button variant="ghost" size="sm" disabled={index === 0 || !csrfToken || Boolean(busy)}
+                      title={index === 0 ? 'Newest backup is protected' : 'Delete older backup'}
+                      onClick={() => { setBackupAction({ filename: backup.filename, action: 'delete' }); setBackupPhrase('') }}>
+                      <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />Delete
                     </Button>
                   </td>
                 </tr>
@@ -259,6 +306,29 @@ export const SystemDataManagementPanel = () => {
           </table>
         </div>
       </Card>
+
+      {backupAction ? (
+        <Card className="space-y-3 border-amber-300 p-4">
+          <h3 className="font-semibold">Confirm backup {backupAction.action}</h3>
+          <p className="text-sm">
+            {backupAction.action === 'restore'
+              ? 'This replaces the active database after creating a safety backup and restarts the application. Use a maintenance window and retain an external copy.'
+              : 'This permanently deletes this older backup. The latest backup remains protected.'}
+          </p>
+          <label className="block text-sm" htmlFor="backup-action-confirmation">
+            Type <code>{`${backupAction.action.toUpperCase()} ${backupAction.filename}`}</code>
+          </label>
+          <Input id="backup-action-confirmation" value={backupPhrase}
+            onChange={(event) => setBackupPhrase(event.target.value)}
+            autoComplete="off" spellCheck={false} />
+          <div className="flex gap-2">
+            <Button variant={backupAction.action === 'delete' ? 'destructive' : 'primary'}
+              disabled={Boolean(busy) || backupPhrase !== `${backupAction.action.toUpperCase()} ${backupAction.filename}`}
+              onClick={() => void submitBackupAction()}>Confirm {backupAction.action}</Button>
+            <Button variant="ghost" onClick={() => { setBackupAction(null); setBackupPhrase('') }}>Cancel</Button>
+          </div>
+        </Card>
+      ) : null}
 
       <Card className="space-y-4 border-red-300 p-4">
         <div>

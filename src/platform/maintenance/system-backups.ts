@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createWriteStream } from 'node:fs'
-import { chmod, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import type { ClientConfig, PoolConfig } from 'pg'
@@ -310,8 +310,8 @@ export const resolveBackupFile = async (filename: string) => {
     safeFilename,
   )
   try {
-    const file = await stat(/*turbopackIgnore: true*/ filePath)
-    if (!file.isFile()) throw new Error('Not a file')
+    const file = await lstat(/*turbopackIgnore: true*/ filePath)
+    if (!file.isFile() || file.isSymbolicLink()) throw new Error('Not a regular file')
   } catch {
     throw new AppError('NOT_FOUND', 'Backup file not found.', 404)
   }
@@ -403,4 +403,85 @@ export const dropApplicationDatabase = async () => {
   }
 
   return { databaseName }
+}
+
+ 
+// Never delete the most recent available backup. Re-evaluate immediately before
+// unlinking to prevent a stale client-side backup list bypassing the rule.
+export const deleteOlderBackup = async (filename: string) => {
+  const target = await resolveBackupFile(filename)
+  const backups = await listBackupFiles()
+  const selected = backups.find((backup) => backup.filename === filename)
+  if (!selected) {
+    throw new AppError('NOT_FOUND', 'Backup file not found.', 404)
+  }
+  const newer = backups.some(
+    (backup) =>
+      backup.filename !== filename &&
+      (Date.parse(backup.createdAt) > Date.parse(selected.createdAt) ||
+        (backup.createdAt === selected.createdAt &&
+          backup.filename > selected.filename)),
+  )
+  if (!newer) {
+    throw new AppError(
+      'VALIDATION_ERROR',
+      'At least one newer backup must exist before deleting this backup.',
+      409,
+    )
+  }
+  const file = await lstat(/*turbopackIgnore: true*/ target)
+  if (!file.isFile() || file.isSymbolicLink()) {
+    throw new AppError('VALIDATION_ERROR', 'Backup must be a regular file.', 400)
+  }
+  await rm(/*turbopackIgnore: true*/ target)
+  return selected
+}
+
+// A database restore only accepts a PostgreSQL custom-format dump.
+// Full ZIP backups require a separate, offline recovery workflow for their
+// persistent filesystem payload; silently restoring only part is unsafe.
+export const restoreDatabaseBackup = async (filename: string) => {
+  if (!/^vpos-ftc-(?:db|pre-reset)-[0-9]{8}-[0-9]{6}\\.dump$/.test(filename)) {
+    throw new AppError(
+      'VALIDATION_ERROR',
+      'In-app restore supports database .dump backups only. Full .zip recovery requires offline restoration of the database and data directory.',
+      400,
+    )
+  }
+  const source = await resolveBackupFile(filename)
+  const sourceInfo = await lstat(/*turbopackIgnore: true*/ source)
+  if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink() || sourceInfo.size < 5) {
+    throw new AppError('VALIDATION_ERROR', 'Invalid database backup file.', 400)
+  }
+  const config = getPostgresPoolConfig()
+  const env = pgEnvironment(config)
+  const restoreBin = process.env.PG_RESTORE_BIN || 'pg_restore'
+  // Validate archive structure before creating a rollback backup.
+  await runCommand(restoreBin, ['--list', source], env)
+  const safetyBackup = await createDatabaseBackup({ preReset: true })
+  await closePool()
+  try {
+    await runCommand(
+      restoreBin,
+      [
+        '--clean',
+        '--if-exists',
+        '--no-owner',
+        '--no-privileges',
+        '--exit-on-error',
+        '--single-transaction',
+        '--dbname', getPostgresDatabaseName(),
+        source,
+      ],
+      env,
+    )
+  } catch (error) {
+    throw new AppError(
+      'INTERNAL_ERROR',
+      'Restore failed. The pre-restore safety backup has been retained; the database may require recovery.',
+      500,
+      { safetyBackup: safetyBackup.filename, cause: String(error) },
+    )
+  }
+  return { filename, safetyBackup }
 }
