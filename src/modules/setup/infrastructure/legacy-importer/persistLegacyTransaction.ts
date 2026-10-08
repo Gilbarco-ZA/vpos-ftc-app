@@ -104,6 +104,10 @@ export async function persistLegacyImportedTransaction(
                 WHEN $5 = 'SUCCESS' THEN COALESCE(fiscalized_at, $6::timestamptz)
                 ELSE fiscalized_at
               END,
+              created_at = CASE
+                WHEN $5 = 'SUCCESS' THEN COALESCE(fiscalized_at, $6::timestamptz)
+                ELSE created_at
+              END,
               updated_at = NOW()
         WHERE station_id = $1::uuid
           AND id = $2::uuid`,
