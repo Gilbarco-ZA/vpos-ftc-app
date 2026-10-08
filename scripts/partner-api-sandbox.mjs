@@ -1,8 +1,9 @@
 import http from 'node:http'
 import { randomUUID } from 'node:crypto'
+import { createCompatibilityApi } from './partner-api-compat.mjs'
 
 const host = process.env.VPOS_PARTNER_SANDBOX_HOST || '127.0.0.1'
-const port = Number(process.env.VPOS_PARTNER_SANDBOX_PORT || 3095)
+const port = Number(process.env.VPOS_PARTNER_SANDBOX_PORT || 3080)
 const token = process.env.VPOS_PARTNER_SANDBOX_TOKEN || 'sandbox-token'
 
 const stationId = '00000000-0000-4000-8000-000000000001'
@@ -91,6 +92,7 @@ const fuelOptions = [
 ]
 
 const allocations = []
+const compatibility = createCompatibilityApi({ customers, transactions, fuelOptions, allocations, stationId, userId })
 
 const send = (res, status, body) => {
   res.writeHead(status, {
@@ -154,8 +156,15 @@ const server = http.createServer(async (req, res) => {
     })
   }
 
+  const publicPaths = new Set(['/api/livez','/api/readyz','/api/healthz','/api/metrics','/api/security/csrf','/api/auth/login'])
+  if (!publicPaths.has(path) && !authOk(req) && req.headers.cookie?.includes('vpos-sandbox-session=1') !== true) {
+    return send(res, 401, fail('Invalid sandbox credentials', 'UNAUTHORIZED'))
+  }
+  if (path.startsWith('/api/')) {
+    try { if (await compatibility.run(req,res,url)) return }
+    catch (error) { return send(res,400,fail(String(error?.message||error))) }
+  }
   if (!path.startsWith('/v1/')) return send(res, 404, fail('Not found', 'NOT_FOUND'))
-  if (!authOk(req)) return send(res, 401, fail('Invalid bearer token', 'UNAUTHORIZED'))
 
   try {
     if (req.method === 'GET' && path === '/v1/customers') {
