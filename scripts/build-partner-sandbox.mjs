@@ -12,6 +12,7 @@ const copy = (source, target) => {
 
 copy('scripts/partner-api-sandbox.mjs', 'server.mjs')
 copy('scripts/partner-api-compat.mjs', 'partner-api-compat.mjs')
+copy('scripts/partner-api-swagger.mjs', 'partner-api-swagger.mjs')
 copy('docs/partner-api/v1/openapi.yaml', 'openapi.yaml')
 copy('docs/partner-api/v1/README.md', 'README.md')
 
@@ -36,7 +37,7 @@ fs.writeFileSync(
   [
     'FROM node:22-alpine',
     'WORKDIR /app',
-    'COPY package.json server.mjs partner-api-compat.mjs openapi.yaml README.md ./',
+    'COPY package.json server.mjs partner-api-compat.mjs partner-api-swagger.mjs openapi.yaml README.md ./',
     'ENV VPOS_PARTNER_SANDBOX_HOST=0.0.0.0',
     'ENV VPOS_PARTNER_SANDBOX_PORT=3080',
     'EXPOSE 3080',
