@@ -33,7 +33,8 @@ test('reporting pagination counts skip receipt joins unless search needs them', 
 })
 
 test('non-search report previews limit transactions before receipt enrichment', () => {
-  assert.match(repository, /FROM \(\s*SELECT t\.\*[\s\S]*LIMIT \$\{limitParam\}[\s\S]*\) t/)
+  assert.match(repository, /FROM \([\s\S]*FROM transactions t[\s\S]*LIMIT \$\{limitParam\}[\s\S]*\) t/)
+  assert.match(repository, /: 't\.\*'/)
   assert.match(repository, /if \(!hasSearch\)/)
   assert.match(repository, /const limitParam = `\$\$\{params\.length \+ 1\}`/)
 })
@@ -127,16 +128,19 @@ test('fiscalized transaction pages keep search and date filters in the server qu
   assert.match(rolePage, /const q = readParam\(searchParams, 'q'\)\.trim\(\)/)
   assert.match(rolePage, /scope: 'fiscalized'/)
   assert.match(rolePage, /search: q \|\| undefined/)
-  assert.match(rolePage, /limit: 100/)
+  assert.match(rolePage, /pageSize,/)
+  assert.match(rolePage, /\[10, 25, 50, 100\]/)
+  assert.match(rolePage, /initialPageSize=\{pageSize\}/)
   assert.match(rolePage, /initialSearch=\{q\}/)
   assert.match(client, /useState\(initialSearch\)/)
   assert.match(
     client,
-    /new URLSearchParams\(\{ scope: 'fiscalized', limit: '100' \}\)/,
+    /scope: 'fiscalized',[\s\S]*page: String\(page\),[\s\S]*pageSize: String\(pageSize\)/,
   )
   assert.match(client, /params\.set\('search', search\.trim\(\)\)/)
   assert.match(client, /params\.set\('startDate', startDate\)/)
   assert.match(client, /params\.set\('endDate', endDate\)/)
+  assert.match(client, /setTotal\(Number\(payload\?\.total/)
 })
 
 test('exact transaction status filters use index-friendly equality predicates', () => {
@@ -215,4 +219,27 @@ test('fiscalized client does not repeat the server browse query immediately on m
     client,
     /if \(!hasMountedRef\.current\)[\s\S]*hasMountedRef\.current = true[\s\S]*if \(!error\) return/,
   )
+})
+
+test('fiscalized pagination narrows the transaction projection before receipt enrichment', () => {
+  assert.match(repository, /const fiscalizedColumnsSql =/)
+  const projection = repository.match(/const fiscalizedColumnsSql = `([\s\S]*?)`/)?.[1]
+  assert.ok(projection)
+  assert.doesNotMatch(projection, /t\.\*/)
+  assert.doesNotMatch(projection, /doms_payload_json|fiscalization_response/)
+  assert.match(repository, /if \(fiscalized && !hasSearch\)/)
+  assert.match(repository, /FROM \([\s\S]*SELECT t\.id, t\.station_id[\s\S]*LIMIT \$\{params\.length \+ 1\} OFFSET \$\{params\.length \+ 2\}/)
+  assert.match(repository, /const countFromSql = hasSearch \? fromSql : 'FROM transactions t'/)
+})
+
+test('fiscalized manager and admin grids expose page size and navigation', () => {
+  const manager = readFileSync('components/transactions/FiscalizedTransactionsManagerClient.tsx', 'utf8')
+  const client = readFileSync('components/transactions/FiscalizedTransactionsPageClient.tsx', 'utf8')
+  for (const source of [manager, client]) {
+    assert.match(source, /Rows per page/)
+    assert.match(source, /10, 25, 50, 100/)
+    assert.match(source, /Previous/)
+    assert.match(source, /Next/)
+  }
+  assert.match(client, /setPage\(1\)/)
 })
