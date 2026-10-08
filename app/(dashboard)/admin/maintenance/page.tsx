@@ -1,6 +1,7 @@
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { getAdminForecourtSyncStatus } from '@/src/modules/forecourt/application/getAdminForecourtSyncStatus'
+import { api } from '@/src/shared/api/fetch'
 import { requireAuth } from '@/src/shared/auth'
 
 import { MaintenanceClient } from './MaintenanceClient'
@@ -11,7 +12,11 @@ const AdminMaintenancePage = async () => {
   const user = await requireAuth(['administrator'])
   if (user.role !== 'administrator') redirect('/dashboard')
 
-  const forecourtStatus = { data: await getAdminForecourtSyncStatus(user.stationId) }
+  const cookieHeader = (await headers()).get('cookie') || ''
+  const forecourtStatus = await api('/api/admin/forecourt-sync/status', {
+    cache: 'no-store',
+    headers: { cookie: cookieHeader },
+  })
 
   return <MaintenanceClient forecourtStatus={forecourtStatus} />
 }
