@@ -1,6 +1,7 @@
 import http from 'node:http'
 import { randomUUID } from 'node:crypto'
 import { createCompatibilityApi } from './partner-api-compat.mjs'
+import { swaggerDocument, swaggerHtml } from './partner-api-swagger.mjs'
 
 const host = process.env.VPOS_PARTNER_SANDBOX_HOST || '127.0.0.1'
 const port = Number(process.env.VPOS_PARTNER_SANDBOX_PORT || 3080)
@@ -150,6 +151,13 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || host}`)
   const path = url.pathname
 
+  if (req.method === 'GET' && path === '/api/docs') {
+    res.writeHead(200, {'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'})
+    return res.end(swaggerHtml)
+  }
+  if (req.method === 'GET' && path === '/api/openapi.json') {
+    return send(res, 200, swaggerDocument)
+  }
   if (req.method === 'GET' && path === '/v1/health') {
     return send(res, 200, {
       ok: true,
