@@ -4,6 +4,9 @@
 **Audience:** developers integrating against an installed VPOS FTC package without repository/source access.  
 **Baseline:** `vpos-ftc-app` `3058ac6bc63073556dfd3d41d7869ab181773d6c` on 2026-09-08.
 
+
+> **Third-party integrations:** build against the versioned [Partner API v1](../partner-api/v1/README.md) and its [OpenAPI contract](../partner-api/v1/openapi.yaml). The installed-package contracts below document internal/current wire behaviour and are not, by themselves, a stability promise for partners.
+
 ## 1. Which document is authoritative for request/response code?
 
 Use this wire-contract reference and its linked contract files when writing HTTP client models.
