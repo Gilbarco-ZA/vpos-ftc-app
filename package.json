@@ -10,6 +10,7 @@
     "dev": "next dev",
     "dev:forecourt": "tsx server/index.ts",
     "partner:sandbox": "node scripts/partner-api-sandbox.mjs",
+    "partner:sandbox:package": "node scripts/build-partner-sandbox.mjs",
     "build": "next build && npm run server:gen",
     "start": "node start.cjs -p 3080",
     "start:next": "next start",
