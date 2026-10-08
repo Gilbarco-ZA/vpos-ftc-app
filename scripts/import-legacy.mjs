@@ -305,6 +305,7 @@ const importTransactionFile = async (
 			    SET latest_fiscal_event_id = $3,
 			        fiscalization_response = $4,
 			        fiscalized_at = CASE WHEN $5 = 'SUCCESS' THEN $6 ELSE fiscalized_at END,
+			        created_at = CASE WHEN $5 = 'SUCCESS' THEN COALESCE(fiscalized_at, $6::timestamptz) ELSE created_at END,
 			        updated_at = NOW()
 			  WHERE station_id = $1 AND id = $2`,
 			[
