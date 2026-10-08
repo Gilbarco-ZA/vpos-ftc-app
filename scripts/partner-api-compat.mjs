@@ -42,6 +42,13 @@ export const createCompatibilityApi = ({customers,transactions,fuelOptions,alloc
   const statusByPath=['/api/transactions/send-now','/api/transactions/','/api/pos/','/api/doms/','/api/control/','/api/terminal/','/api/runtime/','/api/admin/']
   const run=async(req,res,url)=>{
     const path=url.pathname, method=req.method, query=url.searchParams
+    if(method==='GET' && path==='/api/sandbox/coverage'){
+      respond(res,200,ok({baseUrl:'/api',mode:'synthetic',fullySimulated:false,
+        families:['health','auth','customers','transactions','pre-fuel-customer','fuel-options','products','product-categories','stock','reports','receipts-list','settings','pumps-read','tanks-read','pump-mode','proxy-config-read'],
+        unsupportedStatus:501,unsupportedCode:'SANDBOX_NOT_IMPLEMENTED',
+        warning:'This is a partial FTC wire simulator. Unsupported operations never forward to production.'}))
+      return true
+    }
     if(method==='GET' && path==='/api/livez'){respond(res,200,{ok:true,success:true,status:'running'});return true}
     if(method==='GET' && (path==='/api/readyz'||path==='/api/healthz')){
       const health={ok:true,components:{db:{ok:true},jpl:{configured:false,ok:true},ligo:{configured:false,ok:true},namos:{configured:false,ok:true},ppx:{configured:false,ok:true},proxyFiscalization:{configured:false,ok:true},archiveExporters:{configured:false,ok:true,destinations:[]},printer:{configured:false,ok:true},workers:{configured:true,ok:true,required:[],missing:[],stale:[],maxAgeMs:20000}}}
