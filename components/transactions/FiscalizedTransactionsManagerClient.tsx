@@ -62,6 +62,10 @@ export default function FiscalizedTransactionsManagerClient(props: {
   prevHref: string
   nextHref: string
   decimals: DecimalSettings
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -292,13 +296,34 @@ export default function FiscalizedTransactionsManagerClient(props: {
           </TableBody>
         </Table>
 
-        <div className="flex items-center justify-between px-4 py-3 text-sm">
-          <Button asChild variant="secondary" size="sm">
-            <Link href={props.prevHref}>Previous</Link>
-          </Button>
-          <Button asChild variant="secondary" size="sm">
-            <Link href={props.nextHref}>Next</Link>
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+          <label className="flex items-center gap-2">
+            Rows per page
+            <select
+              aria-label="Rows per page"
+              className="rounded border border-border bg-surface-card px-2 py-1"
+              value={props.pageSize}
+              onChange={(event) => {
+                const params = new URLSearchParams(currentSearchParams.toString())
+                params.set('pageSize', event.target.value)
+                params.set('page', '1')
+                router.push(`${pathname}?${params.toString()}`)
+              }}
+            >
+              {[10, 25, 50, 100].map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </label>
+          <span>Page {props.page} of {Math.max(1, props.totalPages)} · {props.total} results</span>
+          <div className="flex gap-2">
+            <Button asChild variant="secondary" size="sm" disabled={props.page <= 1}>
+              <Link href={props.prevHref} aria-disabled={props.page <= 1} tabIndex={props.page <= 1 ? -1 : undefined}>Previous</Link>
+            </Button>
+            <Button asChild variant="secondary" size="sm" disabled={props.page >= props.totalPages}>
+              <Link href={props.nextHref} aria-disabled={props.page >= props.totalPages} tabIndex={props.page >= props.totalPages ? -1 : undefined}>Next</Link>
+            </Button>
+          </div>
         </div>
       </Card>
 
