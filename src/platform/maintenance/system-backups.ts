@@ -310,8 +310,8 @@ export const resolveBackupFile = async (filename: string) => {
     safeFilename,
   )
   try {
-    const file = await stat(/*turbopackIgnore: true*/ filePath)
-    if (!file.isFile()) throw new Error('Not a file')
+    const file = await lstat(/*turbopackIgnore: true*/ filePath)
+    if (!file.isFile() || file.isSymbolicLink()) throw new Error('Not a regular file')
   } catch {
     throw new AppError('NOT_FOUND', 'Backup file not found.', 404)
   }
