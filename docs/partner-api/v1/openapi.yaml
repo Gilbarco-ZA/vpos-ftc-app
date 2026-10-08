@@ -1,3 +1,6 @@
+# LEGACY COMPATIBILITY CONTRACT ONLY
+# This OpenAPI describes the older normalized /v1 API and is NOT the FTC-style /api sandbox.
+# For the current sandbox use GET /api/openapi.json and docs/partner-api/v1/README.md.
 openapi: 3.1.0
 info:
   title: VPOS FTC Partner API
