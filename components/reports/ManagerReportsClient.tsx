@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 
 import { applyDateRangeParams } from '@/src/shared/crud/filters'
+import { formatDate } from '@/src/shared/utils/dates'
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
 import { PageHeader } from '@/components/layout/page-header'
@@ -370,7 +371,7 @@ export function ManagerReportsClient({
                   rows.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>
-                        {r.timestamp || r.transaction_date_time || '—'}
+                        {formatDate(r.timestamp || r.transaction_date_time)}
                       </TableCell>
                       <TableCell>{r.pump_number ?? '—'}</TableCell>
                       <TableCell>{r.fuel_type ?? '—'}</TableCell>
