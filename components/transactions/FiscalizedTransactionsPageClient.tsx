@@ -58,6 +58,9 @@ export type { FiscalizedTransactionListItem }
 
 type FiscalizedTransactionsPageClientProps = {
   initialTransactions: FiscalizedTransactionListItem[]
+  initialPage?: number
+  initialPageSize?: number
+  initialTotal?: number
   error?: string | null
   decimals: DecimalSettings
   initialSearch?: string
@@ -243,6 +246,9 @@ const FiscalStatusSheet = ({
 
 const FiscalizedTransactionsPageClient = ({
   initialTransactions,
+  initialPage = 1,
+  initialPageSize = 50,
+  initialTotal = 0,
   error,
   decimals,
   initialSearch = '',
@@ -258,6 +264,9 @@ const FiscalizedTransactionsPageClient = ({
     [searchParams],
   )
   const [transactions, setTransactions] = useState(initialTransactions)
+  const [page, setPage] = useState(initialPage)
+  const [pageSize, setPageSize] = useState(initialPageSize)
+  const [total, setTotal] = useState(initialTotal)
   const [loadError, setLoadError] = useState<unknown>(error ?? null)
   const [loading, setLoading] = useState(false)
   const [csrfToken, setCsrfToken] = useState('')
@@ -318,7 +327,11 @@ const FiscalizedTransactionsPageClient = ({
     setLoading(true)
     setLoadError(null)
     try {
-      const params = new URLSearchParams({ scope: 'fiscalized', limit: '100' })
+      const params = new URLSearchParams({
+        scope: 'fiscalized',
+        page: String(page),
+        pageSize: String(pageSize),
+      })
       if (search.trim()) params.set('search', search.trim())
       if (customer.trim()) params.set('customer', customer.trim())
       if (fuelType) params.set('fuel', fuelType)
@@ -359,12 +372,13 @@ const FiscalizedTransactionsPageClient = ({
         }),
       )
       setTransactions(mapped)
+      setTotal(Number(payload?.total ?? mapped.length))
     } catch (err: unknown) {
       setLoadError(err)
     } finally {
       setLoading(false)
     }
-  }, [search, customer, fuelType, startDate, endDate])
+  }, [search, customer, fuelType, startDate, endDate, page, pageSize])
 
   useEffect(() => {
     if (!hasMountedRef.current) {
@@ -709,6 +723,27 @@ const FiscalizedTransactionsPageClient = ({
           </div>
         </div>
       )}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface-card px-4 py-3 text-sm">
+        <label className="flex items-center gap-2">
+          Rows per page
+          <select
+            aria-label="Rows per page"
+            value={pageSize}
+            onChange={(event) => {
+              setPageSize(Number(event.target.value))
+              setPage(1)
+            }}
+            className="rounded border border-border bg-surface-card px-2 py-1"
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </label>
+        <span>Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {total} results</span>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" disabled={loading || page <= 1} onClick={() => setPage((n) => Math.max(1, n - 1))}>Previous</Button>
+          <Button variant="secondary" size="sm" disabled={loading || page * pageSize >= total} onClick={() => setPage((n) => n + 1)}>Next</Button>
+        </div>
+      </div>
       <ToastViewport>
         {toasts.map((toast) => (
           <ToastItem key={toast.id} variant={toast.variant}>
