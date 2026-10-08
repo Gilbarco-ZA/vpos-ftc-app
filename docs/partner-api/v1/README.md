@@ -142,3 +142,11 @@ node scripts/partner-api-sandbox.mjs
 ```
 
 Keep the hosted sandbox behind HTTPS, ingress authentication/rate limits and a private network or controlled allowlist. Mock login cookies are intentionally not production-grade authentication. Never publish the raw sandbox HTTP port directly to the Internet.
+
+## Swagger UI
+
+Run `npm run partner:sandbox` and open [Swagger UI](http://localhost:3080/api/docs). The machine-readable [OpenAPI JSON](http://localhost:3080/api/openapi.json) is served from the same sandbox.
+
+Swagger UI includes **Try it out** for implemented FTC-compatible `/api` operations. Click **Authorize** and supply the sandbox bearer token (`sandbox-token` on loopback, or your configured value). It uses a hosted Swagger UI 5 browser bundle from unpkg, so the viewer requires access to that CDN; the OpenAPI JSON endpoint itself does not.
+
+Only implemented simulations are included in this interactive spec. Unimplemented operations return HTTP 501 rather than appearing as successful mocks. The older `docs/partner-api/v1/openapi.yaml` describes the original normalized `/v1` subset; the live JSON is the correct contract for the expanded FTC-compatible sandbox.
