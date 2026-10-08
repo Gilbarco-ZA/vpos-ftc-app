@@ -1,7 +1,20 @@
-# VPOS FTC - packaged release archive
-# Historical releases only. New/unreleased changes belong in .config/changelog.log.
-# Format: release ID followed by release notes; fnez-changelog appends new releases here.
+VPOS FTC - RELEASE CHANGELOG ARCHIVE
+==================================
+Product: PSS 5000 GVR VPOS FTC
+Package: 472-22
+Purpose: Published release history. The active, unreleased change list is
+         maintained in .config/changelog.log.
 
+ARCHIVE POLICY
+--------------
+- Release IDs are preserved for compatibility with mono-package-mgr.
+- The latest release is appended at the end; entries are not duplicated.
+- Commit references identify the original implementation work.
+- Earlier entries may contain less detail because the source records were brief.
+- Grouping and summaries are editorial; they do not imply additional testing.
+
+HISTORICAL RELEASES (original records)
+--------------------------------------
 47210000t004
 - autostart on doms without ssh access needed.
 - redirect in admin route removed
@@ -27,109 +40,133 @@
 47210000t009
 - i18n applied
 
-  47222001t044
-Release date: 2026-10-08
-Release version: 0.1.44
-Scope: Cumulative changes since v0.1.0 (as listed in the published release document)
+========================================================================
+RELEASE 0.1.44 | DOMS 47222001t044 | 2026-10-08
+========================================================================
+Status: Published
+Baseline: Cumulative release history since 0.1.0
+Package date: 2026-10-08 10:28:56 (timezone not specified)
+Package dependencies: 90005102, 79961133, 46701120
 
-Fiscalization, Tanzania and receipts:
-- transaction pagination fix (9c2e472f)
-- Update 1341_fiscalized_reporting_browse_indexes.sql (547284f3)
-- Grant field engineers scoped transaction access (1b6b3823)
-- fiscalized browsing dedicated indexes added (b6050250)
-- revert pkg settings (d5b51587)
-- Update reportingQueryResilience.test.mjs (242bb65b)
-- transaction hardening (235a501e)
-- manager role update on dashboard and transactions (92143c72)
-- centralized date time setup (3f84f56e)
-- fiscal time update (bc8deff7)
-- print receipt time fix (aee65938)
-- printer hardware failure bypass added (d69442f0)
-- customer capture update (bed77697)
+RELEASE HIGHLIGHTS
+------------------
+- Strengthened fuel transaction fiscalization and Tanzania-specific compliance workflows.
+- Improved DOMS/JPL fuel pricing, product synchronization, and tank reporting.
+- Improved receipt presentation, printing reliability, and local time handling.
+- Improved reporting performance, transaction access, and PostgreSQL outage handling.
+- Hardened runtime stability, deployment, and administrative maintenance.
+
+DETAILED CHANGES
+----------------
+
+Fiscalization, Tanzania compliance and transaction lifecycle
+------------------------------------------------------------
+- Preserve original timestamps when importing historic fiscalized transactions (7b98742f)
+- Use receipt numbers on transactions and recover stuck fiscalization (de3dc0b3)
+- Add configurable receipt and TIN capture ordering (836e34ca)
+- Transaction workflow Update (b2585c35)
 - Fix Tanzania assignment counter scope (cee4338f)
 - Fix Tanzania receipt prefix migration ordering (77f64318)
 - Update Tanzania receipt verification (f5b62e09)
 - Fix TIN allocation roles and DOMS authorization state (796a366a)
-- Add tenant TIN allocation pump board. (7a7ae898)
-- Transaction workflow Update (b2585c35)
-- Add configurable receipt and TIN capture ordering (836e34ca)
-- Use receipt numbers on transactions and recover stuck fiscalization (de3dc0b3)
+- Add tenant TIN allocation pump board (7a7ae898)
 - Print Tanzania receipts when TRA is offline (2ecc0575)
-- Guard Tanzania receipt viewer DOMS price fallback (6763791d)
-- Logout Redirect Fix & Customer Capture Update (0f4aeed6)
-- Move storage retention to station settings (2f71cf51)
-- printing and receipt fix (d761b7f7)
-- physical receipt alignment update (876c5d92)
-- QR code update (dee22454)
-- Transaction preview default set to today (19db1431)
-- print receipt update (3cd8da69)
 - Tanzania receipt prefix selection (e3f79142)
 - Cleaned up Tanzania daily-total setup warnings (5e28dfb1)
-- tank reporting update (9e335694)
-- DOMS transaction capture unsolicited ownership fix (a22f8dff)
 - Add tax_code and tax_rate to transaction lines and update related logic (a96e92eb)
-- Refactor SCU ID extraction logic in receipt processing functions (5fc8b4af)
 - Update transaction query (b467abe6)
+- Transaction hardening (235a501e)
+- DOMS transaction capture unsolicited ownership fix (a22f8dff)
+
+Transactions, reporting, access and data resilience
+---------------------------------------------------
+- Improve transaction browsing and pagination (9c2e472f)
+- Update fiscalized reporting browse-index migration (547284f3)
+- Grant field engineers scoped transaction access (1b6b3823)
+- Fiscalized browsing dedicated indexes added (b6050250)
+- Update reporting query resilience tests (242bb65b)
+- Reports hardening (f1bfe170)
+- Manager role update on dashboard and transactions (92143c72)
+- Dashboard status update (f4ec8e49)
+- Recoverable PostgreSQL outages map to retryable 503 responses (f046ee45)
+- API guide update (b782a120)
+- Transaction preview default set to today (19db1431)
+
+Forecourt, DOMS/JPL and fuel pricing
+------------------------------------
+- DOMS acceptance and effective local price sync (e037cd02)
+- Update DOMS/JPL command handling (6057b8c2)
+- Update JPL ACL1 variant handling (2aa955a6)
+- DOMS POS mode none fix on fuel price update (434750fc)
+- Cloud pricing fix (f5d730b1)
+- Fuel price update (5f1fd647)
+- Product update + SignalR connection update (e4856f7f)
+- Product sync fix (90ca5f12)
+- ATG and fuel price update (ee6ef688)
+- Tank internal error resolve (d6f2c88f)
+- Tank gauge update (f0cc1482)
+- Fuel price cycle update (54b3cdb8)
+- Fuel price worker simplified (195120fc)
+- Refactor POS DOMS command execution (05f47416)
+- Fuel price update over vpos cloud init (721ff4ad)
+- APC1 unavailable error fix (b07619a6)
+- Pricing update (0917e3a8)
+- ATG History Patch (6895d341)
+- PSS update and tz prefix update (1a04c138)
+- Solicited request gate hardening (80abddcd)
+- Forecourt stability (846015e8)
+- Decimal fix for price update (b5fdd955)
+- Tank reporting update (9e335694)
+
+Receipts, printing, customers and timestamps
+--------------------------------------------
+- Centralized date time setup (3f84f56e)
+- Time-zone fix (4055b28b)
+- Fiscal time update (bc8deff7)
+- Improve displayed date and time formatting (e04827ba)
+- Print receipt time fix (aee65938)
+- Printer hardware failure bypass added (d69442f0)
+- Alert auto-close (61693813)
+- Added print connectivity worker (87c0c69a)
+- Customer capture update (bed77697)
+- Guard Tanzania receipt viewer DOMS price fallback (6763791d)
+- Logout Redirect Fix & Customer Capture Update (0f4aeed6)
+- Printing and receipt fix (d761b7f7)
+- Add PNG rendering dependency (1ec5cb9b)
+- Physical receipt alignment update (876c5d92)
+- TZ customer type update (4269d2f7)
+- QR code update (dee22454)
+- Print receipt update (3cd8da69)
+- Refactor SCU ID extraction logic in receipt processing functions (5fc8b4af)
 - Refresh old receipts (af095860)
 - Update receipt to include SKU + Product code (8a1493a3)
 
-Forecourt, DOMS, fuel prices and products:
-- DOMS acceptance and effective local price sync (e037cd02)
-- jpl acl1 variant update (2aa955a6)
-- doms pos mode none fix on fuel price update (434750fc)
-- cloud pricing fix (f5d730b1)
-- fuel price update (5f1fd647)
-- product update + signalR connection update (e4856f7f)
-- product sync fix (90ca5f12)
-- atg and fuel price update (ee6ef688)
-- tank internal error resolve (d6f2c88f)
-- tank gauge update (f0cc1482)
-- fuel price cycle update (54b3cdb8)
-- fuel price worker simplified (195120fc)
-- Refactor POS DOMS command execution (05f47416)
-- fuel price update over vpos cloud init (721ff4ad)
-- APC1 unavailable error fix (b07619a6)
-- pricing update (0917e3a8)
-- ATG History Patch (6895d341)
-- pss update and tz prefix update (1a04c138)
-- solicited request gate hardening (80abddcd)
-- forecourt stability (846015e8)
-
-Reporting, queries and permissions:
-- reports hardening (f1bfe170)
-- dashboard status update (f4ec8e49)
-
-Runtime, deployment and reliability:
-- signalR url update (7ae1bb7d)
-- connection timeout fix (fee57271)
-- opkgArchitecture (1c13b270)
-- Update azure-pipelines.yml (35a5dbab)
-- install hardening (7df54120)
-- recoverable PostgreSQL outages map to retryable 503 responses (f046ee45)
-- start debugging check (60bed024)
-- fail test fix (18c5ef38)
-- Update start.cjs (cf291c63)
-- build error resolved (62b8f1bb)
-- alert auto-close (61693813)
-- added print connectivity worker (87c0c69a)
-- package update (dba0c5a3)
+Operations, deployment and maintenance
+--------------------------------------
+- Improve database backup and restore management (41324575)
+- Introduce third-party API simulator (fa1bf3d0)
+- SignalR url update (7ae1bb7d)
+- Connection timeout fix (fee57271)
+- Revert package settings changes (d5b51587)
+- OpkgArchitecture (1c13b270)
+- Update Azure packaging pipeline (35a5dbab)
+- Update application packaging configuration (463e8baa)
+- Install hardening (7df54120)
+- Start debugging check (60bed024)
+- Code standardized (3a994822)
+- Resolve failing tests (18c5ef38)
+- Update application launcher (cf291c63)
+- Resolve build failure (62b8f1bb)
+- Update package dependencies and configuration (dba0c5a3)
 - Queue workers process pressure aware fix (2d531ac4)
 - Host resolution (adf2bdf7)
+- Increment application patch version (5a9b6ce6)
+- Move storage retention to station settings (2f71cf51)
+- Stabilize Tanzania implementation (0ca160ed)
 
-Configuration, API and maintenance:
-- Database backup/restore improvement (41324575)
-- 3rd party simulator implemented (fa1bf3d0)
-- decimal fix for price update (b5fdd955)
-- Update commands.ts (6057b8c2)
-- Update config.js (463e8baa)
-- code standardized (3a994822)
-- time-zone fix (4055b28b)
-- date time format (e04827ba)
-- api guide update (b782a120)
-- pngjs added (1ec5cb9b)
-- TZ customer type update (4269d2f7)
-- stable update with TZ (0ca160ed)
-- increment patch (5a9b6ce6)
-
-Other changes:
-- legacy import created_at fix (7b98742f)
+RELEASE NOTES
+-------------
+This entry retains the 90 unique changes supplied by the original 0.1.44
+software release document. The source document described these cumulatively
+as "Changes since v0.1.0"; they should not be interpreted as 0.1.43-only
+differences. Older releases above are preserved from the original archive.
