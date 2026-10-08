@@ -491,7 +491,7 @@ export async function listReceiptRouteRows(
          ON c.id = t.customer_id AND c.station_id = t.station_id
       WHERE ${conditions.join(' AND ')}
       ORDER BY r.generated_at DESC, r.id DESC
-      LIMIT ${addParam(pageSize)} OFFSET ${addParam(offset)}`
+      LIMIT ${addParam(pageSize)} OFFSET ${addParam(offset)}`,
     params,
   )
   return { items: rows.map((row) => resolveReceiptRowContent(row)), total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
