@@ -125,3 +125,20 @@ Use `Authorization: Bearer sandbox-token` for synthetic test access, or log in w
 **Coverage policy:** implemented simulations provide deterministic synthetic state and never call real fiscal systems, PostgreSQL, pumps or proxy. Unimplemented `/api/*` endpoints respond with HTTP `501` and `error.code=SANDBOX_NOT_IMPLEMENTED`, never a false successful result. In particular, authorization/control/fiscalization and other high-impact device operations must be explicitly simulated before clients can rely on them. The existing `/v1` compatibility aliases remain available but new partner integrations should target `/api`.
 
 The OpenAPI v1 contract covers the original subset and is **not yet a full machine-readable inventory of the expanded FTC-compatible surface**; for additional methods consult the installed-package [wire contracts](../../manuals/API_WIRE_CONTRACTS.md) until they have verified schemas.
+
+
+## Coverage discovery and deployment credentials
+
+Use `GET /api/sandbox/coverage` with sandbox authorization to inspect the simulated endpoint families. A listed family does **not** imply all its methods are implemented; unsupported routes intentionally return HTTP 501.
+
+For network-facing use, change both default credentials:
+
+```bash
+VPOS_PARTNER_SANDBOX_HOST=0.0.0.0 \\
+VPOS_PARTNER_SANDBOX_PORT=3080 \\
+VPOS_PARTNER_SANDBOX_TOKEN='a-long-random-test-token' \\
+VPOS_PARTNER_SANDBOX_PASSWORD='a-separate-strong-password' \\
+node scripts/partner-api-sandbox.mjs
+```
+
+Keep the hosted sandbox behind HTTPS, ingress authentication/rate limits and a private network or controlled allowlist. Mock login cookies are intentionally not production-grade authentication. Never publish the raw sandbox HTTP port directly to the Internet.
