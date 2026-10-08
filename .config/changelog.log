@@ -1,0 +1,9 @@
+VPOS FTC 0.1.45 - Unreleased changes
+Changes since 0.1.44
+
+Reporting and date/time:
+- Display transaction timestamps on the Reports page as readable local date and time instead of raw UTC values (aab54214).
+
+Release notes:
+- Prepared a categorized historical release archive for clearer auditability and ongoing changelog generation (232f869e).
+
