@@ -140,6 +140,59 @@ interface CustomerPage {
 
 `pageSize` defaults to `20` and is clamped to `10..100`.
 
+
+### 1.5 RawCustomerRow
+
+Legacy/search endpoints that explicitly return a `RawCustomerRow` use the stored PostgreSQL field names below. These names are part of that endpoint's wire contract; do not camel-case them automatically.
+
+```ts
+interface RawCustomerRow {
+  id: string
+  station_id: string
+  last_station_id: string | null
+  last_seen_at: string | null
+  tin: string
+  country: string | null
+  buyer_name: string
+  buyer_type: string | null
+  pin: string | null
+  passport_number: string | null
+  business_name: string | null
+  tax_ninbrn: string | null
+  address_street: string | null
+  address_city: string | null
+  address_state: string | null
+  address_province: string | null
+  address_postal_code: string | null
+  address_country_code: string | null
+  contact_phone: string | null
+  contact_mobile: string | null
+  contact_fax: string | null
+  contact_email: string | null
+  contact_website: string | null
+  contact_person: string | null
+  odometer: string | null
+  vehicle_reg_nr: string | null
+  payment_type: string | null
+  is_anonymous: boolean
+  cloud_customer_id: string | null
+  imported_from_cloud: boolean
+  imported_at: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+```
+
+Field semantics:
+
+- `station_id`: station that owns the local customer row.
+- `last_station_id` / `last_seen_at`: most recent station association and observation time.
+- `tin`: tax/customer identifier used by VPOS customer lookup.
+- `buyer_name`: legal/display buyer name.
+- `payment_type`: last/default payment classification when present.
+- `deleted_at`: non-null means the record is soft-deleted.
+
 ## 2. Customer endpoints
 
 ### 2.1 `GET /api/customers`
@@ -456,6 +509,57 @@ interface FuelSelectionResult {
 }
 ```
 
+
+### 3.6 RawTransactionRow
+
+`RawTransactionRow` is the transaction-table portion of `TransactionListRow`: it contains the same snake_case transaction columns documented in §3.2, but not list-only joined properties such as `receipt_number`, `buyer_name`, `tin`, or `customer_*`.
+
+### 3.7 RawTransactionLine
+
+```ts
+interface RawTransactionLine {
+  id: string
+  transaction_id: string
+  product_id: string
+  quantity: number | string
+  unit_price: number | string
+  price_slice_id: string | null
+  created_at: string
+  updated_at: string
+}
+```
+
+- `quantity`: sold quantity; PostgreSQL `NUMERIC(10,3)`.
+- `unit_price`: unit selling price; PostgreSQL `NUMERIC(14,2)`.
+- `price_slice_id`: optional reference to the price slice used when the line was priced.
+- Raw numeric values may serialize as strings; decimal-safe clients should normalize them explicitly.
+
+### 3.8 RawTransactionQueueRow
+
+```ts
+interface RawTransactionQueueRow {
+  id: string
+  station_id: string
+  transaction_id: string | null
+  status: string
+  payload: unknown
+  retry_count: number
+  next_attempt_at: string | null
+  last_error: string | null
+  processing_started_at: string | null
+  created_at: string
+  updated_at: string
+  legacy_source_key?: string | null
+}
+```
+
+Queue semantics:
+
+- `status`: current delivery/fiscalization queue state. Treat unrecognised future values as opaque strings unless an endpoint documents a closed enum.
+- `payload`: implementation-owned JSON snapshot used by the fiscalization workflow. It is deliberately `unknown` to external clients.
+- `retry_count`, `next_attempt_at`, `last_error`: retry diagnostics, not an instruction for clients to replay a fiscal write.
+- `processing_started_at`: non-null while/after a worker has claimed processing.
+
 ## 4. Transaction endpoints
 
 ### 4.1 `GET /api/transactions`
@@ -745,6 +849,48 @@ If `customer.id` is not supplied, the route resolves the transaction's current c
 The success data is the country fiscalization workflow result. Its nested fiscal/proxy payload is country-specific; clients should use the receipt and transaction status endpoints for a normalized cross-country representation unless their integration contract explicitly targets the fiscal engine payload.
 
 ### 4.10 `GET /api/transactions/pre-fuel-customer`
+
+
+#### RawPreFuelAllocation
+
+```ts
+type PreFuelAllocationStatus = 'PENDING' | 'CONSUMED' | 'CANCELLED'
+
+interface RawPreFuelAllocation {
+  id: string
+  station_id: string
+  pump_number: number
+  nozzle_id: string | null
+  nozzle_number: number
+  display_number?: number | null
+  customer_id: string
+  allocated_by: string | null
+  status: PreFuelAllocationStatus
+  transaction_id: string | null
+  consumed_at?: string | null
+  cancelled_at?: string | null
+  created_at: string
+  updated_at?: string
+  buyer_name?: string | null
+  tin?: string | null
+}
+```
+
+Field semantics:
+
+- `id`: allocation identifier. Supply this as `allocationId` for `cancel` or `authorize`.
+- `pump_number`: physical forecourt pump number.
+- `nozzle_number`: configured nozzle number used for matching the eventual pump transaction.
+- `display_number`: UI-facing nozzle number when configured; otherwise the API can fall back to `nozzle_number`.
+- `customer_id`: customer selected before fueling.
+- `allocated_by`: user that created the allocation, or `null` when unavailable.
+- `status=PENDING`: waiting for a matching fuel transaction.
+- `status=CONSUMED`: matched to `transaction_id`; `consumed_at` records when it was consumed.
+- `status=CANCELLED`: allocation was explicitly cancelled or expired; `cancelled_at` records when.
+- `buyer_name` and `tin`: joined convenience fields present on pending-list/read responses; clients must tolerate them being absent on mutation responses.
+- `created_at` is the start of the configured linking window. Expired pending allocations can be changed to `CANCELLED` as part of a state read.
+
+
 
 **Access:** tenant, manager, administrator.
 
