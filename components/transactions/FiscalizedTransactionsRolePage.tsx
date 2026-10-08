@@ -95,6 +95,10 @@ const AdminFiscalizedView = async ({
   if (!['administrator', 'manager', 'field_engineer'].includes(user.role)) redirect('/dashboard')
 
   let rows: FiscalizedTransactionListItem[] = []
+  let total = 0
+  const page = Math.max(1, Number(readParam(searchParams, 'page') || '1') || 1)
+  const requestedPageSize = Number(readParam(searchParams, 'pageSize') || '50')
+  const pageSize = [10, 25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
   let error: string | null = null
   const q = readParam(searchParams, 'q').trim()
   const [decimals, businessDate] = await Promise.all([
@@ -113,12 +117,14 @@ const AdminFiscalizedView = async ({
   try {
     const list = await listTransactions(user.stationId, {
       scope: 'fiscalized',
-      limit: 100,
+      page,
+      pageSize,
       search: q || undefined,
       startDate: dateFilter.startDate || undefined,
       endDate: dateFilter.endDate || undefined,
     })
     rows = normalizeAdminRows(Array.isArray(list?.items) ? list.items : [])
+    total = Number(list?.total ?? rows.length)
   } catch (err: any) {
     error = err?.message ?? 'Failed to load transactions'
   }
@@ -126,6 +132,9 @@ const AdminFiscalizedView = async ({
   return (
     <FiscalizedTransactionsPageClient
       initialTransactions={rows}
+      initialPage={page}
+      initialPageSize={pageSize}
+      initialTotal={total}
       error={error}
       decimals={decimals}
       initialSearch={q}
