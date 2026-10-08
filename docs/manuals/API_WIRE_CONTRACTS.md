@@ -5,7 +5,7 @@
 **Baseline:** `vpos-ftc-app` `3058ac6bc63073556dfd3d41d7869ab181773d6c` on 2026-09-08.
 
 
-> **Third-party integrations:** build against the versioned [Partner API v1](../partner-api/v1/README.md) and its [OpenAPI contract](../partner-api/v1/openapi.yaml). The installed-package contracts below document internal/current wire behaviour and are not, by themselves, a stability promise for partners.
+> **Third-party integrations:** build against the [Sandbox v1 integration guide](../partner-api/v1/README.md), [complete simulated endpoint inventory](../partner-api/v1/ENDPOINTS.md), and live OpenAPI contract served at `/api/openapi.json`. The installed-package contracts below document internal/current wire behaviour and are not, by themselves, a stability promise for partners.
 
 ## 1. Which document is authoritative for request/response code?
 
