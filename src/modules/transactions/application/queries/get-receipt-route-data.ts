@@ -464,8 +464,8 @@ export async function listReceiptRouteRows(
   const countRows = await queryAll<{ count: string }>(
     `SELECT COUNT(*)::text AS count
       FROM receipts r
-      ${search ? `JOIN transactions t ON t.id = r.transaction_id AND t.station_id = r.station_id AND t.deleted_at IS NULL
-          LEFT JOIN customers c ON c.id = t.customer_id AND c.station_id = t.station_id` : ''}
+      JOIN transactions t ON t.id = r.transaction_id AND t.station_id = r.station_id AND t.deleted_at IS NULL
+      ${search ? 'LEFT JOIN customers c ON c.id = t.customer_id AND c.station_id = t.station_id' : ''}
       WHERE ${conditions.join(' AND ')}`,
     params,
   )
