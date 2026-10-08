@@ -71,7 +71,7 @@ const receiptNumberJoinSql = `
 
 const fromSql = `
   FROM transactions t
-  LEFT JOIN customers c ON c.id = t.customer_id
+  LEFT JOIN customers c ON c.id = t.customer_id AND c.station_id = t.station_id
   ${receiptNumberJoinSql}
 `
 
@@ -81,6 +81,18 @@ const selectColumnsSql = `
     receipt_info.receipt_number,
     c.buyer_name,
     c.tin,
+    c.buyer_name AS customer_buyer_name,
+    c.tin AS customer_tin,
+    c.buyer_type AS customer_buyer_type
+`
+
+const fiscalizedColumnsSql = `
+  SELECT
+    t.id, t.station_id, t.customer_id, t.transaction_date_time,
+    t.fiscalized_at, t.pos_reference, t.cloud_transaction_id,
+    t.pump_number, t.fuel_type, t.volume, t.total_amount, t.status,
+    t.fiscalization_reference, receipt_info.receipt_number,
+    c.buyer_name, c.tin,
     c.buyer_name AS customer_buyer_name,
     c.tin AS customer_tin,
     c.buyer_type AS customer_buyer_type
@@ -193,6 +205,8 @@ export async function listTransactionsWithReceiptNumbersRepo(
 ) {
   const { params, where, orderBy } = buildFilter(stationId, opts)
   const baseQuery = `${selectSql}\n${where}\n${orderBy}`
+  const fiscalized = opts.scope === 'fiscalized' || String(opts.status || '').toUpperCase() === 'FISCALIZED'
+  const fiscalizedSelectSql = `${fiscalizedColumnsSql}\n${fromSql}\n${where}\n${orderBy}`
   const hasSearch = Boolean(String(opts.search || '').trim())
   const countFromSql = hasSearch ? fromSql : 'FROM transactions t'
   const baseCount = `SELECT COUNT(*)::text AS count\n${countFromSql}\n${where}`
@@ -203,10 +217,39 @@ export async function listTransactionsWithReceiptNumbersRepo(
       200,
       Math.max(1, Number(opts.pageSize || opts.limit || 50)),
     )
-    const paginated = await queryPaginated<any>(baseQuery, baseCount, params, {
-      page,
-      pageSize,
-    })
+    // Fiscalized browsing selects narrow rows first, resolving receipt payloads
+    // only for the requested page. Do not materialize transaction JSON/TOAST
+    // values or scan receipt events for every historical row on ordinary lists.
+    if (fiscalized && !hasSearch) {
+      const countRows = await queryAll<{ count: string }>(baseCount, params)
+      const total = Number(countRows[0]?.count ?? 0)
+      const offset = (page - 1) * pageSize
+      const rows = await queryAll<any>(
+        `${fiscalizedColumnsSql}
+         FROM (
+           SELECT t.id, t.station_id, t.customer_id,
+                  t.transaction_date_time, t.fiscalized_at, t.pos_reference,
+                  t.cloud_transaction_id, t.pump_number, t.fuel_type,
+                  t.volume, t.total_amount, t.status, t.fiscalization_reference,
+                  t.latest_fiscal_event_id
+             FROM transactions t
+             ${where}
+             ${orderBy}
+             LIMIT ${params.length + 1} OFFSET ${params.length + 2}
+         ) t
+         LEFT JOIN customers c ON c.id = t.customer_id AND c.station_id = t.station_id
+         ${receiptNumberJoinSql}
+         ${orderBy}`,
+        [...params, pageSize, offset],
+      )
+      return { items: rows, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
+    }
+    const paginated = await queryPaginated<any>(
+      fiscalized ? fiscalizedSelectSql : baseQuery,
+      baseCount,
+      params,
+      { page, pageSize },
+    )
     return {
       items: paginated.data,
       total: paginated.total,
@@ -222,7 +265,12 @@ export async function listTransactionsWithReceiptNumbersRepo(
     const limitParam = `$${params.length + 1}`
     const limitedFromSql = `
       FROM (
-        SELECT t.*
+        SELECT ${fiscalized
+            ? `t.id, t.station_id, t.customer_id, t.transaction_date_time,
+                t.fiscalized_at, t.pos_reference, t.cloud_transaction_id,
+                t.pump_number, t.fuel_type, t.volume, t.total_amount, t.status,
+                t.fiscalization_reference, t.latest_fiscal_event_id`
+            : 't.*'}
           FROM transactions t
           ${where}
           ${orderBy}
@@ -232,7 +280,7 @@ export async function listTransactionsWithReceiptNumbersRepo(
       ${receiptNumberJoinSql}
     `
     const rows = await queryAll<any>(
-      `${selectColumnsSql}\n${limitedFromSql}\n${orderBy}`,
+      `${fiscalized ? fiscalizedColumnsSql : selectColumnsSql}\n${limitedFromSql}\n${orderBy}`,
       [...params, limit],
     )
     return {
@@ -244,7 +292,7 @@ export async function listTransactionsWithReceiptNumbersRepo(
     }
   }
 
-  const rows = await queryAll<any>(`${baseQuery} LIMIT $${params.length + 1}`, [
+  const rows = await queryAll<any>(`${fiscalized ? fiscalizedSelectSql : baseQuery} LIMIT ${params.length + 1}`, [
     ...params,
     limit,
   ])
