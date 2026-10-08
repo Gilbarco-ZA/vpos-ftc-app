@@ -21,8 +21,6 @@ const forbiddenPaths = [
   'public/certs',
   'tsconfig.tsbuildinfo',
   'vpos-server.cjs',
-  '.config/changelog.log',
-  '.config/changelog.archive.log',
   '.agent/files.json',
   '.agent/imports.json',
   '.agent/public-api.json',
