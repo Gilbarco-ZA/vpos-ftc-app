@@ -28,7 +28,7 @@ npm run partner:sandbox
 
 Defaults:
 
-- base URL: `http://127.0.0.1:3095/v1`
+- base URL: `http://127.0.0.1:3080/api`
 - token: `sandbox-token`
 - data: synthetic, in-memory, reset whenever the process restarts
 - dependencies: none outside Node.js; it does not import application modules, connect to PostgreSQL, access fiscal keys, or connect to a forecourt controller
@@ -37,7 +37,7 @@ Environment overrides:
 
 ```bash
 VPOS_PARTNER_SANDBOX_HOST=0.0.0.0 \
-VPOS_PARTNER_SANDBOX_PORT=3095 \
+VPOS_PARTNER_SANDBOX_PORT=3080 \
 VPOS_PARTNER_SANDBOX_TOKEN=replace-me \
 npm run partner:sandbox
 ```
@@ -46,7 +46,7 @@ Example:
 
 ```bash
 curl -H 'Authorization: Bearer sandbox-token' \
-  http://127.0.0.1:3095/v1/transactions/pre-fuel-customer
+  http://127.0.0.1:3080/api/transactions/pre-fuel-customer
 ```
 
 
@@ -114,3 +114,14 @@ For external testing, deploy the sandbox as its own container/service from a rel
 Do not deploy the VPOS FTC source checkout to the integrator. Network policy should expose only the sandbox port and should prevent sandbox access to production PostgreSQL, VPOS internal APIs, fiscal certificate stores, and forecourt networks.
 
 A production partner adapter should likewise sit in front of internal VPOS APIs, translate internal/raw DTOs to this stable v1 contract, and authenticate partner tokens independently of VPOS UI sessions.
+
+
+## FTC-compatible API mirror (recommended)
+
+The sandbox now listens on `http://127.0.0.1:3080/api` by default and accepts the same path structure as FTC. It includes simulated health, authentication/session/CSRF, customer, transaction, pre-fuel allocation, fuel options, product, category, stock, reporting, settings, pump/tank and proxy-configuration endpoint families. Supported operations use the real API's response conventions, including raw snake_case transaction and allocation records, direct settings responses, nested envelopes and CSV where appropriate.
+
+Use `Authorization: Bearer sandbox-token` for synthetic test access, or log in with sandbox username/password `sandbox`/`sandbox` to obtain a mock session cookie. This is an intentionally simplified sandbox credential model; it does not assert production supports bearer authentication.
+
+**Coverage policy:** implemented simulations provide deterministic synthetic state and never call real fiscal systems, PostgreSQL, pumps or proxy. Unimplemented `/api/*` endpoints respond with HTTP `501` and `error.code=SANDBOX_NOT_IMPLEMENTED`, never a false successful result. In particular, authorization/control/fiscalization and other high-impact device operations must be explicitly simulated before clients can rely on them. The existing `/v1` compatibility aliases remain available but new partner integrations should target `/api`.
+
+The OpenAPI v1 contract covers the original subset and is **not yet a full machine-readable inventory of the expanded FTC-compatible surface**; for additional methods consult the installed-package [wire contracts](../../manuals/API_WIRE_CONTRACTS.md) until they have verified schemas.
