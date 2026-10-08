@@ -935,6 +935,51 @@ export async function runForecourtConfigSync(params: {
   }
 
   try {
+    if (cfg.source === 'jpl' && !cfg.snapshotPath) {
+      // Modern JPL installations use the recorded DOMS installation/status
+      // evidence plus the already reconciled FTC topology. Do not require a
+      // separate HTTP snapshot endpoint or overwrite station mappings with
+      // partial runtime device statuses.
+      const [{ getDomsConfigurationReconciliation }, productRows] =
+        await Promise.all([
+          import('@/src/modules/forecourt/application/getDomsConfigurationReconciliation'),
+          (async () => {
+            const { queryAll } = await import('@/src/platform/db/postgres')
+            return queryAll<{ count: string }>(
+              'SELECT COUNT(*)::text AS count FROM products WHERE station_id = $1',
+              [params.stationId],
+            )
+          })(),
+        ])
+      const reconciliation = await getDomsConfigurationReconciliation(params.stationId)
+      if (!reconciliation.summary.installStatusSeenAt &&
+          reconciliation.summary.latestRuntimeStateCount === 0) {
+        throw new Error(
+          'No DOMS installation or status snapshot has been recorded. Capture a DOMS snapshot before refreshing forecourt status.',
+        )
+      }
+      const counts = {
+        products: Number(productRows[0]?.count ?? 0),
+        pumps: reconciliation.summary.configuredPumps,
+        tanks: reconciliation.summary.configuredTanks,
+        nozzles: reconciliation.summary.configuredNozzles,
+      }
+      const status: ForecourtSyncStatus = {
+        ok: true,
+        source: 'jpl',
+        lastSyncAt: new Date().toISOString(),
+        lastSyncMs: Date.now() - startedAt,
+        counts,
+      }
+      await kvSet(params.stationId, STATUS_KEY, status)
+      return {
+        ok: true,
+        source: 'jpl',
+        fetchedAt: status.lastSyncAt,
+        counts,
+      }
+    }
+
     if (cfg.source === 'file' && !cfg.snapshotFile) {
       throw new Error('Forecourt snapshotFile is required for file source')
     }
