@@ -51,7 +51,9 @@ export const GET = async (req: Request) => {
         search: searchParams.get('search') || searchParams.get('q') || '',
         startDate: searchParams.get('startDate') || '',
         endDate: searchParams.get('endDate') || '',
-        limit: Number(searchParams.get('limit') || 100),
+        limit: Number(searchParams.get('limit') || 50),
+        page: Number(searchParams.get('page') || 1),
+        pageSize: Number(searchParams.get('pageSize') || searchParams.get('limit') || 50),
       }),
     )
   } catch (err) {
