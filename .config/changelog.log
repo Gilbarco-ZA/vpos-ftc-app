@@ -1,9 +1,28 @@
-VPOS FTC 0.1.45 - Unreleased changes
-Changes since 0.1.44
+VPOS FTC - CURRENT RELEASE CHANGES
+==================================
+Release: 0.1.45 (unreleased)
+Previous published release: 0.1.44 / 47222001t044
+Status: Unreleased
+Scope: Changes introduced after the previous published release
 
-Reporting and date/time:
-- Display transaction timestamps on the Reports page as readable local date and time instead of raw UTC values (aab54214).
+RELEASE HIGHLIGHTS
+------------------
+- Format report transaction timestamps as readable local date and time.
+- Establish structured, traceable software release notes.
 
-Release notes:
-- Prepared a categorized historical release archive for clearer auditability and ongoing changelog generation (232f869e).
+DETAILED CHANGES
+----------------
+Reporting and usability
+- Display transaction timestamps on the Reports page in readable local date
+  and time instead of raw UTC values (aab54214).
 
+Documentation and maintenance
+- Restore historical package change records (9a7090bb).
+- Organize and standardize published release archive entries (232f869e, 523ab68e).
+
+RELEASE NOTES
+-------------
+This is a working changelog for 0.1.45, not a published release. Update it
+as development progresses. Do not repeat changes already recorded in 0.1.44.
+The packaging tool will prepend the generated DOMS release ID during build
+and append this file to changelog.archive.log when fnez-changelog runs.
