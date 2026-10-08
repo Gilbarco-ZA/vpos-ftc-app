@@ -935,7 +935,7 @@ export async function runForecourtConfigSync(params: {
   }
 
   try {
-    if (cfg.source === 'jpl' && !cfg.snapshotPath) {
+    if (cfg.source === 'jpl') {
       // Modern JPL installations use the recorded DOMS installation/status
       // evidence plus the already reconciled FTC topology. Do not require a
       // separate HTTP snapshot endpoint or overwrite station mappings with
