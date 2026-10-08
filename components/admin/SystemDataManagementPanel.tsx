@@ -330,15 +330,6 @@ export const SystemDataManagementPanel = () => {
         </Card>
       ) : null}
 
-      <Card className="space-y-2 p-4">
-        <h2 className="text-lg font-semibold">Historical data retention</h2>
-        <p className="text-sm text-[var(--text-secondary)]">
-          Transaction and report date-range assessments and guarded cleanup are now managed
-          on the administrator Maintenance page.
-        </p>
-        <a href="/admin/maintenance" className="text-sm underline">Open maintenance</a>
-      </Card>
-
       <Card className="space-y-4 border-red-300 p-4">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold text-red-700">
