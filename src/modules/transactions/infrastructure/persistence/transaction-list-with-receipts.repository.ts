@@ -235,7 +235,7 @@ export async function listTransactionsWithReceiptNumbersRepo(
              FROM transactions t
              ${where}
              ${orderBy}
-             LIMIT ${params.length + 1} OFFSET ${params.length + 2}
+             LIMIT $${params.length + 1} OFFSET $${params.length + 2}
          ) t
          LEFT JOIN customers c ON c.id = t.customer_id AND c.station_id = t.station_id
          ${receiptNumberJoinSql}
