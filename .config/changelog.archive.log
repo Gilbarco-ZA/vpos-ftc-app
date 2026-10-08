@@ -1,0 +1,117 @@
+  47210000t004
+- autostart on doms without ssh access needed.
+- redirect in admin route removed
+- added logs api (/api/logs)
+
+  47210000t005
+- clear transaction buffer
+- introduce credit notes in fiscalized transactions
+
+  47210000t006
+- refactor architecture
+- introduction of the POS system
+- improved UI
+
+  47210000t007
+- refactor architecture
+- improved UI
+
+  47210000t008
+- use node v22.15.0
+- upgrade to next v16
+
+  47210000t009
+- i18n applied
+
+  47222001t044
+Changes since v0.1.0
+- legacy import created_at fix (7b98742f)
+- transaction pagination fix (9c2e472f)
+- DB buckup/restore improvement (41324575)
+- 3rd party simulator implemented (fa1bf3d0)
+- decimal fix for price update (b5fdd955)
+- DOMS acceptance and effective local price sync (e037cd02)
+- Update commands.ts (6057b8c2)
+- jpl acl1 viariant update (2aa955a6)
+- doms pos mode none fix on fuel price update (434750fc)
+- cloud pricing fix (f5d730b1)
+- fuel price update (5f1fd647)
+- signalR url update (7ae1bb7d)
+- product update + signalR connection update (e4856f7f)
+- product sync fix (90ca5f12)
+- atg and fuel price update (ee6ef688)
+- Update 1341_fiscalized_reporting_browse_indexes.sql (547284f3)
+- Grant field engineers scoped transaction access (1b6b3823)
+- connection timeout fix (fee57271)
+- fiscalized browsing dedicated indexes added (b6050250)
+- tank internal error resolve (d6f2c88f)
+- tank gauge update (f0cc1482)
+- revert pkg settings (d5b51587)
+- opkgArchitecture (1c13b270)
+- Update azure-pipelines.yml (35a5dbab)
+- Update config.js (463e8baa)
+- install hardening (7df54120)
+- recoverable PostgreSQL outages map to retryable 503 responses (f046ee45)
+- Update reportingQueryResilience.test.mjs (242bb65b)
+- transaction hardening (235a501e)
+- reports hardening (f1bfe170)
+- start debugging check (60bed024)
+- code standardized (3a994822)
+- fuel price cycle update (54b3cdb8)
+- fail test fix (18c5ef38)
+- fuel price worker simplified (195120fc)
+- manager role update on dashboard and transactions (92143c72)
+- Refactor POS DOMS command execution (05f47416)
+- Update start.cjs (cf291c63)
+- fuel price update over vpos cloud init (721ff4ad)
+- build error resolved (62b8f1bb)
+- centralized date time setup (3f84f56e)
+- time-zone fix (4055b28b)
+- fiscal time update (bc8deff7)
+- date time format (e04827ba)
+- print receipt time fix (aee65938)
+- dashboard status update (f4ec8e49)
+- printer hardware failure bypass added (d69442f0)
+- alert auto-close (61693813)
+- added print connectivity worker (87c0c69a)
+- customer capture update (bed77697)
+- api guide update (b782a120)
+- Fix Tanzania assignment counter scope (cee4338f)
+- Fix Tanzania receipt prefix migration ordering (77f64318)
+- Update Tanzania receipt verification (f5b62e09)
+- Fix TIN allocation roles and DOMS authorization state (796a366a)
+- Add tenant TIN allocation pump board. (7a7ae898)
+- Transaction workflow Update (b2585c35)
+- Add configurable receipt and TIN capture ordering (836e34ca)
+- Use receipt numbers on transactions and recover stuck fiscalization (de3dc0b3)
+- Print Tanzania receipts when TRA is offline (2ecc0575)
+- APC1 unavailable error fix (b07619a6)
+- pricing update (0917e3a8)
+- Guard Tanzania receipt viewer DOMS price fallback (6763791d)
+- Logout Redirect Fix & Customer Capture Update (0f4aeed6)
+- Move storage retention to station settings (2f71cf51)
+- printing and receipt fix (d761b7f7)
+- pngjs added (1ec5cb9b)
+- package update (dba0c5a3)
+- physical receipt alignment update (876c5d92)
+- TZ customer type update (4269d2f7)
+- QR code update (dee22454)
+- Transaction preview default set to today (19db1431)
+- print receipt update (3cd8da69)
+- Tanzania receipt prefix selection (e3f79142)
+- ATG History Patch (6895d341)
+- pss update and tz prefix update (1a04c138)
+- Cleaned up Tanzania daily-total setup warnings (5e28dfb1)
+- tank reporting update (9e335694)
+- solicited request gate hardening (80abddcd)
+- DOMS transaction capture unsolicited ownership fix (a22f8dff)
+- Queue workers process pressure aware fix (2d531ac4)
+- forecourt stability (846015e8)
+- stable update with TZ (0ca160ed)
+- Add tax_code and tax_rate to transaction lines and update related logic (a96e92eb)
+- Refactor SCU ID extraction logic in receipt processing functions (5fc8b4af)
+- Update transaction query (b467abe6)
+- Refresh old receipts (af095860)
+- Update receipt to include SKU + Product code (8a1493a3)
+- Host resolution (adf2bdf7)
+- increment patch (5a9b6ce6)
