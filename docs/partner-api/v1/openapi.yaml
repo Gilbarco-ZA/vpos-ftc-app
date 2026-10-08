@@ -1,0 +1,389 @@
+openapi: 3.1.0
+info:
+  title: VPOS FTC Partner API
+  version: 1.0.0
+  description: |
+    Stable contract for approved third-party integrations. This contract intentionally
+    exposes a supported subset of VPOS FTC behaviour and is independent of internal
+    application route implementation details.
+servers:
+  - url: https://sandbox.example.invalid/v1
+    description: Replace with the deployed partner sandbox URL.
+  - url: https://vpos-station.example.invalid/partner/v1
+    description: Example production/station integration base URL.
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      operationId: getPartnerHealth
+      security: []
+      responses:
+        "200":
+          description: Sandbox/API availability.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerHealth"
+  /customers:
+    get:
+      operationId: listCustomers
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Customer page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerPageEnvelope"
+    post:
+      operationId: upsertCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerInput"
+      responses:
+        "200":
+          description: Created or matched customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /transactions:
+    get:
+      operationId: listTransactions
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        "200":
+          description: Transaction page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionPageEnvelope"
+  /transactions/{id}:
+    get:
+      operationId: getTransaction
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Transaction detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /transactions/pre-fuel-customer:
+    get:
+      operationId: getPreFuelCustomerState
+      responses:
+        "200":
+          description: Current pre-fuel capture state and pending allocations.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreFuelCustomerStateEnvelope"
+    post:
+      operationId: updatePreFuelCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/CreatePreFuelAllocation"
+                - $ref: "#/components/schemas/CancelPreFuelAllocation"
+      responses:
+        "200":
+          description: Allocation created or cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreFuelAllocationEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /transactions/fuel-options:
+    get:
+      operationId: getFuelOptions
+      responses:
+        "200":
+          description: Sandbox fuel/nozzle choices.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FuelOptionsEnvelope"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API token
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/FailureEnvelope" }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/FailureEnvelope" }
+  schemas:
+    SuccessBase:
+      type: object
+      required: [ok, success]
+      properties:
+        ok: { const: true }
+        success: { const: true }
+    FailureEnvelope:
+      type: object
+      required: [ok, success, error]
+      properties:
+        ok: { const: false }
+        success: { const: false }
+        error:
+          type: object
+          required: [message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+    PartnerHealth:
+      type: object
+      required: [ok, service, version, sandbox]
+      properties:
+        ok: { const: true }
+        service: { const: vpos-ftc-partner-api }
+        version: { const: "1.0.0" }
+        sandbox: { type: boolean }
+    CustomerInput:
+      type: object
+      required: [tin, buyerName]
+      additionalProperties: false
+      properties:
+        tin: { type: string, minLength: 1, maxLength: 50 }
+        buyerName: { type: string, minLength: 1, maxLength: 255 }
+        buyerType: { type: [string, "null"], maxLength: 45 }
+        pin: { type: [string, "null"], maxLength: 50 }
+        businessName: { type: [string, "null"], maxLength: 255 }
+        contactEmail: { type: [string, "null"], maxLength: 255 }
+        contactPhone: { type: [string, "null"], maxLength: 50 }
+        addressCity: { type: [string, "null"], maxLength: 100 }
+        addressCountryCode: { type: [string, "null"], maxLength: 3 }
+        country: { type: [string, "null"], maxLength: 100 }
+        odometer: { type: [string, "null"], maxLength: 50 }
+        vehicleRegNr: { type: [string, "null"], maxLength: 50 }
+        paymentType:
+          oneOf:
+            - enum: [CASH, CARD]
+            - type: "null"
+    Customer:
+      allOf:
+        - $ref: "#/components/schemas/CustomerInput"
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string, format: uuid }
+            lastStationId: { type: [string, "null"], format: uuid }
+            lastSeenAt: { type: [string, "null"], format: date-time }
+    CustomerEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessBase"
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: "#/components/schemas/Customer" }
+    CustomerPage:
+      type: object
+      required: [rows, page, pageSize, total]
+      properties:
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/Customer" }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    CustomerPageEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessBase"
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: "#/components/schemas/CustomerPage" }
+    Transaction:
+      type: object
+      required: [id, pumpNumber, transactionDateTime, totalAmount, status]
+      properties:
+        id: { type: string, format: uuid }
+        customerId: { type: [string, "null"], format: uuid }
+        pumpNumber: { type: integer, minimum: 1 }
+        transactionDateTime: { type: string, format: date-time }
+        totalAmount: { type: number }
+        volume: { type: [number, "null"] }
+        fuelType: { type: [string, "null"] }
+        posReference: { type: [string, "null"] }
+        status: { type: string }
+        receiptNumber: { type: [string, "null"] }
+        buyerName: { type: [string, "null"] }
+        tin: { type: [string, "null"] }
+    TransactionPage:
+      type: object
+      required: [items, total, page, pageSize, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Transaction" }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalPages: { type: integer }
+    TransactionPageEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessBase"
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: "#/components/schemas/TransactionPage" }
+    TransactionEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessBase"
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: "#/components/schemas/Transaction" }
+    PreFuelAllocation:
+      type: object
+      required:
+        [id, stationId, pumpNumber, nozzleNumber, customerId, status, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        stationId: { type: string, format: uuid }
+        pumpNumber: { type: integer, minimum: 1 }
+        nozzleId: { type: [string, "null"], format: uuid }
+        nozzleNumber: { type: integer, minimum: 1 }
+        displayNumber: { type: [integer, "null"] }
+        customerId: { type: string, format: uuid }
+        allocatedBy: { type: [string, "null"], format: uuid }
+        status: { enum: [PENDING, CONSUMED, CANCELLED] }
+        transactionId: { type: [string, "null"], format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: [string, "null"], format: date-time }
+        consumedAt: { type: [string, "null"], format: date-time }
+        cancelledAt: { type: [string, "null"], format: date-time }
+        buyerName: { type: [string, "null"] }
+        tin: { type: [string, "null"] }
+    PreFuelCustomerState:
+      type: object
+      required: [captureOrder, allocations]
+      properties:
+        captureOrder: { enum: [before_transaction, after_transaction] }
+        allocations:
+          type: array
+          items: { $ref: "#/components/schemas/PreFuelAllocation" }
+    PreFuelCustomerStateEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessBase"
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: "#/components/schemas/PreFuelCustomerState" }
+    CreatePreFuelAllocation:
+      type: object
+      required: [pumpNumber, nozzleNumber, customerId]
+      additionalProperties: false
+      properties:
+        pumpNumber: { type: integer, minimum: 1 }
+        nozzleNumber: { type: integer, minimum: 1 }
+        nozzleId: { type: [string, "null"], format: uuid }
+        customerId: { type: string, format: uuid }
+    CancelPreFuelAllocation:
+      type: object
+      required: [action, allocationId]
+      additionalProperties: false
+      properties:
+        action: { const: cancel }
+        allocationId: { type: string, format: uuid }
+    PreFuelAllocationEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessBase"
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: "#/components/schemas/PreFuelAllocation" }
+    FuelOption:
+      type: object
+      required: [pumpNumber]
+      properties:
+        pumpId: { type: [string, "null"], format: uuid }
+        pumpNumber: { type: integer }
+        nozzleId: { type: [string, "null"], format: uuid }
+        nozzleNumber: { type: [integer, "null"] }
+        displayNumber: { type: [integer, "null"] }
+        tankId: { type: [string, "null"], format: uuid }
+        tankName: { type: [string, "null"] }
+        productRowId: { type: [string, "null"], format: uuid }
+        gradeId: { type: [string, "null"] }
+        gradeName: { type: [string, "null"] }
+        productCode: { type: [string, "null"] }
+    FuelOptionsEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessBase"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [options]
+              properties:
+                options:
+                  type: array
+                  items: { $ref: "#/components/schemas/FuelOption" }
