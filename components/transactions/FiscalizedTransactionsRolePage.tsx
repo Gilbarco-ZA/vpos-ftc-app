@@ -145,7 +145,9 @@ const ManagerFiscalizedView = async ({
   if (!['manager', 'administrator', 'field_engineer'].includes(user.role))
     redirect('/dashboard')
 
-  const page = Number(readParam(searchParams, 'page') || '1') || 1
+  const page = Math.max(1, Number(readParam(searchParams, 'page') || '1') || 1)
+  const requestedPageSize = Number(readParam(searchParams, 'pageSize') || '50')
+  const pageSize = [10, 25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
   const q = readParam(searchParams, 'q').trim()
   const requestedStartDate = readParam(searchParams, 'startDate').trim()
   const requestedEndDate = readParam(searchParams, 'endDate').trim()
@@ -163,7 +165,7 @@ const ManagerFiscalizedView = async ({
 
   const data = await listTransactions(user.stationId, {
     page,
-    pageSize: 50,
+    pageSize,
     scope: 'fiscalized',
     search: q || undefined,
     startDate: startDate || undefined,
@@ -172,6 +174,7 @@ const ManagerFiscalizedView = async ({
 
   const rows: TxnRow[] = Array.isArray(data?.items) ? data.items : []
   const total = Number(data?.total ?? rows.length)
+  const totalPages = Math.ceil(total / pageSize)
 
   const nextPage = page + 1
   const prevPage = Math.max(1, page - 1)
@@ -194,6 +197,7 @@ const ManagerFiscalizedView = async ({
     const params = new URLSearchParams({
       status: 'fiscalized',
       page: String(targetPage),
+      pageSize: String(pageSize),
       preset,
     })
     if (q) params.set('q', q)
@@ -202,7 +206,7 @@ const ManagerFiscalizedView = async ({
     return `/transactions?${params.toString()}`
   }
   const prevHref = pageHref(prevPage)
-  const nextHref = pageHref(nextPage)
+  const nextHref = pageHref(Math.min(nextPage, Math.max(1, totalPages)))
 
   return (
     <div className="space-y-4">
@@ -236,6 +240,10 @@ const ManagerFiscalizedView = async ({
         prevHref={prevHref}
         nextHref={nextHref}
         decimals={decimals}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        totalPages={totalPages}
       />
     </div>
   )
