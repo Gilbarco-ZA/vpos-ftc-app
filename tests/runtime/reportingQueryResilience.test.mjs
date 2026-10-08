@@ -205,7 +205,8 @@ test('receipt list query uses positional parameters instead of bare numbers', ()
   assert.ok(addParamBlock)
   assert.match(addParamBlock, /params\.push\(value\)/)
   assert.match(addParamBlock, /params\.length/)
-  assert.match(receiptQuery, /LIMIT \$\{addParam\(limit\)\}/)
+  assert.match(receiptQuery, /LIMIT \$\{addParam\(pageSize\)\} OFFSET \$\{addParam\(offset\)\}/)
+  assert.match(receiptQuery, /SELECT COUNT\(\*\)::text AS count/)
 })
 
 test('fiscalized client does not repeat the server browse query immediately on mount', () => {
@@ -242,4 +243,31 @@ test('fiscalized manager and admin grids expose page size and navigation', () =>
     assert.match(source, /Next/)
   }
   assert.match(client, /setPage\(1\)/)
+})
+
+test('fiscalized page-first SQL binds limit and offset instead of interpolating numeric literals', () => {
+  assert.match(
+    repository,
+    /LIMIT \$\$\{params\.length \+ 1\} OFFSET \$\$\{params\.length \+ 2\}/,
+  )
+  assert.doesNotMatch(
+    repository,
+    /^\s*LIMIT \$\{params\.length \+ 1\} OFFSET \$\{params\.length \+ 2\}/m,
+  )
+})
+
+test('receipt viewer uses server pagination with 50-row default', () => {
+  const viewer = readFileSync('components/receipts/ReceiptViewerClient.tsx', 'utf8')
+  const route = readFileSync('app/api/receipts/route.ts', 'utf8')
+  const receiptQuery = readFileSync(
+    'src/modules/transactions/application/queries/get-receipt-route-data.ts',
+    'utf8',
+  )
+  assert.match(viewer, /useState\(50\)/)
+  assert.match(viewer, /Rows per page/)
+  assert.match(viewer, /10, 25, 50, 100/)
+  assert.match(viewer, /page: String\(page\), pageSize: String\(pageSize\)/)
+  assert.match(route, /pageSize: Number\(searchParams\.get\('pageSize'\)/)
+  assert.match(receiptQuery, /return \{ items: rows\.map/)
+  assert.match(receiptQuery, /LIMIT \$\{addParam\(pageSize\)\} OFFSET \$\{addParam\(offset\)\}/)
 })
