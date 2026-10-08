@@ -39,7 +39,6 @@ export const createCompatibilityApi = ({customers,transactions,fuelOptions,alloc
   const sessionUser={id:userId,stationId,username:'sandbox',email:'sandbox@example.test',role:'administrator',fullName:'Sandbox User',station:{id:stationId,code:'SANDBOX',name:'Sandbox Station',country:'TZ'}}
   const rawCustomer=c=>({...Object.fromEntries(Object.entries(snake(c)).filter(([k])=>!['last_station_id','last_seen_at'].includes(k))),station_id:stationId,last_station_id:stationId,last_seen_at:c.lastSeenAt,is_anonymous:false,cloud_customer_id:null,imported_from_cloud:false,imported_at:null,created_at:date(),updated_at:date(),deleted_at:null})
   const rawTransaction=t=>({...snake(t),station_id:stationId,customer_id:t.customerId,transaction_date_time:t.transactionDateTime,total_amount:t.totalAmount,volume:t.volume,receipt_number:t.receiptNumber,buyer_name:t.buyerName,tin:t.tin,status:t.status,created_at:date(),updated_at:date(),deleted_at:null})
-  const statusByPath=['/api/transactions/send-now','/api/transactions/','/api/pos/','/api/doms/','/api/control/','/api/terminal/','/api/runtime/','/api/admin/']
   const run=async(req,res,url)=>{
     const path=url.pathname, method=req.method, query=url.searchParams
     if(method==='GET' && path==='/api/sandbox/coverage'){
