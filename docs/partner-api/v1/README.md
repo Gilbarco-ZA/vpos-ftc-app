@@ -93,6 +93,16 @@ A pre-fuel allocation means a customer is selected for a specific pump/nozzle be
 - `allocationId`: the allocation's UUID, used by cancellation operations.
 - `captureOrder`: `before_transaction` means pre-fuel allocation is active; `after_transaction` means customer capture occurs after the pump transaction.
 
+## Standalone distribution bundle
+
+Build a deployable bundle without the FTC application source:
+
+```bash
+npm run partner:sandbox:package
+```
+
+The command creates `dist/partner-sandbox/` containing only `server.mjs`, `openapi.yaml`, `README.md`, a minimal `package.json`, and a `Dockerfile`. Build and publish that directory/image to the sandbox environment; third-party developers only need the hosted base URL, token, and OpenAPI document.
+
 ## Isolation and deployment
 
 For external testing, deploy the sandbox as its own container/service from a release artifact containing only:
