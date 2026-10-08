@@ -75,6 +75,9 @@ const ReceiptViewerClient = ({
   const [fromDate, setFromDate] = useState(initialFromDate)
   const [toDate, setToDate] = useState(initialToDate)
   const [results, setResults] = useState<TransactionListItem[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [total, setTotal] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(
     initialTransactionId || null,
   )
@@ -86,7 +89,7 @@ const ReceiptViewerClient = ({
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ list: '1', limit: '100' })
+      const params = new URLSearchParams({ list: '1', page: String(page), pageSize: String(pageSize) })
       if (search.trim()) params.set('search', search.trim())
       if (fromDate) params.set('startDate', fromDate)
       if (toDate) params.set('endDate', toDate)
@@ -119,6 +122,7 @@ const ReceiptViewerClient = ({
         customer: item?.buyer_name ?? item?.tin ?? null,
       }))
       setResults(mapped)
+      setTotal(Number(payload?.total ?? mapped.length))
       if (mapped.length === 1) {
         setSelectedId(mapped[0].id)
       }
@@ -127,7 +131,7 @@ const ReceiptViewerClient = ({
     } finally {
       setLoading(false)
     }
-  }, [search, fromDate, toDate])
+  }, [search, fromDate, toDate, page, pageSize])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -137,7 +141,7 @@ const ReceiptViewerClient = ({
 
   const showInitialResultsLoading = loading && results.length === 0
   const shouldShowResultsList =
-    results.length > 0 && (alwaysShowResultsList || results.length > 1)
+    results.length > 0 && (alwaysShowResultsList || total > 1 || results.length > 1)
 
   return (
     <div className="space-y-4">
@@ -157,7 +161,7 @@ const ReceiptViewerClient = ({
         <div className="min-w-[240px] flex-1">
           <Input
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => { setSearch(event.target.value); setPage(1) }}
             placeholder="Search receipt number, cloud ID, or fiscal reference"
           />
         </div>
@@ -165,13 +169,13 @@ const ReceiptViewerClient = ({
           <Input
             type="date"
             value={fromDate}
-            onChange={(event) => setFromDate(event.target.value)}
+            onChange={(event) => { setFromDate(event.target.value); setPage(1) }}
           />
           <span className="text-xs text-[var(--text-muted)]">to</span>
           <Input
             type="date"
             value={toDate}
-            onChange={(event) => setToDate(event.target.value)}
+            onChange={(event) => { setToDate(event.target.value); setPage(1) }}
           />
         </div>
         <Button variant="secondary" onClick={fetchResults} disabled={loading}>
@@ -182,6 +186,7 @@ const ReceiptViewerClient = ({
           onClick={() => {
             setFromDate(businessDate)
             setToDate(businessDate)
+            setPage(1)
           }}
           disabled={!businessDate}
         >
@@ -192,6 +197,7 @@ const ReceiptViewerClient = ({
           onClick={() => {
             setFromDate('')
             setToDate('')
+            setPage(1)
           }}
         >
           All dates
@@ -266,6 +272,27 @@ const ReceiptViewerClient = ({
           </div>
         </div>
       ) : null}
+
+      <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface-card px-4 py-3 text-sm">
+        <label className="flex items-center gap-2">
+          Rows per page
+          <select
+            aria-label="Rows per page"
+            className="rounded border border-border bg-surface-card px-2 py-1"
+            value={pageSize}
+            onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
+          >
+            {[10, 25, 50, 100].map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </label>
+        <span>Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {total} receipts</span>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" disabled={loading || page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
+          <Button variant="secondary" size="sm" disabled={loading || page * pageSize >= total} onClick={() => setPage((current) => current + 1)}>Next</Button>
+        </div>
+      </div>
 
       <TransactionReceiptSheet
         open={Boolean(selectedId)}
