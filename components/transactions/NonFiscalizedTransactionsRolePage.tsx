@@ -127,6 +127,10 @@ const AdminNonFiscalizedView = async ({
   if (!['administrator', 'manager', 'field_engineer'].includes(user.role)) redirect('/dashboard')
 
   let rows: TransactionListItem[] = []
+  let total = 0
+  const page = Math.max(1, Number(readParam(searchParams, 'page') || '1') || 1)
+  const requestedPageSize = Number(readParam(searchParams, 'pageSize') || '50')
+  const pageSize = [10, 25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
   let error: string | null = null
   const [decimals, products, businessDate] = await Promise.all([
     getStationDecimalSettings(user.stationId),
@@ -145,11 +149,13 @@ const AdminNonFiscalizedView = async ({
   try {
     const list = await listTransactions(user.stationId, {
       scope: 'non-fiscalized',
-      limit: 200,
+      page,
+      pageSize,
       startDate: dateFilter.startDate || undefined,
       endDate: dateFilter.endDate || undefined,
     })
     rows = normalizeAdminRows(Array.isArray(list?.items) ? list.items : [])
+    total = Number(list?.total ?? rows.length)
   } catch (err: any) {
     error = err?.message ?? 'Failed to load transactions'
   }
@@ -157,6 +163,9 @@ const AdminNonFiscalizedView = async ({
   return (
     <NonFiscalizedTransactionsPageClient
       initialTransactions={rows}
+      initialPage={page}
+      initialPageSize={pageSize}
+      initialTotal={total}
       products={products.map((product) => ({
         id: String(product.id),
         externalProductId: product.externalProductId,
