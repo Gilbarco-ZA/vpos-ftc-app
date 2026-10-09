@@ -14,8 +14,7 @@ function parseIds(input: unknown) {
 
 export const POST = defineMutationRoute<any>({
   roles: ['administrator'],
-  csrf: false,
-  handler: async (_req, { body }) => {
+  handler: async (_req, { body, user }) => {
     const ids = parseIds(body?.ids)
     if (ids === null) return badRequest('ids[] is required')
     if (ids.length === 0) return badRequest('ids[] must contain numbers')
@@ -33,8 +32,7 @@ export const POST = defineMutationRoute<any>({
       return badRequest('Unknown action')
     }
 
-    const stationId =
-      typeof body?.stationId === 'string' ? body.stationId : null
+    const stationId = user.stationId
     const errorText =
       typeof body?.errorText === 'string' ? body.errorText : null
     const result = await bulkManageFiscalInbox({
