@@ -252,7 +252,11 @@ const FiscalInboxPageClient = ({
   const [err, setErr] = useState<string | null>(error ?? null)
 
   const showToast = (variant: ToastVariant, message: string) => {
-    setToast({ id: `${Date.now()}`, variant, message })
+    setToast((previous) => ({
+      id: String(Number(previous?.id ?? 0) + 1),
+      variant,
+      message,
+    }))
   }
 
   const refresh = useCallback(async () => {
