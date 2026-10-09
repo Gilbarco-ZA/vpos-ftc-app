@@ -58,6 +58,7 @@ export type ManagerFiscalizedRow = {
 }
 
 export default function FiscalizedTransactionsManagerClient(props: {
+  allowCreditNotes: boolean
   rows: ManagerFiscalizedRow[]
   prevHref: string
   nextHref: string
@@ -233,9 +234,11 @@ export default function FiscalizedTransactionsManagerClient(props: {
                       <DropdownMenuItem onSelect={() => openReceiptViewer(t)}>
                         View receipt
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => openCreditNote(t)}>
-                        Create credit note
-                      </DropdownMenuItem>
+                      {props.allowCreditNotes && (
+                        <DropdownMenuItem onSelect={() => openCreditNote(t)}>
+                          Create credit note
+                        </DropdownMenuItem>
+                      )}
                       {(t.status || '').toUpperCase() === 'CREDITED' && (
                         <DropdownMenuItem
                           onSelect={() => openCreditNoteViewer(t.id)}
