@@ -428,9 +428,11 @@ const NonFiscalizedTransactionsPageClient = ({
     await refresh()
   }
 
-  const changePage = (next: number) => {
-    setPage(next)
-  }
+  useEffect(() => {
+    if (page !== initialPage || pageSize !== initialPageSize) {
+      queueMicrotask(() => { void refresh() })
+    }
+  }, [page, pageSize, refresh, initialPage, initialPageSize])
 
   const filteredTransactions = useMemo(() => transactions, [transactions])
 
@@ -460,6 +462,18 @@ const NonFiscalizedTransactionsPageClient = ({
           todayDisabled={!businessDate}
           onRefresh={refresh}
         />
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <span>{total} transactions · Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</span>
+          <div className="flex items-center gap-2">
+            <label htmlFor="non-fiscalized-page-size">Rows</label>
+            <select id="non-fiscalized-page-size" className="rounded border border-border bg-surface-card px-2 py-1"
+              value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
+              {[10, 25, 50, 100].map((count) => <option key={count} value={count}>{count}</option>)}
+            </select>
+            <Button variant="secondary" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+            <Button variant="secondary" size="sm" disabled={page * pageSize >= total || loading} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          </div>
+        </div>
         <div className="flex justify-end">
           <BulkRetryFailedTransactionsButton
             transactionIds={transactions
