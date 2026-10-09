@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { getStationCountryCode, isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/infrastructure/country'
 
 import { requireAuth } from '@/src/shared/auth'
 import { resolveDateFilter } from '@/src/shared/crud/dateFilters'
@@ -101,9 +102,10 @@ const AdminFiscalizedView = async ({
   const pageSize = [10, 25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
   let error: string | null = null
   const q = readParam(searchParams, 'q').trim()
-  const [decimals, businessDate] = await Promise.all([
+  const [decimals, businessDate, stationCountry] = await Promise.all([
     getStationDecimalSettings(user.stationId),
     getStationCurrentBusinessDate(user.stationId),
+    getStationCountryCode(user.stationId),
   ])
   const dateFilter = resolveDateFilter(
     {
@@ -131,6 +133,7 @@ const AdminFiscalizedView = async ({
 
   return (
     <FiscalizedTransactionsPageClient
+      allowCreditNotes={!isTanzaniaCountry(stationCountry)}
       initialTransactions={rows}
       initialPage={page}
       initialPageSize={pageSize}
@@ -187,7 +190,7 @@ const ManagerFiscalizedView = async ({
 
   const nextPage = page + 1
   const prevPage = Math.max(1, page - 1)
-  const decimals = await getStationDecimalSettings(user.stationId)
+  const [decimals, stationCountry] = await Promise.all([getStationDecimalSettings(user.stationId), getStationCountryCode(user.stationId)])
 
   const mapped: ManagerFiscalizedRow[] = rows.map((t) => ({
     id: String((t as any)?.id ?? ''),
@@ -245,6 +248,7 @@ const ManagerFiscalizedView = async ({
       </Card>
 
       <FiscalizedTransactionsManagerClient
+        allowCreditNotes={!isTanzaniaCountry(stationCountry)}
         rows={mapped}
         prevHref={prevHref}
         nextHref={nextHref}
