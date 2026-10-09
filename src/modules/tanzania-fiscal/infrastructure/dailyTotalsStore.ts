@@ -106,7 +106,8 @@ export async function setTanzaniaDailyTotalsSendTime(
 
 export async function listTanzaniaDailyTotalSubmissions(
   stationId: string,
-  limit = 120,
+  limit = 50,
+  offset = 0,
 ): Promise<TanzaniaDailyTotalSubmissionHistoryItem[]> {
   const safeLimit = Math.max(1, Math.min(365, Math.trunc(limit)))
   const rows = await queryAll<SubmissionHistoryRow>(
@@ -126,8 +127,8 @@ export async function listTanzaniaDailyTotalSubmissions(
        FROM tanzania_daily_total_submissions
       WHERE station_id = $1::uuid
       ORDER BY business_date DESC, created_at DESC
-      LIMIT $2`,
-    [stationId, safeLimit],
+      LIMIT $2 OFFSET $3`,
+    [stationId, safeLimit, Math.max(0, Math.trunc(offset))],
   )
 
   return rows.map((row) => ({
