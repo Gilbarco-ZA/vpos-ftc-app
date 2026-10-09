@@ -44,6 +44,9 @@ type ApiEnvelope<T> = {
 }
 
 type TransactionsResponse = {
+  total?: number
+  page?: number
+  pageSize?: number
   items?: TxnRow[]
   transactions?: TxnRow[]
 }
@@ -121,11 +124,15 @@ export function ManagerReportsClient({
 
   const [summary, setSummary] = useState<Summary | null>(null)
   const [rows, setRows] = useState<TxnRow[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   const handlePresetChange = (nextPreset: PresetKey) => {
     setPreset(nextPreset)
+    setPage(1)
     if (nextPreset === 'custom') return
     const range = presetToRange(nextPreset)
     setStartDate(range.startDate)
@@ -143,7 +150,7 @@ export function ManagerReportsClient({
         { fromKey: 'start', toKey: 'end' },
       )
 
-      const transactionParams = new URLSearchParams({ limit: '50' })
+      const transactionParams = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
       applyDateRangeParams(transactionParams, { startDate, endDate })
 
       const [sRes, tRes] = await Promise.all([
@@ -171,7 +178,7 @@ export function ManagerReportsClient({
           ? transactionPayload.transactions
           : []
 
-      const txns = transactionRows.slice(0, 50)
+      const txns = transactionRows
 
       const filtered = txns.filter((r) => {
         if (pumpNumber && String(r.pump_number ?? '') !== String(pumpNumber))
@@ -186,12 +193,13 @@ export function ManagerReportsClient({
 
       setSummary(resolvedSummary)
       setRows(filtered)
+      setTotal(Number(transactionPayload?.total ?? filtered.length))
     } catch (e: any) {
       setErr(e?.message || 'Failed to load reports')
     } finally {
       setLoading(false)
     }
-  }, [endDate, pumpNumber, startDate, status])
+  }, [endDate, pumpNumber, startDate, status, page, pageSize])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -330,7 +338,7 @@ export function ManagerReportsClient({
         ) : null}
         <CardContent className="space-y-3">
           <div className="text-sm text-[var(--text-secondary)]">
-            Preview (latest 50 in range)
+            Transactions in selected range · {total} total
           </div>
 
           {showInitialLoading ? (
@@ -385,6 +393,18 @@ export function ManagerReportsClient({
             </Table>
           )}
         </CardContent>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 text-sm">
+          <span>Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</span>
+          <div className="flex items-center gap-2">
+            <label htmlFor="reports-page-size">Rows</label>
+            <select id="reports-page-size" className="rounded border border-border bg-surface-card px-2 py-1" value={pageSize}
+              onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
+              {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+            <Button variant="secondary" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+            <Button variant="secondary" size="sm" disabled={page * pageSize >= total || loading} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          </div>
+        </div>
       </Card>
     </div>
   )
