@@ -39,9 +39,12 @@ async function assertTanzaniaDailyTotalsRoute(stationId: string) {
 
 export const GET = defineGetRoute({
   roles: ['manager', 'administrator'],
-  handler: async (_req, { user }) => {
+  handler: async (req, { user }) => {
     await assertTanzaniaDailyTotalsRoute(user.stationId)
-    return ok(await getTanzaniaDailyTotalsDashboard(user.stationId))
+    const params = new URL(req.url).searchParams
+    const page = Number(params.get('page') || 1)
+    const pageSize = Number(params.get('pageSize') || 50)
+    return ok(await getTanzaniaDailyTotalsDashboard(user.stationId, page, pageSize))
   },
 })
 
