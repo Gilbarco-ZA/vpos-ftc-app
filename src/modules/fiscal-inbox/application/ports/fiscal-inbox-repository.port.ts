@@ -8,6 +8,9 @@ export type FiscalInboxListFilters = {
   topic?: FiscalInboxTopic | 'ANY'
   limit?: number
   offset?: number
+  search?: string
+  startDate?: string
+  endDate?: string
 }
 
 export type FiscalInboxListItem = {
