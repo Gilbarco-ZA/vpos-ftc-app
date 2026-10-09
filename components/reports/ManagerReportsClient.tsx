@@ -152,6 +152,8 @@ export function ManagerReportsClient({
 
       const transactionParams = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
       applyDateRangeParams(transactionParams, { startDate, endDate })
+      if (pumpNumber) transactionParams.set('pumpNumber', pumpNumber)
+      if (status) transactionParams.set('status', status)
 
       const [sRes, tRes] = await Promise.all([
         fetch(`/api/dashboard/summary?${summaryParams.toString()}`, {
@@ -178,22 +180,9 @@ export function ManagerReportsClient({
           ? transactionPayload.transactions
           : []
 
-      const txns = transactionRows
-
-      const filtered = txns.filter((r) => {
-        if (pumpNumber && String(r.pump_number ?? '') !== String(pumpNumber))
-          return false
-        if (
-          status &&
-          String(r.status ?? '').toLowerCase() !== status.toLowerCase()
-        )
-          return false
-        return true
-      })
-
       setSummary(resolvedSummary)
-      setRows(filtered)
-      setTotal(Number(transactionPayload?.total ?? filtered.length))
+      setRows(transactionRows)
+      setTotal(Number(transactionPayload?.total ?? transactionRows.length))
     } catch (e: any) {
       setErr(e?.message || 'Failed to load reports')
     } finally {
@@ -254,6 +243,7 @@ export function ManagerReportsClient({
                 onChange={(e) => {
                   setPreset('custom')
                   setStartDate(e.target.value)
+                  setPage(1)
                 }}
               />
             </FormField>
@@ -265,6 +255,7 @@ export function ManagerReportsClient({
                 onChange={(e) => {
                   setPreset('custom')
                   setEndDate(e.target.value)
+                  setPage(1)
                 }}
               />
             </FormField>
@@ -272,7 +263,7 @@ export function ManagerReportsClient({
             <FormField label="Pump (optional)" className="md:col-span-2">
               <Input
                 value={pumpNumber}
-                onChange={(e) => setPumpNumber(e.target.value)}
+                onChange={(e) => { setPumpNumber(e.target.value); setPage(1) }}
                 placeholder="e.g. 1"
               />
             </FormField>
@@ -280,7 +271,7 @@ export function ManagerReportsClient({
             <FormField label="Status" className="md:col-span-1">
               <Input
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(e) => { setStatus(e.target.value); setPage(1) }}
                 placeholder="OK"
               />
             </FormField>
