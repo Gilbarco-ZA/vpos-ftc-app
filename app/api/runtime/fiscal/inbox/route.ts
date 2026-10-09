@@ -50,9 +50,7 @@ export const GET = defineGetRoute({
   roles: ['administrator'],
   handler: async (req, { user }) => {
     const searchParams = new URL(req.url).searchParams
-    const stationId = String(
-      searchParams.get('stationId') || user.stationId || '',
-    ).trim()
+    const stationId = user.stationId
     if (!stationId) return fail('stationId is required')
 
     const result = await listFiscalInboxQuery({
@@ -61,6 +59,9 @@ export const GET = defineGetRoute({
       topic: parseTopic(searchParams.get('topic')),
       limit: asPositiveInt(searchParams.get('limit'), 50),
       offset: asNonNegativeInt(searchParams.get('offset'), 0),
+      search: searchParams.get('q') || '',
+      startDate: searchParams.get('startDate') || '',
+      endDate: searchParams.get('endDate') || '',
     })
 
     return ok({
