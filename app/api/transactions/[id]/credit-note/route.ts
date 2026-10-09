@@ -5,6 +5,8 @@ import {
 } from '@/src/shared/http/defineRoute'
 import { isUuid } from '@/src/shared/utils/uuid'
 
+import { getStationCountryCode, isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/infrastructure/country'
+
 import { createCreditNote } from '@/src/modules/transactions/application/commands'
 import { getCreditNoteDetails } from '@/src/modules/transactions/application/queries'
 
@@ -39,6 +41,10 @@ export const POST = defineMutationRoute<CreditNoteBody, { id: string }>({
     const transactionId = String(body?.transactionId || '').trim()
     if (!transactionId) return fail('transactionId is required', 400)
     if (!isUuid(transactionId)) return fail('transactionId must be a UUID', 400)
+
+    if (isTanzaniaCountry(await getStationCountryCode(user.stationId))) {
+      return fail('Credit notes are not supported for Tanzania stations.', 400)
+    }
 
     const result = await createCreditNote({
       stationId: user.stationId,
