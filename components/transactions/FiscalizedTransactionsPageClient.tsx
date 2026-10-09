@@ -57,6 +57,7 @@ import { TransactionsStatusToggle } from './TransactionsStatusToggle'
 export type { FiscalizedTransactionListItem }
 
 type FiscalizedTransactionsPageClientProps = {
+  allowCreditNotes: boolean
   initialTransactions: FiscalizedTransactionListItem[]
   initialPage?: number
   initialPageSize?: number
@@ -703,11 +704,13 @@ const FiscalizedTransactionsPageClient = ({
                           >
                             Re-fetch receipt
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => openCreditNote(row)}
-                          >
-                            Create credit note
-                          </DropdownMenuItem>
+                          {allowCreditNotes && (
+                            <DropdownMenuItem
+                              onSelect={() => openCreditNote(row)}
+                            >
+                              Create credit note
+                            </DropdownMenuItem>
+                          )}
                           {row.status.toUpperCase() === 'CREDITED' && (
                             <DropdownMenuItem
                               onSelect={() => openCreditNoteViewer(row.id)}
