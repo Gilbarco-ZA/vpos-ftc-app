@@ -1,3 +1,5 @@
+import { queryOne } from '@/src/platform/db/postgres'
+
 import {
   getTanzaniaDailyTotalsScheduleConfig,
   listTanzaniaDailyTotalSubmissions,
@@ -7,11 +9,14 @@ import { previousClosedBusinessDate } from '../infrastructure/proxyDailyTotals'
 import { forceSendTanzaniaDailyTotal } from '../infrastructure/proxyDailyTotalsWorker'
 import { assertStationIsTanzania } from './country'
 
-export async function getTanzaniaDailyTotalsDashboard(stationId: string) {
+export async function getTanzaniaDailyTotalsDashboard(stationId: string, page = 1, pageSize = 50) {
   await assertStationIsTanzania(stationId)
-  const [schedule, submissions] = await Promise.all([
+  const safePageSize = [10, 25, 50, 100].includes(pageSize) ? pageSize : 50
+  const safePage = Math.max(1, Math.trunc(page))
+  const [schedule, submissions, counted] = await Promise.all([
     getTanzaniaDailyTotalsScheduleConfig(stationId),
-    listTanzaniaDailyTotalSubmissions(stationId),
+    listTanzaniaDailyTotalSubmissions(stationId, safePageSize, (safePage - 1) * safePageSize),
+    queryOne<{ total: string }>('SELECT COUNT(*)::text AS total FROM tanzania_daily_total_submissions WHERE station_id = $1::uuid', [stationId]),
   ])
 
   return {
@@ -22,6 +27,9 @@ export async function getTanzaniaDailyTotalsDashboard(stationId: string) {
       schedule.timezone,
     ),
     submissions,
+    total: Number(counted?.total ?? 0),
+    page: safePage,
+    pageSize: safePageSize,
   }
 }
 
