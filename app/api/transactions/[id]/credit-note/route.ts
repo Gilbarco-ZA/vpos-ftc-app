@@ -5,7 +5,7 @@ import {
 } from '@/src/shared/http/defineRoute'
 import { isUuid } from '@/src/shared/utils/uuid'
 
-import { getStationCountryCode, isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/infrastructure/country'
+import { getStationCountryCode, isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/application/country'
 
 import { createCreditNote } from '@/src/modules/transactions/application/commands'
 import { getCreditNoteDetails } from '@/src/modules/transactions/application/queries'
