@@ -10,6 +10,9 @@ import {
   useState,
 } from 'react'
 
+import CsrfBootstrap from '@/components/security/CsrfBootstrap'
+import { Checkbox } from '@/components/ui/checkbox'
+
 import { STATUS_VARIANT } from '@/src/shared/status/ui'
 
 import { Alert } from '@/components/ui/alert'
@@ -102,6 +105,8 @@ const statusOptions = [
   { label: 'Pending', value: 'PENDING' },
   { label: 'Failed', value: 'FAILED' },
   { label: 'Processed', value: 'PROCESSED' },
+  { label: 'Processing', value: 'PROCESSING' },
+  { label: 'Dead', value: 'DEAD' },
 ]
 
 const normalizeRow = (row: any): FiscalInboxRow => ({
@@ -231,6 +236,12 @@ const FiscalInboxPageClient = ({
   children,
 }: FiscalInboxPageClientProps) => {
   const [rows, setRows] = useState<FiscalInboxRow[]>(initialRows)
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [csrfToken, setCsrfToken] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [filter, setFilter] = useState('')
   const [status, setStatus] = useState('ALL')
   const [startDate, setStartDate] = useState('')
@@ -248,7 +259,7 @@ const FiscalInboxPageClient = ({
     setBusy(true)
     setErr(null)
     try {
-      const sp = new URLSearchParams()
+      const sp = new URLSearchParams({ limit: String(pageSize), offset: String((page - 1) * pageSize) })
       if (filter.trim()) sp.set('q', filter.trim())
       if (status !== 'ALL') sp.set('status', status)
       if (startDate) sp.set('startDate', startDate)
@@ -264,12 +275,14 @@ const FiscalInboxPageClient = ({
           ? payload.items
           : []
       setRows(items.map(normalizeRow))
+      setTotal(Number(payload?.data?.total ?? payload?.total ?? items.length))
+      setSelectedIds([])
     } catch (e: any) {
       setErr(e?.message ?? 'Failed to load fiscal inbox')
     } finally {
       setBusy(false)
     }
-  }, [endDate, filter, startDate, status])
+  }, [endDate, filter, startDate, status, page, pageSize])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -278,17 +291,39 @@ const FiscalInboxPageClient = ({
     // Initial API hydration only. Filter changes remain explicit via Refresh.
   }, [refresh])
 
-  const filtered = useMemo(() => {
-    if (!filter) return rows
-    const needle = filter.toLowerCase()
-    return rows.filter((r) => {
-      const requestId = r.requestId ?? ''
-      return (
-        requestId.toLowerCase().includes(needle) ||
-        String(r.id).includes(needle)
-      )
-    })
-  }, [rows, filter])
+  const visibleIds = useMemo(() => rows.map((row) => row.id), [rows])
+  const allChecked = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id))
+  const toggleAll = () => setSelectedIds(allChecked ? [] : visibleIds)
+  const toggleOne = (id: number) => setSelectedIds((prev) =>
+    prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id],
+  )
+
+  const runBulk = async (action: 'REQUEUE' | 'MARK_FAILED' | 'MARK_DEAD' | 'MARK_PROCESSED' | 'DELETE') => {
+    if (!selectedIds.length || !csrfToken || bulkBusy) return
+    if (!window.confirm(`Apply ${action.replaceAll('_', ' ')} to ${selectedIds.length} selected inbox row(s)?${action === 'DELETE' ? ' This cannot be undone.' : ''}`)) return
+    const errorText = action === 'MARK_FAILED' || action === 'MARK_DEAD'
+      ? window.prompt('Optional error text (Cancel to abort):', '')
+      : null
+    if ((action === 'MARK_FAILED' || action === 'MARK_DEAD') && errorText === null) return
+    setBulkBusy(true)
+    try {
+      const response = await fetch('/api/runtime/fiscal/inbox/bulk', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+        body: JSON.stringify({ ids: selectedIds, action, errorText: errorText || undefined, csrf_token: csrfToken }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok || body?.ok === false || body?.success === false) {
+        throw new Error(body?.error?.message || body?.message || 'Bulk update failed')
+      }
+      showToast('success', `Applied ${action.replaceAll('_', ' ')} to selected inbox rows.`)
+      await refresh()
+    } catch (reason: any) {
+      showToast('error', String(reason?.message || reason))
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   const renderDetails = () => {
     if (!detailsRow) return null
@@ -378,6 +413,7 @@ const FiscalInboxPageClient = ({
   return (
     <FiscalInboxUIContext.Provider value={{ refresh, showToast }}>
       <div className="space-y-4">
+        <CsrfBootstrap onToken={setCsrfToken} />
         {children}
 
         {err && <ErrorDetails title="ERROR" message={err} error={err} />}
@@ -388,12 +424,27 @@ const FiscalInboxPageClient = ({
             status={status}
             startDate={startDate}
             endDate={endDate}
-            onSearchChange={setFilter}
-            onStatusChange={setStatus}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
+            onSearchChange={(value) => { setFilter(value); setPage(1) }}
+            onStatusChange={(value) => { setStatus(value); setPage(1) }}
+            onStartDateChange={(value) => { setStartDate(value); setPage(1) }}
+            onEndDateChange={(value) => { setEndDate(value); setPage(1) }}
             onRefresh={refresh}
           />
+        </Card>
+
+        <Card className="flex flex-wrap items-center gap-2 p-3">
+          <span className="mr-2 text-sm">{selectedIds.length} selected on this page</span>
+          {([
+            ['REQUEUE', 'Requeue'],
+            ['MARK_FAILED', 'Mark FAILED'],
+            ['MARK_DEAD', 'Mark DEAD'],
+            ['MARK_PROCESSED', 'Mark PROCESSED'],
+            ['DELETE', 'Delete'],
+          ] as const).map(([action, label]) => (
+            <Button key={action} size="sm" variant={action === 'DELETE' ? 'destructive' : 'secondary'}
+              disabled={!selectedIds.length || bulkBusy || busy || !csrfToken}
+              onClick={() => void runBulk(action)}>{label}</Button>
+          ))}
         </Card>
 
         {busy ? (
@@ -403,7 +454,7 @@ const FiscalInboxPageClient = ({
             showHeader={false}
             showFilters={false}
           />
-        ) : filtered.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState
             title="No fiscal inbox rows"
             description="No rows match the selected filters."
@@ -413,6 +464,7 @@ const FiscalInboxPageClient = ({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead><Checkbox checked={allChecked} onChange={toggleAll} aria-label="Select displayed inbox rows" /></TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Inbox status</TableHead>
                   <TableHead>Related txn</TableHead>
@@ -424,8 +476,9 @@ const FiscalInboxPageClient = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((row) => (
+                {rows.map((row) => (
                   <TableRow key={row.id}>
+                    <TableCell><Checkbox checked={selectedIds.includes(row.id)} onChange={() => toggleOne(row.id)} aria-label={`Select inbox row ${row.id}`} /></TableCell>
                     <TableCell>{row.id}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant(row.status)}>
@@ -480,6 +533,19 @@ const FiscalInboxPageClient = ({
             </Table>
           </Card>
         )}
+
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
+          <span>{total} total · Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</span>
+          <div className="flex items-center gap-2">
+            <label htmlFor="fiscal-inbox-page-size">Rows</label>
+            <select id="fiscal-inbox-page-size" className="rounded border border-border bg-surface-card p-2"
+              value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
+              {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+            <Button size="sm" variant="secondary" disabled={page <= 1 || busy || bulkBusy} onClick={() => setPage((n) => n - 1)}>Previous</Button>
+            <Button size="sm" variant="secondary" disabled={page * pageSize >= total || busy || bulkBusy} onClick={() => setPage((n) => n + 1)}>Next</Button>
+          </div>
+        </Card>
 
         {renderDetails()}
 
