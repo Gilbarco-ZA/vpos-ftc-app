@@ -77,6 +77,9 @@ export type { TransactionListItem }
 
 type NonFiscalizedTransactionsPageClientProps = {
   initialTransactions: TransactionListItem[]
+  initialPage?: number
+  initialPageSize?: number
+  initialTotal?: number
   products: TransactionBuilderProduct[]
   error?: string | null
   children: ReactNode
@@ -185,6 +188,9 @@ const mapTransactionRow = (item: any): TransactionListItem => ({
 
 const NonFiscalizedTransactionsPageClient = ({
   initialTransactions,
+  initialPage = 1,
+  initialPageSize = 50,
+  initialTotal = 0,
   products,
   error,
   children,
@@ -195,6 +201,9 @@ const NonFiscalizedTransactionsPageClient = ({
   businessDate = '',
 }: NonFiscalizedTransactionsPageClientProps) => {
   const [transactions, setTransactions] = useState(initialTransactions)
+  const [page, setPage] = useState(initialPage)
+  const [pageSize, setPageSize] = useState(initialPageSize)
+  const [total, setTotal] = useState(initialTotal)
   const [loadError, setLoadError] = useState<unknown>(error ?? null)
   const [loading, setLoading] = useState(false)
   const [buyerTypeOptions, setBuyerTypeOptions] = useState<SelectOption[]>([])
@@ -220,9 +229,10 @@ const NonFiscalizedTransactionsPageClient = ({
   useEffect(() => {
     queueMicrotask(() => {
       setTransactions(initialTransactions)
+      setTotal(initialTotal)
       setLoadError(error ?? null)
     })
-  }, [error, initialTransactions])
+  }, [error, initialTransactions, initialTotal])
 
   useEffect(() => {
     const loadBuyerTypes = async () => {
@@ -367,7 +377,8 @@ const NonFiscalizedTransactionsPageClient = ({
     try {
       const params = new URLSearchParams({
         scope: 'non-fiscalized',
-        limit: '200',
+        page: String(page),
+        pageSize: String(pageSize),
       })
       if (search.trim()) params.set('search', search.trim())
       if (status !== 'ALL') params.set('status', status)
@@ -391,12 +402,13 @@ const NonFiscalizedTransactionsPageClient = ({
             ? payload
             : []
       setTransactions(items.map(mapTransactionRow))
+      setTotal(Number(payload?.total ?? items.length))
     } catch (err: unknown) {
       setLoadError(err)
     } finally {
       setLoading(false)
     }
-  }, [search, status, startDate, endDate])
+  }, [search, status, startDate, endDate, page, pageSize])
 
   const formatMoney = (value: number | null | undefined) =>
     formatNumber(value == null ? null : Number(value), decimals.money)
@@ -414,6 +426,10 @@ const NonFiscalizedTransactionsPageClient = ({
     }
     setFiscalizeTransaction(null)
     await refresh()
+  }
+
+  const changePage = (next: number) => {
+    setPage(next)
   }
 
   const filteredTransactions = useMemo(() => transactions, [transactions])
