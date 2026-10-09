@@ -246,6 +246,7 @@ const FiscalStatusSheet = ({
 )
 
 const FiscalizedTransactionsPageClient = ({
+  allowCreditNotes,
   initialTransactions,
   initialPage = 1,
   initialPageSize = 50,
