@@ -8,6 +8,7 @@ import type {
 import type { TanzaniaDailyTotalRequest } from '@/src/modules/tanzania-fiscal/infrastructure/proxyDailyTotals'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, Printer, RefreshCw, Send } from 'lucide-react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 
 import { PageHeader } from '@/components/layout/page-header'
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
@@ -39,6 +40,9 @@ type DashboardData = {
   sendTime: string
   latestClosedBusinessDate: string
   submissions: TanzaniaDailyTotalSubmissionHistoryItem[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 const money = (value: unknown) =>
@@ -316,6 +320,8 @@ export function TanzaniaDailyTotalsClient({
   const [data, setData] = useState<DashboardData | null>(null)
   const [sendTime, setSendTime] = useState('00:00')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
   const [csrfToken, setCsrfToken] = useState('')
   const [busy, setBusy] = useState<string | null>('load')
   const [error, setError] = useState<string | null>(null)
@@ -330,7 +336,7 @@ export function TanzaniaDailyTotalsClient({
     setBusy('load')
     setError(null)
     try {
-      const response = await fetch(endpoint, { cache: 'no-store' })
+      const response = await fetch(`${endpoint}?page=${page}&pageSize=${pageSize}`, { cache: 'no-store' })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
         throw new Error(
@@ -340,17 +346,13 @@ export function TanzaniaDailyTotalsClient({
       const next = (body?.data ?? body) as DashboardData
       setData(next)
       setSendTime(next.sendTime)
-      setSelectedId((current) =>
-        current && next.submissions.some((item) => item.id === current)
-          ? current
-          : next.submissions[0]?.id || null,
-      )
+      setSelectedId(null)
     } catch (reason: any) {
       setError(reason?.message || String(reason))
     } finally {
       setBusy(null)
     }
-  }, [])
+  }, [page, pageSize])
 
   useEffect(() => {
     queueMicrotask(() => void load())
@@ -523,8 +525,7 @@ export function TanzaniaDailyTotalsClient({
           <CardHeader>
             <CardTitle>Submission history</CardTitle>
             <CardDescription>
-              Up to the latest 120 recorded Tanzania daily-total submissions are
-              shown below.
+              Browse recorded Tanzania daily-total submissions by page.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -614,11 +615,31 @@ export function TanzaniaDailyTotalsClient({
                 No Tanzania daily-total submissions have been recorded yet.
               </p>
             )}
+            {data ? (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <span>{data.total} reports · Page {page} of {Math.max(1, Math.ceil(data.total / pageSize))}</span>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="daily-totals-page-size">Rows</label>
+                  <select id="daily-totals-page-size" className="rounded border border-border bg-surface-card px-2 py-1"
+                    value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
+                    {[10, 25, 50, 100].map((count) => <option key={count} value={count}>{count}</option>)}
+                  </select>
+                  <Button size="sm" variant="secondary" disabled={page <= 1 || busy === 'load'} onClick={() => setPage((current) => current - 1)}>Previous</Button>
+                  <Button size="sm" variant="secondary" disabled={page * pageSize >= data.total || busy === 'load'} onClick={() => setPage((current) => current + 1)}>Next</Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
+        <Sheet open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelectedId(null) }}>
+          <SheetContent side="right" className="flex h-dvh w-full flex-col p-0 sm:max-w-3xl">
+            <SheetHeader className="border-b px-6 py-4">
+              <SheetTitle>{selected ? `Report ${selected.businessDate}` : 'Daily total report'}</SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
         {selected ? (
-          <Card>
+          <div>
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -665,8 +686,11 @@ export function TanzaniaDailyTotalsClient({
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </div>
         ) : null}
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {selected ? <PrintableReport item={selected} /> : null}
