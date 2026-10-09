@@ -55,6 +55,22 @@ export function createFiscalInboxRepository(): FiscalInboxRepositoryPort {
         listWhere.push(`fi.topic = $${params.length}`)
       }
 
+      if (filters.search?.trim()) {
+        params.push(`%${filters.search.trim()}%`)
+        const clause = `(request_id ILIKE ${params.length} OR id::text ILIKE ${params.length})`
+        countWhere.push(clause)
+        listWhere.push(`(fi.request_id ILIKE ${params.length} OR fi.id::text ILIKE ${params.length})`)
+      }
+      if (filters.startDate) {
+        params.push(filters.startDate)
+        countWhere.push(`received_at >= ${params.length}::date`)
+        listWhere.push(`fi.received_at >= ${params.length}::date`)
+      }
+      if (filters.endDate) {
+        params.push(filters.endDate)
+        countWhere.push(`received_at < (${params.length}::date + INTERVAL '1 day')`)
+        listWhere.push(`fi.received_at < (${params.length}::date + INTERVAL '1 day')`)
+      }
       const countWhereSql = `WHERE ${countWhere.join(' AND ')}`
       const listWhereSql = `WHERE ${listWhere.join(' AND ')}`
 
