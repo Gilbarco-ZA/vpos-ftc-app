@@ -210,7 +210,9 @@ const ManagerNonFiscalizedView = async ({
   if (!['manager', 'administrator', 'field_engineer'].includes(user.role))
     redirect('/dashboard')
 
-  const page = Number(readParam(searchParams, 'page') || '1') || 1
+  const page = Math.max(1, Number(readParam(searchParams, 'page') || '1') || 1)
+  const requestedPageSize = Number(readParam(searchParams, 'pageSize') || '50')
+  const pageSize = [10, 25, 50, 100].includes(requestedPageSize) ? requestedPageSize : 50
   const pump = readParam(searchParams, 'pump').trim()
   const transactionId = readParam(searchParams, 'transactionId').trim()
   const q = readParam(searchParams, 'q').trim()
@@ -230,7 +232,7 @@ const ManagerNonFiscalizedView = async ({
 
   const data = await loadManagerTransactions(user.stationId, {
     page,
-    pageSize: 50,
+    pageSize,
     pumpNumber: pump || undefined,
     excludeStatus: 'FISCALIZED',
     transactionId: transactionId || undefined,
@@ -248,13 +250,15 @@ const ManagerNonFiscalizedView = async ({
     listTransactionCatalogProducts(user.stationId),
   ])
 
-  const nextPage = page + 1
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const nextPage = Math.min(totalPages, page + 1)
   const prevPage = Math.max(1, page - 1)
 
   const mk = (p: number) => {
     const sp = new URLSearchParams()
     sp.set('status', 'non-fiscalized')
     sp.set('page', String(p))
+    sp.set('pageSize', String(pageSize))
     if (pump) sp.set('pump', pump)
     if (transactionId) sp.set('transactionId', transactionId)
     if (q) sp.set('q', q)
@@ -263,6 +267,8 @@ const ManagerNonFiscalizedView = async ({
     if (preset) sp.set('preset', preset)
     return `/transactions?${sp.toString()}`
   }
+
+  const mkSize = (size: number) => mk(1).replace(`pageSize=${pageSize}`, `pageSize=${size}`)
 
   return (
     <div className="space-y-4">
@@ -325,13 +331,18 @@ const ManagerNonFiscalizedView = async ({
           decimals={decimals}
         />
 
-        <div className="flex items-center justify-between px-4 py-3 text-sm">
-          <Button asChild variant="secondary" size="sm">
-            <Link href={mk(prevPage)}>Previous</Link>
-          </Button>
-          <Button asChild variant="secondary" size="sm">
-            <Link href={mk(nextPage)}>Next</Link>
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+          <span>Page {page} of {totalPages}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span>Rows per page:</span>
+            {[10, 25, 50, 100].map((size) => (
+              <Button key={size} asChild size="sm" variant={pageSize === size ? 'primary' : 'ghost'}>
+                <Link href={mkSize(size)}>{size}</Link>
+              </Button>
+            ))}
+            <Button asChild variant="secondary" size="sm"><Link href={mk(prevPage)}>Previous</Link></Button>
+            <Button asChild variant="secondary" size="sm"><Link href={mk(nextPage)}>Next</Link></Button>
+          </div>
         </div>
       </Card>
 
