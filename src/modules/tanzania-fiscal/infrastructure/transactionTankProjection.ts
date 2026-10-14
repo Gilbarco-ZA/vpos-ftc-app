@@ -133,6 +133,31 @@ export function calculateTanzaniaReportedTankVolume(args: {
   return Math.max(0, remaining)
 }
 
+
+export function calculateTanzaniaRecoveredReportedTankVolume(args: {
+  anchorVolumeLitres: number
+  subsequentSalesVolumeLitres: number
+  deliveryVolumeLitres: number
+}): number {
+  const anchor = Number(args.anchorVolumeLitres)
+  const sales = Number(args.subsequentSalesVolumeLitres)
+  const deliveries = Number(args.deliveryVolumeLitres)
+  if (![anchor, sales, deliveries].every(Number.isFinite)) {
+    throw new Error('Tanzania tank recovery requires finite litre values')
+  }
+  if (anchor < 0 || sales < 0 || deliveries < 0) {
+    throw new Error('Tanzania tank recovery litre values are invalid')
+  }
+
+  const recovered = roundVolume(anchor + sales - deliveries)
+  if (recovered < -0.001) {
+    throw new Error(
+      `Tanzania recovered tank inventory would be negative (${recovered.toFixed(3)} L).`,
+    )
+  }
+  return Math.max(0, recovered)
+}
+
 export function applyTanzaniaTankProjectionToInvoice(
   invoice: ProxyInvoiceRequest,
   projection: TanzaniaTransactionTankProjection,
@@ -452,6 +477,63 @@ async function loadSnapshotBaseline(args: {
   }
 }
 
+
+async function loadRecoverySnapshot(args: {
+  client: PoolClient
+  stationId: string
+  memberTankIds: string[]
+  transactionDate: string | Date
+}): Promise<{ capturedAt: string; volumeLitres: number } | null> {
+  if (!args.memberTankIds.length) return null
+
+  const result = await txQuery<SnapshotRow>(
+    args.client,
+    `WITH eligible_capture AS (
+       SELECT captured_at
+         FROM tank_atg_capture_evidence
+        WHERE station_id = $1::uuid
+          AND tank_id = ANY($2::uuid[])
+          AND captured_at > $3::timestamptz
+        GROUP BY captured_at
+       HAVING COUNT(DISTINCT tank_id) = cardinality($2::uuid[])
+        ORDER BY captured_at DESC
+        LIMIT 1
+     )
+     SELECT evidence.tank_id::text,
+            evidence.captured_at,
+            evidence.volume_litres,
+            evidence.doms_tank_id
+       FROM tank_atg_capture_evidence evidence
+       JOIN eligible_capture capture
+         ON capture.captured_at = evidence.captured_at
+      WHERE evidence.station_id = $1::uuid
+        AND evidence.tank_id = ANY($2::uuid[])
+      ORDER BY evidence.tank_id`,
+    [args.stationId, args.memberTankIds, args.transactionDate],
+  )
+  if (result.rows.length !== args.memberTankIds.length) return null
+
+  const capturedTimes = Array.from(
+    new Set(result.rows.map((row) => new Date(row.captured_at).toISOString())),
+  )
+  if (capturedTimes.length !== 1) return null
+
+  const volumeLitres = result.rows.reduce((sum, row) => {
+    const value = Number(row.volume_litres)
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(
+        `Tanzania ATG recovery volume is missing or invalid for tank ${row.tank_id}.`,
+      )
+    }
+    return sum + value
+  }, 0)
+
+  return {
+    capturedAt: capturedTimes[0],
+    volumeLitres: roundVolume(volumeLitres),
+  }
+}
+
 async function loadReusableProjectionBaseline(args: {
   client: PoolClient
   stationId: string
@@ -598,6 +680,89 @@ async function calculatePriorSales(args: {
   return roundVolume(Number(result.rows[0]?.prior_volume ?? 0))
 }
 
+
+async function calculateRecoveryReportedVolume(args: {
+  client: PoolClient
+  stationId: string
+  transactionId: string
+  memberTankIds: string[]
+  transactionDate: string | Date
+  transactionCreatedAt: string | Date
+}): Promise<number | null> {
+  const snapshot = await loadRecoverySnapshot({
+    client: args.client,
+    stationId: args.stationId,
+    memberTankIds: args.memberTankIds,
+    transactionDate: args.transactionDate,
+  })
+  if (!snapshot) return null
+
+  const movements = await txQuery<{
+    subsequent_sales: string | number | null
+    delivery_volume: string | number | null
+    unsupported_movements: string | number | null
+  }>(
+    args.client,
+    `SELECT COALESCE(SUM(til.quantity_litres) FILTER (
+              WHERE til.movement_type = 'DEDUCTION'
+            ), 0)::numeric AS subsequent_sales,
+            COALESCE(SUM(til.quantity_litres) FILTER (
+              WHERE til.movement_type = 'STOCK_IN'
+                AND til.stock_in_type = 'Delivery'
+            ), 0)::numeric AS delivery_volume,
+            COUNT(*) FILTER (
+              WHERE (til.movement_type = 'DEDUCTION' AND movement_tx.id IS NULL)
+                 OR (til.movement_type = 'STOCK_IN' AND til.stock_in_type IS DISTINCT FROM 'Delivery')
+            )::int AS unsupported_movements
+       FROM tank_inventory_ledger til
+       LEFT JOIN transactions movement_tx
+         ON movement_tx.station_id = til.station_id
+        AND movement_tx.id = til.source_transaction_id
+      WHERE til.station_id = $1::uuid
+        AND til.tank_id = ANY($2::uuid[])
+        AND til.effective_at <= $3::timestamptz
+        AND (
+          (
+            til.movement_type = 'DEDUCTION'
+            AND (
+              movement_tx.transaction_date_time > $4::timestamptz
+              OR (
+                movement_tx.transaction_date_time = $4::timestamptz
+                AND (
+                  movement_tx.created_at > $5::timestamptz
+                  OR (
+                    movement_tx.created_at = $5::timestamptz
+                    AND movement_tx.id::text > $6::text
+                  )
+                )
+              )
+            )
+          )
+          OR (
+            til.movement_type = 'STOCK_IN'
+            AND til.effective_at > $4::timestamptz
+          )
+        )`,
+    [
+      args.stationId,
+      args.memberTankIds,
+      snapshot.capturedAt,
+      args.transactionDate,
+      args.transactionCreatedAt,
+      args.transactionId,
+    ],
+  )
+
+  const row = movements.rows[0]
+  if (Number(row?.unsupported_movements ?? 0) > 0) return null
+
+  return calculateTanzaniaRecoveredReportedTankVolume({
+    anchorVolumeLitres: snapshot.volumeLitres,
+    subsequentSalesVolumeLitres: Number(row?.subsequent_sales ?? 0),
+    deliveryVolumeLitres: Number(row?.delivery_volume ?? 0),
+  })
+}
+
 async function persistProjection(args: {
   client: PoolClient
   projection: TanzaniaTransactionTankProjection
@@ -715,11 +880,33 @@ export async function ensureTanzaniaTransactionTankProjection(args: {
         transactionDate: context.transaction_date_time,
         transactionCreatedAt: context.created_at,
       })
-      const reportedVolumeLitres = calculateTanzaniaReportedTankVolume({
-        baselineVolumeLitres: Number(existing.baseline_volume_litres),
-        priorSalesVolumeLitres,
-        transactionVolumeLitres: transactionVolume,
-      })
+      let reportedVolumeLitres: number
+      try {
+        reportedVolumeLitres = calculateTanzaniaReportedTankVolume({
+          baselineVolumeLitres: Number(existing.baseline_volume_litres),
+          priorSalesVolumeLitres,
+          transactionVolumeLitres: transactionVolume,
+        })
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !error.message.includes('projected tank inventory would be negative')
+        ) {
+          throw error
+        }
+
+        const recovered = await calculateRecoveryReportedVolume({
+          client,
+          stationId: args.stationId,
+          transactionId: args.transactionId,
+          memberTankIds: existing.member_tank_ids ?? [],
+          transactionDate: context.transaction_date_time,
+          transactionCreatedAt: context.created_at,
+        })
+        if (recovered == null) throw error
+        reportedVolumeLitres = recovered
+      }
+
       return await persistProjection({
         client,
         projection: {
