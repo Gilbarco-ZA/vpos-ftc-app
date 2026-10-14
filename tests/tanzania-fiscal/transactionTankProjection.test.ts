@@ -4,6 +4,7 @@ import test from 'node:test'
 import type { ProxyInvoiceRequest } from '@/src/shared/fiscalization/proxy/contracts'
 import {
   applyTanzaniaTankProjectionToInvoice,
+  calculateTanzaniaRecoveredReportedTankVolume,
   calculateTanzaniaReportedTankVolume,
   normalizeTanzaniaTankId,
   type TanzaniaTransactionTankProjection,
@@ -25,6 +26,37 @@ test('Tanzania grouped tank projection deducts cumulative sale litres from the A
       transactionVolumeLitres: 30,
     }),
     34_930,
+  )
+})
+
+test('Tanzania tank projection can be recovered from a later synced ATG anchor', () => {
+  assert.equal(
+    calculateTanzaniaRecoveredReportedTankVolume({
+      anchorVolumeLitres: 80,
+      subsequentSalesVolumeLitres: 30,
+      deliveryVolumeLitres: 0,
+    }),
+    110,
+  )
+  assert.equal(
+    calculateTanzaniaRecoveredReportedTankVolume({
+      anchorVolumeLitres: 80,
+      subsequentSalesVolumeLitres: 30,
+      deliveryVolumeLitres: 25,
+    }),
+    85,
+  )
+})
+
+test('Tanzania tank recovery fails closed when reconstructed inventory is negative', () => {
+  assert.throws(
+    () =>
+      calculateTanzaniaRecoveredReportedTankVolume({
+        anchorVolumeLitres: 10,
+        subsequentSalesVolumeLitres: 0,
+        deliveryVolumeLitres: 20,
+      }),
+    /recovered tank inventory would be negative/,
   )
 })
 
