@@ -725,7 +725,8 @@ async function calculateRecoveryReportedVolume(args: {
           (
             til.movement_type = 'DEDUCTION'
             AND (
-              movement_tx.transaction_date_time > $4::timestamptz
+              movement_tx.id IS NULL
+              OR movement_tx.transaction_date_time > $4::timestamptz
               OR (
                 movement_tx.transaction_date_time = $4::timestamptz
                 AND (
