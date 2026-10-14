@@ -1026,11 +1026,32 @@ export async function ensureTanzaniaTransactionTankProjection(args: {
       transactionDate: context.transaction_date_time,
       transactionCreatedAt: context.created_at,
     })
-    const reportedVolumeLitres = calculateTanzaniaReportedTankVolume({
-      baselineVolumeLitres: baseline.baselineVolumeLitres,
-      priorSalesVolumeLitres,
-      transactionVolumeLitres: transactionVolume,
-    })
+    let reportedVolumeLitres: number
+    try {
+      reportedVolumeLitres = calculateTanzaniaReportedTankVolume({
+        baselineVolumeLitres: baseline.baselineVolumeLitres,
+        priorSalesVolumeLitres,
+        transactionVolumeLitres: transactionVolume,
+      })
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !error.message.includes('projected tank inventory would be negative')
+      ) {
+        throw error
+      }
+
+      const recovered = await calculateRecoveryReportedVolume({
+        client,
+        stationId: args.stationId,
+        transactionId: args.transactionId,
+        memberTankIds: memberTanks.map((tank) => tank.id),
+        transactionDate: context.transaction_date_time,
+        transactionCreatedAt: context.created_at,
+      })
+      if (recovered == null) throw error
+      reportedVolumeLitres = recovered
+    }
 
     return await persistProjection({
       client,
