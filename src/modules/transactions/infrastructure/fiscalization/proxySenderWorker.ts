@@ -1150,13 +1150,29 @@ export async function sendClaimedTransactionToProxy(input: {
       at: Date.now(),
     })
 
+    // Persist the outgoing identifier before a potentially lost HTTP response.
+    // The status worker needs this key even when the proxy returns a timeout.
+    docId = trimString(invoice.documentId)
     const res = await submitInvoiceToProxy(stationId, invoice, {
       idempotencyKey: `${stationId}:${txn.id}`,
     })
-    if (!res.ok)
-      throw new Error(
-        `Proxy submit failed: ${res.status} ${JSON.stringify(res.data)}`,
-      )
+    if (!res.ok) {
+      // A gateway failure does not prove that the upstream did not fiscalize.
+      // Keep Tanzania submissions available for authoritative status polling.
+      if (isTanzaniaCountry(country) && (res.status >= 500 || res.status === 0)) {
+        await persistProxySubmission({
+          stationId,
+          transactionId: String(txn.id),
+          engine: proxyEngine,
+          fiscalDocumentId: docId,
+          requestPayload: invoice,
+          responsePayload: { ...res.data, documentId: docId, status: 'PENDING', transportStatus: res.status },
+          existingEventId: txn?.latest_fiscal_event_id ?? null,
+        })
+        return { ok: true as const, documentId: docId, documentNumber: null, awaitingFinalResult: true }
+      }
+      throw new Error(`Proxy submit failed: ${res.status} ${JSON.stringify(res.data)}`)
+    }
 
     // Tanzania final responses may omit documentId. The exact identifier sent
     // to the proxy remains authoritative and is safer than leaving the local
