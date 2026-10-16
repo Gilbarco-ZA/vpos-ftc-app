@@ -493,6 +493,17 @@ function extractProxyCorrelationKeys(source: any): string[] {
 }
 
 function extractProxyResults(data: any): any[] {
+  // Tanzania and Cloud invoice status endpoints return an invoices collection.
+  if (Array.isArray(data?.invoices)) return data.invoices
+  if (Array.isArray(data?.data?.invoices)) return data.data.invoices
+  // Queue lookups wrap the persisted row under request; completion data is
+  // stored in responseData rather than directly on the queue envelope.
+  if (data?.request && typeof data.request === 'object') {
+    return extractProxyResults(data.request)
+  }
+  if (data?.responseData && typeof data.responseData === 'object') {
+    return extractProxyResults(data.responseData)
+  }
   if (Array.isArray(data)) return data
 
   const candidates = [
