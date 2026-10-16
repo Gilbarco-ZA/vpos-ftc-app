@@ -555,6 +555,13 @@ function hasFinalFiscalizationPayload(source: any): boolean {
   )
   if (hasReceiptEvidence) return true
 
+  // The Tanzania invoice-status collection can return final TRA receipt
+  // evidence directly on the invoice entry rather than under details.receipt.
+  const statusEvidence = trimString(source?.fiscalVerificationCode) ||
+    trimString(source?.fiscalQrCodeData)
+  const statusValue = extractProxyStatus(source)
+  if (statusEvidence && statusValue && FINAL_SUCCESS_STATUSES.has(statusValue)) return true
+
   const fiscalizedFlag = upperTrim(
     extractFirstString(source, [
       'isFiscalized',
