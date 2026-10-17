@@ -7,6 +7,7 @@ import {
 import { getEnvValue } from '@/src/shared/config/envDb'
 import {
   getFiscalizationResultsSinceViaProxy,
+  getTanzaniaInvoiceStatusViaProxy,
   getOfflineQueueItemViaProxy,
   getOfflineQueuePendingViaProxy,
 } from '@/src/shared/proxy/client'
@@ -554,6 +555,13 @@ function hasFinalFiscalizationPayload(source: any): boolean {
   )
   if (hasReceiptEvidence) return true
 
+  // The Tanzania invoice-status collection can return final TRA receipt
+  // evidence directly on the invoice entry rather than under details.receipt.
+  const statusEvidence = trimString(source?.fiscalVerificationCode) ||
+    trimString(source?.fiscalQrCodeData)
+  const statusValue = extractProxyStatus(source)
+  if (statusEvidence && statusValue && FINAL_SUCCESS_STATUSES.has(statusValue)) return true
+
   const fiscalizedFlag = upperTrim(
     extractFirstString(source, [
       'isFiscalized',
@@ -832,6 +840,8 @@ async function reconcilePendingProxyFiscalizations(input: {
   let finalized = 0
   let failed = 0
   const defaultProxyEngine = await loadFiscalizationEngine(input.stationId)
+  const station = await loadStation(input.stationId)
+  const isTanzania = isTanzaniaCountry(normalizeFiscalCountryCode(station?.country))
 
   for (const txn of pending) {
     const stored = getStoredProxyFiscalizationPayload(txn)
@@ -858,6 +868,36 @@ async function reconcilePendingProxyFiscalizations(input: {
             stationId: input.stationId,
             transactionId: String(txn.id),
             requestId,
+            error: String(error?.message || error),
+          })
+        }
+      }
+    }
+
+    // The Tanzania status endpoint is authoritative when the submission
+    // response was lost or the proxy queue only has a pending response.
+    if (isTanzania && (!matched || (!hasFinalFiscalizationPayload(matched) && !isFailedFiscalizationPayload(matched)))) {
+      const documentId = trimString(txn?.fiscal_document_id) || extractProxyDocumentId(stored)
+      if (documentId) {
+        try {
+          const lookup = await getTanzaniaInvoiceStatusViaProxy(input.stationId, documentId)
+          if (lookup.ok && lookup.data?.error !== true) {
+            const invoices = extractProxyResults(lookup.data)
+            const matching = invoices.filter((invoice) =>
+              upperTrim(extractProxyDocumentId(invoice)) === upperTrim(documentId),
+            )
+            if (matching.length === 1) {
+              const invoice = matching[0]
+              const status = extractProxyStatus(invoice)
+              if (status && (FINAL_SUCCESS_STATUSES.has(status) || FINAL_FAILURE_STATUSES.has(status))) {
+                matched = invoice
+              }
+            }
+          }
+        } catch (error: any) {
+          logger.warn(`[${WORKER_NAME}] Tanzania status lookup failed`, {
+            stationId: input.stationId,
+            transactionId: String(txn.id),
             error: String(error?.message || error),
           })
         }
@@ -1110,13 +1150,29 @@ export async function sendClaimedTransactionToProxy(input: {
       at: Date.now(),
     })
 
+    // Persist the outgoing identifier before a potentially lost HTTP response.
+    // The status worker needs this key even when the proxy returns a timeout.
+    docId = trimString(invoice.documentId)
     const res = await submitInvoiceToProxy(stationId, invoice, {
       idempotencyKey: `${stationId}:${txn.id}`,
     })
-    if (!res.ok)
-      throw new Error(
-        `Proxy submit failed: ${res.status} ${JSON.stringify(res.data)}`,
-      )
+    if (!res.ok) {
+      // A gateway failure does not prove that the upstream did not fiscalize.
+      // Keep Tanzania submissions available for authoritative status polling.
+      if (isTanzaniaCountry(country) && (res.status >= 500 || res.status === 0)) {
+        await persistProxySubmission({
+          stationId,
+          transactionId: String(txn.id),
+          engine: proxyEngine,
+          fiscalDocumentId: docId,
+          requestPayload: invoice,
+          responsePayload: { ...res.data, documentId: docId, status: 'PENDING', transportStatus: res.status },
+          existingEventId: txn?.latest_fiscal_event_id ?? null,
+        })
+        return { ok: true as const, documentId: docId, documentNumber: null, awaitingFinalResult: true }
+      }
+      throw new Error(`Proxy submit failed: ${res.status} ${JSON.stringify(res.data)}`)
+    }
 
     // Tanzania final responses may omit documentId. The exact identifier sent
     // to the proxy remains authoritative and is safer than leaving the local

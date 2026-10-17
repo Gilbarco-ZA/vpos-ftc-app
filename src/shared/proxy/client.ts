@@ -311,6 +311,17 @@ export const stopOfflineQueueProcessingViaProxy = async (
   })
 }
 
+export const getTanzaniaInvoiceStatusViaProxy = async (
+  stationId: string | undefined,
+  documentId: string,
+) => proxyRequest(stationId, {
+  method: 'GET',
+  path: '/api/tanzania/invoices/status',
+  fallbackPath: '/api/tanzania/invoices/status',
+  query: { DocumentId: documentId },
+  timeoutMs: 10_000,
+})
+
 export const getFiscalizationResultsSinceViaProxy = async (
   stationId: string | undefined,
   query: { since: string; limit?: number },
