@@ -124,30 +124,20 @@ export interface FiscalEndpoint {
   path: string
 }
 
-/** An adapter must never silently convert unsupported operations to another country. */
+/**
+ * Domain contract for a composed country policy set. HTTP transport, endpoints,
+ * transaction persistence and retry workers are intentionally not provided here.
+ * The production registry remains empty until a separate integration pass.
+ */
 export interface CountryFiscalizationAdapter {
   readonly countryCode: FiscalCountryCode
   readonly capabilities: Readonly<CountryCapabilities>
-  readonly endpoints: Readonly<Partial<Record<
-    'invoice' | 'creditNote' | 'productRegistration' | 'productStatus' |
-    'invoiceStatus' | 'dailyTotals' | 'tankInventory',
-    FiscalEndpoint
-  >>>
-  readonly products: {
-    defaultsForFuel(gradeName: string): Partial<CanonicalProduct>
-    validate(product: CanonicalProduct): ValidationResult
-    buildRegistration(products: readonly CanonicalProduct[]): unknown
-  }
-  readonly invoices: {
-    validate(invoice: CanonicalInvoice): ValidationResult
-    buildPayload(invoice: CanonicalInvoice): unknown
-    buildCreditNote?(invoice: CanonicalInvoice): unknown
-  }
-  readonly receipts: {
-    build(receipt: CanonicalReceipt): unknown
-  }
-  readonly fiscalization: {
-    interpretStatus(response: unknown): FiscalProcessingState
-    buildStatusRequest?(documentId: string): unknown
-  }
+  readonly products: import('./productPolicy').ProductPolicy
+  readonly invoices: import('./invoicePolicy').InvoicePolicy
+  readonly creditNotes: import('./creditNotePolicy').CreditNotePolicy
+  readonly receipts: import('./receiptPolicy').ReceiptPolicy
+  readonly normalizeStatus: (
+    response: import('@/src/shared/fiscalization/proxy/contracts').ProxyInvoiceResponse
+  ) => import('./statusPolicy').FiscalStatusResolution
+  readonly productionConnected: false
 }
