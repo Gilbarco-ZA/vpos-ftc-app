@@ -216,3 +216,16 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Add enriched KE/TZ receipt snapshot fixtures; the receipt policies already delegate to live templates.
 - [ ] Validate against authoritative proxy Swagger, not only local code parity.
 - [ ] Run npm run check and targeted fiscalization tests after this pass.
+
+## Fiscal-layer testing pass: receipt fixtures and status correlation
+
+- [x] Add representative Kenya and Tanzania enriched receipt model parity tests.
+- [x] Test reuse of existing receipt template output rather than duplicating print logic.
+- [x] Add side-effect-free document ID correlation gate for fiscal status reconciliation.
+- [x] Require explicit, matching proxy document ID before proposing fiscalized state update.
+- [x] Never authorize automatic resubmission from unknown, pending or rejected status alone.
+- [x] Test mismatched/missing identifiers, pending, failed and confirmed responses.
+- [ ] Verify live provider status field/ID semantics against current proxy Swagger.
+- [ ] Capture redacted real receipt models and add snapshots covering TRA/KE regulatory format.
+- [ ] Test npm run check and targeted new cases.
+- [ ] Plan production recovery integration separately, including locking and idempotency.
