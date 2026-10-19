@@ -19,7 +19,14 @@ export function normalizeInvoiceFiscalStatus(
 ): FiscalStatusResolution {
   const raw = String(response.status ?? '').trim().toUpperCase()
   const isFiscalized = response.details?.isFiscalized === true
-  // An explicit fiscalization confirmation wins over transient top-level errors.
+  // Contradictory evidence must not authorize a recovery write.
+  if (response.error === true && (isFiscalized || SUCCESS.has(raw))) {
+    return {
+      state: 'unknown', documentId: response.documentId ?? null, sourceStatus: raw || null,
+      reason: 'Proxy status is contradictory (success with error); manual reconciliation required',
+      safeToResubmit: false,
+    }
+  }
   if (isFiscalized || SUCCESS.has(raw)) {
     return {
       state: 'fiscalized',
