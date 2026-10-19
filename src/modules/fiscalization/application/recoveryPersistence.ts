@@ -72,5 +72,5 @@ export async function applyConfirmedFiscalRecovery(
       documentId: assessment.documentId,
     },
   })
-  return { ...safe, outcome: result.outcome }
+  return { ...safe, outcome: result.outcome === 'updated' ? 'applied' : result.outcome }
 }
