@@ -51,6 +51,46 @@ function toLegacyInvoicePayload(invoice: ProxyInvoiceRequest) {
   })
 }
 
+function toKenyaInvoicePayload(invoice: ProxyInvoiceRequest) {
+  return compact({
+    DocumentId: invoice.documentId ?? null,
+    issueDateTime: invoice.issueDateTime,
+    createdByName: invoice.createdByName ?? 'VPOS-LITE',
+    buyer: invoice.buyer ?? undefined,
+    Lines: (invoice.lines ?? []).map((line) => ({
+      lineType: line.lineType ?? null,
+      product: line.product
+        ? {
+            productId: line.product.productId ?? null,
+            productCode: line.product.productCode ?? null,
+            productClassCode: line.product.productClassCode ?? null,
+            productTypeCode: line.product.productTypeCode ?? null,
+            description: line.product.description ?? null,
+            unitOfMeasure: line.product.unitOfMeasure ?? null,
+            unitOfPackaging: line.product.unitOfPackaging ?? null,
+            quantity: line.product.quantity,
+            unitPrice: line.product.unitPrice ?? null,
+            hazardousIndicator: line.product.hazardousIndicator ?? null,
+            fuel: line.product.fuel ?? undefined,
+          }
+        : null,
+      taxes: (line.taxes ?? []).map((tax) => ({
+        type: tax.type ?? null,
+        rate: tax.rate ?? 0,
+      })),
+    })),
+    Currency: invoice.currency ?? 'KES',
+    Payment: invoice.payment
+      ? {
+          Tenders: invoice.payment.tenders.map((tender) => ({
+            Method: tender.method,
+            Amount: tender.amount,
+          })),
+        }
+      : undefined,
+  })
+}
+
 function toTanzaniaInvoicePayload(invoice: ProxyInvoiceRequest) {
   const localInvoiceDate = withoutTimezoneSuffix(
     invoice.tanzania?.invoiceDate ?? invoice.issueDateTime,
@@ -118,9 +158,14 @@ export function toCountrySpecificInvoicePayload(invoice: ProxyInvoiceRequest) {
     invoice.countryCode?.trim().toUpperCase() === 'TZ' ||
     Boolean(invoice.tanzania)
 
+  const countryCode = invoice.countryCode?.trim().toUpperCase()
+  const isKenya = countryCode === 'KE' || countryCode === 'KEN'
+
   return isTanzania
     ? toTanzaniaInvoicePayload(invoice)
-    : toLegacyInvoicePayload(invoice)
+    : isKenya
+      ? toKenyaInvoicePayload(invoice)
+      : toLegacyInvoicePayload(invoice)
 }
 
 /** @deprecated Use toCountrySpecificInvoicePayload. */
