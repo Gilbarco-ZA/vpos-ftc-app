@@ -37,9 +37,12 @@ adapters have been implemented, connected, or tested.
 
 ## Invoice, credit notes and payments
 - [ ] Canonical transaction-to-invoice mapping, multi-line fuel/nonfuel parity
-- [ ] Kenya DocumentId / Lines / Currency / Payment.Tenders mapping
-- [ ] Payment method 01-07 normalization, mixed tender totals and rounding
-- [ ] Tanzania fiscal envelope, timestamp and metadata preservation
+- [x] Standalone Kenya DocumentId / Lines / Currency / Payment.Tenders serializer (testing only)
+- [ ] Verify Kenya serializer parity against current proxy payloads
+- [x] Payment method 01-07 normalization and mixed tender sum validation in standalone policy
+- [ ] Verify rounding and split tender behavior against live proxy contracts
+- [x] Initial Tanzania envelope/timestamp builder with required enrichment guard (testing only)
+- [ ] Tanzania full metadata, tax and totals parity with existing runtime implementation
 - [ ] Tax rates, exemptions, discounts and inclusive/exclusive prices
 - [ ] Buyer TIN/PIN and country-specific mandatory fields
 - [ ] Credit-note reference, reason and reversing amounts
@@ -97,3 +100,14 @@ These locations are **references only**: none are modified by the scaffold PR.
 - [ ] Verify actual Kenya Diesel class against authoritative catalog; example and class catalog can differ.
 - [ ] Execute TypeScript, lint and tests in CI/local development environment.
 - [ ] Connect full adapters to registry only after invoice/receipt/status capabilities exist.
+
+## Fiscal-layer testing pass: invoice policies
+
+- [x] Opt-in invoice policy registry for KE and TZ; production code remains unconnected.
+- [x] Kenya invoice serializer with exact country casing and tender mapping.
+- [x] Tanzania draft invoice serializer requiring explicit fiscal enrichment rather than inventing counters.
+- [x] Tests for Kenya multi-tenders, invalid payment values, Tanzania timestamp and missing enrichment.
+- [ ] Confirm Tanzania VAT-inclusive rounding and fiscal envelope against real persisted fixtures.
+- [ ] Extend canonical invoice with authoritative tax bases, discounts and fiscal metadata before switching production.
+- [ ] Check all invoice policy outputs against current vpos-proxy swagger (especially Kenya tender types).
+- [ ] Run lint, typecheck and test suite for this pass.
