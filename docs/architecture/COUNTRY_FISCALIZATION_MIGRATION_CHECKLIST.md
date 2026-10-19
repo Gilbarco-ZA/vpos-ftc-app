@@ -111,3 +111,19 @@ These locations are **references only**: none are modified by the scaffold PR.
 - [ ] Extend canonical invoice with authoritative tax bases, discounts and fiscal metadata before switching production.
 - [ ] Check all invoice policy outputs against current vpos-proxy swagger (especially Kenya tender types).
 - [ ] Run lint, typecheck and test suite for this pass.
+
+## Fiscal-layer testing pass: invoice wire parity
+
+- [x] Separate lossless proxy-DTO serializer added for KE/TZ (test-only).
+- [x] Deep-equality comparison tests against the live country serializer.
+- [x] Kenya tender casing, class codes and compact optional-field rules covered.
+- [x] Tanzania tax base, fiscal counters, totals, discounts and timestamp preservation covered.
+- [x] Reject unsupported countries and invoice/country mismatches explicitly.
+- [ ] Execute proxy parity tests, lint and TypeScript checks on fiscal-layer.
+- [ ] Replace draft canonical invoice's inferred totals with authoritative totals.
+- [ ] Verify product and invoice samples against the latest current proxy Swagger.
+- [ ] Only then migrate production routes/workers (separate integration PR).
+
+**Architecture constraint:** The draft canonical invoice adapters remain unconnected.
+The new parity serializer deliberately accepts the existing ProxyInvoiceRequest
+to identify any lost wire fields before moving to canonical-only mapping.
