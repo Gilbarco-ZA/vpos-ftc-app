@@ -168,3 +168,15 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Introduce country-specific status overrides if proxy contract differences require them.
 - [ ] Add real receipt-model fixture snapshots (Kenya/Tanzania) and execute CI.
 - [ ] Wire status reconciliation into existing timeout recovery only after end-to-end approval.
+
+## Fiscal-layer testing pass: adapter composition
+
+- [x] Combine Kenya/Tanzania product, invoice, credit-note, receipt and status policies into one explicit test-only layer.
+- [x] Resolve aliases once using the central country registry.
+- [x] Validate the receipt policy belongs to the selected country.
+- [x] Preserve the unconnected production registry and explicit productionConnected=false marker.
+- [x] Add composition tests for KE, TZ, unknown country and Tanzania credit-note fail-closed behavior.
+- [x] Remove unused FiscalReceiptModel import warning in receipt-and-status-policies.test.ts.
+- [ ] Harmonize CountryFiscalizationAdapter interface with the fully composed policy contracts.
+- [ ] Keep capability declarations separate from verified runtime readiness, pending endpoint contract tests.
+- [ ] Run lint, TypeScript check and tests; do not activate in production.
