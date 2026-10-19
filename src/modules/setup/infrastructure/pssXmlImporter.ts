@@ -884,6 +884,7 @@ export const importPssConfigXml = async (args: {
 
   const proxyProducts = mapToProxyProducts(importedProducts, {
     createdByName: 'PSS Config Import',
+    country,
   })
 
   try {
@@ -911,9 +912,10 @@ export const importPssConfigXml = async (args: {
 
 function mapToProxyProducts(
   importedProducts: ImportedProduct[],
-  options?: { createdByName?: string },
+  options?: { createdByName?: string; country?: string },
 ): ProxyProductDto[] {
   const createdByName = options?.createdByName ?? 'PSS Import'
+  const isKenya = options?.country === 'KE'
 
   return importedProducts.map(
     (p): ProxyProductDto => ({
@@ -925,7 +927,7 @@ function mapToProxyProducts(
       productName: p.name,
       category: p.category ?? null,
       unitOfMeasure: 'L', // for fuel; change if you also import dry stock
-      unitOfPackaging: null,
+      unitOfPackaging: isKenya ? 'TY' : null,
       packSize: null,
       unitPrice: p.price ?? 0,
       unitCost: 0, // or your internal cost if available
