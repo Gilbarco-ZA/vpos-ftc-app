@@ -143,3 +143,15 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [x] Add Tanzania regression coverage for authoritative financial values.
 - [ ] Confirm exact Tanzania line unit-price semantics and tax-rounding parity against real proxy fixtures.
 - [ ] Run repository lint, typecheck and test suite.
+
+## Fiscal-layer testing pass: credit notes
+
+- [x] Canonical credit-note context and shared validation (original document reference, unique credit note ID, reason, user and timestamp).
+- [x] Opt-in country credit-note policy registry.
+- [x] Kenya draft proxy creditNotes[] envelope, with Lines/lines and original document reference.
+- [x] Fail-closed Tanzania adapter: no unverified TRA credit-note output.
+- [x] Tests for Kenya envelope, invalid self-reference, unsupported countries and Tanzania fail-closed handling.
+- [ ] Verify Kenya-specific credit-note acceptance, tax and reversal sign conventions against current proxy Swagger.
+- [ ] Confirm Tanzania fiscal credit-note counters, reference rules and payload against authoritative API.
+- [ ] Add real proxy-contract parity fixtures and approval before enabling either path.
+- [ ] Run lint, typecheck and targeted tests on fiscal-layer.
