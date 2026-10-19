@@ -11,6 +11,8 @@ test('maps transaction lines into the expected fiscal product payload shape', ()
       pos_reference: 'POS-1',
       pump_number: 4,
       transaction_date_time: '2026-03-18T08:00:00.000Z',
+      payment_type: 'MOBILE_MONEY',
+      total_amount: 7929,
       lines: [
         {
           productId: 'PRD-1',
@@ -59,11 +61,19 @@ test('maps transaction lines into the expected fiscal product payload shape', ()
   })
 
   assert.equal(invoice.countryCode, 'KE')
+  assert.equal(invoice.currency, 'KES')
+  assert.deepEqual(invoice.payment, {
+    tenders: [{ method: 'MobileMoney', amount: 7929 }],
+  })
 
   const payload = toCountrySpecificInvoicePayload(invoice) as any
 
   assert.equal(payload.DocumentId, 'POS-1')
   assert.equal(payload.createdByName, 'Test User')
+  assert.equal(payload.Currency, 'KES')
+  assert.deepEqual(payload.Payment, {
+    Tenders: [{ Method: 'MobileMoney', Amount: 7929 }],
+  })
   assert.deepEqual(payload.buyer, {
     buyerType: 'B2C',
     name: 'David Mukuria',
