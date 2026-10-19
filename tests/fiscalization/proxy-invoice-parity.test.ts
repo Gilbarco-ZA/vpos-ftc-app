@@ -82,7 +82,7 @@ test('Kenya proxy DTO serializer exactly matches existing country serializer', (
 test('Tanzania proxy DTO serializer preserves fiscal counters, totals and timestamps', () => {
   const actual = serializeFiscalProxyInvoiceForComparison('TZA', tanzania)
   assert.deepEqual(actual, toCountrySpecificInvoicePayload(tanzania))
-  assert.equal((actual.tanzania as { invoiceDate: string }).invoiceDate, '2026-10-19T12:00:00')
+  assert.equal((actual['tanzania'] as { invoiceDate: string }).invoiceDate, '2026-10-19T12:00:00')
 })
 
 test('unsupported country and country mismatch fail closed', () => {
