@@ -354,6 +354,26 @@ export function buildProxyProductPayload(
   }
 }
 
+export function buildKenyaProductRegistrationPayload(
+  product: ProductCloudSyncInput,
+) {
+  return {
+    createdByName: product.createdByName,
+    productId: product.extProductId ?? product.productId,
+    productCode: product.extProductCode ?? product.productCode,
+    productClassCode: product.extProductClassCode ?? product.productClassCode,
+    productTypeCode: product.extProductTypeCode ?? product.productTypeCode,
+    productName: product.extDescription ?? product.productName,
+    unitOfMeasure: product.extUnitOfMeasure ?? product.unitOfMeasure,
+    unitOfPackaging: product.extUnitOfPackaging ?? product.unitOfPackaging,
+    unitPrice: product.extUnitPrice ?? product.unitPrice,
+    currency: product.extCurrency ?? product.currency,
+    taxCode: product.extTaxCode ?? product.taxCode,
+    hazardousIndicator:
+      product.extHazardousIndicator ?? product.hazardousIndicator ?? false,
+  }
+}
+
 export type TanzaniaProductSyncPayload = {
   productId: string
   productCode: string
@@ -425,7 +445,10 @@ export async function syncProductsToCloudService(params: {
   }
 
   return await uploadProductsViaProxy(params.stationId, {
-    products: params.products.map(buildProxyProductPayload),
+    products:
+      String(country || '').trim().toUpperCase() === 'KE'
+        ? params.products.map(buildKenyaProductRegistrationPayload)
+        : params.products.map(buildProxyProductPayload),
   })
 }
 
