@@ -1,11 +1,9 @@
-import type { FiscalCountryCode, CountryCapabilities } from '../domain/countryAdapter'
+import type { CountryFiscalizationAdapter } from '../domain/countryAdapter'
 import type { CountryAdapterDefinition } from '../domain/countryDefinition'
 import type { ProductPolicy } from '../domain/productPolicy'
 import type { InvoicePolicy } from '../domain/invoicePolicy'
 import type { CreditNotePolicy } from '../domain/creditNotePolicy'
 import type { ReceiptPolicy } from '../domain/receiptPolicy'
-import type { FiscalStatusResolution } from '../domain/statusPolicy'
-import type { ProxyInvoiceResponse } from '@/src/shared/fiscalization/proxy/contracts'
 
 import { getCountryDefinition, normalizeRegisteredCountry } from './countryRegistry'
 import { getCountryProductPolicy } from './productPolicyRegistry'
@@ -17,16 +15,8 @@ import { getCountryStatusNormalizer } from './statusPolicyRegistry'
 export type FiscalLayerOperation = 'products' | 'invoices' | 'creditNotes' | 'receipts' | 'status'
 
 /** A registered test policy is NOT evidence of a verified or production-ready API. */
-export interface CountryFiscalLayer {
-  readonly countryCode: FiscalCountryCode
+export interface CountryFiscalLayer extends CountryFiscalizationAdapter {
   readonly definition: CountryAdapterDefinition
-  readonly capabilities: Readonly<CountryCapabilities>
-  readonly products: ProductPolicy
-  readonly invoices: InvoicePolicy
-  readonly creditNotes: CreditNotePolicy
-  readonly receipts: ReceiptPolicy
-  readonly normalizeStatus: (response: ProxyInvoiceResponse) => FiscalStatusResolution
-  readonly productionConnected: false
 }
 
 /**
@@ -58,7 +48,7 @@ export function getFiscalLayerPolicy(
   country: unknown,
   operation: FiscalLayerOperation,
 ): ProductPolicy | InvoicePolicy | CreditNotePolicy | ReceiptPolicy |
-  ((response: ProxyInvoiceResponse) => FiscalStatusResolution) {
+  CountryFiscalLayer['normalizeStatus'] {
   const layer = createCountryFiscalLayer(country)
   switch (operation) {
     case 'products': return layer.products
