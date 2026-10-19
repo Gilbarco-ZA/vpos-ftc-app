@@ -243,3 +243,23 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Add real country-specific lookup transport adapters only once contracts are verified.
 - [ ] Specify transactional locking, status audit trails and idempotency before worker integration.
 - [ ] Run npm run check and fiscalization tests on fiscal-layer.
+
+## Swagger verification pass — cloud/internal/Tanzania (19 Oct 2026)
+
+Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.json.
+
+- [x] Cloud invoice status: GET /api/invoices/status?DocumentId=...
+- [x] Tanzania invoice status: GET /api/tanzania/invoices/status?DocumentId=...
+- [x] Both invoice status endpoints return InvoiceStatusCollectionResponse (invoices[]), not a single InvoiceResponse.
+- [x] Implement pure country-aware endpoint descriptor and strict collection parser.
+- [x] Require exactly one matching documentId; reject empty, ambiguous, failed and malformed results.
+- [x] Add tests covering endpoint routing, unrelated rows, duplicates and end-to-end recovery assessment with a fake port.
+- [x] Cloud credit-note status: GET /api/creditnotes/status?DocumentId=...
+- [x] Cloud product status: GET /api/products/status?ProductId=...
+- [x] Tanzania products: POST /api/tanzania/products and GET /api/tanzania/products.
+- [ ] Add HTTP lookup port implementation with injected authenticated proxy transport after inspecting current client; avoid direct production connection.
+- [ ] Confirm whether Kenya route uses cloud invoice status with its configured fiscal device (no Kenya-specific status path appears in the supplied files).
+- [ ] Validate real status enum values, HTTP failures, and responseCode meanings against operational samples.
+- [ ] IMPORTANT: Tanzania direct invoice submission POST /api/tanzania/invoices expects TanzaniaInvoiceRequest {invoice,items,payments}; distinguish from cloud POST /api/invoices contract.
+- [ ] Credit-note full validation, including reversal references and totals, against CreditNoteUploadRequest.
+- [ ] Keep country readiness blocked pending response samples, authenticated transport tests, and activation safeguards.
