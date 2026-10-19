@@ -61,3 +61,50 @@ test('Tanzania refuses missing enrichment and preserves local timestamp', () => 
 test('unknown country cannot inherit another invoice policy', () => {
   assert.throws(() => getCountryInvoicePolicy('ZZ'), /Unsupported fiscalization country/)
 })
+
+test('Tanzania preserves authoritative tax, discounts and offline totals', () => {
+  const policy = getCountryInvoicePolicy('TZ')
+  const invoice: CanonicalInvoice = {
+    documentId: 'TZ-AUTH-1',
+    issuedAt: '2026-10-19T11:00:00.000Z',
+    currency: 'TZS',
+    isOnline: false,
+    notes: 'Offline recovery',
+    lines: [{
+      product: {
+        id: '1', code: 'G1', name: 'Diesel', classCode: 'FUEL',
+        typeCode: 'DIESEL', price: 118, currency: 'TZS', taxCode: 'A',
+      },
+      quantity: 2, unitPrice: 100,
+      lineId: 'fuel-1', lineType: 'FuelSale',
+      priceExtension: 236, netTotal: 200,
+      taxes: [{ type: 'A', rate: 18, base: 200, amount: 36 }],
+      discounts: [{ amount: 2 }],
+      commodityCode: '271019',
+    }],
+    tenders: [{ method: 'Cash', amount: 236 }],
+    totals: { priceExtension: 238, discount: 2, net: 200, tax: 36, amount: 236 },
+    metadata: { tanzania: { invoiceNumber: '100', dailyCounter: 10 } },
+  }
+  const payload = policy.buildPayload(invoice) as {
+    isOnline: boolean
+    totals: { amount: number; discount: number }
+    lines: Array<{
+      lineId: string
+      discounts: unknown[]
+      taxes: Array<{ base: number; amount: number }>
+      product: { priceExtension: number; netTotal: number; commodityCode: string | null }
+    }>
+    notes: string | null
+  }
+  assert.equal(payload.isOnline, false)
+  assert.equal(payload.totals.amount, 236)
+  assert.equal(payload.totals.discount, 2)
+  assert.equal(payload.lines[0].lineId, 'fuel-1')
+  assert.equal(payload.lines[0].product.priceExtension, 236)
+  assert.equal(payload.lines[0].product.netTotal, 200)
+  assert.equal(payload.lines[0].product.commodityCode, '271019')
+  assert.equal(payload.lines[0].taxes[0].amount, 36)
+  assert.deepEqual(payload.lines[0].discounts, [{ amount: 2 }])
+  assert.equal(payload.notes, 'Offline recovery')
+})
