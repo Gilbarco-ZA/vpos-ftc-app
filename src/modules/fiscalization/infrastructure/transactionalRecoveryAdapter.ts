@@ -49,6 +49,8 @@ export async function confirmTransactionFiscalizedAtomically(
     !decision.resolution.sourceStatus?.trim()) {
     throw new Error('Correlated fiscal status confirmation is required')
   }
+  const observedStatus = decision.resolution.sourceStatus
+  if (!observedStatus?.trim()) throw new Error('Correlated fiscal status confirmation is required')
   const plan = buildRecoveryStatusTransitionSql(input)
   return boundary.transaction(async client => {
     const result = await client.query(plan.sql, plan.params)
@@ -57,7 +59,7 @@ export async function confirmTransactionFiscalizedAtomically(
       stationId: input.stationId.trim(),
       transactionId: input.transactionId.trim(),
       documentId: input.documentId.trim(),
-      observedStatus: decision.resolution.sourceStatus.trim(),
+      observedStatus: observedStatus.trim(),
       idempotencyKey: recoveryAuditIdempotencyKey(input.transactionId, input.documentId),
     })
     return 'applied'
