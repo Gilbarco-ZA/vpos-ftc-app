@@ -338,7 +338,8 @@ const resolveCurrency = async (stationId: string) => {
 
 export function kenyaFuelClassCode(gradeName: string): string {
   const name = gradeName.toUpperCase()
-  if (/DIESEL|GAS\s*OIL|AGO/.test(name)) return '9901300112'
+  // Keep the Diesel 50 default aligned with the Kenya registration example.
+  if (/DIESEL|GAS\s*OIL|AGO/.test(name)) return '9901300102'
   if (/95|97|98|PREMIUM|SUPER/.test(name)) return '9901300103'
   return '9901300102'
 }
