@@ -127,3 +127,11 @@ These locations are **references only**: none are modified by the scaffold PR.
 **Architecture constraint:** The draft canonical invoice adapters remain unconnected.
 The new parity serializer deliberately accepts the existing ProxyInvoiceRequest
 to identify any lost wire fields before moving to canonical-only mapping.
+
+## Fiscal-layer testing pass: canonical finance (partial)
+- [x] Canonical invoice carries authoritative totals, line IDs, tax detail and discounts.
+- [x] Financial integrity helper validates non-negative finite amounts and tender reconciliation.
+- [x] Kenya draft policy validates against authoritative totals.
+- [ ] Tanzania draft policy: switch to supplied authoritative financial fields (pending).
+- [ ] Verify full amount and tax parity with production fixtures.
+- [ ] Run all fiscal-layer tests, lint and typecheck.
