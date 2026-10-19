@@ -44,6 +44,13 @@ function compareValues(a: unknown, b: unknown, path: string, out: ContractDiffer
   if (!Object.is(a, b)) out.push({ path: path || '$', existing: a, candidate: b })
 }
 
+/** Compare arbitrary wire payloads, including intentionally divergent test fixtures. */
+export function findContractDifferences(existing: unknown, candidate: unknown): ContractDifference[] {
+  const differences: ContractDifference[] = []
+  compareValues(existing, candidate, '', differences)
+  return differences
+}
+
 /** Pure, deterministic local wire-shape comparison. Never sends requests. */
 export function compareProxyInvoiceContracts(
   country: unknown,
@@ -52,8 +59,7 @@ export function compareProxyInvoiceContracts(
   const countryCode = normalizeRegisteredCountry(country)
   const existing = toCountrySpecificInvoicePayload({ ...invoice, countryCode })
   const candidate = serializeFiscalProxyInvoiceForComparison(countryCode, invoice)
-  const differences: ContractDifference[] = []
-  compareValues(existing, candidate, '', differences)
+  const differences = findContractDifferences(existing, candidate)
   return {
     countryCode,
     matches: differences.length === 0,
