@@ -263,3 +263,16 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] IMPORTANT: Tanzania direct invoice submission POST /api/tanzania/invoices expects TanzaniaInvoiceRequest {invoice,items,payments}; distinguish from cloud POST /api/invoices contract.
 - [ ] Credit-note full validation, including reversal references and totals, against CreditNoteUploadRequest.
 - [ ] Keep country readiness blocked pending response samples, authenticated transport tests, and activation safeguards.
+
+## Fiscal-layer pass: opt-in authenticated status transport
+
+- [x] Inject a status HTTP transport into the isolated status lookup port; no production import.
+- [x] Route KE to GET /api/invoices/status and TZ to GET /api/tanzania/invoices/status.
+- [x] Require exact document correlation through the collection parser and recovery guard.
+- [x] Add a caller-configured authenticated fetch transport with x-api-key, bounded timeout, JSON response parsing, and redirect refusal.
+- [x] Prevent status request submission and filesystem/DB writes from new adapters; all operations are GET-only.
+- [x] Test routing, URL encoding, authentication, 503 errors, unavailable/malformed responses, and timeouts via fakes.
+- [ ] Run npm run check and targeted tests for this pass.
+- [ ] Confirm deployment's proxy base path, site API key lookup and client timeout integration with an isolated staging environment.
+- [ ] Implement locked, idempotent persistence workflow only after approved production integration pass.
+- [ ] Confirm the provider's actual status values from redacted response captures; status wording remains a hypothesis from previous policies.
