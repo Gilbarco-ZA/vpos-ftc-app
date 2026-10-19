@@ -336,6 +336,13 @@ const resolveCurrency = async (stationId: string) => {
   return currency
 }
 
+export function kenyaFuelClassCode(gradeName: string): string {
+  const name = gradeName.toUpperCase()
+  if (/DIESEL|GAS\s*OIL|AGO/.test(name)) return '9901300112'
+  if (/95|97|98|PREMIUM|SUPER/.test(name)) return '9901300103'
+  return '9901300102'
+}
+
 const pickPrimaryPriceGroup = (cfg: PssXmlConfig) => {
   // Heuristic: choose PriceGroup ID=1 if present, else first.
   const pg1 = cfg.priceGroups.find((p) => p.id === '1')
@@ -535,6 +542,9 @@ export const importPssConfigXml = async (args: {
   const parsed = parsePssConfigXml(xml)
   validateParsedPssTopology(parsed)
   const currency = await resolveCurrency(stationId)
+  const siteProfile = await kvGet<{ country?: string }>(stationId, KV_KEYS.SITE_PROFILE)
+  const country = safeTrim(siteProfile?.country).toUpperCase()
+  const isKenya = country === 'KE'
 
   const primaryPriceGroup = pickPrimaryPriceGroup(parsed)
 
@@ -609,11 +619,20 @@ export const importPssConfigXml = async (args: {
              currency = EXCLUDED.currency,
              category_id = COALESCE(EXCLUDED.category_id, products.category_id),
              category = COALESCE(EXCLUDED.category, products.category),
-             product_class_code = COALESCE(EXCLUDED.product_class_code, products.product_class_code),
-             product_type_code = COALESCE(EXCLUDED.product_type_code, products.product_type_code),
-             tax_code = COALESCE(EXCLUDED.tax_code, products.tax_code),
+             product_class_code = CASE
+               WHEN products.product_class_code IS NULL OR products.product_class_code = 'FUEL'
+                 THEN EXCLUDED.product_class_code
+               ELSE products.product_class_code END,
+             product_type_code = CASE
+               WHEN products.product_type_code IS NULL OR products.product_type_code = 'FUEL'
+                 THEN EXCLUDED.product_type_code
+               ELSE products.product_type_code END,
+             tax_code = CASE
+               WHEN products.tax_code IS NULL OR products.tax_code = 'VAT'
+                 THEN EXCLUDED.tax_code
+               ELSE products.tax_code END,
              updated_at = NOW()
-           RETURNING id, product_code as code, product_name as name, unit_price as price, currency, tax_code as taxCode, tax_rate as taxRate, hazardous_indicator as hazardous, category`,
+           RETURNING id, product_code as code, product_name as name, unit_price as price, currency, tax_code as "taxCode", tax_rate as "taxRate", hazardous_indicator as hazardous, category, product_class_code as "productClassCode", product_type_code as "productTypeCode"`,
           [
             uuidv4(),
             stationId,
@@ -626,11 +645,11 @@ export const importPssConfigXml = async (args: {
             16,
             fuelCategoryId,
             FUEL_CATEGORY_NAME,
-            'FUEL',
-            'FUEL',
-            'VAT',
+            isKenya ? kenyaFuelClassCode(productName) : 'FUEL',
+            isKenya ? '2' : 'FUEL',
+            isKenya ? 'B' : 'VAT',
             null,
-            false,
+            isKenya,
             'PSS_IMPORT',
             false,
             null,
@@ -900,8 +919,8 @@ function mapToProxyProducts(
       devFlowOverride: undefined, // or some flag if you use it
       productId: String(p.id), // decide what you want to expose as productId
       productCode: String(p.code),
-      productClassCode: null, // fill in if you have it
-      productTypeCode: null, // fill in if you have it
+      productClassCode: (p as ImportedProduct & { productClassCode?: string }).productClassCode ?? null,
+      productTypeCode: (p as ImportedProduct & { productTypeCode?: string }).productTypeCode ?? null
       productName: p.name,
       category: p.category ?? null,
       unitOfMeasure: 'L', // for fuel; change if you also import dry stock
