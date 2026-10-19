@@ -204,3 +204,15 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Confirm current vpos-proxy Swagger endpoint request schemas and response/status semantics.
 - [ ] Compare real production-redacted fixtures with both canonical mappers before activation.
 - [ ] Extend fixture coverage to credit notes, products and completed fiscal receipts.
+
+## Fiscal-layer testing pass: product and credit-note baseline comparison
+
+- [x] Add Kenya product-registration parity test against the current product-service builder.
+- [x] Add Tanzania product-registration parity test against the current individual-upload builder.
+- [x] Add Kenya credit-note envelope/reference comparison against existing transaction mapper.
+- [x] Keep Tanzania draft credit-note issuance fail-closed.
+- [ ] Verify country-specific product overrides and non-fuel classifications with real redacted fixtures.
+- [ ] Compare the full Kenya credit-note payload (including reversal signs) after confirming proxy API semantics.
+- [ ] Add enriched KE/TZ receipt snapshot fixtures; the receipt policies already delegate to live templates.
+- [ ] Validate against authoritative proxy Swagger, not only local code parity.
+- [ ] Run npm run check and targeted fiscalization tests after this pass.
