@@ -6,9 +6,18 @@ export type FiscalizeFormErrors = {
   buyerName?: string
 }
 
+export type FiscalizationPaymentType =
+  | 'CASH'
+  | 'CREDIT'
+  | 'CASH_CREDIT'
+  | 'CHEQUE'
+  | 'CARD'
+  | 'MOBILE_MONEY'
+  | 'OTHER'
+
 export type LocalReceiptFields = {
   odometer: string
-  paymentType: 'CASH' | 'CARD'
+  paymentType: FiscalizationPaymentType
   vehicleRegNr: string
 }
 
