@@ -302,3 +302,15 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Implement the actual PostgreSQL adapter with transactional event persistence and row-count conflict classification only after schema and fiscal metadata lifecycle approval.
 - [ ] Confirm recovery does not skip receipt generation, print job handling, or required fiscalization-event compatibility summaries.
 - [ ] Run npm run check on the new tests; existing runtime behavior unchanged.
+
+## Recovery transaction boundary pass
+
+- [x] Add a test-only transaction-boundary adapter invoking the schema-aligned guarded UPDATE.
+- [x] Require a same-transaction fiscal recovery audit callback; errors propagate for rollback.
+- [x] Treat a guarded UPDATE returning zero rows as stale and suppress audit.
+- [x] Add fake-transaction tests for duplicate confirmations, audit failures and stale status.
+- [ ] Bind to a validated FiscalRecoveryAssessment rather than accepting a standalone confirmation flag.
+- [ ] Implement the database transaction client with actual fiscalization_events and compatibility summary semantics.
+- [ ] Replace version-based recoveryPersistence port or adapt it explicitly to status-conditional PostgreSQL updates.
+- [ ] Prove receipt and print-job parity with the existing completion workflow.
+- [ ] Run npm run check; no live worker or database integration in this pass.
