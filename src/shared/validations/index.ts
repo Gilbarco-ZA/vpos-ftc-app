@@ -42,7 +42,17 @@ const customerBaseSchema = z.object({
   country: z.string().max(100).optional(),
   odometer: z.string().max(50).optional(),
   vehicleRegNr: z.string().max(50).optional(),
-  paymentType: z.enum(['CASH', 'CARD']).optional(),
+  paymentType: z
+    .enum([
+      'CASH',
+      'CREDIT',
+      'CASH_CREDIT',
+      'CHEQUE',
+      'CARD',
+      'MOBILE_MONEY',
+      'OTHER',
+    ])
+    .optional(),
 })
 
 export const customerCreateSchema = customerBaseSchema
