@@ -4,7 +4,6 @@ import { getCountryReceiptPolicy } from '@/src/modules/fiscalization/application
 import { getCountryStatusNormalizer } from '@/src/modules/fiscalization/application/statusPolicyRegistry'
 import { buildReceiptLines as kenyaTemplate } from '@/src/shared/fiscalization/receipt/templates/KE'
 import { buildReceiptLines as tanzaniaTemplate } from '@/src/shared/fiscalization/receipt/templates/TZ'
-import type { FiscalReceiptModel } from '@/src/shared/fiscalization/receipt/types'
 
 test('receipt policies delegate to existing templates without transformation', () => {
   assert.equal(getCountryReceiptPolicy('KE').render, kenyaTemplate)
