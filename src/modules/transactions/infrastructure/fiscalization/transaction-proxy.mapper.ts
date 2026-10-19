@@ -3,6 +3,7 @@ import type {
   InvoiceLineProductDto,
   InvoiceLineTaxDto,
   ProxyInvoiceRequest,
+  ProxyPaymentMethod,
 } from '@/src/shared/fiscalization/proxy/contracts'
 
 function iso(dt: any) {
@@ -35,6 +36,49 @@ function strOrNull(value: any) {
   if (value == null) return null
   const s = String(value).trim()
   return s.length ? s : null
+}
+
+function normalizeProxyPaymentMethod(value: any): ProxyPaymentMethod {
+  const raw = String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '')
+
+  switch (raw) {
+    case '':
+    case '01':
+    case 'CASH':
+      return 'Cash'
+    case '02':
+    case 'CREDIT':
+    case 'ACCOUNT':
+    case 'INVOICE':
+      return 'Credit'
+    case '03':
+    case 'CASHCREDIT':
+      return 'Cash/Credit'
+    case '04':
+    case 'CHEQUE':
+    case 'CHECK':
+    case 'BANKCHEQUE':
+      return 'Cheque'
+    case '05':
+    case 'CARD':
+    case 'CCARD':
+    case 'CREDITCARD':
+    case 'DEBITCARD':
+      return 'Card'
+    case '06':
+    case 'MOBILE':
+    case 'MOBILEMONEY':
+    case 'EMONEY':
+    case 'MPESA':
+      return 'MobileMoney'
+    case '07':
+    case 'OTHER':
+    default:
+      return 'Other'
+  }
 }
 
 function defaultRateForTaxCode(code: string, vatRate: number): number {
@@ -173,6 +217,7 @@ export function mapTransactionToProxyInvoice(args: {
   const customer = args.customer ?? null
   const enrichment = args.enrichment ?? {}
 
+  const countryCode = strOrNull(args.station?.country)?.toUpperCase() ?? null
   const currency =
     enrichment.currency != null
       ? String(enrichment.currency)
@@ -180,7 +225,9 @@ export function mapTransactionToProxyInvoice(args: {
         ? String(args.currency)
         : txn.currency != null
           ? String(txn.currency)
-          : process.env.DEFAULT_CURRENCY?.trim() || 'USD'
+          : countryCode === 'KE'
+            ? 'KES'
+            : process.env.DEFAULT_CURRENCY?.trim() || 'USD'
 
   const vatRate = normalizeRate(args.vatRate, 0.16)
   const hasExplicitLines =
@@ -515,7 +562,7 @@ export function mapTransactionToProxyInvoice(args: {
         txn.createdAt,
     ),
     currency: strOrNull(currency),
-    countryCode: strOrNull(args.station?.country)?.toUpperCase() ?? null,
+    countryCode,
     createdByName: strOrNull(
       args.createdByName ?? txn.created_by_name ?? txn.createdByName,
     ),
@@ -581,6 +628,22 @@ export function mapTransactionToProxyInvoice(args: {
       : null,
     lines,
     totals,
+    payment:
+      countryCode === 'KE'
+        ? {
+            tenders: [
+              {
+                method: normalizeProxyPaymentMethod(
+                  txn.payment_type ?? txn.paymentType,
+                ),
+                amount: roundMoney(
+                  num(txn.total_amount ?? txn.totalAmount, totals.amount),
+                  totals.amount,
+                ),
+              },
+            ],
+          }
+        : null,
     notes:
       strOrNull(txn.notes) ??
       (hasAnyFuelLine ? 'AUTO_ENRICHED_FROM_FORECOURT' : null),
