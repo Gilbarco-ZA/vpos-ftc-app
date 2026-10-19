@@ -30,6 +30,53 @@ const isKenyaStation = (country?: string | null) =>
     .trim()
     .toUpperCase() === 'KE'
 
+const KENYA_PAYMENT_OPTIONS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'CREDIT', label: 'Credit' },
+  { value: 'CASH_CREDIT', label: 'Cash/Credit' },
+  { value: 'CHEQUE', label: 'Bank Cheque' },
+  { value: 'CARD', label: 'Card' },
+  { value: 'MOBILE_MONEY', label: 'Mobile Money' },
+  { value: 'OTHER', label: 'Other' },
+] as const
+
+const DEFAULT_PAYMENT_OPTIONS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'CARD', label: 'Card' },
+] as const
+
+const normalizePaymentSelection = (
+  value: unknown,
+  kenya: boolean,
+): string => {
+  const raw = String(value ?? '').trim().toUpperCase()
+  const aliases: Record<string, string> = {
+    CASH: 'CASH',
+    CREDIT: 'CREDIT',
+    ACCOUNT: 'CREDIT',
+    INVOICE: 'CREDIT',
+    'CASH/CREDIT': 'CASH_CREDIT',
+    CASH_CREDIT: 'CASH_CREDIT',
+    CHEQUE: 'CHEQUE',
+    CHECK: 'CHEQUE',
+    BANK_CHEQUE: 'CHEQUE',
+    'BANK CHEQUE': 'CHEQUE',
+    CARD: 'CARD',
+    CCARD: 'CARD',
+    MOBILE: 'MOBILE_MONEY',
+    MOBILEMONEY: 'MOBILE_MONEY',
+    MOBILE_MONEY: 'MOBILE_MONEY',
+    'MOBILE MONEY': 'MOBILE_MONEY',
+    EMONEY: 'MOBILE_MONEY',
+    OTHER: 'OTHER',
+  }
+  const normalized = aliases[raw] ?? raw
+  const allowed = kenya
+    ? KENYA_PAYMENT_OPTIONS.map((option) => option.value)
+    : DEFAULT_PAYMENT_OPTIONS.map((option) => option.value)
+  return allowed.includes(normalized as any) ? normalized : 'CASH'
+}
+
 const NonFiscalizedFiscalizeSheet = ({
   transaction,
   stationCountry,
@@ -71,15 +118,17 @@ const NonFiscalizedFiscalizeSheet = ({
       setTin(linkedTin)
       setBuyerName(linkedBuyerName)
       setBuyerType(buyerTypeOptions[0]?.value ?? '')
-      const transactionPaymentType = String(transaction.paymentType || '')
-        .trim()
-        .toUpperCase()
+      const kenya = isKenyaStation(stationCountry)
+      const transactionPaymentType = normalizePaymentSelection(
+        transaction.paymentType,
+        kenya,
+      )
 
       setContactPhone('')
       setContactEmail('')
       setLocalReceiptFields({
         odometer: String(transaction.odometer ?? ''),
-        paymentType: transactionPaymentType === 'CARD' ? 'CARD' : 'CASH',
+        paymentType: transactionPaymentType,
         vehicleRegNr: String(transaction.vehicleRegNr ?? ''),
       })
       setCustomerState(linkedCustomerId ? 'found' : 'idle')
@@ -104,7 +153,7 @@ const NonFiscalizedFiscalizeSheet = ({
       setError(null)
       setIsSubmitting(false)
     })
-  }, [transaction, buyerTypeOptions])
+  }, [transaction, buyerTypeOptions, stationCountry])
 
   const validateTin = (value: string) => {
     const trimmed = value.trim()
@@ -162,12 +211,10 @@ const NonFiscalizedFiscalizeSheet = ({
           setBuyerType(mapped.buyerType || 'B2C')
           setLocalReceiptFields((current) => ({
             odometer: current.odometer.trim() || String(mapped.odometer ?? ''),
-            paymentType:
-              String(current.paymentType || mapped.paymentType || '')
-                .trim()
-                .toUpperCase() === 'CARD'
-                ? 'CARD'
-                : 'CASH',
+            paymentType: normalizePaymentSelection(
+              current.paymentType || mapped.paymentType,
+              isKenyaStation(stationCountry),
+            ),
             vehicleRegNr:
               current.vehicleRegNr.trim() || String(mapped.vehicleRegNr ?? ''),
           }))
@@ -187,7 +234,7 @@ const NonFiscalizedFiscalizeSheet = ({
         setError(err)
       }
     },
-    [mapCustomer],
+    [mapCustomer, stationCountry],
   )
 
   const handleTinBlur = async () => {
@@ -504,12 +551,18 @@ const NonFiscalizedFiscalizeSheet = ({
                       onChange={(event) =>
                         setLocalReceiptFields((prev) => ({
                           ...prev,
-                          paymentType: event.target.value as 'CASH' | 'CARD',
+                          paymentType: event.target.value,
                         }))
                       }
                     >
-                      <option value="cash">Cash</option>
-                      <option value="card">Card</option>
+                      {(isKenyaStation(stationCountry)
+                        ? KENYA_PAYMENT_OPTIONS
+                        : DEFAULT_PAYMENT_OPTIONS
+                      ).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </Select>
                   </div>
                   <div className="space-y-2">
