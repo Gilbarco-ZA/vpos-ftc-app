@@ -192,3 +192,15 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Run lint, typecheck and targeted tests.
 - [ ] Verify each contract against live authoritative swagger and real fixtures before promoting any readiness status.
 - [ ] Design opt-in production integration/rollback in a separate pass.
+
+## Fiscal-layer testing pass: deterministic contract comparison
+
+- [x] Add a pure local comparison harness with field-level mismatch paths.
+- [x] Compare representative Kenya split-tender, fuel and nonfuel invoice payload.
+- [x] Compare representative Tanzania offline invoice with authoritative tax totals, counters and timestamp.
+- [x] Keep local serializer parity separate from authoritative proxy API validation.
+- [x] Keep readiness explicitly false even when local comparisons match.
+- [ ] Run npm run check with new tests and resolve any diagnostics.
+- [ ] Confirm current vpos-proxy Swagger endpoint request schemas and response/status semantics.
+- [ ] Compare real production-redacted fixtures with both canonical mappers before activation.
+- [ ] Extend fixture coverage to credit notes, products and completed fiscal receipts.
