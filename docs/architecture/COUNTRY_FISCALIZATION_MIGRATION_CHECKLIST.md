@@ -229,3 +229,17 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Capture redacted real receipt models and add snapshots covering TRA/KE regulatory format.
 - [ ] Test npm run check and targeted new cases.
 - [ ] Plan production recovery integration separately, including locking and idempotency.
+
+## Fiscal-layer testing pass: status recovery port
+
+- [x] Define typed status lookup request, result and infrastructure port.
+- [x] Implement isolated, side-effect-free recovery assessment.
+- [x] Require station and document IDs and strict country normalization before lookup.
+- [x] Reuse status correlation guard to reject mismatched documents.
+- [x] Treat provider unavailability, transport errors and thrown exceptions as unresolved.
+- [x] Never authorize automatic resubmission or database mutation.
+- [x] Add fake-port tests for confirmed, mismatched, unavailable and timeout outcomes.
+- [ ] Confirm Kenya and Tanzania status endpoint paths, methods, identifiers and response schemas from Swagger.
+- [ ] Add real country-specific lookup transport adapters only once contracts are verified.
+- [ ] Specify transactional locking, status audit trails and idempotency before worker integration.
+- [ ] Run npm run check and fiscalization tests on fiscal-layer.
