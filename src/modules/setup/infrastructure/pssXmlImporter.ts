@@ -635,11 +635,11 @@ export const importPssConfigXml = async (args: {
                  THEN EXCLUDED.tax_code
                ELSE products.tax_code END,
              unit_of_measure = CASE
-               WHEN $24 AND (products.unit_of_measure IS NULL OR BTRIM(products.unit_of_measure) = '')
+               WHEN $24
                  THEN EXCLUDED.unit_of_measure
                ELSE products.unit_of_measure END,
              unit_of_packaging = CASE
-               WHEN $24 AND (products.unit_of_packaging IS NULL OR BTRIM(products.unit_of_packaging) = '')
+               WHEN $24
                  THEN EXCLUDED.unit_of_packaging
                ELSE products.unit_of_packaging END,
              updated_at = NOW()
