@@ -36,6 +36,8 @@ test('mismatched proxy response never reaches persistence', async () => {
     { error: false, documentId: 'OTHER', status: 'FISCALIZED' },
     { error: false, documentId: 'D1', status: 'PENDING' },
     { error: true, documentId: 'D1', status: 'FAILED' },
+    { error: true, documentId: 'D1', status: 'FISCALIZED' },
+    { error: true, documentId: 'D1', status: 'SUCCESS' },
   ]) {
     const lookup: FiscalStatusLookupPort = {
       async lookup() { return { kind: 'response', response } },
