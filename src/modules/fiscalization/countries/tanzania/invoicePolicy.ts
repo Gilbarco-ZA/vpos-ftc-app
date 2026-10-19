@@ -1,3 +1,4 @@
+import { invoiceExpectedAmount, validateFinancialIntegrity } from '../../domain/financialValidation'
 import type { CanonicalInvoice, ValidationIssue, ValidationResult } from '../../domain/countryAdapter'
 import { requireValidInvoice, roundInvoiceMoney, validateInvoiceCore } from '../../domain/invoicePolicy'
 import type { InvoicePolicy } from '../../domain/invoicePolicy'
@@ -19,7 +20,7 @@ const readMetadata = (invoice: CanonicalInvoice): TanzaniaInvoiceMetadata =>
 
 export const tanzaniaInvoicePolicy: InvoicePolicy = {
   validate(invoice): ValidationResult {
-    const issues: ValidationIssue[] = validateInvoiceCore(invoice)
+    const issues: ValidationIssue[] = [...validateInvoiceCore(invoice), ...validateFinancialIntegrity(invoice)]
     if (invoice.currency.trim().toUpperCase() !== 'TZS') {
       issues.push({ field: 'currency', message: 'Tanzania invoices require TZS' })
     }
@@ -40,13 +41,13 @@ export const tanzaniaInvoicePolicy: InvoicePolicy = {
     const issueDateTime = String(meta.invoiceDate ?? invoice.issuedAt)
       .replace(/(?:Z|[+-]\d{2}:?\d{2})$/i, '')
     const lines = invoice.lines.map((line, index) => {
-      const gross = roundInvoiceMoney(line.quantity * line.unitPrice)
+      const gross = line.priceExtension ?? roundInvoiceMoney(line.quantity * line.unitPrice)
       const rate = line.taxRate ?? 0
-      const net = roundInvoiceMoney(gross / (1 + rate / 100))
+      const net = line.netTotal ?? roundInvoiceMoney(gross / (1 + rate / 100))
       const tax = roundInvoiceMoney(gross - net)
       return {
-        lineType: line.fuel ? 'FuelSale' : 'Sale',
-        lineId: String(index + 1),
+        lineType: line.lineType ?? (line.fuel ? 'FuelSale' : 'Sale'),
+        lineId: line.lineId ?? String(index + 1),
         product: {
           productId: line.product.id,
           productCode: line.product.code,
@@ -56,27 +57,31 @@ export const tanzaniaInvoicePolicy: InvoicePolicy = {
           unitOfMeasure: line.product.unitOfMeasure,
           unitOfPackaging: line.product.unitOfPackaging,
           quantity: line.quantity,
-          unitPrice: roundInvoiceMoney(line.unitPrice / (1 + rate / 100)),
+          unitPrice: line.taxes?.length ? line.unitPrice : roundInvoiceMoney(line.unitPrice / (1 + rate / 100)),
           priceExtension: gross,
           netTotal: net,
           hazardousIndicator: line.product.hazardousIndicator ?? false,
+          commodityCode: line.commodityCode ?? null,
           ...(line.fuel ? { fuel: line.fuel } : {}),
         },
-        taxes: [{ type: line.product.taxCode, rate, base: net, amount: tax }],
+        taxes: line.taxes ?? [{ type: line.product.taxCode, rate, base: net, amount: tax }],
+        discounts: line.discounts,
       }
     })
-    const total = roundInvoiceMoney(lines.reduce((sum, line) => sum + line.product.priceExtension, 0))
+    const total = invoiceExpectedAmount(invoice)
     return {
       documentId: invoice.documentId,
       documentNumber: meta.documentNumber ?? null,
       documentType: 'Invoice',
       issueDateTime,
       currency: 'TZS',
-      createdByName: meta.createdByName ?? 'VPOS-LITE',
-      isOnline: true,
+      createdByName: invoice.createdByName ?? meta.createdByName ?? 'VPOS-LITE',
+      isOnline: invoice.isOnline ?? true,
       ...(invoice.buyer ? { buyer: invoice.buyer } : {}),
       lines,
-      totals: { amount: total },
+      totals: invoice.totals ?? { amount: total },
+      payment: invoice.tenders.length ? { tenders: invoice.tenders } : undefined,
+      notes: invoice.notes ?? null,
       countryCode: 'TZ',
       tanzania: { ...meta.tanzania, invoiceDate: issueDateTime },
     }
