@@ -2,6 +2,7 @@ import type { PoolClient } from '@/src/platform/db/postgres'
 import { txQuery, withTransaction } from '@/src/platform/db/postgres'
 import { persistFiscalizationEventRepo } from '@/src/modules/transactions/infrastructure/fiscalization/fiscalization-event.repository'
 import type { RecoveryTransactionBoundary, RecoveryTransactionClient } from './transactionalRecoveryAdapter'
+import { persistAndLinkRecoveryAudit } from './recoveryAuditLink'
 
 /**
  * Opt-in PostgreSQL adapter. Nothing in production imports or constructs it.
@@ -20,44 +21,52 @@ export function createPostgresRecoveryTransactionBoundary(): RecoveryTransaction
           return { rows: response.rows }
         },
         async recordRecoveryAudit(input) {
-          const recorded = await persistFiscalizationEventRepo({
-            stationId: input.stationId,
-            transactionId: input.transactionId,
-            fiscalDocumentId: input.documentId,
-            engine: 'vpos-proxy-status-recovery',
-            transport: 'proxy',
-            status: 'SUCCESS',
-            idempotencyKey: input.idempotencyKey,
-            responsePayload: {
-              documentId: input.documentId,
-              status: input.observedStatus,
-              recoveredFromStatusLookup: true,
+          await persistAndLinkRecoveryAudit({
+            async persist(audit) {
+              const recorded = await persistFiscalizationEventRepo({
+                stationId: audit.stationId,
+                transactionId: audit.transactionId,
+                fiscalDocumentId: audit.documentId,
+                engine: 'vpos-proxy-status-recovery',
+                transport: 'proxy',
+                status: 'SUCCESS',
+                idempotencyKey: audit.idempotencyKey,
+                responsePayload: {
+                  documentId: audit.documentId,
+                  status: audit.observedStatus,
+                  recoveredFromStatusLookup: true,
+                },
+                client,
+              })
+              return {
+                eventId: recorded.event.id,
+                summary: recorded.compatibilitySummary,
+              }
             },
-            client,
-          })
-          const response = await txQuery<{ id: string }>(
-            client,
-            `UPDATE transactions
-                SET latest_fiscal_event_id = $3::uuid,
-                    fiscalization_response = $4,
-                    updated_at = NOW()
-              WHERE station_id = $1::uuid
-                AND id = $2::uuid
-                AND status = 'FISCALIZED'
-                AND fiscal_document_id = $5
-                AND deleted_at IS NULL
-            RETURNING id`,
-            [
-              input.stationId,
-              input.transactionId,
-              recorded.event.id,
-              JSON.stringify(recorded.compatibilitySummary),
-              input.documentId,
-            ],
-          )
-          if (response.rows.length !== 1) {
-            throw new Error('Recovery audit summary could not be bound to transaction')
-          }
+            async link(audit) {
+              const response = await txQuery<{ id: string }>(
+                client,
+                `UPDATE transactions
+                    SET latest_fiscal_event_id = $3::uuid,
+                        fiscalization_response = $4,
+                        updated_at = NOW()
+                  WHERE station_id = $1::uuid
+                    AND id = $2::uuid
+                    AND status = 'FISCALIZED'
+                    AND fiscal_document_id = $5
+                    AND deleted_at IS NULL
+                RETURNING id`,
+                [
+                  audit.stationId,
+                  audit.transactionId,
+                  audit.eventId,
+                  JSON.stringify(audit.summary),
+                  audit.documentId,
+                ],
+              )
+              return response.rows.length
+            },
+          }, input)
         },
       }))
     },
