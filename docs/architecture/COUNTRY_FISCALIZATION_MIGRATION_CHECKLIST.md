@@ -325,3 +325,13 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Replace the still-isolated adapter's public plain-object evidence with a trusted status lookup / verification entry point before production integration.
 - [ ] Preserve fiscalization event, receipt creation and printing semantics in the actual PostgreSQL integration.
 - [ ] Run npm run check. No existing workers, routes or database services modified.
+
+## Lookup-driven recovery workflow pass
+
+- [x] Fix nullable sourceStatus TS18047 by narrowing into a local nonnull variable before audit write.
+- [x] Add isolated orchestration from status lookup to confirmed assessment to guarded transactional recovery.
+- [x] Disallow persistence when transport fails, a document mismatches, or fiscalization remains pending/failed.
+- [x] Test happy path and fail-closed results using injected fake lookup/transaction boundaries.
+- [ ] Resolve authenticated production lookup and database transaction implementations; injected ports alone do not establish a trusted external source.
+- [ ] Validate real PostgreSQL lock, audit rollback, receipt/printing integration and multiworker idempotency before activation.
+- [ ] Run npm run check and new tests. No production worker, route or DB integration was changed.
