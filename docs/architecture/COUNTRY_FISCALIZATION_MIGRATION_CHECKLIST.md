@@ -15,19 +15,23 @@ adapters have been implemented, connected, or tested.
 - [x] Registry with duplicate registration guard and unconnected-adapter failure
 - [x] Kenya and Tanzania declarative country definitions
 - [x] Scaffold regression tests for country resolution
-- [ ] Country-specific adapter implementations with typed error handling
+- [x] Standalone Kenya/Tanzania product policy implementations (testing only)
+- [x] Opt-in product policy registry and country-specific registration serializers
+- [ ] Country-specific full fiscal adapter implementations with typed error handling
 - [ ] Unit tests for all implemented adapter methods
 - [ ] Definition/implementation capability consistency checks
 - [ ] Confirm supported country configuration versus bundled dataset availability
 
 ## Product catalog and registration
 - [ ] Resolve class code, type code, tax code, currency, units, packaging and hazardous flag
-- [ ] Validate Kenya types 1 / 2 / 3 and accepted aliases
-- [ ] Validate Kenya tax codes A / B / C / D / E
-- [ ] Make Kenya fuel-grade defaults configurable; avoid guessing unknown classes
+- [x] Validate Kenya types 1 / 2 / 3 and accepted aliases in isolated policy
+- [x] Validate Kenya tax codes A / B / C / D / E in isolated policy
+- [x] Avoid guessing classification for unknown Kenya fuel grade in standalone policy
+- [ ] Make Kenya fuel-grade defaults configurable and review diesel classification with tax catalog
 - [ ] Preserve configured overrides on XML reimport
-- [ ] Tanzania product upload shape and status lookup parity
-- [ ] Kenya products[] batch contract parity
+- [x] Tanzania single-product registration serializer scaffold
+- [ ] Tanzania product upload and status lookup integration parity
+- [x] Kenya products[] batch serialization unit test (production parity still pending)
 - [ ] Map API validation errors to actionable product statuses
 - [ ] Confirm batch limits, partial failures, idempotent product registration
 
@@ -82,3 +86,14 @@ adapters have been implemented, connected, or tested.
 - `src/shared/config/datasets/registry.ts`
 
 These locations are **references only**: none are modified by the scaffold PR.
+
+## Fiscal-layer testing pass: product policies
+
+- [x] Kenya product validation, aliases and products[] batch builder isolated from live services.
+- [x] Tanzania product classification validation and per-product registration mapper scaffold.
+- [x] Opt-in resolver `getCountryProductPolicy()`; existing runtime remains unchanged.
+- [x] Initial unit tests for Kenya registration and Tanzania single-product serialization.
+- [ ] Compare Tanzania mapper outputs with real existing proxy requests before activating it.
+- [ ] Verify actual Kenya Diesel class against authoritative catalog; example and class catalog can differ.
+- [ ] Execute TypeScript, lint and tests in CI/local development environment.
+- [ ] Connect full adapters to registry only after invoice/receipt/status capabilities exist.
