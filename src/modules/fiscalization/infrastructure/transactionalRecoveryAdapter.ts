@@ -1,3 +1,4 @@
+import type { FiscalRecoveryAssessment } from '../application/statusRecoveryService'
 import { buildRecoveryStatusTransitionSql, recoveryAuditIdempotencyKey } from './recoverySqlPlan'
 
 export interface RecoveryTransactionClient {
@@ -32,14 +33,23 @@ export async function confirmTransactionFiscalizedAtomically(
     stationId: string
     transactionId: string
     documentId: string
-    observedStatus: string
-    confirmed: true
+    assessment: FiscalRecoveryAssessment
   },
 ): Promise<TransactionalRecoveryOutcome> {
-  const plan = buildRecoveryStatusTransitionSql(input)
-  if (input.confirmed !== true || !input.observedStatus.trim()) {
-    throw new Error('Confirmed fiscal status evidence is required')
+  const assessment = input.assessment
+  const decision = assessment.decision
+  if (assessment.outcome !== 'confirmed' || assessment.canMarkFiscalized !== true ||
+    !decision || decision.canMarkFiscalized !== true ||
+    decision.resolution.state !== 'fiscalized' ||
+    decision.resolution.documentId !== input.documentId ||
+    decision.transactionDocumentId !== input.documentId ||
+    decision.countryCode !== assessment.countryCode ||
+    assessment.documentId !== input.documentId ||
+    assessment.stationId !== input.stationId ||
+    !decision.resolution.sourceStatus?.trim()) {
+    throw new Error('Correlated fiscal status confirmation is required')
   }
+  const plan = buildRecoveryStatusTransitionSql(input)
   return boundary.transaction(async client => {
     const result = await client.query(plan.sql, plan.params)
     if (result.rows.length !== 1) return 'stale'
@@ -47,7 +57,7 @@ export async function confirmTransactionFiscalizedAtomically(
       stationId: input.stationId.trim(),
       transactionId: input.transactionId.trim(),
       documentId: input.documentId.trim(),
-      observedStatus: input.observedStatus.trim(),
+      observedStatus: decision.resolution.sourceStatus.trim(),
       idempotencyKey: recoveryAuditIdempotencyKey(input.transactionId, input.documentId),
     })
     return 'applied'
