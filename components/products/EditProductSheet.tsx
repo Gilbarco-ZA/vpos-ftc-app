@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/src/shared/api/fetch'
 
@@ -117,6 +117,13 @@ export const EditProductSheet = ({
     }
   }, [isOpen, productId, defaultCurrency, showToast])
 
+  const stableInitialValues = useMemo(
+    () => initialValues
+      ? { ...createEmptyForm(defaultCurrency), ...initialValues }
+      : undefined,
+    [defaultCurrency, initialValues],
+  )
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex h-dvh flex-col p-0">
@@ -132,10 +139,7 @@ export const EditProductSheet = ({
             defaultCurrency={defaultCurrency}
             taxTypeOptions={taxTypeOptions}
             isDevEnv={isDevEnv}
-            initialValues={{
-              ...createEmptyForm(defaultCurrency),
-              ...initialValues,
-            }}
+            initialValues={stableInitialValues}
             onSubmit={async ({ csrfToken, payload }) => {
               const res = await fetch('/api/products', {
                 method: 'POST',
