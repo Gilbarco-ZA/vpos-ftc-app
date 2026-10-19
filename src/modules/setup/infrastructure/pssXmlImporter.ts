@@ -603,6 +603,8 @@ export const importPssConfigXml = async (args: {
              product_class_code,
              product_type_code,
              tax_code,
+             unit_of_measure,
+             unit_of_packaging,
              commodity_code,
              hazardous_indicator,
              created_by_name,
@@ -611,7 +613,7 @@ export const importPssConfigXml = async (args: {
              last_sync_at,
              last_sync_message
            ) VALUES (
-             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
            )
            ON CONFLICT (station_id, product_id) DO UPDATE SET
              product_code = EXCLUDED.product_code,
@@ -632,6 +634,14 @@ export const importPssConfigXml = async (args: {
                WHEN products.tax_code IS NULL OR products.tax_code = 'VAT'
                  THEN EXCLUDED.tax_code
                ELSE products.tax_code END,
+             unit_of_measure = CASE
+               WHEN $22 AND (products.unit_of_measure IS NULL OR BTRIM(products.unit_of_measure) = '')
+                 THEN EXCLUDED.unit_of_measure
+               ELSE products.unit_of_measure END,
+             unit_of_packaging = CASE
+               WHEN $22 AND (products.unit_of_packaging IS NULL OR BTRIM(products.unit_of_packaging) = '')
+                 THEN EXCLUDED.unit_of_packaging
+               ELSE products.unit_of_packaging END,
              updated_at = NOW()
            RETURNING id, product_code as code, product_name as name, unit_price as price, currency, tax_code as "taxCode", tax_rate as "taxRate", hazardous_indicator as hazardous, category, product_class_code as "productClassCode", product_type_code as "productTypeCode"`,
           [
@@ -649,12 +659,16 @@ export const importPssConfigXml = async (args: {
             isKenya ? kenyaFuelClassCode(productName) : 'FUEL',
             isKenya ? '2' : 'FUEL',
             isKenya ? 'B' : 'VAT',
+            isKenya ? 'L' : null,
+            isKenya ? 'TY' : null,
             null,
             isKenya,
             'PSS_IMPORT',
             false,
             null,
             null,
+            null,
+            isKenya,
             null,
           ],
         ).then((r) => r.rows[0])
