@@ -155,3 +155,16 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Confirm Tanzania fiscal credit-note counters, reference rules and payload against authoritative API.
 - [ ] Add real proxy-contract parity fixtures and approval before enabling either path.
 - [ ] Run lint, typecheck and targeted tests on fiscal-layer.
+
+## Fiscal-layer testing pass: receipts and fiscal status
+
+- [x] Opt-in Kenya/Tanzania receipt policy registry wraps the existing templates.
+- [x] Retain enriched FiscalReceiptModel: no duplicate QR, tax or TRA counter calculations.
+- [x] Shared proxy status interpretation with explicit fiscalized/processing/failed/unknown states.
+- [x] Never authorize resubmission solely from an error, missing or unknown response.
+- [x] Receipt delegation and fiscal status guard tests.
+- [ ] Verify all status codes and nested response variants against current proxy Swagger.
+- [ ] Correlate invoice-status responses and records before changing any transaction.
+- [ ] Introduce country-specific status overrides if proxy contract differences require them.
+- [ ] Add real receipt-model fixture snapshots (Kenya/Tanzania) and execute CI.
+- [ ] Wire status reconciliation into existing timeout recovery only after end-to-end approval.
