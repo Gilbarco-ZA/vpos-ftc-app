@@ -1,7 +1,7 @@
 import type { PoolClient } from '@/src/platform/db/postgres'
 import { txQuery, withTransaction } from '@/src/platform/db/postgres'
 import { persistFiscalizationEventRepo } from '@/src/modules/transactions/infrastructure/fiscalization/fiscalization-event.repository'
-import type { RecoveryTransactionBoundary } from './transactionalRecoveryAdapter'
+import type { RecoveryTransactionBoundary, RecoveryTransactionClient } from './transactionalRecoveryAdapter'
 
 /**
  * Opt-in PostgreSQL adapter. Nothing in production imports or constructs it.
@@ -13,7 +13,7 @@ import type { RecoveryTransactionBoundary } from './transactionalRecoveryAdapter
  */
 export function createPostgresRecoveryTransactionBoundary(): RecoveryTransactionBoundary {
   return {
-    transaction<T>(run: Parameters<RecoveryTransactionBoundary['transaction']>[0]): Promise<T> {
+    transaction<T>(run: (client: RecoveryTransactionClient) => Promise<T>): Promise<T> {
       return withTransaction(async (client: PoolClient) => run({
         async query(sql, params) {
           const response = await txQuery<{ id: string }>(client, sql, [...params])
@@ -59,7 +59,7 @@ export function createPostgresRecoveryTransactionBoundary(): RecoveryTransaction
             throw new Error('Recovery audit summary could not be bound to transaction')
           }
         },
-      })) as Promise<T>
+      }))
     },
   }
 }
