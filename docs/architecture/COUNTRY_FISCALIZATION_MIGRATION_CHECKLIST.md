@@ -346,3 +346,15 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Confirm receipt creation / enrichment and print queue parity before any worker hookup.
 - [ ] Verify status response supplies any missing fiscal receipt fields before showing recovered transaction as complete.
 - [ ] Run npm run check; no production route, job, or worker imports this boundary.
+
+## Recovery audit evidence hardening pass
+
+- [x] Reject contradictory invoice status evidence (`error: true` alongside `FISCALIZED` or `SUCCESS`) in the isolated fiscal status normalizer.
+- [x] Add workflow negative tests proving contradictory status cannot reach the transaction boundary.
+- [x] Extract a transaction-local recovery audit/link validation helper.
+- [x] Require a nonempty event ID and exactly one linked transaction row before completing an audit operation.
+- [x] Add fake-operation tests for successful linking, audit exceptions, missing evidence, zero links and multiple links.
+- [x] Reuse helper in opt-in PostgreSQL recovery transaction boundary; audit/link exceptions propagate through withTransaction for rollback.
+- [ ] Run npm run check and fiscalization tests on fiscal-layer.
+- [ ] Validate real PostgreSQL rollback and parallel-worker race behavior.
+- [ ] Confirm receipt enrichment and auto-print parity before any production integration.
