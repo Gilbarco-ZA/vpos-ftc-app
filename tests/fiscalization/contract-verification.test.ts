@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { ProxyInvoiceRequest } from '@/src/shared/fiscalization/proxy/contracts'
-import { compareProxyInvoiceContracts } from '@/src/modules/fiscalization/application/contractVerification'
+import { compareProxyInvoiceContracts, findContractDifferences } from '@/src/modules/fiscalization/application/contractVerification'
 import { assessFiscalLayerReadiness } from '@/src/modules/fiscalization/application/fiscalLayerReadiness'
 
 const cases: Array<{ country: 'KE' | 'TZ'; name: string; invoice: ProxyInvoiceRequest }> = [
@@ -58,4 +58,15 @@ test('local shape parity never promotes runtime readiness', () => {
 
 test('unknown fiscal country is rejected', () => {
   assert.throws(() => compareProxyInvoiceContracts('XX', cases[0].invoice), /Unsupported/)
+})
+
+test('contract comparison reports nested changed and missing paths', () => {
+  const differences = findContractDifferences(
+    { Lines: [{ product: { unitOfPackaging: 'TY', quantity: 2 } }] },
+    { Lines: [{ product: { quantity: 3 } }] },
+  )
+  assert.deepEqual(differences.map(item => item.path).sort(), [
+    'Lines[0].product.quantity',
+    'Lines[0].product.unitOfPackaging',
+  ])
 })
