@@ -132,6 +132,14 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [x] Canonical invoice carries authoritative totals, line IDs, tax detail and discounts.
 - [x] Financial integrity helper validates non-negative finite amounts and tender reconciliation.
 - [x] Kenya draft policy validates against authoritative totals.
-- [ ] Tanzania draft policy: switch to supplied authoritative financial fields (pending).
+- [x] Tanzania draft policy: preserve supplied authoritative financial fields, discounts and totals.
 - [ ] Verify full amount and tax parity with production fixtures.
 - [ ] Run all fiscal-layer tests, lint and typecheck.
+
+## Tanzania financial mapping pass
+- [x] Preserve supplied price extension, net total, tax base, tax amount and discounts.
+- [x] Preserve authoritative invoice totals, offline indicator, notes and tender list.
+- [x] Preserve line identifiers and commodity codes.
+- [x] Add Tanzania regression coverage for authoritative financial values.
+- [ ] Confirm exact Tanzania line unit-price semantics and tax-rounding parity against real proxy fixtures.
+- [ ] Run repository lint, typecheck and test suite.
