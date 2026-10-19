@@ -27,7 +27,13 @@ test('Tanzania composes policies but refuses unverified credit-note execution', 
   assert.equal(layer.countryCode, 'TZ')
   assert.equal(layer.receipts.countryCode, 'TZ')
   assert.equal(layer.normalizeStatus({ error: true, status: 'unknown' }).safeToResubmit, false)
-  assert.throws(() => layer.creditNotes.buildPayload(), /not yet verified/)
+  assert.throws(() => layer.creditNotes.buildPayload({
+    creditNoteId: 'CN-1', originalDocumentId: 'INV-1',
+    issuedAt: '2026-10-19T10:00:00Z', reasonCode: '13', reason: 'Return',
+    createdByName: 'Operator', isOnline: true,
+    invoice: { documentId: 'INV-1', issuedAt: '2026-10-19T09:00:00Z',
+      currency: 'TZS', lines: [], tenders: [] },
+  }), /not yet verified/)
   assertFiscalLayerNotLive(layer)
 })
 
