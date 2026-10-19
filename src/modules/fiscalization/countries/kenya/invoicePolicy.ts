@@ -1,5 +1,5 @@
 import { invoiceExpectedAmount, validateFinancialIntegrity } from '../../domain/financialValidation'
-import type { CanonicalInvoice, ValidationIssue, ValidationResult } from '../../domain/countryAdapter'
+import type { ValidationIssue, ValidationResult } from '../../domain/countryAdapter'
 import { requireValidInvoice, roundInvoiceMoney, validateInvoiceCore } from '../../domain/invoicePolicy'
 import type { InvoicePolicy } from '../../domain/invoicePolicy'
 import { kenyaProductPolicy } from './productPolicy'
