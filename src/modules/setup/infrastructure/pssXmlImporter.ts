@@ -542,10 +542,10 @@ export const importPssConfigXml = async (args: {
 
   const parsed = parsePssConfigXml(xml)
   validateParsedPssTopology(parsed)
-  const currency = await resolveCurrency(stationId)
   const siteProfile = await kvGet<{ country?: string }>(stationId, KV_KEYS.SITE_PROFILE)
   const country = safeTrim(siteProfile?.country).toUpperCase()
   const isKenya = country === 'KE'
+  const currency = isKenya ? 'KES' : await resolveCurrency(stationId)
 
   const primaryPriceGroup = pickPrimaryPriceGroup(parsed)
 
