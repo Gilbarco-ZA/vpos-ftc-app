@@ -635,11 +635,11 @@ export const importPssConfigXml = async (args: {
                  THEN EXCLUDED.tax_code
                ELSE products.tax_code END,
              unit_of_measure = CASE
-               WHEN $22 AND (products.unit_of_measure IS NULL OR BTRIM(products.unit_of_measure) = '')
+               WHEN $24 AND (products.unit_of_measure IS NULL OR BTRIM(products.unit_of_measure) = '')
                  THEN EXCLUDED.unit_of_measure
                ELSE products.unit_of_measure END,
              unit_of_packaging = CASE
-               WHEN $22 AND (products.unit_of_packaging IS NULL OR BTRIM(products.unit_of_packaging) = '')
+               WHEN $24 AND (products.unit_of_packaging IS NULL OR BTRIM(products.unit_of_packaging) = '')
                  THEN EXCLUDED.unit_of_packaging
                ELSE products.unit_of_packaging END,
              updated_at = NOW()
@@ -669,7 +669,6 @@ export const importPssConfigXml = async (args: {
             null,
             null,
             isKenya,
-            null,
           ],
         ).then((r) => r.rows[0])
 
