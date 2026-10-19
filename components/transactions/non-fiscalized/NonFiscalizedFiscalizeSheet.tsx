@@ -4,6 +4,7 @@ import type {
   CustomerState,
   FiscalizeFormErrors,
   LocalReceiptFields,
+  FiscalizationPaymentType,
   NonFiscalizedFiscalizeSheetProps,
   ResolvedCustomer,
 } from '@/components/transactions/non-fiscalized/types'
@@ -48,9 +49,9 @@ const DEFAULT_PAYMENT_OPTIONS = [
 const normalizePaymentSelection = (
   value: unknown,
   kenya: boolean,
-): string => {
+): FiscalizationPaymentType => {
   const raw = String(value ?? '').trim().toUpperCase()
-  const aliases: Record<string, string> = {
+  const aliases: Record<string, FiscalizationPaymentType> = {
     CASH: 'CASH',
     CREDIT: 'CREDIT',
     ACCOUNT: 'CREDIT',
@@ -70,11 +71,12 @@ const normalizePaymentSelection = (
     EMONEY: 'MOBILE_MONEY',
     OTHER: 'OTHER',
   }
-  const normalized = aliases[raw] ?? raw
-  const allowed = kenya
+  const normalized = aliases[raw]
+  if (!normalized) return 'CASH'
+  const allowed: readonly string[] = kenya
     ? KENYA_PAYMENT_OPTIONS.map((option) => option.value)
     : DEFAULT_PAYMENT_OPTIONS.map((option) => option.value)
-  return allowed.includes(normalized as any) ? normalized : 'CASH'
+  return allowed.includes(normalized) ? normalized : 'CASH'
 }
 
 const NonFiscalizedFiscalizeSheet = ({
@@ -551,7 +553,10 @@ const NonFiscalizedFiscalizeSheet = ({
                       onChange={(event) =>
                         setLocalReceiptFields((prev) => ({
                           ...prev,
-                          paymentType: event.target.value,
+                          paymentType: normalizePaymentSelection(
+                            event.target.value,
+                            isKenyaStation(stationCountry),
+                          ),
                         }))
                       }
                     >
