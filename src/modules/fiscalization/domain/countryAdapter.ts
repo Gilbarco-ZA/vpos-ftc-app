@@ -28,11 +28,36 @@ export interface CanonicalProduct {
   hazardousIndicator?: boolean
 }
 
+export interface CanonicalTaxDetail {
+  type: string
+  rate: number
+  base?: number | null
+  amount?: number | null
+  exemptionCode?: string | null
+}
+
+export interface CanonicalInvoiceTotals {
+  priceExtension?: number | null
+  discount?: number | null
+  charge?: number | null
+  net?: number | null
+  tax?: number | null
+  amount: number
+}
+
 export interface CanonicalInvoiceLine {
   product: CanonicalProduct
   quantity: number
   unitPrice: number
   taxRate?: number | null
+  /** Existing, authoritative fiscal amounts: do not infer when supplied. */
+  lineId?: string | null
+  lineType?: string | null
+  priceExtension?: number | null
+  netTotal?: number | null
+  taxes?: CanonicalTaxDetail[]
+  discounts?: unknown[]
+  commodityCode?: string | null
   fuel?: {
     gradeId?: string | null
     gradeName?: string | null
@@ -55,6 +80,11 @@ export interface CanonicalInvoice {
   lines: CanonicalInvoiceLine[]
   tenders: CanonicalTender[]
   buyer?: Record<string, unknown> | null
+  /** Amounts must originate from transaction accounting, not a second VAT calculation. */
+  totals?: CanonicalInvoiceTotals
+  createdByName?: string
+  isOnline?: boolean
+  notes?: string
   metadata?: Record<string, unknown>
 }
 
