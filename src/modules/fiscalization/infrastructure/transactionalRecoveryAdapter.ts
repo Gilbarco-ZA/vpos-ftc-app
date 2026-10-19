@@ -1,7 +1,7 @@
 import { buildRecoveryStatusTransitionSql, recoveryAuditIdempotencyKey } from './recoverySqlPlan'
 
 export interface RecoveryTransactionClient {
-  query<T extends { id: string }>(sql: string, params: readonly unknown[]): Promise<{ rows: T[] }>
+  query(sql: string, params: readonly unknown[]): Promise<{ rows: { id: string }[] }>
   /**
    * Must write a fiscalization_events SUCCESS event and compatibility summary
    * using the same database transaction. Throwing rolls back the status update.
@@ -41,7 +41,7 @@ export async function confirmTransactionFiscalizedAtomically(
     throw new Error('Confirmed fiscal status evidence is required')
   }
   return boundary.transaction(async client => {
-    const result = await client.query<{ id: string }>(plan.sql, plan.params)
+    const result = await client.query(plan.sql, plan.params)
     if (result.rows.length !== 1) return 'stale'
     await client.recordRecoveryAudit({
       stationId: input.stationId.trim(),
