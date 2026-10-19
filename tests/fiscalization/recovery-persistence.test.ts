@@ -47,7 +47,7 @@ test('matching confirmation changes a fiscalizing record exactly once', async ()
   const { port, record, audit } = memoryPort()
   const first = await applyConfirmedFiscalRecovery(port, confirmation)
   const second = await applyConfirmedFiscalRecovery(port, confirmation)
-  assert.equal(first.outcome, 'updated')
+  assert.equal(first.outcome, 'applied')
   assert.equal(second.outcome, 'already-fiscalized')
   assert.equal(record.state, 'fiscalized')
   assert.equal(audit.length, 1)
@@ -60,7 +60,7 @@ test('concurrent confirmations cannot both apply in compare-and-set port', async
     applyConfirmedFiscalRecovery(port, confirmation),
     applyConfirmedFiscalRecovery(port, confirmation),
   ])
-  assert.deepEqual(results.map(item => item.outcome).sort(), ['already-fiscalized', 'updated'])
+  assert.deepEqual(results.map(item => item.outcome).sort(), ['already-fiscalized', 'applied'])
   assert.equal(audit.length, 1)
 })
 
