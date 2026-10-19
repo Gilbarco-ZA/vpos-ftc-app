@@ -923,7 +923,7 @@ function mapToProxyProducts(
       productId: String(p.id), // decide what you want to expose as productId
       productCode: String(p.code),
       productClassCode: (p as ImportedProduct & { productClassCode?: string }).productClassCode ?? null,
-      productTypeCode: (p as ImportedProduct & { productTypeCode?: string }).productTypeCode ?? null
+      productTypeCode: (p as ImportedProduct & { productTypeCode?: string }).productTypeCode ?? null,
       productName: p.name,
       category: p.category ?? null,
       unitOfMeasure: 'L', // for fuel; change if you also import dry stock
