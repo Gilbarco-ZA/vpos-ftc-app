@@ -289,3 +289,16 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Add concurrency tests against the actual storage engine before live integration.
 - [ ] Verify status-code semantics against redacted successful responses, not just Swagger shapes.
 - [ ] Do not wire production transactions/workers until recovery lock, idempotency, and rollback approach approved.
+
+## Recovery persistence schema review and guarded SQL plan
+
+- [x] Fix the two recovery-persistence regression assertions: application outcome is `applied`, not storage `updated`.
+- [x] Inspect existing transaction repository, status service, fiscalization-event repository and transaction migration.
+- [x] Verify existing transactions store uppercase `FISCALIZING` / `FISCALIZED`, `fiscal_document_id`, station/transaction IDs and soft deletion.
+- [x] Record a critical integration mismatch: the actual transactions table has no `version` column, while the test-only recovery port currently assumes one.
+- [x] Add a pure guarded PostgreSQL UPDATE statement plan keyed by station ID, transaction ID, fiscal document ID, expected FISCALIZING state and nondeleted rows.
+- [x] Add deterministic recovery audit idempotency-key helper and tests. Production must reuse existing fiscalization_events uniqueness in a single DB transaction.
+- [ ] Decide whether to replace the version-based port with a row-lock/status-only CAS implementation; do not fake a version from updated_at.
+- [ ] Implement the actual PostgreSQL adapter with transactional event persistence and row-count conflict classification only after schema and fiscal metadata lifecycle approval.
+- [ ] Confirm recovery does not skip receipt generation, print job handling, or required fiscalization-event compatibility summaries.
+- [ ] Run npm run check on the new tests; existing runtime behavior unchanged.
