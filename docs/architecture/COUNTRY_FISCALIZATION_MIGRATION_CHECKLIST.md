@@ -335,3 +335,14 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Resolve authenticated production lookup and database transaction implementations; injected ports alone do not establish a trusted external source.
 - [ ] Validate real PostgreSQL lock, audit rollback, receipt/printing integration and multiworker idempotency before activation.
 - [ ] Run npm run check and new tests. No production worker, route or DB integration was changed.
+
+## Opt-in PostgreSQL recovery audit boundary pass
+
+- [x] Add PostgreSQL transaction boundary using existing withTransaction and txQuery.
+- [x] Reuse persistFiscalizationEventRepo to write idempotent SUCCESS event inside the same transaction.
+- [x] Persist compatibility summary and latest_fiscal_event_id under station, transaction, document and status constraints.
+- [x] Verify latest_fiscal_event_id comes from migration 1258_fiscalization_event_canonical.sql.
+- [ ] Validate rollback and parallel-worker behavior against a disposable PostgreSQL database.
+- [ ] Confirm receipt creation / enrichment and print queue parity before any worker hookup.
+- [ ] Verify status response supplies any missing fiscal receipt fields before showing recovered transaction as complete.
+- [ ] Run npm run check; no production route, job, or worker imports this boundary.
