@@ -1,6 +1,6 @@
 {
   "name": "@gilbarcoafs/vpos-ftc-app",
-  "version": "0.1.43",
+  "version": "0.1.50",
   "private": true,
   "main": "start.cjs",
   "engines": {
