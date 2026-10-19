@@ -120,3 +120,45 @@ test('keeps zero-rated lines at 0 instead of coercing them to 16', () => {
   const payload = toCountrySpecificInvoicePayload(invoice) as any
   assert.deepEqual(payload.Lines[0].taxes, [{ type: 'C', rate: 0 }])
 })
+
+
+test('maps Kenya payment codes and aliases to proxy tender methods', () => {
+  const cases = [
+    ['01', 'Cash'],
+    ['02', 'Credit'],
+    ['03', 'Cash/Credit'],
+    ['04', 'Cheque'],
+    ['05', 'Card'],
+    ['06', 'MobileMoney'],
+    ['07', 'Other'],
+    ['BANK CHEQUE', 'Cheque'],
+    ['M-PESA', 'MobileMoney'],
+  ] as const
+
+  for (const [paymentType, expectedMethod] of cases) {
+    const invoice = mapTransactionToProxyInvoice({
+      transaction: {
+        id: `txn-${paymentType}`,
+        created_at: '2026-03-18T08:00:00.000Z',
+        total_amount: 100,
+        payment_type: paymentType,
+        lines: [
+          {
+            productId: 'PRD-1',
+            description: 'Product',
+            quantity: 1,
+            unitPrice: 100,
+            lineTotal: 100,
+            taxCode: 'C',
+            taxRate: 0,
+          },
+        ],
+      },
+      customer: null,
+      station: { country: 'KE' },
+    })
+
+    assert.equal(invoice.payment?.tenders[0]?.method, expectedMethod)
+    assert.equal(invoice.payment?.tenders[0]?.amount, 100)
+  }
+})
