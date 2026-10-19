@@ -180,3 +180,15 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Harmonize CountryFiscalizationAdapter interface with the fully composed policy contracts.
 - [ ] Keep capability declarations separate from verified runtime readiness, pending endpoint contract tests.
 - [ ] Run lint, TypeScript check and tests; do not activate in production.
+
+## Fiscal-layer testing pass: interface alignment and readiness
+
+- [x] Align CountryFiscalizationAdapter with the actual composed product, invoice, credit-note, receipt and status interfaces.
+- [x] CountryFiscalLayer explicitly extends the adapter contract.
+- [x] Add fail-closed per-country readiness assessment, separate from advertised API capabilities.
+- [x] Document blockers for each Kenya and Tanzania feature.
+- [x] Keep Tanzania credit notes marked not implemented and both countries unverified/not connected.
+- [x] Add type-level composition and readiness guard tests.
+- [ ] Run lint, typecheck and targeted tests.
+- [ ] Verify each contract against live authoritative swagger and real fixtures before promoting any readiness status.
+- [ ] Design opt-in production integration/rollback in a separate pass.
