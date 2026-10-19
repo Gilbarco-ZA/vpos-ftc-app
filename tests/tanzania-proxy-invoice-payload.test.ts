@@ -91,7 +91,7 @@ test('Tanzania proxy payload retains sequencing and strips timezone suffixes', (
   })
 })
 
-test('non-Tanzania proxy payload retains the existing invoice contract', () => {
+test('Kenya proxy payload includes currency and payment tenders', () => {
   const invoice: ProxyInvoiceRequest = {
     documentId: 'transaction-ke-1',
     documentNumber: 'INV-KE-1',
@@ -100,6 +100,9 @@ test('non-Tanzania proxy payload retains the existing invoice contract', () => {
     currency: 'KES',
     createdByName: 'Jane',
     countryCode: 'KE',
+    payment: {
+      tenders: [{ method: 'Cash', amount: 116 }],
+    },
     lines: [
       {
         lineId: '1',
@@ -125,10 +128,16 @@ test('non-Tanzania proxy payload retains the existing invoice contract', () => {
   assert.ok(Array.isArray(payload.Lines))
   assert.equal(payload.Lines[0].product.description, 'Product')
   assert.deepEqual(payload.Lines[0].taxes, [{ type: 'A', rate: 16 }])
+  assert.equal(payload.Currency, 'KES')
+  assert.deepEqual(payload.Payment, {
+    Tenders: [{ Method: 'Cash', Amount: 116 }],
+  })
   assert.equal('deviceId' in payload, false)
   assert.equal('documentId' in payload, false)
   assert.equal('lines' in payload, false)
   assert.equal('countryCode' in payload, false)
+  assert.equal('currency' in payload, false)
+  assert.equal('payment' in payload, false)
   assert.equal('tanzania' in payload, false)
   assert.equal('totals' in payload, false)
 })
