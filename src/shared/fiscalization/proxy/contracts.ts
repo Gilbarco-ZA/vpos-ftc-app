@@ -49,6 +49,24 @@ export type InvoiceTotalDto = {
   amount?: number | null
 }
 
+export type ProxyPaymentMethod =
+  | 'Cash'
+  | 'Credit'
+  | 'Cash/Credit'
+  | 'Cheque'
+  | 'Card'
+  | 'MobileMoney'
+  | 'Other'
+
+export type ProxyPaymentTenderDto = {
+  method: ProxyPaymentMethod
+  amount: number
+}
+
+export type ProxyPaymentDto = {
+  tenders: ProxyPaymentTenderDto[]
+}
+
 export type TanzaniaProxyInvoiceMetadata = {
   invoiceNumber: string
   rctVerificationNum: string
@@ -87,7 +105,7 @@ export type ProxyInvoiceRequest = {
   buyer?: any | null
   lines?: InvoiceLineDto[] | null
   totals?: InvoiceTotalDto | null
-  payment?: any | null
+  payment?: ProxyPaymentDto | null
   delivery?: any | null
   notes?: string | null
   countryCode?: string | null
