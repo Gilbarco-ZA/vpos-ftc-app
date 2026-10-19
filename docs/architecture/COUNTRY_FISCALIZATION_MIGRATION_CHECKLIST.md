@@ -314,3 +314,14 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Replace version-based recoveryPersistence port or adapt it explicitly to status-conditional PostgreSQL updates.
 - [ ] Prove receipt and print-job parity with the existing completion workflow.
 - [ ] Run npm run check; no live worker or database integration in this pass.
+
+## Recovery evidence binding pass
+
+- [x] Remove standalone `confirmed: true` authorization from the isolated transactional recovery adapter.
+- [x] Require `FiscalRecoveryAssessment` with confirmed outcome and a matching fiscalized reconciliation decision.
+- [x] Verify station ID, document ID and decision country match before beginning a transaction.
+- [x] Derive audit observed status from the reconciliation result rather than caller-supplied text.
+- [x] Add fail-closed tests for unresolved, mismatched and nonfiscalized evidence.
+- [ ] Replace the still-isolated adapter's public plain-object evidence with a trusted status lookup / verification entry point before production integration.
+- [ ] Preserve fiscalization event, receipt creation and printing semantics in the actual PostgreSQL integration.
+- [ ] Run npm run check. No existing workers, routes or database services modified.
