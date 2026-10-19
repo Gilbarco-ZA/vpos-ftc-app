@@ -1,3 +1,4 @@
+import { invoiceExpectedAmount, validateFinancialIntegrity } from '../../domain/financialValidation'
 import type { CanonicalInvoice, ValidationIssue, ValidationResult } from '../../domain/countryAdapter'
 import { requireValidInvoice, roundInvoiceMoney, validateInvoiceCore } from '../../domain/invoicePolicy'
 import type { InvoicePolicy } from '../../domain/invoicePolicy'
@@ -21,7 +22,7 @@ export function kenyaTenderMethod(value: string): string | null {
 
 export const kenyaInvoicePolicy: InvoicePolicy = {
   validate(invoice): ValidationResult {
-    const issues: ValidationIssue[] = validateInvoiceCore(invoice)
+    const issues: ValidationIssue[] = [...validateInvoiceCore(invoice), ...validateFinancialIntegrity(invoice)]
     if (invoice.currency.trim().toUpperCase() !== 'KES') {
       issues.push({ field: 'currency', message: 'Kenya invoices require KES' })
     }
@@ -42,9 +43,7 @@ export const kenyaInvoicePolicy: InvoicePolicy = {
         issues.push({ field: `tenders.${index}.amount`, message: 'Tender amount must be positive' })
       }
     })
-    const expected = roundInvoiceMoney(invoice.lines.reduce(
-      (sum, line) => sum + line.quantity * line.unitPrice, 0,
-    ))
+    const expected = invoiceExpectedAmount(invoice)
     const actual = roundInvoiceMoney(invoice.tenders.reduce(
       (sum, tender) => sum + tender.amount, 0,
     ))
@@ -58,9 +57,10 @@ export const kenyaInvoicePolicy: InvoicePolicy = {
     return {
       DocumentId: invoice.documentId,
       issueDateTime: invoice.issuedAt,
+      createdByName: invoice.createdByName ?? 'VPOS-LITE',
       ...(invoice.buyer ? { buyer: invoice.buyer } : {}),
       Lines: invoice.lines.map(line => ({
-        lineType: 'Sale',
+        lineType: line.lineType ?? 'Sale',
         product: {
           productId: line.product.id,
           productCode: line.product.code,
@@ -74,7 +74,7 @@ export const kenyaInvoicePolicy: InvoicePolicy = {
           hazardousIndicator: line.product.hazardousIndicator ?? false,
           ...(line.fuel ? { fuel: line.fuel } : {}),
         },
-        taxes: [{ type: line.product.taxCode, rate: line.taxRate ?? 0 }],
+        taxes: (line.taxes ?? [{ type: line.product.taxCode ?? '', rate: line.taxRate ?? 0 }]).map(tax => ({ type: tax.type, rate: tax.rate })),
       })),
       Currency: 'KES',
       Payment: {
