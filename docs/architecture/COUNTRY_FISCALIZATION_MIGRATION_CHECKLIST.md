@@ -276,3 +276,16 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Confirm deployment's proxy base path, site API key lookup and client timeout integration with an isolated staging environment.
 - [ ] Implement locked, idempotent persistence workflow only after approved production integration pass.
 - [ ] Confirm the provider's actual status values from redacted response captures; status wording remains a hypothesis from previous policies.
+
+## Fiscal-layer pass: advisory recovery persistence boundary
+
+- [x] Add a test-only read / atomic compare-and-set persistence port for status recovery.
+- [x] Require exact station, document and country match, fiscalizing state, and nonnegative version.
+- [x] Restrict writes to confirmed, correlated fiscal status assessments.
+- [x] Require the DB adapter to commit state change and audit information in one transaction.
+- [x] Preserve no-resubmission semantics for all results.
+- [x] Test duplicate recovery, parallel confirmations, mismatched country, invalid version, and unconfirmed outcomes.
+- [ ] Implement PostgreSQL compare-and-set with a suitable transaction/version field and unique audit identity after examining existing schema.
+- [ ] Add concurrency tests against the actual storage engine before live integration.
+- [ ] Verify status-code semantics against redacted successful responses, not just Swagger shapes.
+- [ ] Do not wire production transactions/workers until recovery lock, idempotency, and rollback approach approved.
