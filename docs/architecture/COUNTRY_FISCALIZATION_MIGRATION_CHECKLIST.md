@@ -366,3 +366,14 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [x] Reject `details.isFiscalized: true` paired with `FAILED`, `REJECTED` or `ERROR`, even if the top-level error flag is false.
 - [x] Add negative regression assertions for conflicting status combinations.
 - [ ] Run npm run check and fiscalization tests; no production connections were activated.
+
+## Conditional recovery UPDATE result integrity pass
+
+- [x] Require PostgreSQL RETURNING rows to include transaction ID, station ID, fiscal document ID, and FISCALIZED status.
+- [x] Reject mismatched or multiple rows before writing the recovery event/audit, rather than interpreting every nonzero response as success.
+- [x] Retain zero-row stale outcome for concurrent or already-finalized transactions.
+- [x] Match PostgreSQL boundary row typing to the actual four-column RETURNING projection.
+- [x] Extend isolated regression tests for wrong station, transaction, document, status, and multiple rows.
+- [ ] Validate guarded transition, rollback, and simultaneous workers against a disposable PostgreSQL instance.
+- [ ] Confirm receipt and print parity; no production worker connection is authorized.
+- [ ] Run npm run check and fiscalization tests after this pass.
