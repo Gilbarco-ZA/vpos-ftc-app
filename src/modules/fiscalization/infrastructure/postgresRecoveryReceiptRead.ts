@@ -25,7 +25,11 @@ export function createPostgresRecoveryReceiptRead(client: PoolClient): RecoveryR
            AND r.voided_at IS NULL
            AND t.deleted_at IS NULL
          ORDER BY r.generated_at DESC, r.id DESC
-         LIMIT 1`, [stationId, transactionId])
+         LIMIT 2
+         FOR UPDATE OF r`, [stationId, transactionId])
+      if (result.rows.length > 1) {
+        throw new Error('Ambiguous persisted receipts for recovered transaction')
+      }
       return result.rows[0] ?? null
     },
   }
