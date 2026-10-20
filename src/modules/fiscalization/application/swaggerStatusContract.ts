@@ -28,6 +28,11 @@ type StatusRow = {
   status?: string | null
   error?: boolean
   message?: string | null
+  fiscalId?: string | null
+  fiscalCode?: string | null
+  fiscalVerificationCode?: string | null
+  fiscalQrCodeData?: string | null
+  revenueAuthorityReference?: string | null
 }
 
 export interface SwaggerInvoiceStatusCollection {
@@ -52,6 +57,9 @@ export function parseInvoiceStatusCollection(
     return { kind: 'unavailable', reason: 'Invalid invoice status collection' }
   }
   const data = payload as SwaggerInvoiceStatusCollection
+  if (typeof data.error !== 'boolean') {
+    return { kind: 'unavailable', reason: 'Invoice status collection error flag missing or invalid' }
+  }
   if (data.error === true) {
     return { kind: 'unavailable', reason: data.message || 'Proxy invoice status query failed' }
   }
@@ -69,6 +77,9 @@ export function parseInvoiceStatusCollection(
   const match = matches[0]
   if (!match || typeof match.status !== 'string' || !match.status.trim()) {
     return { kind: 'unavailable', reason: 'Matching invoice has no status' }
+  }
+  if (typeof match.error !== 'boolean') {
+    return { kind: 'unavailable', reason: 'Matching invoice error flag missing or invalid' }
   }
   if (match.error === true) {
     return { kind: 'unavailable', reason: match.message || 'Matching invoice status reports an error' }
