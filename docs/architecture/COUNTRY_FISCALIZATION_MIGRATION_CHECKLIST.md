@@ -424,3 +424,13 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Cover valid persisted references and conflicting/missing references with regression tests.
 - [ ] Obtain verified KE/TZ field semantics and transaction-to-receipt reference provenance from redacted provider responses.
 - [ ] Integrate policy with transaction-scoped receipt verification only after confirmed mapping and receipt/print parity.
+
+## Country reference provenance enforced by receipt verifier (20 Oct 2026)
+
+- [x] Require an explicit KE/TZ country code for read-only persisted receipt verification.
+- [x] Apply the existing fiscal-reference provenance policy to the transaction and linked SUCCESS event before accepting the receipt snapshot's reference.
+- [x] Preserve strict document, fiscal event ID, receipt number and fiscal snapshot checks.
+- [x] Allow optional status metadata as supplementary evidence only; it cannot replace missing persisted transaction or event reference.
+- [x] Add regression coverage for both countries and mismatched/missing persisted reference evidence.
+- [ ] Resolve authoritative country-specific mappings and receipt data provenance before activating any recovery worker.
+- [ ] Wire transactional receipt creation and idempotent auto-print only after verified event and receipt lifecycle parity is established.
