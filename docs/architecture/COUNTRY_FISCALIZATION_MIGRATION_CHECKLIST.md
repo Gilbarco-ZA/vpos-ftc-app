@@ -472,5 +472,14 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Throw within the shared transaction whenever receipt or print parity is incomplete so a compliant transaction implementation rolls back all earlier writes.
 - [x] Distinguish blocked recovery prerequisites from database failures and preserve no-resubmission behavior.
 - [x] Cover applied, stale, missing receipt, unverified print and thrown database error with isolated transaction-boundary tests.
-- [ ] Connect the unified boundary to one real PostgreSQL PoolClient; existing status and receipt/print PostgreSQL adapters currently open separate transactions.
+- [x] Add opt-in unified PostgreSQL boundary sharing one PoolClient for status, audit, linked event lookup, receipt verification and print persistence.
 - [ ] Resolve fiscal reference and missing-receipt metadata parity before enabling workers or assuming recovered transactions are complete.
+
+## Unified PostgreSQL client milestone (20 Oct 2026)
+
+- [x] Implement `createPostgresUnifiedRecoveryBoundary` with a single `withTransaction` enclosing guarded UPDATE, fiscalization event/audit, linked event lookup, receipt verification, station settings and print-job operations.
+- [x] Keep linked-event discovery scoped to station, transaction and fiscal document, requiring the FISCALIZED state and a nondeleted row.
+- [x] Use the existing SUCCESS fiscalization event repository and compatibility-summary link, and preserve transactional rollback on incomplete receipt or print parity.
+- [x] Keep this boundary opt-in; it is not imported into a production worker or route.
+- [ ] Current recovery status collection does not provide proven receipt reference semantics. Missing references/receipts continue to block completion and roll back fiscal status updates.
+- [ ] Validate real PostgreSQL concurrency and transactional rollback prior to production activation.
