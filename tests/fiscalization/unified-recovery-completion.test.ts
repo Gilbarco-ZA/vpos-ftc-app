@@ -89,3 +89,35 @@ test('transaction failures are not disguised as safe blockers', async () => {
   }
   await assert.rejects(completeFiscalRecoveryAtomically(adapter, input), /database unavailable/)
 })
+
+test('missing station printing configuration fails and cannot commit recovery', async () => {
+  let committed = false
+  const adapter: UnifiedRecoveryBoundary = {
+    async transaction(run) {
+      const result = await run({
+        recovery: {
+          async query() {
+            return { rows: [{ id: 'T1', station_id: 'S1', fiscal_document_id: 'D1', status: 'FISCALIZED' }] }
+          },
+          async recordRecoveryAudit() {},
+        },
+        async linkedEventId() { return 'E1' },
+        receiptRead: { async find() { return row } },
+        printing: {
+          async isAutoPrintEnabled() { throw new Error('Station auto-print configuration is unavailable') },
+          async ensurePrintJob() { throw new Error('Print must not be attempted') },
+        },
+      })
+      committed = true
+      return result
+    },
+  }
+  await assert.rejects(completeFiscalRecoveryAtomically(adapter, input), /configuration is unavailable/)
+  assert.equal(committed, false)
+})
+
+test('invalid newly inserted print result blocks unified transaction', async () => {
+  const fake = boundary({ printed: false })
+  assert.equal((await completeFiscalRecoveryAtomically(fake.adapter, input)).outcome, 'blocked')
+  assert.equal(fake.state().committed, false)
+})
