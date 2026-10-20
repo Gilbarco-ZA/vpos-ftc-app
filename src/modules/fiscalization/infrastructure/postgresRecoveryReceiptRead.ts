@@ -1,6 +1,7 @@
 import type { PoolClient } from '@/src/platform/db/postgres'
 import { txQuery } from '@/src/platform/db/postgres'
 import type { RecoveryReceiptReadPort, RecoveryReceiptRow } from './recoveryReceiptVerification'
+import { selectUniqueRecoveryReceipt } from './recoveryReceiptSelection'
 
 /** Requires an existing transaction-scoped client; never opens a connection. */
 export function createPostgresRecoveryReceiptRead(client: PoolClient): RecoveryReceiptReadPort {
@@ -27,10 +28,7 @@ export function createPostgresRecoveryReceiptRead(client: PoolClient): RecoveryR
          ORDER BY r.generated_at DESC, r.id DESC
          LIMIT 2
          FOR UPDATE OF r`, [stationId, transactionId])
-      if (result.rows.length > 1) {
-        throw new Error('Ambiguous persisted receipts for recovered transaction')
-      }
-      return result.rows[0] ?? null
+      return selectUniqueRecoveryReceipt(result.rows)
     },
   }
 }
