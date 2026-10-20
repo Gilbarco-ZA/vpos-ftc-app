@@ -464,3 +464,13 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Cover success, missing fiscal evidence, failed idempotency and database errors with injected transaction-boundary tests.
 - [ ] Integrate this transaction with the earlier guarded status recovery transaction only after authoritative fiscal reference and receipt generation parity. Currently these are separate opt-in workflows.
 - [ ] Validate real PostgreSQL isolation, concurrency and receipt/print rollback, and confirm the referenced fiscal receipt snapshot is complete before activating workers.
+
+## Unified recovery transaction coordinator (20 Oct 2026)
+
+- [x] Compose guarded FISCALIZING-to-FISCALIZED transition and event audit with linked fiscal event discovery, persisted receipt verification and optional idempotent print handling under one injected transaction boundary.
+- [x] Return stale without receipt/print operations when guarded UPDATE changes zero rows.
+- [x] Throw within the shared transaction whenever receipt or print parity is incomplete so a compliant transaction implementation rolls back all earlier writes.
+- [x] Distinguish blocked recovery prerequisites from database failures and preserve no-resubmission behavior.
+- [x] Cover applied, stale, missing receipt, unverified print and thrown database error with isolated transaction-boundary tests.
+- [ ] Connect the unified boundary to one real PostgreSQL PoolClient; existing status and receipt/print PostgreSQL adapters currently open separate transactions.
+- [ ] Resolve fiscal reference and missing-receipt metadata parity before enabling workers or assuming recovered transactions are complete.
