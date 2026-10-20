@@ -14,8 +14,8 @@ test('Tanzania uses GET /api/tanzania/invoices/status with precise DocumentId', 
     calls.push(request)
     return { ok: true, status: 200, body: {
       error: false, invoices: [
-        { documentId: 'OTHER', status: 'FISCALIZED' },
-        { documentId: 'INV-1', status: 'FISCALIZED' },
+        { documentId: 'OTHER', status: 'FISCALIZED', error: false },
+        { documentId: 'INV-1', status: 'FISCALIZED', error: false },
       ],
     } }
   } }
@@ -34,7 +34,7 @@ test('Kenya routes through general invoice status API', async () => {
   const port = createSwaggerStatusLookupPort({ async request(request) {
     path = request.path
     return { ok: true, status: 200, body: {
-      error: false, invoices: [{ documentId: 'A', status: 'FISCALIZING' }],
+      error: false, invoices: [{ documentId: 'A', status: 'FISCALIZING', error: false }],
     } }
   } })
   const result = await assessFiscalStatusRecovery(port, {
