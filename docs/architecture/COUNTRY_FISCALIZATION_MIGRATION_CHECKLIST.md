@@ -492,3 +492,12 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Extend unified recovery failure coverage for unavailable station print settings.
 - [ ] Validate PostgreSQL concurrent insertion and rollback semantics with the disposable integration database.
 - [ ] Retain worker-disabled state until authoritative fiscal reference and receipt generation are available.
+
+## Concurrent receipt verification safety (20 Oct 2026)
+
+- [x] Lock the selected persisted receipt row within the caller-owned PostgreSQL transaction before fiscal-data verification and optional auto-print.
+- [x] Read up to two nonvoided receipts for the same station and transaction; reject ambiguous duplicate receipts instead of silently choosing the newest.
+- [x] Preserve the missing-receipt fail-closed behavior; receipt creation and provider-specific fiscal-reference recovery are not inferred.
+- [x] Add focused unique/missing/duplicate receipt-selection regression coverage.
+- [ ] Establish an approved receipt generation path and authoritative fiscal metadata provenance for delayed fiscalization.
+- [ ] Verify concurrent receipt mutation, transaction rollback and duplicate print-job behavior in disposable PostgreSQL before worker activation.
