@@ -434,3 +434,13 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Add regression coverage for both countries and mismatched/missing persisted reference evidence.
 - [ ] Resolve authoritative country-specific mappings and receipt data provenance before activating any recovery worker.
 - [ ] Wire transactional receipt creation and idempotent auto-print only after verified event and receipt lifecycle parity is established.
+
+## Verified persisted receipt before optional auto-print (20 Oct 2026)
+
+- [x] Add isolated read-verify-print coordinator requiring transaction-scoped receipt verification before print eligibility.
+- [x] Use existing country-specific fiscal-reference provenance, linked SUCCESS event and receipt snapshot checks.
+- [x] Reject missing or mismatched receipt evidence without checking station printing settings or enqueueing a job.
+- [x] Preserve existing auto-print idempotency key `receipt:<transactionId>:default` and block completion if idempotency cannot be verified.
+- [x] Cover valid, incomplete, contradictory and printing-disabled cases in isolated tests.
+- [ ] Implement transaction-scoped PostgreSQL printing adapter and authoritative receipt creation before production recovery activation.
+- [ ] Ensure receipt verification and print-job persistence execute within the same transaction as recovery status and event writes.
