@@ -483,3 +483,12 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Keep this boundary opt-in; it is not imported into a production worker or route.
 - [ ] Current recovery status collection does not provide proven receipt reference semantics. Missing references/receipts continue to block completion and roll back fiscal status updates.
 - [ ] Validate real PostgreSQL concurrency and transactional rollback prior to production activation.
+
+## Unified recovery print integrity safeguards (20 Oct 2026)
+
+- [x] Treat absent or malformed station auto-print configuration as an error, not implicit printing-disabled permission.
+- [x] Validate an INSERT RETURNING print job against the expected receipt/transaction identity instead of treating a single returned row as sufficient.
+- [x] Reject unexpected multi-row insert results, preserve strict validation on idempotency conflicts, and propagate configuration failures for transaction rollback.
+- [x] Extend unified recovery failure coverage for unavailable station print settings.
+- [ ] Validate PostgreSQL concurrent insertion and rollback semantics with the disposable integration database.
+- [ ] Retain worker-disabled state until authoritative fiscal reference and receipt generation are available.
