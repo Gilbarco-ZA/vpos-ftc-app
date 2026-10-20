@@ -1,5 +1,8 @@
 # Country fiscalization layer — integration checklist
 
+> Current authoritative milestone overview: [COUNTRY_FISCALIZATION_MIGRATION_MILESTONES.md](./COUNTRY_FISCALIZATION_MIGRATION_MILESTONES.md). This longer checklist retains historical pass notes, including superseded open items.
+
+
 Status: **Scaffold only / no production wiring**.
 
 The country registry and contracts are added in isolation. Do not change the
