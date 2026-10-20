@@ -25,5 +25,10 @@ test('uncertain status does not grant retry permission', () => {
   assert.equal(normalize({ error: false, details: { isFiscalized: true } }).state, 'fiscalized')
   assert.equal(normalize({ error: true, status: 'FISCALIZED' }).state, 'unknown')
   assert.equal(normalize({ error: false, status: 'FISCALIZED' }).state, 'fiscalized')
+  for (const status of ['FAILED', 'REJECTED', 'ERROR']) {
+    const conflicting = normalize({ error: false, status, details: { isFiscalized: true } })
+    assert.equal(conflicting.state, 'unknown')
+    assert.equal(conflicting.safeToResubmit, false)
+  }
   assert.throws(() => getCountryStatusNormalizer('XX'), /Unsupported/)
 })
