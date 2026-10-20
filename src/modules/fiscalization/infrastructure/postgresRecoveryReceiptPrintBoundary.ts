@@ -1,6 +1,6 @@
 import type { PoolClient } from '@/src/platform/db/postgres'
 import { withTransaction } from '@/src/platform/db/postgres'
-import type { RecoveryReceiptPrintBoundary } from './transactionalRecoveryReceiptPrint'
+import type { RecoveryReceiptPrintBoundary, RecoveryReceiptPrintTransaction } from './transactionalRecoveryReceiptPrint'
 import { createPostgresRecoveryReceiptRead } from './postgresRecoveryReceiptRead'
 import { createPostgresRecoveryPrintPort } from './postgresRecoveryPrintPort'
 
@@ -10,11 +10,11 @@ import { createPostgresRecoveryPrintPort } from './postgresRecoveryPrintPort'
  */
 export function createPostgresRecoveryReceiptPrintBoundary(): RecoveryReceiptPrintBoundary {
   return {
-    transaction<T>(run: Parameters<RecoveryReceiptPrintBoundary['transaction']>[0]): Promise<T> {
+    transaction<T>(run: (ports: RecoveryReceiptPrintTransaction) => Promise<T>): Promise<T> {
       return withTransaction(async (client: PoolClient) => run({
         receiptRead: createPostgresRecoveryReceiptRead(client),
         printing: createPostgresRecoveryPrintPort(client),
-      })) as Promise<T>
+      }))
     },
   }
 }
