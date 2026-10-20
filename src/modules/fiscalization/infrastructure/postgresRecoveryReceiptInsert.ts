@@ -32,6 +32,15 @@ export async function insertVerifiedRecoveryReceipt(
   const persisted = await createPostgresRecoveryReceiptEvidenceReader(client).read(input)
   const decision = authorizeRecoveryReceiptCandidate(persisted, candidate, input)
   if (!decision.allowed || !candidate) return { kind: 'blocked', reason: decision.reason }
+  const data = candidate.fiscalData as { receipt?: Record<string, unknown> } | null
+  const fiscalReceipt = data && typeof data === 'object' ? data.receipt : null
+  if (!fiscalReceipt || typeof fiscalReceipt !== 'object' ||
+      fiscalReceipt.country !== input.countryCode ||
+      !((typeof fiscalReceipt.fiscalVerificationCode === 'string' && fiscalReceipt.fiscalVerificationCode.trim()) ||
+        (typeof fiscalReceipt.receiptSignature === 'string' && fiscalReceipt.receiptSignature.trim()) ||
+        (typeof fiscalReceipt.cuInvoiceNo === 'string' && fiscalReceipt.cuInvoiceNo.trim()))) {
+    return { kind: 'blocked', reason: 'Country-specific provider receipt evidence required' }
+  }
   if (!candidate.plainTextContent?.trim() ||
       !Number.isSafeInteger(candidate.renderVersion) || candidate.renderVersion < 1) {
     return { kind: 'blocked', reason: 'Authoritative printable receipt content required' }
