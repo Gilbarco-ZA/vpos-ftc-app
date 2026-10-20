@@ -358,3 +358,11 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Run npm run check and fiscalization tests on fiscal-layer.
 - [ ] Validate real PostgreSQL rollback and parallel-worker race behavior.
 - [ ] Confirm receipt enrichment and auto-print parity before any production integration.
+
+## Contradictory fiscal status regression pass (20 Oct 2026)
+
+- [x] Align the legacy status-policy test with fail-closed handling when `error: true` conflicts with `details.isFiscalized: true`.
+- [x] Keep explicit success with `error: false` accepted; unknown and error states never grant automatic retry.
+- [x] Reject `details.isFiscalized: true` paired with `FAILED`, `REJECTED` or `ERROR`, even if the top-level error flag is false.
+- [x] Add negative regression assertions for conflicting status combinations.
+- [ ] Run npm run check and fiscalization tests; no production connections were activated.
