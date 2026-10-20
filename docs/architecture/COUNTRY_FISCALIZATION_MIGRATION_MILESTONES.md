@@ -13,7 +13,7 @@ requires evidence, not merely isolated unit tests.
 - [x] Transaction-scoped receipt identity read and guarded insert **from supplied complete evidence**.
 - [ ] Authoritative KE/TZ fiscal-reference and receipt field mapping, based on provider samples.
 - [ ] Build a complete receipt candidate using transaction-scoped queries; current normal receipt builder reads through its own pool.
-- [ ] Integrate guarded receipt insertion into unified coordinator and then reverify persisted receipt in the same transaction.
+- [x] Integrate optional guarded receipt insertion into the unified transaction and reverify exact receipt identity and fiscal data before printing. No candidate source is live yet.
 - [ ] Disposable PostgreSQL concurrency, rollback and print idempotency validation.
 - [ ] Controlled production recovery worker hookup and operational safeguards.
 
