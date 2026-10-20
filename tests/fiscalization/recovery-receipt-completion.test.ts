@@ -3,12 +3,12 @@ import test from 'node:test'
 import { completeRecoveredReceipt } from '@/src/modules/fiscalization/application/recoveryReceiptCompletion'
 import type { RecoveryReceiptCompletionPort } from '@/src/modules/fiscalization/application/recoveryReceiptCompletion'
 
-const input = { stationId: 'S1', transactionId: 'T1', documentId: 'D1', fiscalEventLinked: true }
+const input = { stationId: 'S1', transactionId: 'T1', documentId: 'D1', fiscalEventId: 'E1' }
 
 test('reuses a verified receipt and uses the existing auto-print idempotency key', async () => {
   const keys: string[] = []
   const port: RecoveryReceiptCompletionPort = {
-    async findReceipt() { return { id: 'R1', number: 'RCPT1', fiscalDataVerified: true } },
+    async findReceipt() { return { id: 'R1', number: 'RCPT1', fiscalDataVerified: true, documentId: 'D1', fiscalEventId: 'E1' } },
     async ensureReceipt() { throw new Error('unexpected creation') },
     async isAutoPrintEnabled() { return true },
     async ensurePrintJob(job) {
@@ -25,7 +25,7 @@ test('missing receipts are created through injected transaction-local port', asy
   let count = 0
   const port: RecoveryReceiptCompletionPort = {
     async findReceipt() { return null },
-    async ensureReceipt() { count++; return { id: 'R1', number: 'RCPT1', fiscalDataVerified: true } },
+    async ensureReceipt() { count++; return { id: 'R1', number: 'RCPT1', fiscalDataVerified: true, documentId: 'D1', fiscalEventId: 'E1' } },
     async isAutoPrintEnabled() { return false },
     async ensurePrintJob() { throw new Error('printing disabled') },
   }
@@ -36,7 +36,7 @@ test('missing receipts are created through injected transaction-local port', asy
 test('unverified receipts cannot trigger printing', async () => {
   let printed = false
   const port: RecoveryReceiptCompletionPort = {
-    async findReceipt() { return { id: 'R1', number: 'RCPT1', fiscalDataVerified: false } },
+    async findReceipt() { return { id: 'R1', number: 'RCPT1', fiscalDataVerified: false, documentId: 'D1', fiscalEventId: 'E1' } },
     async ensureReceipt() { throw new Error('unexpected') },
     async isAutoPrintEnabled() { return true },
     async ensurePrintJob() { printed = true; return { idempotencyVerified: true } },
@@ -53,16 +53,36 @@ test('missing fiscal event blocks all receipt operations', async () => {
     async isAutoPrintEnabled() { return false },
     async ensurePrintJob() { throw new Error('unexpected') },
   }
-  await assert.rejects(completeRecoveredReceipt(port, { ...input, fiscalEventLinked: false }), /Linked fiscalization/)
+  await assert.rejects(completeRecoveredReceipt(port, { ...input, fiscalEventId: '' }), /Linked fiscalization/)
   assert.equal(read, false)
 })
 
 test('print operation must confirm idempotency', async () => {
   const port: RecoveryReceiptCompletionPort = {
-    async findReceipt() { return { id: 'R1', number: 'RCPT1', fiscalDataVerified: true } },
+    async findReceipt() { return { id: 'R1', number: 'RCPT1', fiscalDataVerified: true, documentId: 'D1', fiscalEventId: 'E1' } },
     async ensureReceipt() { throw new Error('unexpected') },
     async isAutoPrintEnabled() { return true },
     async ensurePrintJob() { return { idempotencyVerified: false } },
   }
   assert.equal((await completeRecoveredReceipt(port, input)).ready, false)
+})
+
+test('different fiscal document or event prevents receipt reuse and printing', async () => {
+  for (const mismatch of [
+    { documentId: 'OTHER', fiscalEventId: 'E1' },
+    { documentId: 'D1', fiscalEventId: 'OTHER' },
+  ]) {
+    let printed = false
+    const port: RecoveryReceiptCompletionPort = {
+      async findReceipt() {
+        return { id: 'R1', number: 'RCPT1', fiscalDataVerified: true, ...mismatch }
+      },
+      async ensureReceipt() { throw new Error('unexpected') },
+      async isAutoPrintEnabled() { return true },
+      async ensurePrintJob() { printed = true; return { idempotencyVerified: true } },
+    }
+    const result = await completeRecoveredReceipt(port, input)
+    assert.equal(result.ready, false)
+    assert.equal(printed, false)
+  }
 })
