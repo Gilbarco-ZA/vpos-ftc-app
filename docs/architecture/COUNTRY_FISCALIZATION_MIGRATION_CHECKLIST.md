@@ -390,3 +390,15 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Resolve whether normal completion's `generateReceipt` is safe inside its existing transactional callback; do not blindly reuse with an unrelated database client.
 - [ ] Add real PostgreSQL concurrency, rollback and receipt/print transactional integration tests.
 - [ ] Do not activate recovery worker while receipt and print parity are outstanding.
+
+## Isolated recovered receipt completion coordinator
+
+- [x] Add injected recovery receipt completion coordinator with existing receipt reuse and optional receipt creation.
+- [x] Require an already-linked fiscalization event before receipt operations.
+- [x] Reject incomplete or unverified fiscal receipt data before attempting auto-print.
+- [x] Use normal completion's idempotency key format `receipt:<transactionId>:default`.
+- [x] Only require idempotent print job verification when automatic printing is enabled.
+- [x] Test existing receipt reuse, missing receipt creation, unverified receipt, missing event and unverified print idempotency with fake ports.
+- [ ] Implement database-backed receipt creation and verification in the same recovery transaction. Current port's `fiscalDataVerified` is caller supplied and not authoritative.
+- [ ] Wire completion into atomic PostgreSQL recovery only when all receipt-fiscalization fields and transaction consistency are proven.
+- [ ] Add actual database concurrency and rollback tests; until then recovery worker remains disconnected.
