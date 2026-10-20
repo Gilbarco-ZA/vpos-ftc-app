@@ -12,6 +12,26 @@ export interface CompleteRecoveryReceiptCandidate extends RecoveryReceiptCreatio
   renderVersion: number
 }
 
+export function validateCompleteRecoveryReceiptCandidate(
+  candidate: CompleteRecoveryReceiptCandidate,
+  countryCode: FiscalCountryCode,
+): { allowed: boolean; reason: string } {
+  const data = candidate.fiscalData as { receipt?: Record<string, unknown> } | null
+  const fiscalReceipt = data && typeof data === 'object' ? data.receipt : null
+  if (!fiscalReceipt || typeof fiscalReceipt !== 'object' ||
+      fiscalReceipt.country !== countryCode ||
+      !((typeof fiscalReceipt.fiscalVerificationCode === 'string' && fiscalReceipt.fiscalVerificationCode.trim()) ||
+        (typeof fiscalReceipt.receiptSignature === 'string' && fiscalReceipt.receiptSignature.trim()) ||
+        (typeof fiscalReceipt.cuInvoiceNo === 'string' && fiscalReceipt.cuInvoiceNo.trim()))) {
+    return { allowed: false, reason: 'Country-specific provider receipt evidence required' }
+  }
+  if (!candidate.plainTextContent?.trim() ||
+      !Number.isSafeInteger(candidate.renderVersion) || candidate.renderVersion < 1) {
+    return { allowed: false, reason: 'Authoritative printable receipt content required' }
+  }
+  return { allowed: true, reason: 'Complete candidate is printable' }
+}
+
 export async function insertVerifiedRecoveryReceipt(
   client: PoolClient,
   input: {
@@ -32,19 +52,8 @@ export async function insertVerifiedRecoveryReceipt(
   const persisted = await createPostgresRecoveryReceiptEvidenceReader(client).read(input)
   const decision = authorizeRecoveryReceiptCandidate(persisted, candidate, input)
   if (!decision.allowed || !candidate) return { kind: 'blocked', reason: decision.reason }
-  const data = candidate.fiscalData as { receipt?: Record<string, unknown> } | null
-  const fiscalReceipt = data && typeof data === 'object' ? data.receipt : null
-  if (!fiscalReceipt || typeof fiscalReceipt !== 'object' ||
-      fiscalReceipt.country !== input.countryCode ||
-      !((typeof fiscalReceipt.fiscalVerificationCode === 'string' && fiscalReceipt.fiscalVerificationCode.trim()) ||
-        (typeof fiscalReceipt.receiptSignature === 'string' && fiscalReceipt.receiptSignature.trim()) ||
-        (typeof fiscalReceipt.cuInvoiceNo === 'string' && fiscalReceipt.cuInvoiceNo.trim()))) {
-    return { kind: 'blocked', reason: 'Country-specific provider receipt evidence required' }
-  }
-  if (!candidate.plainTextContent?.trim() ||
-      !Number.isSafeInteger(candidate.renderVersion) || candidate.renderVersion < 1) {
-    return { kind: 'blocked', reason: 'Authoritative printable receipt content required' }
-  }
+  const complete = validateCompleteRecoveryReceiptCandidate(candidate, input.countryCode)
+  if (!complete.allowed) return { kind: 'blocked', reason: complete.reason }
 
   const existing = await createPostgresRecoveryReceiptRead(client).find(input)
   if (existing) return { kind: 'blocked', reason: 'Persisted receipt already exists' }
