@@ -2,7 +2,7 @@ import type { FiscalRecoveryAssessment } from '../application/statusRecoveryServ
 import { buildRecoveryStatusTransitionSql, recoveryAuditIdempotencyKey } from './recoverySqlPlan'
 
 export interface RecoveryTransactionClient {
-  query(sql: string, params: readonly unknown[]): Promise<{ rows: { id: string }[] }>
+  query(sql: string, params: readonly unknown[]): Promise<{ rows: { id: string; station_id: string; fiscal_document_id: string; status: string }[] }>
   /**
    * Must write a fiscalization_events SUCCESS event and compatibility summary
    * using the same database transaction. Throwing rolls back the status update.
@@ -54,7 +54,13 @@ export async function confirmTransactionFiscalizedAtomically(
   const plan = buildRecoveryStatusTransitionSql(input)
   return boundary.transaction(async client => {
     const result = await client.query(plan.sql, plan.params)
-    if (result.rows.length !== 1) return 'stale'
+    if (result.rows.length === 0) return 'stale'
+    if (result.rows.length !== 1 || result.rows[0]?.id !== input.transactionId.trim() ||
+      result.rows[0]?.station_id !== input.stationId.trim() ||
+      result.rows[0]?.fiscal_document_id !== input.documentId.trim() ||
+      result.rows[0]?.status !== 'FISCALIZED') {
+      throw new Error('Recovery update returned an unexpected transaction identity')
+    }
     await client.recordRecoveryAudit({
       stationId: input.stationId.trim(),
       transactionId: input.transactionId.trim(),
