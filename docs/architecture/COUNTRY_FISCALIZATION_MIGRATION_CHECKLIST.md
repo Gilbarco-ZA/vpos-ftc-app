@@ -405,3 +405,12 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Keep status response parsing fail-closed on missing, malformed or string-valued error flags.
 - [x] Align test fixtures with the Swagger-required explicit error flags.
 - [ ] Confirm operational proxy responses consistently include both error flags across KE and TZ.
+
+## Invoice status fiscal evidence preservation (20 Oct 2026)
+
+- [x] Retain fiscalId, fiscalCode, fiscalVerificationCode, fiscalQrCodeData and revenueAuthorityReference from the exactly matched Swagger status row.
+- [x] Reject malformed or empty metadata values instead of treating contradictory shapes as reliable evidence.
+- [x] Keep absent metadata fields explicitly null; do not invent missing fiscal values or equate fiscalId with receipt reference.
+- [x] Carry the optional evidence through the isolated recovery assessment and cover correlation with focused tests.
+- [ ] Establish country-specific authoritative mapping from these named fields to transaction fiscalization_reference, fiscal event reference and receipt fiscal snapshots using redacted operational samples.
+- [ ] Do not persist candidate reference values or mark receipt parity complete until mapping and receipt provenance are verified.
