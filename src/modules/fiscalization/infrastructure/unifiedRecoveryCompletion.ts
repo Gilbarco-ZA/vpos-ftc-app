@@ -1,3 +1,4 @@
+import type { CompleteRecoveryReceiptCandidate } from './postgresRecoveryReceiptInsert'
 import type { FiscalRecoveryAssessment } from '../application/statusRecoveryService'
 import type { RecoveryTransactionClient } from './transactionalRecoveryAdapter'
 import { confirmTransactionFiscalizedAtomically } from './transactionalRecoveryAdapter'
@@ -6,6 +7,7 @@ import { completeVerifiedRecoveredReceipt } from '../application/verifiedRecover
 
 export interface UnifiedRecoveryClient extends RecoveryReceiptPrintTransaction {
   recovery: RecoveryTransactionClient
+  insertMissingReceipt?: (input: { stationId: string; transactionId: string; documentId: string; fiscalEventId: string; countryCode: FiscalRecoveryAssessment['countryCode'] }, candidate: CompleteRecoveryReceiptCandidate) => Promise<{ kind: 'created'; receiptId: string } | { kind: 'blocked'; reason: string }>
   linkedEventId(input: { stationId: string; transactionId: string; documentId: string }): Promise<string | null>
 }
 
@@ -37,6 +39,7 @@ export async function completeFiscalRecoveryAtomically(
     transactionId: string
     documentId: string
     assessment: FiscalRecoveryAssessment
+    receiptCandidate?: CompleteRecoveryReceiptCandidate
   },
 ): Promise<UnifiedRecoveryOutcome> {
   try {
@@ -52,6 +55,25 @@ export async function completeFiscalRecoveryAtomically(
         documentId: input.documentId,
       })
       if (!eventId?.trim()) throw new IncompleteRecovery(['Linked fiscal event identity unavailable'])
+      // Never replace an existing receipt. The PostgreSQL inserter independently
+      // validates persisted transaction/event provenance before writing.
+      const currentReceipt = await client.receiptRead.find({
+        stationId: input.stationId,
+        transactionId: input.transactionId,
+      })
+      if (!currentReceipt && input.receiptCandidate) {
+        if (!client.insertMissingReceipt) {
+          throw new IncompleteRecovery(['Transactional receipt insertion unavailable'])
+        }
+        const inserted = await client.insertMissingReceipt({
+          stationId: input.stationId,
+          transactionId: input.transactionId,
+          documentId: input.documentId,
+          fiscalEventId: eventId,
+          countryCode: input.assessment.countryCode,
+        }, input.receiptCandidate)
+        if (inserted.kind === 'blocked') throw new IncompleteRecovery([inserted.reason])
+      }
       const completion = await completeVerifiedRecoveredReceipt(
         client.receiptRead,
         client.printing,
