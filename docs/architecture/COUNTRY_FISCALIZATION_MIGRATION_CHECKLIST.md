@@ -412,3 +412,14 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Add regression coverage for mismatched document and event evidence.
 - [ ] Existing `fiscalDataVerified` remains port-supplied; implement authoritative DB verification, receipt fiscal metadata validation, and proof of same-transaction consistency before integration.
 - [ ] Run npm run check and fiscalization tests; no production worker wiring has changed.
+
+## PostgreSQL receipt verification pass (20 Oct 2026)
+
+- [x] Add read-only receipt evidence verification scoped to a transaction and its current linked fiscalization event.
+- [x] Add transaction-scoped PostgreSQL receipt query using `receipts`, `transactions` and `fiscalization_events`; exclude voided and deleted records.
+- [x] Verify schemaVersion 1 fiscal snapshot, receipt number and fiscal reference match linked SUCCESS event and transaction.
+- [x] Fail closed on missing evidence, mismatched document/event, invalid JSON, incorrect snapshot version and reference discrepancies.
+- [x] Add tests for both valid and mismatched persisted evidence using fake reads.
+- [ ] CRITICAL: Current recovery event records do not populate `reference` and receipt snapshots do not directly encode fiscal document ID or event ID. The verifier therefore intentionally blocks those records until an authoritative reference mapping or enriched fiscal metadata is implemented.
+- [ ] Wire receipt-read verification to completion coordinator only after authoritative fiscal proof and transactional receipt generation are implemented.
+- [ ] Test against disposable PostgreSQL and validate country-specific receipt fiscal fields. No worker activation.
