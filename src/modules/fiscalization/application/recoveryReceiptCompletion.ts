@@ -12,7 +12,7 @@ export interface RecoveryReceiptCompletionPort {
   /** Must read in the same transaction as recovery status and event linking. */
   findReceipt(input: { stationId: string; transactionId: string }): Promise<RecoveryReceipt | null>
   /** The port must verify a persisted fiscal receipt against the recovered event. */
-  ensureReceipt(input: { stationId: string; transactionId: string; documentId: string }): Promise<RecoveryReceipt>
+  ensureReceipt(input: { stationId: string; transactionId: string; documentId: string; fiscalEventId: string }): Promise<RecoveryReceipt>
   isAutoPrintEnabled(stationId: string): Promise<boolean>
   /** Must use the normal receipt:<transactionId>:default uniqueness key. */
   ensurePrintJob(input: {
@@ -48,7 +48,7 @@ export async function completeRecoveredReceipt(
 
   let receipt = await port.findReceipt({ stationId, transactionId })
   if (!receipt) {
-    receipt = await port.ensureReceipt({ stationId, transactionId, documentId })
+    receipt = await port.ensureReceipt({ stationId, transactionId, documentId, fiscalEventId })
   }
   const verified = receipt.fiscalDataVerified === true &&
     receipt.documentId === documentId && receipt.fiscalEventId === fiscalEventId
