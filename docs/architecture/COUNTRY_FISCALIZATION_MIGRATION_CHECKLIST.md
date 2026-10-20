@@ -444,3 +444,13 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Cover valid, incomplete, contradictory and printing-disabled cases in isolated tests.
 - [ ] Implement transaction-scoped PostgreSQL printing adapter and authoritative receipt creation before production recovery activation.
 - [ ] Ensure receipt verification and print-job persistence execute within the same transaction as recovery status and event writes.
+
+## Opt-in PostgreSQL recovery auto-print adapter (20 Oct 2026)
+
+- [x] Add a transaction-scoped PostgreSQL printing port that reuses the existing receipt reference payload and `receipt:<transactionId>:default` idempotency key.
+- [x] Read station auto-print setting using the caller's existing PostgreSQL client.
+- [x] Use insert-on-conflict-do-nothing to avoid mutating an already dispatched print job.
+- [x] Validate preexisting job transaction, receipt ID, receipt number, job type, source and payload mode before reporting idempotency verified.
+- [x] Cover matching and conflicting existing print jobs in isolated policy tests.
+- [ ] Connect the receipt verifier and print adapter within a single approved recovery transaction after authoritative fiscal reference and receipt lifecycle integration.
+- [ ] Do not enable production recovery workers while missing receipt generation and fiscal evidence mapping remain unresolved.
