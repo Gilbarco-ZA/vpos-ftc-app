@@ -20,7 +20,8 @@ export function normalizeInvoiceFiscalStatus(
   const raw = String(response.status ?? '').trim().toUpperCase()
   const isFiscalized = response.details?.isFiscalized === true
   // Contradictory evidence must not authorize a recovery write.
-  if (response.error === true && (isFiscalized || SUCCESS.has(raw))) {
+  if ((response.error === true && (isFiscalized || SUCCESS.has(raw))) ||
+      (isFiscalized && FAILED.has(raw))) {
     return {
       state: 'unknown', documentId: response.documentId ?? null, sourceStatus: raw || null,
       reason: 'Proxy status is contradictory (success with error); manual reconciliation required',
