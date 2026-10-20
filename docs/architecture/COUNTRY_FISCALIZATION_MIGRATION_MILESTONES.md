@@ -12,7 +12,8 @@ requires evidence, not merely isolated unit tests.
 - [x] Unified opt-in PostgreSQL transaction, persisted receipt verification and idempotent printing.
 - [x] Transaction-scoped receipt identity read and guarded insert **from supplied complete evidence**.
 - [x] Add transaction-scoped linked fiscal-event provenance read and block receipt creation from status-only synthetic audit events.
-- [ ] Authoritative KE/TZ fiscal-reference and receipt field mapping, based on provider samples.
+- [x] Introduce conservative KE/TZ status-field inventory and same-name conflict detection without promoting unverified fields to fiscal references.
+- [ ] Authoritative KE/TZ fiscal-reference and receipt field mapping, based on redacted operational provider samples.
 - [ ] Build a complete receipt candidate using transaction-scoped queries; current normal receipt builder reads through its own pool.
 - [x] Integrate optional guarded receipt insertion into the unified transaction and reverify exact receipt identity and fiscal data before printing. No candidate source is live yet.
 - [ ] Disposable PostgreSQL concurrency, rollback and print idempotency validation.
@@ -44,3 +45,7 @@ candidate and a verified persisted transaction/event.
 ## Fiscal event provenance gate (20 Oct 2026)
 
 Missing receipt insertion now independently reads the exact linked fiscalization event within the recovery transaction. It rejects mismatched document, event ID, status or reference, nonstructured response payloads, and synthetic `vpos-proxy-status-recovery` audit events. This is deliberate: a status confirmation does not include the authoritative receipt data needed for generation. A future provider-specific adapter must establish that provenance before creating a candidate; accepting an arbitrary caller-supplied receipt snapshot is not enough. The new reader **does not** manufacture fiscal receipt fields or activate the recovery worker.
+
+## KE/TZ status field mapping baseline (20 Oct 2026)
+
+The isolated `recoveryProviderFieldInventory` preserves the five named status fields (`fiscalId`, `fiscalCode`, `fiscalVerificationCode`, `fiscalQrCodeData`, `revenueAuthorityReference`). It can report missing fields and contradictory fields when **the same exact field name** is present on a linked provider response. It does not interpret aliases, traverse unrelated nested payloads, infer event reference identities, or provide receipt authorization; `referenceMappingApproved` always remains false. A real provider contract sample and approved country-specific mapping are still required. This helper is not wired into production.
