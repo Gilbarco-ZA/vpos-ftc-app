@@ -511,3 +511,12 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Implement an authoritative transaction-visible receipt builder rather than calling the normal generator that may read through a separate PostgreSQL connection.
 - [ ] Bind authorization to a real transaction-scoped read and insert; the gate alone does not create receipts and cannot authenticate its caller-provided evidence.
 - [ ] Preserve worker-disabled state until provider fiscal reference semantics, receipt parity and real DB concurrency are verified.
+
+## Transaction-scoped missing-receipt fiscal evidence (20 Oct 2026)
+
+- [x] Inspect the existing receipt generator and identify independent pool reads in receiptBuilder and branding loading that are unsafe for uncommitted recovery state.
+- [x] Add opt-in PostgreSQL fiscal identity reader using the existing recovery transaction client, locking the transaction and correlating its linked fiscalization event.
+- [x] Require current FISCALIZED state, expected fiscal document/event IDs and matching persisted fiscal references before accepting an independently supplied receipt candidate.
+- [x] Reject stale, mismatched and absent fiscal evidence in isolated regression coverage.
+- [ ] Refactor the complete receipt builder dependency tree for transaction-visible reads or supply an equivalent authoritative snapshot without changing production entrypoints.
+- [ ] Implement guarded receipt insertion only after the source and generated fiscal snapshot have been independently verified. This pass does not insert receipts or enable workers.
