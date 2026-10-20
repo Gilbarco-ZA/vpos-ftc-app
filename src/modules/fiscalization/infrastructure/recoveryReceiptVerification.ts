@@ -1,3 +1,7 @@
+import type { FiscalCountryCode } from '../domain/countryAdapter'
+import type { InvoiceStatusFiscalEvidence } from '../application/invoiceStatusFiscalEvidence'
+import { reconcileRecoveryFiscalReference } from '../application/recoveryFiscalReferencePolicy'
+
 /**
  * Read-only verification of a persisted receipt against the recovered
  * transaction and its linked SUCCESS event. No receipt creation or printing.
@@ -27,7 +31,7 @@ export interface RecoveryReceiptVerification {
 
 export function verifyRecoveryReceiptRow(
   row: RecoveryReceiptRow | null,
-  expected: { documentId: string; fiscalEventId: string },
+  expected: { documentId: string; fiscalEventId: string; countryCode: FiscalCountryCode; statusEvidence?: InvoiceStatusFiscalEvidence },
 ): RecoveryReceiptVerification {
   const invalid = (reason: string): RecoveryReceiptVerification => ({
     verified: false, receiptId: row?.id ?? null,
@@ -53,9 +57,16 @@ export function verifyRecoveryReceiptRow(
   }
   const fields = receipt as Record<string, unknown>
   if (fields.receiptNumber !== row.receipt_number) return invalid('Receipt number mismatch')
-  const reference = row.event_reference?.trim()
-  if (!reference || reference !== row.fiscalization_reference?.trim() ||
-    data.reference !== reference) {
+  const provenance = reconcileRecoveryFiscalReference({
+    countryCode: expected.countryCode,
+    documentId: expected.documentId,
+    transactionDocumentId: row.transaction_document_id,
+    transactionReference: row.fiscalization_reference,
+    eventReference: row.event_reference,
+    eventStatus: row.event_status,
+    statusEvidence: expected.statusEvidence,
+  })
+  if (provenance.kind !== 'verified' || data.reference !== provenance.reference) {
     return invalid('Fiscal receipt reference not verified')
   }
   return { verified: true, receiptId: row.id, receiptNumber: row.receipt_number, reason: 'Receipt reference and fiscal event correlated' }
@@ -63,7 +74,7 @@ export function verifyRecoveryReceiptRow(
 
 export async function verifyPersistedRecoveryReceipt(
   port: RecoveryReceiptReadPort,
-  input: { stationId: string; transactionId: string; documentId: string; fiscalEventId: string },
+  input: { stationId: string; transactionId: string; documentId: string; fiscalEventId: string; countryCode: FiscalCountryCode; statusEvidence?: InvoiceStatusFiscalEvidence },
 ): Promise<RecoveryReceiptVerification> {
   if (!input.stationId.trim() || !input.transactionId.trim()) throw new Error('Receipt lookup identity required')
   const row = await port.find({ stationId: input.stationId.trim(), transactionId: input.transactionId.trim() })
