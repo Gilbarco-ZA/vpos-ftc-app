@@ -3,6 +3,8 @@ import { assessRecoveryCompletionParity } from './recoveryCompletionParity'
 export interface RecoveryReceipt {
   id: string
   number: string
+  documentId: string
+  fiscalEventId: string
   fiscalDataVerified: boolean
 }
 
@@ -35,24 +37,27 @@ export interface RecoveryReceiptCompletionResult {
  */
 export async function completeRecoveredReceipt(
   port: RecoveryReceiptCompletionPort,
-  input: { stationId: string; transactionId: string; documentId: string; fiscalEventLinked: boolean },
+  input: { stationId: string; transactionId: string; documentId: string; fiscalEventId: string },
 ): Promise<RecoveryReceiptCompletionResult> {
   const stationId = input.stationId.trim()
   const transactionId = input.transactionId.trim()
   const documentId = input.documentId.trim()
   if (!stationId || !transactionId || !documentId) throw new Error('Recovery receipt identifiers required')
-  if (!input.fiscalEventLinked) throw new Error('Linked fiscalization event required before receipt completion')
+  const fiscalEventId = input.fiscalEventId.trim()
+  if (!fiscalEventId) throw new Error('Linked fiscalization event required before receipt completion')
 
   let receipt = await port.findReceipt({ stationId, transactionId })
   if (!receipt) {
     receipt = await port.ensureReceipt({ stationId, transactionId, documentId })
   }
-  if (!receipt.id?.trim() || !receipt.number?.trim() || !receipt.fiscalDataVerified) {
+  const verified = receipt.fiscalDataVerified === true &&
+    receipt.documentId === documentId && receipt.fiscalEventId === fiscalEventId
+  if (!receipt.id?.trim() || !receipt.number?.trim() || !verified) {
     const decision = assessRecoveryCompletionParity({
       fiscalEventLinked: true,
       receiptId: receipt.id ?? null,
       receiptNumber: receipt.number ?? null,
-      receiptFiscalDataVerified: receipt.fiscalDataVerified === true,
+      receiptFiscalDataVerified: verified,
       autoPrintEnabled: false,
       printJobIdempotencyVerified: false,
     })
@@ -66,7 +71,7 @@ export async function completeRecoveredReceipt(
   const decision = assessRecoveryCompletionParity({
     fiscalEventLinked: true,
     receiptId: receipt.id, receiptNumber: receipt.number,
-    receiptFiscalDataVerified: receipt.fiscalDataVerified,
+    receiptFiscalDataVerified: verified,
     autoPrintEnabled,
     printJobIdempotencyVerified: print.idempotencyVerified,
   })
