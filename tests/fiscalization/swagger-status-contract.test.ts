@@ -21,8 +21,8 @@ test('select exactly one matching document, never the first unrelated invoice', 
   const result = parseInvoiceStatusCollection('INV-2', {
     responseCode: '200', error: false,
     invoices: [
-      { documentId: 'INV-1', status: 'FISCALIZED' },
-      { documentId: 'INV-2', status: 'FISCALIZING' },
+      { documentId: 'INV-1', status: 'FISCALIZED', error: false },
+      { documentId: 'INV-2', status: 'FISCALIZING', error: false },
     ],
   })
   assert.equal(result.kind, 'response')
@@ -35,11 +35,11 @@ test('select exactly one matching document, never the first unrelated invoice', 
 test('invalid, failed, absent and duplicate collections fail closed', () => {
   const cases: unknown[] = [
     null,
-    { error: true, invoices: [{ documentId: 'A', status: 'FISCALIZED' }] },
+    { error: true, invoices: [{ documentId: 'A', status: 'FISCALIZED', error: false }] },
     { error: false },
     { error: false, invoices: [] },
-    { error: false, invoices: [{ documentId: 'B', status: 'FISCALIZED' }] },
-    { error: false, invoices: [{ documentId: 'A', status: 'FISCALIZED' }, { documentId: 'A', status: 'FAILED' }] },
+    { error: false, invoices: [{ documentId: 'B', status: 'FISCALIZED', error: false }] },
+    { error: false, invoices: [{ documentId: 'A', status: 'FISCALIZED', error: false }, { documentId: 'A', status: 'FAILED', error: false }] },
     { error: false, invoices: [{ documentId: 'A', status: null }] },
     { error: false, invoices: [{ documentId: 'A', status: 'SUCCESS', error: true }] },
   ]
@@ -52,7 +52,7 @@ test('a matching collection result is assessed without allowing resubmission', a
   const port = {
     async lookup() {
       return parseInvoiceStatusCollection('A', {
-        error: false, invoices: [{ documentId: 'A', status: 'FISCALIZED' }],
+        error: false, invoices: [{ documentId: 'A', status: 'FISCALIZED', error: false }],
       })
     },
   }
@@ -61,4 +61,15 @@ test('a matching collection result is assessed without allowing resubmission', a
   })
   assert.equal(result.outcome, 'confirmed')
   assert.equal(result.canAutomaticallyResubmit, false)
+})
+
+test('Swagger collection and row error flags must be explicitly boolean', () => {
+  for (const payload of [
+    { invoices: [{ documentId: 'A', status: 'FISCALIZED', error: false }] },
+    { error: 'false', invoices: [{ documentId: 'A', status: 'FISCALIZED', error: false }] },
+    { error: false, invoices: [{ documentId: 'A', status: 'FISCALIZED' }] },
+    { error: false, invoices: [{ documentId: 'A', status: 'FISCALIZED', error: 'false' }] },
+  ]) {
+    assert.equal(parseInvoiceStatusCollection('A', payload).kind, 'unavailable')
+  }
 })
