@@ -17,7 +17,7 @@ export function createPostgresRecoveryTransactionBoundary(): RecoveryTransaction
     transaction<T>(run: (client: RecoveryTransactionClient) => Promise<T>): Promise<T> {
       return withTransaction(async (client: PoolClient) => run({
         async query(sql, params) {
-          const response = await txQuery<{ id: string }>(client, sql, [...params])
+          const response = await txQuery<{ id: string; station_id: string; fiscal_document_id: string; status: string }>(client, sql, [...params])
           return { rows: response.rows }
         },
         async recordRecoveryAudit(input) {
