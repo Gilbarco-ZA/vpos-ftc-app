@@ -37,7 +37,7 @@ test('guarded transaction updates once and records matching audit in same bounda
           assert.deepEqual(params, ['S1', 'T1', 'D1'])
           if (state !== 'FISCALIZING') return { rows: [] }
           state = 'FISCALIZED'
-          return { rows: [{ id: 'T1' }] }
+          return { rows: [{ id: 'T1', station_id: 'S1', fiscal_document_id: 'D1', status: 'FISCALIZED' }] }
         },
         async recordRecoveryAudit(audit) { audits.push(audit.idempotencyKey) },
       })
@@ -53,7 +53,7 @@ test('audit failure propagates so transactional caller can roll back', async () 
   const boundary: RecoveryTransactionBoundary = {
     async transaction(run) {
       return run({
-        async query() { return { rows: [{ id: 'T1' }] } },
+        async query() { return { rows: [{ id: 'T1', station_id: 'S1', fiscal_document_id: 'D1', status: 'FISCALIZED' }] } },
         async recordRecoveryAudit() { throw new Error('audit failed') },
       })
     },
@@ -100,4 +100,32 @@ test('unverified and mismatched assessments never start a database transaction',
     )
   }
   assert.equal(started, false)
+})
+
+test('unexpected UPDATE identities and multiple rows reject without auditing', async () => {
+  for (const rows of [
+    [{ id: 'OTHER', station_id: 'S1', fiscal_document_id: 'D1', status: 'FISCALIZED' }],
+    [{ id: 'T1', station_id: 'OTHER', fiscal_document_id: 'D1', status: 'FISCALIZED' }],
+    [{ id: 'T1', station_id: 'S1', fiscal_document_id: 'OTHER', status: 'FISCALIZED' }],
+    [{ id: 'T1', station_id: 'S1', fiscal_document_id: 'D1', status: 'FAILED' }],
+    [
+      { id: 'T1', station_id: 'S1', fiscal_document_id: 'D1', status: 'FISCALIZED' },
+      { id: 'T1', station_id: 'S1', fiscal_document_id: 'D1', status: 'FISCALIZED' },
+    ],
+  ]) {
+    let audited = false
+    const boundary: RecoveryTransactionBoundary = {
+      async transaction(run) {
+        return run({
+          async query() { return { rows } },
+          async recordRecoveryAudit() { audited = true },
+        })
+      },
+    }
+    await assert.rejects(
+      confirmTransactionFiscalizedAtomically(boundary, input),
+      /unexpected transaction identity/,
+    )
+    assert.equal(audited, false)
+  }
 })
