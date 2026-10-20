@@ -1,3 +1,4 @@
+import { parseInvoiceStatusFiscalEvidence } from './invoiceStatusFiscalEvidence'
 import type { FiscalCountryCode } from '../domain/countryAdapter'
 import { normalizeRegisteredCountry } from './countryRegistry'
 import type { FiscalStatusLookupResult } from './statusRecoveryService'
@@ -84,8 +85,13 @@ export function parseInvoiceStatusCollection(
   if (match.error === true) {
     return { kind: 'unavailable', reason: match.message || 'Matching invoice status reports an error' }
   }
+  const fiscalEvidence = parseInvoiceStatusFiscalEvidence(match)
+  if (!fiscalEvidence) {
+    return { kind: 'unavailable', reason: 'Invoice status contains invalid fiscal metadata' }
+  }
   return {
     kind: 'response',
     response: { error: false, documentId: id, status: match.status },
+    fiscalEvidence,
   }
 }
