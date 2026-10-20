@@ -12,7 +12,7 @@ test('HTTP transport authenticates GET and encodes DocumentId without leaking ke
     method = init?.method
     key = new Headers(init?.headers).get('x-api-key')
     return new Response(JSON.stringify({ error: false, invoices: [
-      { documentId: 'A&B #1', status: 'FISCALIZED' },
+      { documentId: 'A&B #1', status: 'FISCALIZED', error: false },
     ] }), { status: 200, headers: { 'content-type': 'application/json' } })
   }
   const transport = createFetchStatusHttpTransport(async () => ({
@@ -47,7 +47,7 @@ test('invalid credentials and base URL fail without dispatching a request', asyn
 
 test('HTTP error cannot become fiscalized status even when response body claims success', async () => {
   const fakeFetch: typeof fetch = async () =>
-    new Response(JSON.stringify({ invoices: [{ documentId: 'A', status: 'FISCALIZED' }] }),
+    new Response(JSON.stringify({ invoices: [{ documentId: 'A', status: 'FISCALIZED', error: false }] }),
       { status: 503, headers: { 'content-type': 'application/json' } })
   const transport = createFetchStatusHttpTransport(async () => ({
     baseUrl: 'https://example.invalid', apiKey: 'key', timeoutMs: 1000,
