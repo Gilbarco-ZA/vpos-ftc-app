@@ -18,7 +18,10 @@ export function createPostgresRecoveryPrintPort(client: PoolClient): VerifiedRec
         'SELECT auto_print_receipts FROM station_settings WHERE station_id = $1::uuid',
         [stationId],
       )
-      return result.rows[0]?.auto_print_receipts === true
+      if (result.rows.length !== 1 || typeof result.rows[0]?.auto_print_receipts !== 'boolean') {
+        throw new Error('Station auto-print configuration is unavailable')
+      }
+      return result.rows[0].auto_print_receipts
     },
     async ensurePrintJob(input) {
       if (!input.stationId.trim() || !input.transactionId.trim() ||
@@ -44,8 +47,9 @@ export function createPostgresRecoveryPrintPort(client: PoolClient): VerifiedRec
            RETURNING idempotency_key, source_transaction_id, job_type, payload`,
         [uuidv4(), input.stationId, JSON.stringify(payload), input.idempotencyKey, input.transactionId],
       )
+      if (result.rows.length > 1) throw new Error('Unexpected recovery print insert result')
       if (result.rows.length === 1) {
-        return { idempotencyVerified: true }
+        return { idempotencyVerified: matchesRecoveryPrintJob(result.rows[0], input) }
       }
       const existing = await txQuery<{ idempotency_key: string; source_transaction_id: string; job_type: string; payload: unknown }>(
         client,
