@@ -377,3 +377,16 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Validate guarded transition, rollback, and simultaneous workers against a disposable PostgreSQL instance.
 - [ ] Confirm receipt and print parity; no production worker connection is authorized.
 - [ ] Run npm run check and fiscalization tests after this pass.
+
+## Receipt and print completion parity assessment (20 Oct 2026)
+
+Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCCESS event, changes transaction status, reuses or creates a receipt, and conditionally enqueues a print job with idempotency key `receipt:<transactionId>:default`. The isolated recovery PostgreSQL boundary currently persists the event, updates status and compatibility summary, but does not yet execute receipt creation or print queue handling.
+
+- [x] Create pure `assessRecoveryCompletionParity` readiness contract.
+- [x] Require event linking, persisted receipt ID/number and verified recovered fiscal receipt data.
+- [x] When auto-print is enabled, require verified print job idempotency before treating recovery lifecycle as complete.
+- [x] Add positive and negative regression tests for missing receipt, fiscal data, audit and conditional print handling.
+- [ ] Integrate the parity check with transactional recovery only after receipt handling is genuinely implemented. Current readiness inputs must not be inferred or hardcoded as true.
+- [ ] Resolve whether normal completion's `generateReceipt` is safe inside its existing transactional callback; do not blindly reuse with an unrelated database client.
+- [ ] Add real PostgreSQL concurrency, rollback and receipt/print transactional integration tests.
+- [ ] Do not activate recovery worker while receipt and print parity are outstanding.
