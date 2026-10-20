@@ -73,6 +73,13 @@ export async function completeFiscalRecoveryAtomically(
           countryCode: input.assessment.countryCode,
         }, input.receiptCandidate)
         if (inserted.kind === 'blocked') throw new IncompleteRecovery([inserted.reason])
+        const persistedReceipt = await client.receiptRead.find({
+          stationId: input.stationId,
+          transactionId: input.transactionId,
+        })
+        if (!inserted.receiptId.trim() || persistedReceipt?.id !== inserted.receiptId) {
+          throw new IncompleteRecovery(['New receipt identity cannot be verified after insertion'])
+        }
       }
       const completion = await completeVerifiedRecoveredReceipt(
         client.receiptRead,
