@@ -1,3 +1,4 @@
+import type { InvoiceStatusFiscalEvidence } from './invoiceStatusFiscalEvidence'
 import type { ProxyInvoiceResponse } from '@/src/shared/fiscalization/proxy/contracts'
 import type { FiscalCountryCode } from '../domain/countryAdapter'
 import { normalizeRegisteredCountry } from './countryRegistry'
@@ -11,7 +12,7 @@ export interface FiscalStatusLookupRequest {
 }
 
 export type FiscalStatusLookupResult =
-  | { kind: 'response'; response: ProxyInvoiceResponse }
+  | { kind: 'response'; response: ProxyInvoiceResponse; fiscalEvidence?: InvoiceStatusFiscalEvidence }
   | { kind: 'unavailable'; reason: string }
   | { kind: 'transport-error'; reason: string }
 
@@ -32,6 +33,7 @@ export interface FiscalRecoveryAssessment {
   canMarkFiscalized: boolean
   canAutomaticallyResubmit: false
   reason: string
+  fiscalEvidence?: InvoiceStatusFiscalEvidence
 }
 
 /** A lookup result is advisory until a future locked persistence workflow verifies it. */
@@ -56,7 +58,7 @@ export async function assessFiscalStatusRecovery(
       canMarkFiscalized: false, reason: result.reason }
   }
   const decision = evaluateStatusReconciliation(countryCode, documentId, result.response)
-  return { ...base, decision,
+  return { ...base, decision, fiscalEvidence: result.fiscalEvidence,
     outcome: decision.canMarkFiscalized ? 'confirmed' : 'unresolved',
     canMarkFiscalized: decision.canMarkFiscalized,
     reason: decision.reason }
