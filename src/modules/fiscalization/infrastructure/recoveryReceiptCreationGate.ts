@@ -29,7 +29,9 @@ export function assessRecoveryReceiptCreation(
   if (!candidate) return { allowed: false, reason: 'Authoritative receipt candidate unavailable' }
   if (!candidate.receiptNumber?.trim() || !candidate.fiscalReference?.trim() ||
     candidate.transactionDocumentId !== input.documentId ||
-    candidate.fiscalEventId !== input.fiscalEventId) {
+    candidate.fiscalEventId !== input.fiscalEventId ||
+    candidate.fiscalReference !== input.persistedTransactionReference ||
+    candidate.fiscalReference !== input.persistedEventReference) {
     return { allowed: false, reason: 'Receipt candidate lacks correlated fiscal identity' }
   }
   const row: RecoveryReceiptRow = {
