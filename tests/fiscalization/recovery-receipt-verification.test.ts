@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { verifyRecoveryReceiptRow, verifyPersistedRecoveryReceipt } from '@/src/modules/fiscalization/infrastructure/recoveryReceiptVerification'
 
-const expected = { documentId: 'D1', fiscalEventId: 'E1' }
+const expected = { countryCode: 'TZ' as const, documentId: 'D1', fiscalEventId: 'E1' }
 const row = {
   id: 'R1', receipt_number: 'RC1',
   transaction_document_id: 'D1', latest_fiscal_event_id: 'E1',
@@ -46,4 +46,25 @@ test('read-only verification delegates station-scoped lookup to injected port', 
   }, { stationId: 'S1', transactionId: 'T1', ...expected })
   assert.equal(result.verified, true)
   assert.deepEqual(calls, [{ stationId: 'S1', transactionId: 'T1' }])
+})
+
+test('both country policies reject missing fiscal reference provenance', () => {
+  for (const countryCode of ['KE', 'TZ'] as const) {
+    assert.equal(verifyRecoveryReceiptRow(row, { ...expected, countryCode }).verified, true)
+    assert.equal(verifyRecoveryReceiptRow({ ...row, event_reference: 'OTHER' },
+      { ...expected, countryCode }).verified, false)
+    assert.equal(verifyRecoveryReceiptRow({ ...row, fiscalization_reference: null },
+      { ...expected, countryCode }).verified, false)
+  }
+})
+
+test('status metadata does not substitute for missing persisted references', () => {
+  const statusEvidence = {
+    fiscalId: 'REF1', fiscalCode: 'REF1', fiscalVerificationCode: 'REF1',
+    fiscalQrCodeData: 'REF1', revenueAuthorityReference: 'REF1',
+  }
+  const result = verifyRecoveryReceiptRow({ ...row, event_reference: null }, {
+    ...expected, statusEvidence,
+  })
+  assert.equal(result.verified, false)
 })
