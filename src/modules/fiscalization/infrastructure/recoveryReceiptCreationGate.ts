@@ -17,7 +17,14 @@ export interface RecoveryReceiptCreationCandidate {
  */
 export function assessRecoveryReceiptCreation(
   candidate: RecoveryReceiptCreationCandidate | null,
-  input: { documentId: string; fiscalEventId: string; countryCode: FiscalCountryCode },
+  input: {
+    documentId: string
+    fiscalEventId: string
+    countryCode: FiscalCountryCode
+    persistedTransactionReference: string | null
+    persistedEventReference: string | null
+    persistedEventStatus: string | null
+  },
 ): { allowed: boolean; reason: string } {
   if (!candidate) return { allowed: false, reason: 'Authoritative receipt candidate unavailable' }
   if (!candidate.receiptNumber?.trim() || !candidate.fiscalReference?.trim() ||
@@ -31,10 +38,10 @@ export function assessRecoveryReceiptCreation(
     fiscal_data: candidate.fiscalData,
     transaction_document_id: candidate.transactionDocumentId,
     latest_fiscal_event_id: candidate.fiscalEventId,
-    fiscalization_reference: candidate.fiscalReference,
+    fiscalization_reference: input.persistedTransactionReference,
     event_id: candidate.fiscalEventId,
-    event_status: 'SUCCESS',
-    event_reference: candidate.fiscalReference,
+    event_status: input.persistedEventStatus,
+    event_reference: input.persistedEventReference,
   }
   const verified = verifyRecoveryReceiptRow(row, input)
   return { allowed: verified.verified, reason: verified.reason }
