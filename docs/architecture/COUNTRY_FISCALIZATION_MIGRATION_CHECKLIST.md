@@ -454,3 +454,13 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Cover matching and conflicting existing print jobs in isolated policy tests.
 - [ ] Connect the receipt verifier and print adapter within a single approved recovery transaction after authoritative fiscal reference and receipt lifecycle integration.
 - [ ] Do not enable production recovery workers while missing receipt generation and fiscal evidence mapping remain unresolved.
+
+## Transactional verified receipt and auto-print boundary (20 Oct 2026)
+
+- [x] Add opt-in recovery receipt/print transaction coordinator.
+- [x] Bind PostgreSQL receipt verification and idempotent print persistence to a single transaction-scoped PoolClient.
+- [x] Abort the transaction when a receipt cannot be verified or print-job idempotency cannot be established, including after an attempted insert.
+- [x] Distinguish blocked completion from database failures; the latter propagate rather than appearing as a safe completed outcome.
+- [x] Cover success, missing fiscal evidence, failed idempotency and database errors with injected transaction-boundary tests.
+- [ ] Integrate this transaction with the earlier guarded status recovery transaction only after authoritative fiscal reference and receipt generation parity. Currently these are separate opt-in workflows.
+- [ ] Validate real PostgreSQL isolation, concurrency and receipt/print rollback, and confirm the referenced fiscal receipt snapshot is complete before activating workers.
