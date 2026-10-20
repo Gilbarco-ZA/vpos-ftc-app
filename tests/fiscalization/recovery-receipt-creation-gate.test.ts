@@ -31,6 +31,7 @@ test('missing provider identity and guessed status metadata cannot authorize rec
     { fiscalEventId: 'OTHER' },
     { fiscalReference: '' },
     { fiscalReference: 'WRONG' },
+    { fiscalReference: ' REF1 ' },
     { fiscalData: null },
     { fiscalData: { schemaVersion: 1, reference: 'WRONG', receipt: { receiptNumber: 'RC1' } } },
     { fiscalData: { schemaVersion: 1, reference: 'REF1', receipt: { receiptNumber: 'OTHER' } } },
@@ -52,4 +53,18 @@ test('independent persisted event and transaction evidence is mandatory', () => 
 
 test('both country policies require the same reference provenance', () => {
   assert.equal(assessRecoveryReceiptCreation(candidate, { ...expected, countryCode: 'KE' }).allowed, true)
+})
+
+test('candidate fiscal reference must exactly match both persisted references', () => {
+  const decision = assessRecoveryReceiptCreation({
+    ...candidate,
+    fiscalReference: 'WRONG',
+    fiscalData: {
+      schemaVersion: 1,
+      reference: 'REF1',
+      receipt: { receiptNumber: 'RC1' },
+    },
+  }, expected)
+  assert.equal(decision.allowed, false)
+  assert.match(decision.reason, /correlated fiscal identity/)
 })
