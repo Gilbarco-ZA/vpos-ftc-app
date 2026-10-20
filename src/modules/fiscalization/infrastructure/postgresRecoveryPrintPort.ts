@@ -3,6 +3,7 @@ import { txQuery } from '@/src/platform/db/postgres'
 import { buildReferencePrintJobPayload } from '@/src/modules/printing/domain/printJobPayload'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 import type { VerifiedRecoveryPrintPort } from '../application/verifiedRecoveryReceiptCompletion'
+import { matchesRecoveryPrintJob } from './recoveryPrintJobPolicy'
 
 /**
  * Opt-in transaction-scoped print adapter. No independent connection or
@@ -55,20 +56,8 @@ export function createPostgresRecoveryPrintPort(client: PoolClient): VerifiedRec
         [input.stationId, input.idempotencyKey],
       )
       const job = existing.rows[0]
-      const stored = typeof job?.payload === 'string'
-        ? (() => { try { return JSON.parse(job.payload) as unknown } catch { return null } })()
-        : job?.payload
-      const body = stored && typeof stored === 'object' && !Array.isArray(stored)
-        ? stored as Record<string, unknown> : null
-      return {
-        idempotencyVerified: existing.rows.length === 1 &&
-          job?.idempotency_key === input.idempotencyKey &&
-          job?.source_transaction_id === input.transactionId &&
-          job?.job_type === 'print.receipt' &&
-          body?.receiptId === input.receiptId &&
-          body?.receiptNumber === input.receiptNumber &&
-          body?.storageMode === 'reference',
-      }
+      return { idempotencyVerified: existing.rows.length === 1 &&
+        matchesRecoveryPrintJob(job ?? null, input) }
     },
   }
 }
