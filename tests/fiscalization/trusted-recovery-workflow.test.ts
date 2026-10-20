@@ -11,7 +11,7 @@ test('status lookup confirmation is required before transaction transition', asy
   const boundary: RecoveryTransactionBoundary = {
     async transaction(run) {
       return run({
-        async query() { writes++; return { rows: [{ id: 'T1' }] } },
+        async query() { writes++; return { rows: [{ id: 'T1', station_id: 'S1', fiscal_document_id: 'D1', status: 'FISCALIZED' }] } },
         async recordRecoveryAudit() {},
       })
     },
