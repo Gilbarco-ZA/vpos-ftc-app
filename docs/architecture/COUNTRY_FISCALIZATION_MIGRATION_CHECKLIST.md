@@ -402,3 +402,13 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Implement database-backed receipt creation and verification in the same recovery transaction. Current port's `fiscalDataVerified` is caller supplied and not authoritative.
 - [ ] Wire completion into atomic PostgreSQL recovery only when all receipt-fiscalization fields and transaction consistency are proven.
 - [ ] Add actual database concurrency and rollback tests; until then recovery worker remains disconnected.
+
+## Receipt document/event correlation pass (20 Oct 2026)
+
+- [x] Require persisted recovery receipt evidence to include a matching fiscal document ID and fiscalization event ID.
+- [x] Replace the standalone `fiscalEventLinked` boolean on the receipt coordinator input with a nonempty fiscal event ID.
+- [x] Pass fiscal event ID into the receipt creation port.
+- [x] Block receipt readiness and printing when stored receipt document/event identifiers differ from the recovered document/event.
+- [x] Add regression coverage for mismatched document and event evidence.
+- [ ] Existing `fiscalDataVerified` remains port-supplied; implement authoritative DB verification, receipt fiscal metadata validation, and proof of same-transaction consistency before integration.
+- [ ] Run npm run check and fiscalization tests; no production worker wiring has changed.
