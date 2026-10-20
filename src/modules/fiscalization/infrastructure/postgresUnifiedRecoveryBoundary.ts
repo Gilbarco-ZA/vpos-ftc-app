@@ -2,6 +2,7 @@ import type { PoolClient } from '@/src/platform/db/postgres'
 import { txQuery, withTransaction } from '@/src/platform/db/postgres'
 import { persistFiscalizationEventRepo } from '@/src/modules/transactions/infrastructure/fiscalization/fiscalization-event.repository'
 import { persistAndLinkRecoveryAudit } from './recoveryAuditLink'
+import { insertVerifiedRecoveryReceipt } from './postgresRecoveryReceiptInsert'
 import { createPostgresRecoveryReceiptRead } from './postgresRecoveryReceiptRead'
 import { createPostgresRecoveryPrintPort } from './postgresRecoveryPrintPort'
 import type { UnifiedRecoveryBoundary, UnifiedRecoveryClient } from './unifiedRecoveryCompletion'
@@ -79,6 +80,7 @@ export function createPostgresUnifiedRecoveryBoundary(): UnifiedRecoveryBoundary
           return result.rows.length === 1 ? result.rows[0]?.latest_fiscal_event_id ?? null : null
         },
         receiptRead: createPostgresRecoveryReceiptRead(client),
+        insertMissingReceipt: (input, candidate) => insertVerifiedRecoveryReceipt(client, input, candidate),
         printing: createPostgresRecoveryPrintPort(client),
       }))
     },
