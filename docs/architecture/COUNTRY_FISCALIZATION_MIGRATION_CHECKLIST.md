@@ -501,3 +501,13 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Add focused unique/missing/duplicate receipt-selection regression coverage.
 - [ ] Establish an approved receipt generation path and authoritative fiscal metadata provenance for delayed fiscalization.
 - [ ] Verify concurrent receipt mutation, transaction rollback and duplicate print-job behavior in disposable PostgreSQL before worker activation.
+
+## Missing receipt authorization gate (20 Oct 2026)
+
+- [x] Add isolated validation for a candidate fiscal receipt snapshot before permitting future persistence.
+- [x] Require exact expected document/event IDs, receipt number, schemaVersion 1 and matching fiscal reference.
+- [x] Independently require the persisted transaction reference, linked event reference and SUCCESS status to match the candidate; candidate-supplied status alone cannot authorize creation.
+- [x] Add regression cases for absent snapshots, mismatches, missing references and both KE/TZ policies.
+- [ ] Implement an authoritative transaction-visible receipt builder rather than calling the normal generator that may read through a separate PostgreSQL connection.
+- [ ] Bind authorization to a real transaction-scoped read and insert; the gate alone does not create receipts and cannot authenticate its caller-provided evidence.
+- [ ] Preserve worker-disabled state until provider fiscal reference semantics, receipt parity and real DB concurrency are verified.
