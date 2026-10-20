@@ -414,3 +414,13 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Carry the optional evidence through the isolated recovery assessment and cover correlation with focused tests.
 - [ ] Establish country-specific authoritative mapping from these named fields to transaction fiscalization_reference, fiscal event reference and receipt fiscal snapshots using redacted operational samples.
 - [ ] Do not persist candidate reference values or mark receipt parity complete until mapping and receipt provenance are verified.
+
+## KE/TZ fiscal reference provenance policy (20 Oct 2026)
+
+- [x] Add isolated country-aware reference decision for Kenya and Tanzania.
+- [x] Require exact transaction document correlation and a SUCCESS event before trusting a persisted reference.
+- [x] Require transaction and linked fiscal-event reference to agree; reject absent or contradictory values.
+- [x] Do not equate status fiscalId, fiscalCode, fiscalVerificationCode, QR payload or revenueAuthorityReference with the receipt reference without authoritative documentation.
+- [x] Cover valid persisted references and conflicting/missing references with regression tests.
+- [ ] Obtain verified KE/TZ field semantics and transaction-to-receipt reference provenance from redacted provider responses.
+- [ ] Integrate policy with transaction-scoped receipt verification only after confirmed mapping and receipt/print parity.
