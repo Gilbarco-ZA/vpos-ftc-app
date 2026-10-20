@@ -30,7 +30,7 @@ const row = {
 }
 const input = { stationId: 'S1', transactionId: 'T1', documentId: 'D1', assessment, receiptCandidate: candidate }
 
-function fake(mode: 'created' | 'blocked' | 'existing') {
+function fake(mode: 'created' | 'blocked' | 'existing' | 'wrong-id') {
   let inserted = 0
   let printed = 0
   let committed = false
@@ -45,13 +45,13 @@ function fake(mode: 'created' | 'blocked' | 'existing') {
         },
         async linkedEventId() { return 'E1' },
         receiptRead: { async find() {
-          return mode === 'existing' || (mode === 'created' && inserted) ? row : null
+          return mode === 'existing' || ((mode === 'created' || mode === 'wrong-id') && inserted) ? row : null
         } },
         async insertMissingReceipt() {
           inserted++
           return mode === 'blocked'
             ? { kind: 'blocked' as const, reason: 'Fiscal evidence incomplete' }
-            : { kind: 'created' as const, receiptId: 'R1' }
+            : { kind: 'created' as const, receiptId: mode === 'wrong-id' ? 'R2' : 'R1' }
         },
         printing: {
           async isAutoPrintEnabled() { return true },
@@ -81,4 +81,10 @@ test('existing verified receipt is reused without insertion', async () => {
   const x = fake('existing')
   assert.equal((await completeFiscalRecoveryAtomically(x.boundary, input)).outcome, 'applied')
   assert.deepEqual(x.state(), { inserted: 0, printed: 1, committed: true })
+})
+
+test('unexpected post-insert receipt identity aborts without printing', async () => {
+  const x = fake('wrong-id')
+  assert.equal((await completeFiscalRecoveryAtomically(x.boundary, input)).outcome, 'blocked')
+  assert.deepEqual(x.state(), { inserted: 1, printed: 0, committed: false })
 })
