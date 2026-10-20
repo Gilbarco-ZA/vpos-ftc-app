@@ -11,6 +11,7 @@ requires evidence, not merely isolated unit tests.
 - [x] Status lookup, correlated status guard, guarded state transition and audit.
 - [x] Unified opt-in PostgreSQL transaction, persisted receipt verification and idempotent printing.
 - [x] Transaction-scoped receipt identity read and guarded insert **from supplied complete evidence**.
+- [x] Add transaction-scoped linked fiscal-event provenance read and block receipt creation from status-only synthetic audit events.
 - [ ] Authoritative KE/TZ fiscal-reference and receipt field mapping, based on provider samples.
 - [ ] Build a complete receipt candidate using transaction-scoped queries; current normal receipt builder reads through its own pool.
 - [x] Integrate optional guarded receipt insertion into the unified transaction and reverify exact receipt identity and fiscal data before printing. No candidate source is live yet.
@@ -39,3 +40,7 @@ layer until M1 and the applicable country parity/rollout gates are satisfied.
 Do not treat a generic status success as receipt fiscal metadata. The guarded
 receipt writer cannot create a receipt without a complete authoritative
 candidate and a verified persisted transaction/event.
+
+## Fiscal event provenance gate (20 Oct 2026)
+
+Missing receipt insertion now independently reads the exact linked fiscalization event within the recovery transaction. It rejects mismatched document, event ID, status or reference, nonstructured response payloads, and synthetic `vpos-proxy-status-recovery` audit events. This is deliberate: a status confirmation does not include the authoritative receipt data needed for generation. A future provider-specific adapter must establish that provenance before creating a candidate; accepting an arbitrary caller-supplied receipt snapshot is not enough. The new reader **does not** manufacture fiscal receipt fields or activate the recovery worker.
