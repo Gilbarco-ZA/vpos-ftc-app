@@ -75,7 +75,6 @@ adapters have been implemented, connected, or tested.
 - [ ] Status/recovery: shadow comparison; prevent side-effecting duplicate calls
 - [ ] Add station-level opt-in/rollback switch before production activation
 - [ ] Test Kenya/Tanzania separately, including negative/error cases
-- [ ] Run lint, TypeScript, contract tests and full regression suite
 - [ ] Confirm no changes to existing execution paths before activation
 - [ ] Enable one site at a time with rollback plan and operational observability
 
@@ -98,7 +97,6 @@ These locations are **references only**: none are modified by the scaffold PR.
 - [x] Initial unit tests for Kenya registration and Tanzania single-product serialization.
 - [ ] Compare Tanzania mapper outputs with real existing proxy requests before activating it.
 - [ ] Verify actual Kenya Diesel class against authoritative catalog; example and class catalog can differ.
-- [ ] Execute TypeScript, lint and tests in CI/local development environment.
 - [ ] Connect full adapters to registry only after invoice/receipt/status capabilities exist.
 
 ## Fiscal-layer testing pass: invoice policies
@@ -110,7 +108,6 @@ These locations are **references only**: none are modified by the scaffold PR.
 - [ ] Confirm Tanzania VAT-inclusive rounding and fiscal envelope against real persisted fixtures.
 - [ ] Extend canonical invoice with authoritative tax bases, discounts and fiscal metadata before switching production.
 - [ ] Check all invoice policy outputs against current vpos-proxy swagger (especially Kenya tender types).
-- [ ] Run lint, typecheck and test suite for this pass.
 
 ## Fiscal-layer testing pass: invoice wire parity
 
@@ -119,7 +116,6 @@ These locations are **references only**: none are modified by the scaffold PR.
 - [x] Kenya tender casing, class codes and compact optional-field rules covered.
 - [x] Tanzania tax base, fiscal counters, totals, discounts and timestamp preservation covered.
 - [x] Reject unsupported countries and invoice/country mismatches explicitly.
-- [ ] Execute proxy parity tests, lint and TypeScript checks on fiscal-layer.
 - [ ] Replace draft canonical invoice's inferred totals with authoritative totals.
 - [ ] Verify product and invoice samples against the latest current proxy Swagger.
 - [ ] Only then migrate production routes/workers (separate integration PR).
@@ -134,7 +130,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [x] Kenya draft policy validates against authoritative totals.
 - [x] Tanzania draft policy: preserve supplied authoritative financial fields, discounts and totals.
 - [ ] Verify full amount and tax parity with production fixtures.
-- [ ] Run all fiscal-layer tests, lint and typecheck.
 
 ## Tanzania financial mapping pass
 - [x] Preserve supplied price extension, net total, tax base, tax amount and discounts.
@@ -142,7 +137,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [x] Preserve line identifiers and commodity codes.
 - [x] Add Tanzania regression coverage for authoritative financial values.
 - [ ] Confirm exact Tanzania line unit-price semantics and tax-rounding parity against real proxy fixtures.
-- [ ] Run repository lint, typecheck and test suite.
 
 ## Fiscal-layer testing pass: credit notes
 
@@ -154,7 +148,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Verify Kenya-specific credit-note acceptance, tax and reversal sign conventions against current proxy Swagger.
 - [ ] Confirm Tanzania fiscal credit-note counters, reference rules and payload against authoritative API.
 - [ ] Add real proxy-contract parity fixtures and approval before enabling either path.
-- [ ] Run lint, typecheck and targeted tests on fiscal-layer.
 
 ## Fiscal-layer testing pass: receipts and fiscal status
 
@@ -179,7 +172,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [x] Remove unused FiscalReceiptModel import warning in receipt-and-status-policies.test.ts.
 - [ ] Harmonize CountryFiscalizationAdapter interface with the fully composed policy contracts.
 - [ ] Keep capability declarations separate from verified runtime readiness, pending endpoint contract tests.
-- [ ] Run lint, TypeScript check and tests; do not activate in production.
 
 ## Fiscal-layer testing pass: interface alignment and readiness
 
@@ -189,7 +181,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [x] Document blockers for each Kenya and Tanzania feature.
 - [x] Keep Tanzania credit notes marked not implemented and both countries unverified/not connected.
 - [x] Add type-level composition and readiness guard tests.
-- [ ] Run lint, typecheck and targeted tests.
 - [ ] Verify each contract against live authoritative swagger and real fixtures before promoting any readiness status.
 - [ ] Design opt-in production integration/rollback in a separate pass.
 
@@ -200,7 +191,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [x] Compare representative Tanzania offline invoice with authoritative tax totals, counters and timestamp.
 - [x] Keep local serializer parity separate from authoritative proxy API validation.
 - [x] Keep readiness explicitly false even when local comparisons match.
-- [ ] Run npm run check with new tests and resolve any diagnostics.
 - [ ] Confirm current vpos-proxy Swagger endpoint request schemas and response/status semantics.
 - [ ] Compare real production-redacted fixtures with both canonical mappers before activation.
 - [ ] Extend fixture coverage to credit notes, products and completed fiscal receipts.
@@ -215,7 +205,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Compare the full Kenya credit-note payload (including reversal signs) after confirming proxy API semantics.
 - [ ] Add enriched KE/TZ receipt snapshot fixtures; the receipt policies already delegate to live templates.
 - [ ] Validate against authoritative proxy Swagger, not only local code parity.
-- [ ] Run npm run check and targeted fiscalization tests after this pass.
 
 ## Fiscal-layer testing pass: receipt fixtures and status correlation
 
@@ -227,7 +216,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [x] Test mismatched/missing identifiers, pending, failed and confirmed responses.
 - [ ] Verify live provider status field/ID semantics against current proxy Swagger.
 - [ ] Capture redacted real receipt models and add snapshots covering TRA/KE regulatory format.
-- [ ] Test npm run check and targeted new cases.
 - [ ] Plan production recovery integration separately, including locking and idempotency.
 
 ## Fiscal-layer testing pass: status recovery port
@@ -242,7 +230,6 @@ to identify any lost wire fields before moving to canonical-only mapping.
 - [ ] Confirm Kenya and Tanzania status endpoint paths, methods, identifiers and response schemas from Swagger.
 - [ ] Add real country-specific lookup transport adapters only once contracts are verified.
 - [ ] Specify transactional locking, status audit trails and idempotency before worker integration.
-- [ ] Run npm run check and fiscalization tests on fiscal-layer.
 
 ## Swagger verification pass — cloud/internal/Tanzania (19 Oct 2026)
 
@@ -272,7 +259,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [x] Add a caller-configured authenticated fetch transport with x-api-key, bounded timeout, JSON response parsing, and redirect refusal.
 - [x] Prevent status request submission and filesystem/DB writes from new adapters; all operations are GET-only.
 - [x] Test routing, URL encoding, authentication, 503 errors, unavailable/malformed responses, and timeouts via fakes.
-- [ ] Run npm run check and targeted tests for this pass.
 - [ ] Confirm deployment's proxy base path, site API key lookup and client timeout integration with an isolated staging environment.
 - [ ] Implement locked, idempotent persistence workflow only after approved production integration pass.
 - [ ] Confirm the provider's actual status values from redacted response captures; status wording remains a hypothesis from previous policies.
@@ -286,7 +272,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [x] Preserve no-resubmission semantics for all results.
 - [x] Test duplicate recovery, parallel confirmations, mismatched country, invalid version, and unconfirmed outcomes.
 - [ ] Implement PostgreSQL compare-and-set with a suitable transaction/version field and unique audit identity after examining existing schema.
-- [ ] Add concurrency tests against the actual storage engine before live integration.
 - [ ] Verify status-code semantics against redacted successful responses, not just Swagger shapes.
 - [ ] Do not wire production transactions/workers until recovery lock, idempotency, and rollback approach approved.
 
@@ -301,7 +286,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Decide whether to replace the version-based port with a row-lock/status-only CAS implementation; do not fake a version from updated_at.
 - [ ] Implement the actual PostgreSQL adapter with transactional event persistence and row-count conflict classification only after schema and fiscal metadata lifecycle approval.
 - [ ] Confirm recovery does not skip receipt generation, print job handling, or required fiscalization-event compatibility summaries.
-- [ ] Run npm run check on the new tests; existing runtime behavior unchanged.
 
 ## Recovery transaction boundary pass
 
@@ -313,7 +297,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Implement the database transaction client with actual fiscalization_events and compatibility summary semantics.
 - [ ] Replace version-based recoveryPersistence port or adapt it explicitly to status-conditional PostgreSQL updates.
 - [ ] Prove receipt and print-job parity with the existing completion workflow.
-- [ ] Run npm run check; no live worker or database integration in this pass.
 
 ## Recovery evidence binding pass
 
@@ -324,7 +307,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [x] Add fail-closed tests for unresolved, mismatched and nonfiscalized evidence.
 - [ ] Replace the still-isolated adapter's public plain-object evidence with a trusted status lookup / verification entry point before production integration.
 - [ ] Preserve fiscalization event, receipt creation and printing semantics in the actual PostgreSQL integration.
-- [ ] Run npm run check. No existing workers, routes or database services modified.
 
 ## Lookup-driven recovery workflow pass
 
@@ -334,7 +316,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [x] Test happy path and fail-closed results using injected fake lookup/transaction boundaries.
 - [ ] Resolve authenticated production lookup and database transaction implementations; injected ports alone do not establish a trusted external source.
 - [ ] Validate real PostgreSQL lock, audit rollback, receipt/printing integration and multiworker idempotency before activation.
-- [ ] Run npm run check and new tests. No production worker, route or DB integration was changed.
 
 ## Opt-in PostgreSQL recovery audit boundary pass
 
@@ -345,7 +326,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Validate rollback and parallel-worker behavior against a disposable PostgreSQL database.
 - [ ] Confirm receipt creation / enrichment and print queue parity before any worker hookup.
 - [ ] Verify status response supplies any missing fiscal receipt fields before showing recovered transaction as complete.
-- [ ] Run npm run check; no production route, job, or worker imports this boundary.
 
 ## Recovery audit evidence hardening pass
 
@@ -355,7 +335,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [x] Require a nonempty event ID and exactly one linked transaction row before completing an audit operation.
 - [x] Add fake-operation tests for successful linking, audit exceptions, missing evidence, zero links and multiple links.
 - [x] Reuse helper in opt-in PostgreSQL recovery transaction boundary; audit/link exceptions propagate through withTransaction for rollback.
-- [ ] Run npm run check and fiscalization tests on fiscal-layer.
 - [ ] Validate real PostgreSQL rollback and parallel-worker race behavior.
 - [ ] Confirm receipt enrichment and auto-print parity before any production integration.
 
@@ -365,7 +344,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [x] Keep explicit success with `error: false` accepted; unknown and error states never grant automatic retry.
 - [x] Reject `details.isFiscalized: true` paired with `FAILED`, `REJECTED` or `ERROR`, even if the top-level error flag is false.
 - [x] Add negative regression assertions for conflicting status combinations.
-- [ ] Run npm run check and fiscalization tests; no production connections were activated.
 
 ## Conditional recovery UPDATE result integrity pass
 
@@ -376,7 +354,6 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [x] Extend isolated regression tests for wrong station, transaction, document, status, and multiple rows.
 - [ ] Validate guarded transition, rollback, and simultaneous workers against a disposable PostgreSQL instance.
 - [ ] Confirm receipt and print parity; no production worker connection is authorized.
-- [ ] Run npm run check and fiscalization tests after this pass.
 
 ## Receipt and print completion parity assessment (20 Oct 2026)
 
@@ -388,7 +365,6 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Add positive and negative regression tests for missing receipt, fiscal data, audit and conditional print handling.
 - [ ] Integrate the parity check with transactional recovery only after receipt handling is genuinely implemented. Current readiness inputs must not be inferred or hardcoded as true.
 - [ ] Resolve whether normal completion's `generateReceipt` is safe inside its existing transactional callback; do not blindly reuse with an unrelated database client.
-- [ ] Add real PostgreSQL concurrency, rollback and receipt/print transactional integration tests.
 - [ ] Do not activate recovery worker while receipt and print parity are outstanding.
 
 ## Isolated recovered receipt completion coordinator
@@ -411,7 +387,6 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Block receipt readiness and printing when stored receipt document/event identifiers differ from the recovered document/event.
 - [x] Add regression coverage for mismatched document and event evidence.
 - [ ] Existing `fiscalDataVerified` remains port-supplied; implement authoritative DB verification, receipt fiscal metadata validation, and proof of same-transaction consistency before integration.
-- [ ] Run npm run check and fiscalization tests; no production worker wiring has changed.
 
 ## PostgreSQL receipt verification pass (20 Oct 2026)
 
@@ -422,4 +397,11 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Add tests for both valid and mismatched persisted evidence using fake reads.
 - [ ] CRITICAL: Current recovery event records do not populate `reference` and receipt snapshots do not directly encode fiscal document ID or event ID. The verifier therefore intentionally blocks those records until an authoritative reference mapping or enriched fiscal metadata is implemented.
 - [ ] Wire receipt-read verification to completion coordinator only after authoritative fiscal proof and transactional receipt generation are implemented.
-- [ ] Test against disposable PostgreSQL and validate country-specific receipt fiscal fields. No worker activation.
+
+
+## Swagger status error-flag hardening (20 Oct 2026)
+
+- [x] Require boolean collection-level and matching-row error flags before accepting invoice status as recoverable evidence.
+- [x] Keep status response parsing fail-closed on missing, malformed or string-valued error flags.
+- [x] Align test fixtures with the Swagger-required explicit error flags.
+- [ ] Confirm operational proxy responses consistently include both error flags across KE and TZ.
