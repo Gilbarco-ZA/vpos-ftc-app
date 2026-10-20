@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { assessRecoveryReceiptCreation } from '@/src/modules/fiscalization/infrastructure/recoveryReceiptCreationGate'
 
-const expected = { countryCode: 'TZ' as const, documentId: 'D1', fiscalEventId: 'E1' }
+const expected = {
+  countryCode: 'TZ' as const, documentId: 'D1', fiscalEventId: 'E1',
+  persistedTransactionReference: 'REF1', persistedEventReference: 'REF1',
+  persistedEventStatus: 'SUCCESS',
+}
 const candidate = {
   receiptNumber: 'RC1',
   transactionDocumentId: 'D1',
@@ -32,6 +36,17 @@ test('missing provider identity and guessed status metadata cannot authorize rec
     { fiscalData: { schemaVersion: 1, reference: 'REF1', receipt: { receiptNumber: 'OTHER' } } },
   ]) {
     assert.equal(assessRecoveryReceiptCreation({ ...candidate, ...changed }, expected).allowed, false)
+  }
+})
+
+test('independent persisted event and transaction evidence is mandatory', () => {
+  for (const changed of [
+    { persistedTransactionReference: null },
+    { persistedEventReference: null },
+    { persistedEventStatus: 'PENDING' },
+    { persistedTransactionReference: 'OTHER' },
+  ]) {
+    assert.equal(assessRecoveryReceiptCreation(candidate, { ...expected, ...changed }).allowed, false)
   }
 })
 
