@@ -4,6 +4,7 @@ import { uuidv4 } from '@/src/shared/utils/uuid'
 import type { FiscalCountryCode } from '../domain/countryAdapter'
 import type { RecoveryReceiptCreationCandidate } from './recoveryReceiptCreationGate'
 import { authorizeRecoveryReceiptCandidate, createPostgresRecoveryReceiptEvidenceReader } from './postgresRecoveryReceiptEvidence'
+import { assessRecoveryEventSource, createPostgresRecoveryFiscalEventSource } from './postgresRecoveryFiscalEventSource'
 import { createPostgresRecoveryReceiptRead } from './postgresRecoveryReceiptRead'
 
 /** Complete content must come from an independently verified fiscal receipt source. */
@@ -52,6 +53,14 @@ export async function insertVerifiedRecoveryReceipt(
   const persisted = await createPostgresRecoveryReceiptEvidenceReader(client).read(input)
   const decision = authorizeRecoveryReceiptCandidate(persisted, candidate, input)
   if (!decision.allowed || !candidate) return { kind: 'blocked', reason: decision.reason }
+  const eventSource = await createPostgresRecoveryFiscalEventSource(client).read({
+    stationId: input.stationId, transactionId: input.transactionId, eventId: input.fiscalEventId,
+  })
+  const eventProof = assessRecoveryEventSource(eventSource, {
+    eventId: input.fiscalEventId, documentId: input.documentId,
+    reference: candidate.fiscalReference,
+  })
+  if (!eventProof.usable) return { kind: 'blocked', reason: eventProof.reason }
   const complete = validateCompleteRecoveryReceiptCandidate(candidate, input.countryCode)
   if (!complete.allowed) return { kind: 'blocked', reason: complete.reason }
 
