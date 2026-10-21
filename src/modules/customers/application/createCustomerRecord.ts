@@ -1,3 +1,4 @@
+import { isValidKenyaPin } from '@/src/modules/customers/domain/kenyaPin'
 import { fail } from '@/src/platform/web/api/response'
 import { auditCustomerCreated } from '@/src/shared/audit/log'
 import { customerCreateSchema } from '@/src/shared/validations'
@@ -66,6 +67,10 @@ export async function createCustomerRecord(params: {
   ).trim()
 
   if (!normalizedTin) return fail('TIN is required', 400)
+  if (stationCountry === 'KE' &&
+      (!isValidKenyaPin(normalizedTin) || !isValidKenyaPin(normalizedPin))) {
+    return fail('Kenya PIN/TIN must match [AP] followed by 9 digits and one uppercase letter.', 400)
+  }
   if (!normalizedBuyer) return fail('Buyer name is required', 400)
 
   const customerId = await createOrUpdateCustomerRepo({
