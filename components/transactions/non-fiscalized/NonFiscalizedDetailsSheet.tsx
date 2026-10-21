@@ -1,3 +1,6 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import type { TransactionListItem } from '@/src/shared/types/transactions'
 import { Ban, Copy, FileText, RotateCcw, Send, UserRound } from 'lucide-react'
@@ -67,7 +70,43 @@ const NonFiscalizedDetailsSheet = ({
   onFiscalize,
   onCopySupportBundle,
   decimals,
-}: NonFiscalizedDetailsSheetProps) => (
+}: NonFiscalizedDetailsSheetProps) => {
+  const [diagnostics, setDiagnostics] = useState<{
+    blockers: string[]
+    queueStatus: string | null
+    nextAttemptAt: string | null
+    printJob: { status: string; last_error: string | null } | null
+  } | null>(null)
+  const [diagnosticError, setDiagnosticError] = useState<string | null>(null)
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!transaction?.id) {
+      setDiagnostics(null)
+      return
+    }
+    const controller = new AbortController()
+    setDiagnostics(null)
+    setDiagnosticError(null)
+    setDiagnosticsLoading(true)
+    void fetch(`/api/transactions/${encodeURIComponent(transaction.id)}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error('Unable to load fiscalization diagnostics')
+      const json = await response.json()
+      if (!controller.signal.aborted) {
+        setDiagnostics(json?.data?.fiscalizationDiagnostics ?? null)
+      }
+    }).catch((error) => {
+      if (!controller.signal.aborted) setDiagnosticError(String(error?.message || error))
+    }).finally(() => {
+      if (!controller.signal.aborted) setDiagnosticsLoading(false)
+    })
+    return () => controller.abort()
+  }, [transaction?.id])
+
+  return (
   <Sheet
     open={Boolean(transaction)}
     onOpenChange={(open) => !open && onClose()}
@@ -79,6 +118,26 @@ const NonFiscalizedDetailsSheet = ({
       <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4 text-sm">
         {transaction && (
           <div className="space-y-4">
+            <section className="rounded-lg border border-border bg-surface-muted p-3" aria-label="Fiscalization status details">
+              <div className="font-semibold text-[var(--text-primary)]">Fiscalization status details</div>
+              {diagnosticsLoading ? <p>Checking current fiscalization conditions…</p> : null}
+              {diagnosticError ? <p className="text-amber-700">{diagnosticError}</p> : null}
+              {diagnostics && (
+                <div className="mt-2 space-y-2">
+                  {diagnostics.blockers.length ? (
+                    <div>
+                      <div className="font-medium text-amber-700">Blocking or delaying fiscalization</div>
+                      <ul className="list-disc space-y-1 pl-5">
+                        {diagnostics.blockers.map((reason, i) => <li key={i}>{reason}</li>)}
+                      </ul>
+                    </div>
+                  ) : <p>No current blocking condition identified. The transaction may be awaiting the next worker cycle.</p>}
+                  {diagnostics.queueStatus ? <p>Queue status: {diagnostics.queueStatus}</p> : null}
+                  {diagnostics.nextAttemptAt ? <p>Next queue attempt: {formatDate(diagnostics.nextAttemptAt)}</p> : null}
+                  {diagnostics.printJob ? <p>Pre-fiscalization print job: {diagnostics.printJob.status}</p> : null}
+                </div>
+              )}
+            </section>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
                 <div className="text-xs text-[var(--text-muted)]">
@@ -290,6 +349,7 @@ const NonFiscalizedDetailsSheet = ({
       </div>
     </SheetContent>
   </Sheet>
-)
+  )
+}
 
 export default NonFiscalizedDetailsSheet
