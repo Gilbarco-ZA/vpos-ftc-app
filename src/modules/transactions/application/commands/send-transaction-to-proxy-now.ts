@@ -9,7 +9,7 @@ import { sendTransactionToProxyNow } from '../../infrastructure/fiscalization/pr
 const PRINTER_UNAVAILABLE_ERROR_PREFIX = 'PRINTER_UNAVAILABLE:'
 
 function isPrinterUnavailable(lastError: string | null | undefined) {
-  return String(lastError || '').startsWith(PRINTER_UNAVAILABLE_ERROR_PREFIX)
+  return String(lastError || '').startsWith(PRINTER_UNAVAILABLE_ERROR_PREFIX) ||\n    String(lastError || '').includes('No printer configured')
 }
 
 export async function sendTransactionToProxyNowCommand(
