@@ -134,7 +134,7 @@ export async function getTransactionDetailsRepo(
     if (workflow?.auto_print_receipts === true &&
         workflow.print_receipt_order === 'before_fiscalization') {
       if (printJob?.status === 'FAILED' &&
-          !String(printJob.last_error ?? '').startsWith('PRINTER_UNAVAILABLE:')) {
+          !String(printJob.last_error ?? '').startsWith('PRINTER_UNAVAILABLE:') &&\n          !String(printJob.last_error ?? '').includes('No printer configured')) {
         blockers.push(`Pre-fiscalization receipt printing failed: ${printJob.last_error ?? 'Unknown error'}`)
       } else if (printJob && printJob.status !== 'DONE' &&
                  !String(printJob.last_error ?? '').startsWith('PRINTER_UNAVAILABLE:')) {
