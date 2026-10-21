@@ -27,7 +27,7 @@ function isPrinterConnectivityError(error: unknown) {
     String((error as any)?.code || '') +
     ' ' +
     String((error as any)?.message || error || '')
-  return /ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|EHOSTDOWN|ENETUNREACH|ENETDOWN|ENOTFOUND|EAI_AGAIN|EPIPE|printer connection timeout|socket hang up/i.test(
+  return /ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|EHOSTDOWN|ENETUNREACH|ENETDOWN|ENOTFOUND|EAI_AGAIN|EPIPE|printer connection timeout|socket hang up|No printer configured \(set device_configs device_type=printer, or pass printerIP\)/i.test(
     text,
   )
 }
