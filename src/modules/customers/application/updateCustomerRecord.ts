@@ -1,3 +1,4 @@
+import { isValidKenyaPin } from '@/src/modules/customers/domain/kenyaPin'
 import { fail, notFound } from '@/src/platform/web/api/response'
 import { customerUpdateSchema } from '@/src/shared/validations'
 
@@ -62,6 +63,12 @@ export async function updateCustomerRecord(params: {
   }
 
   const data = parsed.data
+  const existingCountry = String(existing.country ?? '').trim().toUpperCase()
+  if (existingCountry === 'KE' &&
+      (!isValidKenyaPin(normalizeTin(data.tin)) ||
+       !isValidKenyaPin(normalizeOptional(data.pin) ?? data.tin))) {
+    return fail('Kenya PIN/TIN must match [AP] followed by 9 digits and one uppercase letter.', 400)
+  }
   await updateCustomerRepo({
     stationId: params.stationId,
     customerId,
