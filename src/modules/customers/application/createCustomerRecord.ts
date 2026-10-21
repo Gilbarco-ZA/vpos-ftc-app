@@ -63,7 +63,7 @@ export async function createCustomerRecord(params: {
     .toUpperCase()
   const normalizedBuyer = String(data.buyerName || '').trim()
   const normalizedPin = String(
-    data.pin || (stationCountry === 'KE' ? normalizedTin : ''),
+    stationCountry === 'KE' ? normalizedTin : data.pin,
   ).trim()
 
   if (!normalizedTin) return fail('TIN is required', 400)
