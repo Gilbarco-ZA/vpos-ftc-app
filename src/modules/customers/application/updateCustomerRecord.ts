@@ -21,6 +21,7 @@ const normalizeTin = (value: unknown) => {
 export async function updateCustomerRecord(params: {
   stationId: string
   customerId: string
+  stationCountry?: string | null
   body: Record<string, any>
 }) {
   const customerId = String(params.customerId || '').trim()
@@ -63,7 +64,7 @@ export async function updateCustomerRecord(params: {
   }
 
   const data = parsed.data
-  const existingCountry = String(existing.country ?? '').trim().toUpperCase()
+  const existingCountry = String(params.stationCountry || existing.country || '').trim().toUpperCase()
   if (existingCountry === 'KE' &&
       (!isValidKenyaPin(normalizeTin(data.tin)) ||
        !isValidKenyaPin(normalizeOptional(data.pin) ?? data.tin))) {
@@ -77,7 +78,7 @@ export async function updateCustomerRecord(params: {
       tin: normalizeTin(data.tin),
       buyerName: normalizeOptional(data.buyerName),
       buyerType: normalizeOptional(data.buyerType),
-      pin: normalizeOptional(data.pin),
+      pin: existingCountry === 'KE' ? normalizeTin(data.tin) : normalizeOptional(data.pin),
       passportNumber: normalizeOptional(data.passportNumber),
       businessName: normalizeOptional(data.businessName),
       taxNinbrn: normalizeOptional(data.taxNinbrn),
