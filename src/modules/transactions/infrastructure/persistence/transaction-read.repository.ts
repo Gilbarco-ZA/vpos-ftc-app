@@ -96,7 +96,68 @@ export async function getTransactionDetailsRepo(
     queryAll<any>(getTransactionLinesSql, [stationId, transactionId]),
     queryOne<any>(getTransactionQueueSql, [stationId, transactionId]),
   ])
-  return { ...transaction, lines, transactionQueue }
+  const [workflow, printJob] = await Promise.all([
+    queryOne<{
+      auto_print_receipts: boolean | null
+      print_receipt_order: string | null
+      tin_capture_order: string | null
+      linking_window_seconds: number | null
+      fiscalization_transport: string | null
+    }>(
+      `SELECT auto_print_receipts, print_receipt_order, tin_capture_order,
+              linking_window_seconds, fiscalization_transport
+         FROM station_settings WHERE station_id = $1::uuid LIMIT 1`,
+      [stationId],
+    ),
+    queryOne<{ status: string; last_error: string | null; updated_at: string }>(
+      `SELECT status, last_error, updated_at FROM print_jobs
+        WHERE station_id = $1::uuid AND source_transaction_id = $2::uuid
+          AND COALESCE(payload->>'offlinePrint', 'false') = 'true'
+        ORDER BY updated_at DESC LIMIT 1`,
+      [stationId, transactionId],
+    ),
+  ])
+  const blockers: string[] = []
+  const status = String(transaction.status ?? '').toUpperCase()
+  const expiry = transaction.linking_window_expires_at
+    ? new Date(transaction.linking_window_expires_at).getTime()
+    : new Date(transaction.created_at).getTime() +
+      Number(workflow?.linking_window_seconds ?? 0) * 1000
+
+  if (['OPEN', 'ALLOCATED', 'PENDING', 'FAILED'].includes(status)) {
+    if (workflow?.fiscalization_transport !== 'proxy') {
+      blockers.push('Station fiscalization transport is not configured for proxy submission.')
+    }
+    if (transaction.customer_id == null && Number.isFinite(expiry) && expiry > Date.now()) {
+      blockers.push(`Waiting for customer/TIN allocation until ${new Date(expiry).toISOString()}.`)
+    }
+    if (workflow?.auto_print_receipts === true &&
+        workflow.print_receipt_order === 'before_fiscalization') {
+      if (printJob?.status === 'FAILED' &&
+          !String(printJob.last_error ?? '').startsWith('PRINTER_UNAVAILABLE:')) {
+        blockers.push(`Pre-fiscalization receipt printing failed: ${printJob.last_error ?? 'Unknown error'}`)
+      } else if (printJob && printJob.status !== 'DONE' &&
+                 !String(printJob.last_error ?? '').startsWith('PRINTER_UNAVAILABLE:')) {
+        blockers.push('Waiting for pre-fiscalization receipt printing to complete.')
+      }
+    }
+    if (transactionQueue?.last_error) blockers.push(`Fiscalization queue: ${transactionQueue.last_error}`)
+    if (transaction.last_error) blockers.push(`Last transaction error: ${transaction.last_error}`)
+  }
+  return {
+    ...transaction,
+    lines,
+    transactionQueue,
+    fiscalizationDiagnostics: {
+      blockers: [...new Set(blockers)],
+      printJob,
+      printOrder: workflow?.print_receipt_order ?? null,
+      tinCaptureOrder: workflow?.tin_capture_order ?? null,
+      linkingWindowSeconds: workflow?.linking_window_seconds ?? null,
+      queueStatus: transactionQueue?.status ?? null,
+      nextAttemptAt: transactionQueue?.next_attempt_at ?? null,
+    },
+  }
 }
 
 export async function listPendingTransactionsRepo(stationId: string) {
