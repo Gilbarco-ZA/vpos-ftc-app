@@ -140,7 +140,7 @@ const completedOrUnavailableOfflinePrintGate = (
      AND COALESCE(preprint.payload->>'offlinePrint', 'false') = 'true'
      AND (
        preprint.status = 'DONE'
-       OR COALESCE(preprint.last_error, '') LIKE 'PRINTER_UNAVAILABLE:%'
+       OR COALESCE(preprint.last_error, '') LIKE 'PRINTER_UNAVAILABLE:%'\n        OR COALESCE(preprint.last_error, '') LIKE 'No printer configured%'
      )
 )`
 
