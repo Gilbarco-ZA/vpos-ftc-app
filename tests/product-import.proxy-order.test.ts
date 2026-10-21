@@ -4,6 +4,7 @@ import test from 'node:test'
 
 import {
   buildProxyProductPayload,
+  buildKenyaProductRegistrationPayload,
   buildTanzaniaProductSyncPayload,
 } from '@/src/modules/products/application/services/product-service'
 
@@ -147,3 +148,21 @@ test('product status UI avoids callback-driven refetch loops and Tanzania uses c
   assert.match(service, /status: 'NOT_FOUND'/)
 })
 
+
+test('Kenya product payload includes numeric taxRate, preserving zero and nonzero values', () => {
+  const base = {
+    productId: 'P1',
+    productCode: 'P1',
+    productName: 'Petrol',
+    productClassCode: 'FUEL',
+    productTypeCode: 'FUEL',
+    unitPrice: 100,
+    unitCost: 0,
+    currency: 'KES',
+    taxCode: 'B',
+    createdByName: 'Admin',
+    isOnline: false,
+  }
+  assert.equal(buildKenyaProductRegistrationPayload({ ...base, taxRate: 16 }).taxRate, 16)
+  assert.equal(buildKenyaProductRegistrationPayload({ ...base, taxRate: 0 }).taxRate, 0)
+})
