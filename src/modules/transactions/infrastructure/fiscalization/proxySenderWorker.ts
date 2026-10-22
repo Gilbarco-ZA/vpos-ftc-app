@@ -1704,7 +1704,7 @@ async function resolveEnrichmentFromTables(
       ORDER BY tl.created_at ASC LIMIT 1`,
     [stationId, transactionId],
   )
-  if (pumpNumber == null && !exactProduct) return {}
+  if (pumpNumber == null) return {}
 
   const pump = await queryOne<{ id: string }>(
     `SELECT id FROM pumps WHERE station_id = $1 AND pump_number = $2`,
