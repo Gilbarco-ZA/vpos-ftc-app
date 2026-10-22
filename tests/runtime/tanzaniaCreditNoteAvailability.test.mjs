@@ -15,7 +15,8 @@ test('Tanzania hides create credit note for administrators and managers', () => 
 })
 
 test('credit note POST rejects Tanzania before issuing the command', () => {
-  assert.match(route, /isTanzaniaCountry\(await getStationCountryCode\(user\.stationId\)\)/)
+  assert.match(route, /const country = String\(await getStationCountryCode\(user\.stationId\)\)/)
+  assert.match(route, /if \(isTanzaniaCountry\(country\)\)/)
   assert.match(route, /Credit notes are not supported for Tanzania stations/)
-  assert.ok(route.indexOf('isTanzaniaCountry(await') < route.indexOf('const result = await createCreditNote'))
+  assert.ok(route.indexOf('if (isTanzaniaCountry(country))') < route.indexOf('const result = await createCreditNote'))
 })
