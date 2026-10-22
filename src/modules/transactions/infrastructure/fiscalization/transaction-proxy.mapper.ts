@@ -396,12 +396,12 @@ export function mapTransactionToProxyInvoice(args: {
           : roundMoney(num(rawLine.unitPrice, 0), 0)
 
       const taxTypeCode = String(
-        rawLine.taxCode || enrichment.taxCode || args.taxType || 'B',
+        (countryCode === 'KE' ? enrichment.taxCode : rawLine.taxCode) || rawLine.taxCode || enrichment.taxCode || args.taxType || 'B',
       )
       const codeFallback = defaultRateForTaxCode(taxTypeCode, vatRate)
       const lineTaxRate = roundMoney(
         normalizeRate(
-          rawLine.taxRate ?? enrichment.taxRate ?? args.taxRate,
+          (countryCode === 'KE' ? enrichment.taxRate : rawLine.taxRate) ?? rawLine.taxRate ?? enrichment.taxRate ?? args.taxRate,
           codeFallback,
         ),
       )
@@ -469,10 +469,10 @@ export function mapTransactionToProxyInvoice(args: {
         productId: strOrNull(rawLine.productId ?? enrichment.productId),
         productCode: strOrNull(rawLine.productCode ?? enrichment.productCode),
         productClassCode: strOrNull(
-          rawLine.productClassCode ?? enrichment.productClassCode,
+          (countryCode === 'KE' ? enrichment.productClassCode : rawLine.productClassCode) ?? rawLine.productClassCode ?? enrichment.productClassCode,
         ),
         productTypeCode: strOrNull(
-          rawLine.productTypeCode ?? enrichment.productTypeCode,
+          (countryCode === 'KE' ? enrichment.productTypeCode : rawLine.productTypeCode) ?? rawLine.productTypeCode ?? enrichment.productTypeCode,
         ),
         description:
           strOrNull(
