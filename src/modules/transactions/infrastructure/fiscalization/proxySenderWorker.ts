@@ -1694,7 +1694,17 @@ async function resolveEnrichmentFromTables(
   pumpNumber: number | null,
   fuelType?: string | null,
 ) {
-  if (pumpNumber == null) return {}
+  // Resolve the product actually sold, not an arbitrary nozzle on the pump.
+  // This also picks up refreshed cloud mappings on a first retry.
+  const exactProduct = await queryOne<any>(
+    `SELECT p.*
+       FROM transaction_lines tl
+       JOIN products p ON p.id = tl.product_id AND p.station_id = $1
+      WHERE tl.transaction_id = $2::uuid
+      ORDER BY tl.created_at ASC LIMIT 1`,
+    [stationId, transactionId],
+  )
+  if (pumpNumber == null && !exactProduct) return {}
 
   const pump = await queryOne<{ id: string }>(
     `SELECT id FROM pumps WHERE station_id = $1 AND pump_number = $2`,
@@ -1796,6 +1806,8 @@ async function resolveEnrichmentFromTables(
     [stationId, transactionId],
   )
 
+  if (exactProduct) bestProduct = { ...bestProduct, ...exactProduct }
+
   return {
     pumpId: String(pump.id),
     nozzleId: String(bestNozzle.id),
@@ -1833,7 +1845,7 @@ async function resolveEnrichmentFromTables(
           ? Number(bestProduct.tax_rate)
           : null,
     currency: bestProduct?.ext_currency ?? null,
-    taxCode: line?.tax_code ?? bestProduct?.ext_tax_code ?? null,
+    taxCode: bestProduct?.ext_tax_code ?? bestProduct?.tax_code ?? line?.tax_code ?? null,
     commodityCode: bestProduct?.commodity_code ?? null,
     hazardousIndicator:
       bestProduct?.ext_hazardous_indicator != null
