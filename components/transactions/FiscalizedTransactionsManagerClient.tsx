@@ -1,5 +1,6 @@
 'use client'
 
+import { KENYA_CREDIT_NOTE_REASONS } from '@/src/modules/transactions/domain/kenyaCreditNoteReasons'
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -362,14 +363,23 @@ export default function FiscalizedTransactionsManagerClient(props: {
             ) : null}
 
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-[var(--text-secondary)]">
-                Reason code (optional)
-              </div>
-              <Input
+              <label htmlFor="kenya-credit-reason" className="text-xs font-semibold text-[var(--text-secondary)]">
+                Credit note reason code
+              </label>
+              <select
+                id="kenya-credit-reason"
                 value={creditReasonCode}
                 onChange={(e) => setCreditReasonCode(e.target.value)}
-                placeholder="e.g. RETURN, ERROR, CANCEL"
-              />
+                required
+                className="w-full rounded border border-border bg-surface-card px-3 py-2 text-sm"
+              >
+                <option value="">Select a reason</option>
+                {KENYA_CREDIT_NOTE_REASONS.map((reason) => (
+                  <option key={reason.code} value={reason.code}>
+                    {reason.code} — {reason.description}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
@@ -404,7 +414,7 @@ export default function FiscalizedTransactionsManagerClient(props: {
               </Button>
               <Button
                 onClick={submitCreditNote}
-                disabled={!csrfToken || isCreatingCreditNote}
+                disabled={!csrfToken || isCreatingCreditNote || !creditReasonCode}
                 title={!csrfToken ? 'Loading security token…' : undefined}
               >
                 {isCreatingCreditNote ? 'Creating…' : 'Create credit note'}
