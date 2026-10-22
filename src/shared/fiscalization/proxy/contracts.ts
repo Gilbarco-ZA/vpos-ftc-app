@@ -155,25 +155,30 @@ export type ProxyInvoiceResponse = {
 
 export type ProxyCreditNoteLineDto = {
   lineType?: string | null
+  lineId?: string | null
   product?: InvoiceLineProductDto | null
-  taxes?: Array<Pick<InvoiceLineTaxDto, 'type' | 'rate'>> | null
+  discounts?: any[] | null
+  taxes?: InvoiceLineTaxDto[] | null
 }
 
 export type ProxyCreditNoteDto = {
-  IsOnline?: boolean | null
-  isOnline?: boolean | null
-  DocumentId: string
-  documentId?: string | null
+  isOnline: boolean
+  documentId: string
   documentNumber?: string | null
   documentReference?: string | null
   documentType?: string | null
   modificationType?: string | null
   issueDateTime: string
+  currency?: string | null
   createdByName?: string | null
-  reasonCode?: string | null
+  lines: ProxyCreditNoteLineDto[]
+  seller?: any | null
+  buyer?: any | null
+  totals?: InvoiceTotalDto | null
+  payment: ProxyPaymentDto
+  delivery?: any | null
+  reasonCode: string
   reason?: string | null
-  Lines: ProxyCreditNoteLineDto[]
-  lines?: ProxyCreditNoteLineDto[]
 }
 
 export type ProxyCreditNotesRequest = {
