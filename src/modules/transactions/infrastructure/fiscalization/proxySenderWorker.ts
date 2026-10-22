@@ -1547,6 +1547,9 @@ async function sendCreditNoteQueueItemToProxy(input: {
     const country = station?.country
       ? String(station.country).toUpperCase()
       : null
+    if (isTanzaniaCountry(country)) {
+      throw new Error('Credit notes are not supported for Tanzania stations.')
+    }
     const defaultTaxType = await getDefaultTaxTypeForCountry(country)
     const vatRate =
       defaultTaxType?.rate != null
