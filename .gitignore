@@ -3,6 +3,7 @@
 
 # Runtime and generated build output
 /.next/
+/dist/
 /out/
 /build/
 /vpos-runtime/
