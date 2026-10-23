@@ -40,9 +40,7 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
   const note = payload.creditNotes[0]
   assert.ok(note, 'expected credit note payload item')
 
-  assert.equal(note.IsOnline, true)
   assert.equal(note.isOnline, true)
-  assert.equal(note.DocumentId, 'cn-200')
   assert.equal(note.documentId, 'cn-200')
   assert.equal(note.documentNumber, 'cn-200')
   assert.equal(note.documentReference, 'INV-445')
@@ -52,14 +50,14 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
   assert.equal(note.reason, 'Customer returned product')
   assert.equal(note.createdByName, 'Tester')
 
-  assert.equal(note.Lines?.length, 1)
   assert.equal(note.lines?.length, 1)
-  assert.equal(note.Lines?.[0]?.lineType, 'FuelSale')
-  assert.equal(note.Lines?.[0]?.product?.productCode, 'FUEL-95')
-  assert.equal(note.Lines?.[0]?.product?.quantity, 10)
-  assert.equal(note.Lines?.[0]?.product?.unitPrice, 86.21)
-  assert.equal(note.Lines?.[0]?.taxes?.[0]?.type, 'B')
-  assert.equal(note.Lines?.[0]?.taxes?.[0]?.rate, 16)
+  assert.equal(note.lines?.length, 1)
+  assert.equal(note.lines?.[0]?.lineType, 'FuelSale')
+  assert.equal(note.lines?.[0]?.product?.productCode, 'FUEL-95')
+  assert.equal(note.lines?.[0]?.product?.quantity, 10)
+  assert.equal(note.lines?.[0]?.product?.unitPrice, 86.21)
+  assert.equal(note.lines?.[0]?.taxes?.[0]?.type, 'B')
+  assert.equal(note.lines?.[0]?.taxes?.[0]?.rate, 16)
 })
 
 test('rejects credit notes outside Kenya', () => {
