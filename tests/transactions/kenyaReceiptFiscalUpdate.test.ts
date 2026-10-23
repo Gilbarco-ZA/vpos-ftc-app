@@ -42,7 +42,7 @@ test('Kenya receipt does not apply unapproved or uncorrelated status evidence', 
   }
 })
 
-test('Kenya receipt refuses conflicting verification metadata', () => {
+test('Kenya receipt prefers fresh approved verification over stale local metadata', () => {
   const receipt = makeReceipt()
   applyKenyaReceiptFiscalUpdate(receipt, {
     eventResponsePayload: { details: { receipt: { fiscalVerificationCode: 'ORIGINAL' } } },
@@ -50,5 +50,6 @@ test('Kenya receipt refuses conflicting verification metadata', () => {
     expectedDocumentId: 'DOC',
     statusRow: { documentId: 'DOC', status: 'Approved', fiscalVerificationCode: 'DIFFERENT' },
   })
-  assert.equal(receipt.footer.fiscalVerificationCode, '')
+  assert.equal(receipt.footer.fiscalVerificationCode, 'DIFFERENT')
+  assert.equal(receipt.footer.receiptSignature, '')
 })
