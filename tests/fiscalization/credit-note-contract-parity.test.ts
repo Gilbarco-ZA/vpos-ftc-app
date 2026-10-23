@@ -6,7 +6,7 @@ import type { CanonicalCreditNote } from '@/src/modules/fiscalization/domain/cre
 
 test('Kenya credit note preserves production envelope and reference fields', () => {
   const transaction = {
-    id: 'TX-1', product_id: 'PRD-1', product_code: 'G1',
+    id: 'TX-1', product_id: 'PRD-1', product_code: 'G1', grade_id: '4',
     fuel_type: 'Petrol', volume: 2, total_amount: 366,
     created_at: '2026-10-19T11:00:00Z',
   }
