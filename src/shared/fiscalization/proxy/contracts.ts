@@ -160,10 +160,8 @@ export type ProxyCreditNoteLineDto = {
 }
 
 export type ProxyCreditNoteDto = {
-  IsOnline?: boolean | null
-  isOnline?: boolean | null
-  DocumentId: string
-  documentId?: string | null
+  isOnline: boolean
+  documentId: string
   documentNumber?: string | null
   documentReference?: string | null
   documentType?: string | null
@@ -172,8 +170,8 @@ export type ProxyCreditNoteDto = {
   createdByName?: string | null
   reasonCode?: string | null
   reason?: string | null
-  Lines: ProxyCreditNoteLineDto[]
-  lines?: ProxyCreditNoteLineDto[]
+  lines: ProxyCreditNoteLineDto[]
+  payment: ProxyPaymentDto
 }
 
 export type ProxyCreditNotesRequest = {
