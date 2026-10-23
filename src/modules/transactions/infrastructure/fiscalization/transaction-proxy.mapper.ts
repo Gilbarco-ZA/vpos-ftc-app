@@ -668,13 +668,14 @@ export function mapTransactionToProxyInvoice(args: {
 export function deriveKenyaCreditNoteDocumentId(creditNoteId: string, documentReference: string): string {
   const id = creditNoteId.trim()
   const reference = documentReference.trim()
-  if (!id || !reference || reference.length > 64 || !/^[A-Za-z0-9]+$/.test(reference)) {
+  if (!id || !reference || id === reference || reference.length > 64 || !/^[A-Za-z0-9-]+$/.test(reference) || !/[A-Za-z0-9]/.test(reference)) {
     throw new Error('Credit note requires an alphanumeric original fiscal document ID and stable credit note ID')
   }
   const digest = createHash('sha256').update('KE-CREDIT-NOTE:' + id).digest()
   const hexReference = /^[0-9A-Fa-f]+$/.test(reference)
   const generated = Array.from(reference, (character, index) => {
     const seed = digest[index % digest.length]
+    if (character === '-') return '-'
     if (/[0-9]/.test(character)) return String(seed % 10)
     if (hexReference) {
       const alphabet = character === character.toLowerCase() ? 'abcdef' : 'ABCDEF'
@@ -685,11 +686,13 @@ export function deriveKenyaCreditNoteDocumentId(creditNoteId: string, documentRe
     return alphabet[seed % alphabet.length]
   }).join('')
   if (generated !== reference) return generated
-  // Extremely unlikely, but never submit a note using the original document ID.
-  const last = generated.at(-1)!
-  const replacement = /[0-9]/.test(last) ? (last === '9' ? '0' : String(Number(last) + 1))
-    : last === 'Z' ? 'A' : last === 'z' ? 'a' : String.fromCharCode(last.charCodeAt(0) + 1)
-  return generated.slice(0, -1) + replacement
+  // Preserve separators and character classes even in the collision case.
+  const index = Array.from(generated).findLastIndex(char => char !== '-')
+  const last = generated[index]
+  const alphabet = /[0-9]/.test(last) ? '0123456789'
+    : hexReference ? (last === last.toLowerCase() ? 'abcdef' : 'ABCDEF')
+    : (last === last.toLowerCase() ? 'abcdefghijklmnopqrstuvwxyz' : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+  return generated.slice(0, index) + alphabet[(alphabet.indexOf(last) + 1) % alphabet.length] + generated.slice(index + 1)
 }
 
 export function mapTransactionToProxyCreditNote(
