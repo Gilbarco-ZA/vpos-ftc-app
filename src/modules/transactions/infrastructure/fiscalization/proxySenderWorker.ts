@@ -1590,6 +1590,19 @@ async function sendCreditNoteQueueItemToProxy(input: {
       throw new Error('Credit notes are currently supported only for fuel transactions')
     }
 
+    // Reuse the buyer sent on the original successful Kenya invoice rather
+    // than constructing a possibly different buyer from today's customer row.
+    const originalInvoiceEvent = await queryOne<{ request_payload: unknown }>(
+      `SELECT request_payload
+         FROM fiscalization_events
+        WHERE station_id = $1::uuid
+          AND transaction_id = $2::uuid
+          AND status = 'SUCCESS'
+        ORDER BY occurred_at ASC, created_at ASC
+        LIMIT 1`,
+      [stationId, transactionId],
+    )
+
     const creditNotePayload = mapTransactionToProxyCreditNote({
       transaction: fullTxn,
       customer,
@@ -1600,6 +1613,7 @@ async function sendCreditNoteQueueItemToProxy(input: {
       createdByName: null,
       enrichment,
       creditNoteId,
+      originalInvoiceRequest: originalInvoiceEvent?.request_payload,
       documentReference,
       reasonCode,
       notes,
