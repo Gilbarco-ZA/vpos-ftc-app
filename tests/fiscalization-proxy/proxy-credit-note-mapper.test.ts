@@ -9,6 +9,8 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
       id: 'txn-100',
       pos_reference: 'POS-100',
       document_number: '1194',
+      grade_id: '4',
+      fuel_type: 'Petrol 95',
       transaction_date_time: '2026-05-27T10:15:30.000Z',
       lines: [
         {
@@ -24,7 +26,7 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
       ],
     },
     customer: { buyerType: 'B2C', name: 'Jane Doe', pin: 'P12345' },
-    station: { country: 'CV' },
+    station: { country: 'KE' },
     vatRate: 16,
     taxType: 'B',
     taxRate: 16,
@@ -42,7 +44,7 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
   assert.equal(note.isOnline, true)
   assert.equal(note.DocumentId, 'cn-200')
   assert.equal(note.documentId, 'cn-200')
-  assert.equal(note.documentNumber, '1194')
+  assert.equal(note.documentNumber, 'cn-200')
   assert.equal(note.documentReference, 'INV-445')
   assert.equal(note.documentType, 'Return')
   assert.equal(note.modificationType, 'None')
@@ -58,4 +60,29 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
   assert.equal(note.Lines?.[0]?.product?.unitPrice, 86.21)
   assert.equal(note.Lines?.[0]?.taxes?.[0]?.type, 'B')
   assert.equal(note.Lines?.[0]?.taxes?.[0]?.rate, 16)
+})
+
+test('rejects credit notes outside Kenya', () => {
+  assert.throws(() => mapTransactionToProxyCreditNote({
+    transaction: { id: 'txn-1', grade_id: '4' },
+    customer: null, station: { country: 'TZ' },
+    creditNoteId: 'CN-NEW', documentReference: 'ORIGINAL-DOC',
+  }), /only for Kenya/)
+})
+
+test('rejects nonfuel transactions even with valid credit note IDs', () => {
+  assert.throws(() => mapTransactionToProxyCreditNote({
+    transaction: { id: 'txn-1', transaction_date_time: '2026-10-23T08:00:00Z',
+      lines: [{ productId: 'PRD-1', description: 'Snack', quantity: 1, unitPrice: 10 }] },
+    customer: null, station: { country: 'KE' },
+    creditNoteId: 'CN-NEW', documentReference: 'ORIGINAL-DOC',
+  }), /only for fuel transactions/)
+})
+
+test('requires a distinct new credit document identifier', () => {
+  assert.throws(() => mapTransactionToProxyCreditNote({
+    transaction: { id: 'txn-1', grade_id: '4' },
+    customer: null, station: { country: 'KE' },
+    creditNoteId: 'ORIGINAL-DOC', documentReference: 'ORIGINAL-DOC',
+  }), /new document ID/)
 })
