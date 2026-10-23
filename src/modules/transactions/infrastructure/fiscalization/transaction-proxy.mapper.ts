@@ -687,7 +687,7 @@ export function deriveKenyaCreditNoteDocumentId(creditNoteId: string, documentRe
   }).join('')
   if (generated !== reference) return generated
   // Preserve separators and character classes even in the collision case.
-  const index = Array.from(generated).findLastIndex(char => char !== '-')
+  const index = generated.search(/[^-](?=-*$)/)
   const last = generated[index]
   const alphabet = /[0-9]/.test(last) ? '0123456789'
     : hexReference ? (last === last.toLowerCase() ? 'abcdef' : 'ABCDEF')
