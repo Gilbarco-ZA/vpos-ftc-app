@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { mapTransactionToProxyCreditNote } from '../../src/modules/transactions/infrastructure/fiscalization/transaction-proxy.mapper'
+import { deriveKenyaCreditNoteDocumentId, mapTransactionToProxyCreditNote } from '../../src/modules/transactions/infrastructure/fiscalization/transaction-proxy.mapper'
 
 test('maps credit note payload with full invoice-derived values for proxy', () => {
   const payload = mapTransactionToProxyCreditNote({
@@ -41,7 +41,9 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
   assert.equal('IsOnline' in note, false)
   assert.equal(note.isOnline, true)
   assert.equal('DocumentId' in note, false)
-  assert.equal(note.documentId, 'cn-200')
+  assert.equal(note.documentId, deriveKenyaCreditNoteDocumentId('cn-200', 'INV-445'))
+  assert.equal(note.documentId?.length, note.documentReference?.length)
+  assert.notEqual(note.documentId, note.documentReference)
   assert.equal(note.documentNumber, null)
   assert.equal(note.documentReference, 'INV-445')
   assert.equal(note.documentType, 'Return')
@@ -88,7 +90,7 @@ test('Kenya credit note rejects invalid original reference or reason code', () =
   }), /reasonCode/)
   assert.throws(() => mapTransactionToProxyCreditNote({
     ...base, documentReference: 'cn-1',
-  }), /distinct new documentId/)
+  }), /original fiscal document/)
   assert.throws(() => mapTransactionToProxyCreditNote({
     ...base, documentReference: '',
   }), /original fiscal documentId/)
@@ -110,4 +112,14 @@ test('Kenya credit note rejects nonfuel lines and unsupported countries', () => 
   assert.throws(() => mapTransactionToProxyCreditNote({
     ...base, station: { country: 'ZA' },
   }), /only for Kenya/)
+})
+
+test('Kenya credit note document ID matches original hex reference shape and is retry stable', () => {
+  const original = 'D1CEF7E18822'
+  const first = deriveKenyaCreditNoteDocumentId('de012727-600d-499f-8323-37a62d822330', original)
+  assert.match(first, /^[0-9A-F]{12}$/)
+  assert.equal(first.length, original.length)
+  assert.notEqual(first, original)
+  assert.equal(deriveKenyaCreditNoteDocumentId('de012727-600d-499f-8323-37a62d822330', original), first)
+  assert.notEqual(deriveKenyaCreditNoteDocumentId('a9f5a360-f2a2-4cb3-a646-a8944c330a54', original), first)
 })
