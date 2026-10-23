@@ -747,9 +747,7 @@ export function mapTransactionToProxyCreditNote(
   return {
     creditNotes: [
       {
-        IsOnline: isOnline,
         isOnline,
-        DocumentId: String(args.creditNoteId),
         documentId: String(args.creditNoteId),
         documentNumber,
         documentReference,
@@ -759,7 +757,6 @@ export function mapTransactionToProxyCreditNote(
         createdByName,
         reasonCode,
         reason,
-        Lines,
         lines: Lines,
       },
     ],
