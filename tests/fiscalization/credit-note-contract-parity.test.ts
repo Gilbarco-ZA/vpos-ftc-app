@@ -24,7 +24,7 @@ test('Kenya credit note preserves production envelope and reference fields', () 
     invoice: {
       documentId: 'INV-1',
       issuedAt: existing.creditNotes[0].issueDateTime,
-      currency: 'KES', tenders: [],
+      currency: 'KES', tenders: existing.creditNotes[0].payment.tenders,
       lines: (existing.creditNotes[0].lines ?? []).filter(line => line.product).map(line => ({
         product: {
           id: line.product?.productId ?? 'PRD-1',
@@ -44,7 +44,8 @@ test('Kenya credit note preserves production envelope and reference fields', () 
   assert.equal(candidate.creditNotes[0].documentReference, existing.creditNotes[0].documentReference)
   assert.equal(candidate.creditNotes[0].documentType, existing.creditNotes[0].documentType)
   assert.equal(candidate.creditNotes[0].reasonCode, existing.creditNotes[0].reasonCode)
-  assert.deepEqual(candidate.creditNotes[0].lines, candidate.creditNotes[0].lines)
+  assert.deepEqual(candidate.creditNotes[0].payment, existing.creditNotes[0].payment)
+  assert.deepEqual(candidate.creditNotes[0].lines, existing.creditNotes[0].lines)
 })
 
 test('Tanzania draft credit note stays blocked until real API contract is verified', () => {
