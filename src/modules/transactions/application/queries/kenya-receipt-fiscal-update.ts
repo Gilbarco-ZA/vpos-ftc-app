@@ -26,16 +26,16 @@ export function applyKenyaReceiptFiscalUpdate(
   const checkedStatus = matches ? status : null
   const previousCode = value(eventReceipt?.fiscalVerificationCode, prior?.fiscalVerificationCode, canonical?.fiscalVerificationCode, receipt.footer.fiscalVerificationCode)
   const previousQr = value(eventReceipt?.fiscalQrCodeData, prior?.fiscalQrCodeData, canonical?.fiscalQrCodeData, receipt.footer.fiscalQrCodeData)
-  // Do not present a mix of conflicting event/status verification values.
+  // An explicitly refreshed, correlated Approved status supersedes stale local
+  // verification fields for display. Never persist this display-only merge.
   const statusCode = value(checkedStatus?.fiscalVerificationCode)
   const statusQr = value(checkedStatus?.fiscalQrCodeData)
-  if (statusCode && previousCode && statusCode !== previousCode) return
-  if (statusQr && previousQr && statusQr !== previousQr) return
   const verification = value(statusCode, previousCode)
   const qr = value(statusQr, previousQr)
   if (verification) receipt.footer.fiscalVerificationCode = verification
   if (qr) receipt.footer.fiscalQrCodeData = qr
-  const signature = value(eventReceipt?.receiptSignature, prior?.receiptSignature)
+  const signature = statusCode && previousCode && statusCode !== previousCode
+    ? null : value(eventReceipt?.receiptSignature, prior?.receiptSignature)
   const internal = value(eventReceipt?.receiptInternalData, prior?.receiptInternalData)
   if (signature) receipt.footer.receiptSignature = signature
   if (internal) receipt.footer.receiptInternalData = internal
