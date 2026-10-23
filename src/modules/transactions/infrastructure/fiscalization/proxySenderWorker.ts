@@ -1547,8 +1547,8 @@ async function sendCreditNoteQueueItemToProxy(input: {
     const country = station?.country
       ? String(station.country).toUpperCase()
       : null
-    if (isTanzaniaCountry(country)) {
-      throw new Error('Credit notes are not supported for Tanzania stations.')
+    if (country !== 'KE' && country !== 'KEN' && country !== 'KENYA') {
+      throw new Error('Credit notes are currently supported only for Kenya stations.')
     }
     const defaultTaxType = await getDefaultTaxTypeForCountry(country)
     const vatRate =
@@ -1584,9 +1584,11 @@ async function sendCreditNoteQueueItemToProxy(input: {
       fullTxn.fuel_type ?? null,
     )
 
-    const documentReference =
-      trimString(fullTxn.fiscalization_reference) ??
-      trimString(fullTxn.fiscal_document_id)
+    const documentReference = trimString(fullTxn.fiscal_document_id)
+    if (!documentReference) throw new Error('Original fiscal document ID required for Kenya credit note')
+    if (!trimString(fullTxn.grade_id) && !trimString(fullTxn.fuel_type)) {
+      throw new Error('Credit notes are currently supported only for fuel transactions')
+    }
 
     const creditNotePayload = mapTransactionToProxyCreditNote({
       transaction: fullTxn,
