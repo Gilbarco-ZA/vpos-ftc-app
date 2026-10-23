@@ -186,6 +186,7 @@ export async function getReceiptRoutePayload(input: {
     taxPinKv?.pin,
     taxPinKv?.tax_pin,
   )
+  const isKenya = ['KE', 'KEN', 'KENYA'].includes(String(station?.country ?? '').trim().toUpperCase())
   const isTanzania = ['TZ', 'TZA', 'TANZANIA'].includes(
     String(station?.country ?? '')
       .trim()
@@ -369,6 +370,43 @@ export async function getReceiptRoutePayload(input: {
     if (tanzaniaProxyReceipt?.receiptSignature) {
       receipt.footer.receiptSignature = tanzaniaProxyReceipt.receiptSignature
     }
+  }
+  if (receipt && isKenya) {
+    // A delayed KRA approval can add verification data after the receipt was
+    // first materialized. Reconcile the canonical persisted event with the
+    // receipt snapshot without replacing known signature/internal fields.
+    const eventPayload = latestFiscalEvent?.response_payload
+    const eventObject = eventPayload && typeof eventPayload === 'object'
+      ? eventPayload as Record<string, any> : null
+    const eventReceipt = eventObject?.details?.receipt ?? eventObject?.receipt
+    const storedData = storedReceipt?.fiscal_data
+    const snapshot = (storedData && typeof storedData === 'object'
+      ? storedData : null) as Record<string, any> | null
+    const snapshotReceipt = snapshot?.receipt
+    const latest = eventReceipt && typeof eventReceipt === 'object' ? eventReceipt : {}
+    const snapshotFields = snapshotReceipt && typeof snapshotReceipt === 'object' ? snapshotReceipt : {}
+    const verification = firstNonEmpty(
+      latest.fiscalVerificationCode,
+      canonicalFiscalization.payload && typeof canonicalFiscalization.payload === 'object'
+        ? (canonicalFiscalization.payload as Record<string, any>).fiscalVerificationCode : null,
+      snapshotFields.fiscalVerificationCode,
+      receipt.footer.fiscalVerificationCode,
+    )
+    const qr = firstNonEmpty(
+      latest.fiscalQrCodeData,
+      canonicalFiscalization.payload && typeof canonicalFiscalization.payload === 'object'
+        ? (canonicalFiscalization.payload as Record<string, any>).fiscalQrCodeData : null,
+      snapshotFields.fiscalQrCodeData,
+      receipt.footer.fiscalQrCodeData,
+    )
+    if (verification) receipt.footer.fiscalVerificationCode = verification
+    if (qr) receipt.footer.fiscalQrCodeData = qr
+    const signature = firstNonEmpty(latest.receiptSignature, snapshotFields.receiptSignature)
+    if (signature) receipt.footer.receiptSignature = signature
+    const internal = firstNonEmpty(latest.receiptInternalData, snapshotFields.receiptInternalData)
+    if (internal) receipt.footer.receiptInternalData = internal
+    const number = firstNonEmpty(latest.receiptNumber, snapshotFields.receiptNumber)
+    if (number) receipt.meta.receiptNumber = number
   }
   if (!receipt) {
     return {
