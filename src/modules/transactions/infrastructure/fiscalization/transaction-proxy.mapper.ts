@@ -698,6 +698,7 @@ export function deriveKenyaCreditNoteDocumentId(creditNoteId: string, documentRe
 export function mapTransactionToProxyCreditNote(
   args: Parameters<typeof mapTransactionToProxyInvoice>[0] & {
     creditNoteId: string
+    originalInvoiceRequest?: unknown
     documentReference?: string | null
     documentNumber?: string | null
     reasonCode?: string | null
@@ -743,6 +744,18 @@ export function mapTransactionToProxyCreditNote(
     throw new Error('Kenya credit-note payment is required.')
   }
 
+  // Credit notes must preserve the buyer actually submitted on the original
+  // fiscal invoice. A customer may have been edited or linked afterward.
+  // Only trust a stored request when it matches the original document ID.
+  const sourceRequest = args.originalInvoiceRequest
+  const sourceObject = sourceRequest && typeof sourceRequest === 'object' &&
+    !Array.isArray(sourceRequest) ? sourceRequest as Record<string, unknown> : null
+  const sourceDocumentId = String(sourceObject?.DocumentId ?? sourceObject?.documentId ?? '').trim()
+  const hasOriginalBuyer = sourceObject !== null &&
+    sourceDocumentId === documentReference &&
+    Object.prototype.hasOwnProperty.call(sourceObject, 'buyer')
+  const buyer = hasOriginalBuyer ? sourceObject!.buyer ?? null : invoice.buyer
+
   const lines = (invoice.lines ?? []).map((line) => ({
     lineType: line.lineType ?? 'Sale',
     lineId: line.lineId ?? null,
@@ -771,7 +784,7 @@ export function mapTransactionToProxyCreditNote(
         createdByName,
         lines,
         seller: invoice.seller ?? null,
-        buyer: invoice.buyer ?? null,
+        buyer: buyer ?? null,
         totals: invoice.totals ?? null,
         payment: invoice.payment,
         delivery: invoice.delivery ?? null,
