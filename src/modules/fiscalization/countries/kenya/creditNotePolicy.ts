@@ -41,11 +41,9 @@ export const kenyaCreditNotePolicy: CreditNotePolicy = {
       taxes: (line.taxes ?? []).map(tax => ({ type: tax.type, rate: tax.rate })),
     }))
     return { creditNotes: [{
-      IsOnline: note.isOnline,
       isOnline: note.isOnline,
-      DocumentId: note.creditNoteId,
       documentId: note.creditNoteId,
-      documentNumber: note.documentNumber ?? note.originalDocumentId,
+      documentNumber: note.documentNumber ?? note.creditNoteId,
       documentReference: note.originalDocumentId,
       documentType: 'Return',
       modificationType: 'None',
@@ -53,7 +51,6 @@ export const kenyaCreditNotePolicy: CreditNotePolicy = {
       createdByName: note.createdByName,
       reasonCode: note.reasonCode,
       reason: note.reason.trim() || 'Credit note issued',
-      Lines: lines,
       lines,
     }] }
   },
