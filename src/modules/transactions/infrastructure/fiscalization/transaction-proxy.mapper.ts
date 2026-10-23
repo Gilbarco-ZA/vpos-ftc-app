@@ -668,7 +668,10 @@ export function mapTransactionToProxyCreditNote(
     notes?: string | null
   },
 ): import('@/src/shared/fiscalization/proxy/contracts').ProxyCreditNotesRequest {
-  // Reuse the invoice mapper because it already applies ext_* product overrides.
+  if (!['KE', 'KEN', 'KENYA'].includes(String(args.station?.country ?? '').trim().toUpperCase())) {
+    throw new Error('Credit notes are currently supported only for Kenya')
+  }
+  // Reuse invoice mapping for validated product/tax/payment data.
   const invoice = mapTransactionToProxyInvoice(args)
 
   const reasonCode = (() => {
@@ -676,46 +679,27 @@ export function mapTransactionToProxyCreditNote(
     return raw.length ? raw : '13'
   })()
 
-  const documentReference = (() => {
-    const raw = String(
-      args.documentReference ??
-        invoice.documentNumber ??
-        invoice.documentId ??
-        '',
-    ).trim()
-    return raw.length ? raw : null
-  })()
+  const documentReference = String(args.documentReference ?? '').trim()
+  const creditDocumentId = String(args.creditNoteId ?? '').trim()
+  if (!documentReference || !creditDocumentId || creditDocumentId === documentReference) {
+    throw new Error('Credit note requires a distinct new documentId and original fiscal documentId as documentReference')
+  }
+  if (!invoice.lines?.length || invoice.lines.some(line => !line.product?.fuel)) {
+    throw new Error('Credit notes are currently supported only for fuel transactions')
+  }
 
   const createdByName =
     strOrNull(args.createdByName ?? invoice.createdByName) ?? 'VPOS-LITE'
 
   const isOnline = invoice.isOnline ?? true
 
-  const documentNumber = (() => {
-    const raw = String(
-      args.documentNumber ??
-        invoice.documentNumber ??
-        documentReference ??
-        args.creditNoteId,
-    ).trim()
-    return raw.length ? raw : null
-  })()
+  const documentNumber = String(args.documentNumber ?? '').trim() || null
 
   const reason = (() => {
     const raw = String(args.notes ?? invoice.notes ?? '').trim()
     return raw.length ? raw : 'Credit note issued'
   })()
 
-  const referenceId = String(
-    (args.transaction as any).pos_reference ??
-    (args.transaction as any).posReference ??
-    (args.transaction as any).fiscal_document_id ??
-    (args.transaction as any).fiscalDocumentId ??
-    '',
-  ).trim()
-  if (!referenceId || referenceId.length > 20) {
-    throw new Error('Kenya credit-note documentId must be the original transaction POS reference (1-20 characters).')
-  }
   if (!/^(0[1-9]|1[0-3])$/.test(reasonCode)) {
     throw new Error('Kenya credit-note reasonCode must be 01 through 13.')
   }
@@ -741,7 +725,7 @@ export function mapTransactionToProxyCreditNote(
     creditNotes: [
       {
         isOnline,
-        documentId: referenceId,
+        documentId: creditDocumentId,
         documentNumber,
         documentReference,
         documentType: 'Return',
