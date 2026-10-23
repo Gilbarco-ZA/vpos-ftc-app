@@ -34,8 +34,9 @@ export function applyKenyaReceiptFiscalUpdate(
   const qr = value(statusQr, previousQr)
   if (verification) receipt.footer.fiscalVerificationCode = verification
   if (qr) receipt.footer.fiscalQrCodeData = qr
-  const signature = statusCode && previousCode && statusCode !== previousCode
-    ? null : value(eventReceipt?.receiptSignature, prior?.receiptSignature)
+  const signatureConflicts = Boolean(statusCode && previousCode && statusCode !== previousCode)
+  if (signatureConflicts) receipt.footer.receiptSignature = undefined
+  const signature = signatureConflicts ? null : value(eventReceipt?.receiptSignature, prior?.receiptSignature)
   const internal = value(eventReceipt?.receiptInternalData, prior?.receiptInternalData)
   if (signature) receipt.footer.receiptSignature = signature
   if (internal) receipt.footer.receiptInternalData = internal
