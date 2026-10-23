@@ -51,5 +51,5 @@ test('Kenya receipt prefers fresh approved verification over stale local metadat
     statusRow: { documentId: 'DOC', status: 'Approved', fiscalVerificationCode: 'DIFFERENT' },
   })
   assert.equal(receipt.footer.fiscalVerificationCode, 'DIFFERENT')
-  assert.equal(receipt.footer.receiptSignature, '')
+  assert.equal(receipt.footer.receiptSignature, undefined)
 })
