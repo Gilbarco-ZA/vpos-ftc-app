@@ -701,6 +701,10 @@ export function mapTransactionToProxyCreditNote(
     return raw.length ? raw : null
   })()
 
+  if (!invoice.payment?.tenders?.length) {
+    throw new Error('Kenya credit note requires original payment tenders')
+  }
+
   const reason = (() => {
     const raw = String(args.notes ?? invoice.notes ?? '').trim()
     return raw.length ? raw : 'Credit note issued'
@@ -758,6 +762,7 @@ export function mapTransactionToProxyCreditNote(
         reasonCode,
         reason,
         lines: Lines,
+        payment: invoice.payment,
       },
     ],
   }
