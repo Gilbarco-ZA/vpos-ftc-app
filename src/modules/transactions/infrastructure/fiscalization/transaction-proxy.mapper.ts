@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type {
   InvoiceLineDto,
   InvoiceLineProductDto,
@@ -659,6 +660,38 @@ export function mapTransactionToProxyInvoice(args: {
  * - Uses the same product mapping rules as invoices (including ext_* overrides).
  * - Negates monetary amounts (unitPrice, net/tax totals) while keeping quantity positive.
  */
+/**
+ * Stable proxy document ID for a credit note. Preserve the original document
+ * reference's character classes and length, without reusing its identity.
+ * Derive from the persisted credit-note UUID so retries submit the same ID.
+ */
+export function deriveKenyaCreditNoteDocumentId(creditNoteId: string, documentReference: string): string {
+  const id = creditNoteId.trim()
+  const reference = documentReference.trim()
+  if (!id || !reference || reference.length > 64 || !/^[A-Za-z0-9]+$/.test(reference)) {
+    throw new Error('Credit note requires an alphanumeric original fiscal document ID and stable credit note ID')
+  }
+  const digest = createHash('sha256').update('KE-CREDIT-NOTE:' + id).digest()
+  const hexReference = /^[0-9A-Fa-f]+$/.test(reference)
+  const generated = Array.from(reference, (character, index) => {
+    const seed = digest[index % digest.length]
+    if (/[0-9]/.test(character)) return String(seed % 10)
+    if (hexReference) {
+      const alphabet = character === character.toLowerCase() ? 'abcdef' : 'ABCDEF'
+      return alphabet[seed % alphabet.length]
+    }
+    const alphabet = character === character.toLowerCase()
+      ? 'abcdefghijklmnopqrstuvwxyz' : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    return alphabet[seed % alphabet.length]
+  }).join('')
+  if (generated !== reference) return generated
+  // Extremely unlikely, but never submit a note using the original document ID.
+  const last = generated.at(-1)!
+  const replacement = /[0-9]/.test(last) ? (last === '9' ? '0' : String(Number(last) + 1))
+    : last === 'Z' ? 'A' : last === 'z' ? 'a' : String.fromCharCode(last.charCodeAt(0) + 1)
+  return generated.slice(0, -1) + replacement
+}
+
 export function mapTransactionToProxyCreditNote(
   args: Parameters<typeof mapTransactionToProxyInvoice>[0] & {
     creditNoteId: string
@@ -680,7 +713,7 @@ export function mapTransactionToProxyCreditNote(
   })()
 
   const documentReference = String(args.documentReference ?? '').trim()
-  const creditDocumentId = String(args.creditNoteId ?? '').trim()
+  const creditDocumentId = deriveKenyaCreditNoteDocumentId(String(args.creditNoteId ?? ''), documentReference)
   if (!documentReference || !creditDocumentId || creditDocumentId === documentReference) {
     throw new Error('Credit note requires a distinct new documentId and original fiscal documentId as documentReference')
   }
