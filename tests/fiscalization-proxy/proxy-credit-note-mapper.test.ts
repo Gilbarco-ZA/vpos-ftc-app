@@ -123,3 +123,33 @@ test('Kenya credit note document ID matches original hex reference shape and is 
   assert.equal(deriveKenyaCreditNoteDocumentId('de012727-600d-499f-8323-37a62d822330', original), first)
   assert.notEqual(deriveKenyaCreditNoteDocumentId('a9f5a360-f2a2-4cb3-a646-a8944c330a54', original), first)
 })
+
+test('Kenya customer-linked credit note preserves the original fiscal invoice buyer', () => {
+  const args = {
+    transaction: {
+      id: 'txn-buyer', grade_id: '4', fuel_type: 'Diesel 50',
+      volume: 2, total_amount: 356.72,
+      transaction_date_time: '2026-10-23T10:00:00Z',
+    },
+    station: { country: 'KE' },
+    customer: { buyer_name: 'Current Changed Name', pin: 'UPDATEDPIN' },
+    creditNoteId: 'credit-buyer-1', documentReference: 'D1CEF7E18822',
+    reasonCode: '06',
+  }
+  const originalBuyer = { name: 'Original Customer', buyerType: 'B2B', pin: 'ORIGINALPIN' }
+  const matched = mapTransactionToProxyCreditNote({
+    ...args,
+    originalInvoiceRequest: { DocumentId: 'D1CEF7E18822', buyer: originalBuyer },
+  })
+  assert.deepEqual(matched.creditNotes[0].buyer, originalBuyer)
+  const notMatched = mapTransactionToProxyCreditNote({
+    ...args,
+    originalInvoiceRequest: { DocumentId: 'UNRELATED', buyer: originalBuyer },
+  })
+  assert.equal((notMatched.creditNotes[0].buyer as { name: string }).name, 'Current Changed Name')
+  const originalWithoutBuyer = mapTransactionToProxyCreditNote({
+    ...args,
+    originalInvoiceRequest: { DocumentId: 'D1CEF7E18822', buyer: null },
+  })
+  assert.equal(originalWithoutBuyer.creditNotes[0].buyer, null)
+})
