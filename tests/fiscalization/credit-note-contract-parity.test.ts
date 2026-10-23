@@ -20,12 +20,12 @@ test('Kenya credit note preserves production envelope and reference fields', () 
     creditNoteId: 'CN-1', originalDocumentId: 'INV-1',
     issuedAt: existing.creditNotes[0].issueDateTime,
     reasonCode: '13', reason: 'Customer return', createdByName: 'Operator',
-    isOnline: existing.creditNotes[0].IsOnline ?? true,
+    isOnline: existing.creditNotes[0].isOnline ?? true,
     invoice: {
       documentId: 'INV-1',
       issuedAt: existing.creditNotes[0].issueDateTime,
       currency: 'KES', tenders: [],
-      lines: (existing.creditNotes[0].Lines ?? []).filter(line => line.product).map(line => ({
+      lines: (existing.creditNotes[0].lines ?? []).filter(line => line.product).map(line => ({
         product: {
           id: line.product?.productId ?? 'PRD-1',
           code: line.product?.productCode ?? 'G1',
@@ -40,11 +40,11 @@ test('Kenya credit note preserves production envelope and reference fields', () 
     },
   }
   const candidate = getCountryCreditNotePolicy('KE').buildPayload(note) as typeof existing
-  assert.equal(candidate.creditNotes[0].DocumentId, existing.creditNotes[0].DocumentId)
+  assert.equal(candidate.creditNotes[0].documentId, existing.creditNotes[0].documentId)
   assert.equal(candidate.creditNotes[0].documentReference, existing.creditNotes[0].documentReference)
   assert.equal(candidate.creditNotes[0].documentType, existing.creditNotes[0].documentType)
   assert.equal(candidate.creditNotes[0].reasonCode, existing.creditNotes[0].reasonCode)
-  assert.deepEqual(candidate.creditNotes[0].Lines, candidate.creditNotes[0].lines)
+  assert.deepEqual(candidate.creditNotes[0].lines, candidate.creditNotes[0].lines)
 })
 
 test('Tanzania draft credit note stays blocked until real API contract is verified', () => {

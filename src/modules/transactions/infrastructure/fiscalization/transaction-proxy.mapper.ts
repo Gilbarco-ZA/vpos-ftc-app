@@ -396,12 +396,12 @@ export function mapTransactionToProxyInvoice(args: {
           : roundMoney(num(rawLine.unitPrice, 0), 0)
 
       const taxTypeCode = String(
-        (countryCode === 'KE' ? enrichment.taxCode : rawLine.taxCode) || rawLine.taxCode || enrichment.taxCode || args.taxType || 'B',
+        rawLine.taxCode || enrichment.taxCode || args.taxType || 'B',
       )
       const codeFallback = defaultRateForTaxCode(taxTypeCode, vatRate)
       const lineTaxRate = roundMoney(
         normalizeRate(
-          (countryCode === 'KE' ? enrichment.taxRate : rawLine.taxRate) ?? rawLine.taxRate ?? enrichment.taxRate ?? args.taxRate,
+          rawLine.taxRate ?? enrichment.taxRate ?? args.taxRate,
           codeFallback,
         ),
       )
@@ -469,10 +469,10 @@ export function mapTransactionToProxyInvoice(args: {
         productId: strOrNull(rawLine.productId ?? enrichment.productId),
         productCode: strOrNull(rawLine.productCode ?? enrichment.productCode),
         productClassCode: strOrNull(
-          (countryCode === 'KE' ? enrichment.productClassCode : rawLine.productClassCode) ?? rawLine.productClassCode ?? enrichment.productClassCode,
+          rawLine.productClassCode ?? enrichment.productClassCode,
         ),
         productTypeCode: strOrNull(
-          (countryCode === 'KE' ? enrichment.productTypeCode : rawLine.productTypeCode) ?? rawLine.productTypeCode ?? enrichment.productTypeCode,
+          rawLine.productTypeCode ?? enrichment.productTypeCode,
         ),
         description:
           strOrNull(
@@ -706,57 +706,58 @@ export function mapTransactionToProxyCreditNote(
     return raw.length ? raw : 'Credit note issued'
   })()
 
-  const referenceId = String(
-    (args.transaction as any).pos_reference ??
-    (args.transaction as any).posReference ??
-    (args.transaction as any).fiscal_document_id ??
-    (args.transaction as any).fiscalDocumentId ??
-    '',
-  ).trim()
-  if (!referenceId || referenceId.length > 20) {
-    throw new Error('Kenya credit-note documentId must be the original transaction POS reference (1-20 characters).')
-  }
-  if (!/^(0[1-9]|1[0-3])$/.test(reasonCode)) {
-    throw new Error('Kenya credit-note reasonCode must be 01 through 13.')
-  }
-  if (!invoice.payment?.tenders?.length) {
-    throw new Error('Kenya credit-note payment is required.')
-  }
+  // Build credit note lines in the shape expected by proxy/cloud contract.
+  const Lines = (invoice.lines ?? []).map((line) => {
+    const product = line?.product
+      ? {
+          productId: line.product.productId ?? null,
+          productCode: line.product.productCode ?? null,
+          productClassCode: line.product.productClassCode ?? null,
+          productTypeCode: line.product.productTypeCode ?? null,
+          description: line.product.description ?? null,
+          unitOfMeasure: line.product.unitOfMeasure ?? null,
+          unitOfPackaging: line.product.unitOfPackaging ?? null,
+          quantity: Number(line.product.quantity ?? 0),
+          unitPrice: line.product.unitPrice ?? null,
+          hazardousIndicator: line.product.hazardousIndicator ?? null,
+          fuel: line.product.fuel
+            ? {
+                gradeId: line.product.fuel.gradeId ?? null,
+                gradeName: line.product.fuel.gradeName ?? null,
+                tankId: line.product.fuel.tankId ?? null,
+                pumpId: line.product.fuel.pumpId ?? null,
+                nozzleId: line.product.fuel.nozzleId ?? null,
+              }
+            : null,
+        }
+      : null
 
-  const lines = (invoice.lines ?? []).map((line) => ({
-    lineType: line.lineType ?? 'Sale',
-    lineId: line.lineId ?? null,
-    product: line.product ?? null,
-    discounts: line.discounts ?? null,
-    taxes: (line.taxes ?? []).map((tax) => ({
-      type: tax.type ?? null,
-      rate: tax.rate ?? 0,
-      base: tax.base ?? null,
-      amount: tax.amount ?? null,
-      exemptionCode: tax.exemptionCode ?? null,
-    })),
-  }))
+    const taxes = (line?.taxes ?? []).map((t) => ({
+      type: t?.type ?? null,
+      rate: t?.rate ?? 16,
+    }))
+
+    return {
+      lineType: line?.lineType ?? 'Sale',
+      product,
+      taxes,
+    }
+  })
 
   return {
     creditNotes: [
       {
         isOnline,
-        documentId: referenceId,
+        documentId: String(args.creditNoteId),
         documentNumber,
         documentReference,
         documentType: 'Return',
         modificationType: 'None',
         issueDateTime: invoice.issueDateTime,
-        currency: invoice.currency ?? 'KES',
         createdByName,
-        lines,
-        seller: invoice.seller ?? null,
-        buyer: invoice.buyer ?? null,
-        totals: invoice.totals ?? null,
-        payment: invoice.payment,
-        delivery: invoice.delivery ?? null,
         reasonCode,
         reason,
+        lines: Lines,
       },
     ],
   }
