@@ -1,4 +1,4 @@
-import type { ProxyCreditNotesRequest, ProxyCreditNoteLineDto } from '@/src/shared/fiscalization/proxy/contracts'
+import type { ProxyCreditNotesRequest, ProxyCreditNoteLineDto, ProxyPaymentMethod } from '@/src/shared/fiscalization/proxy/contracts'
 import type { ValidationResult } from '../../domain/countryAdapter'
 import type { CreditNotePolicy } from '../../domain/creditNotePolicy'
 import { requireValidCreditNote, validateCreditNoteCore } from '../../domain/creditNotePolicy'
@@ -40,6 +40,12 @@ export const kenyaCreditNotePolicy: CreditNotePolicy = {
       },
       taxes: (line.taxes ?? []).map(tax => ({ type: tax.type, rate: tax.rate })),
     }))
+    const allowedMethods: readonly string[] = ['Cash', 'Credit', 'Cash/Credit', 'Cheque', 'Card', 'MobileMoney', 'Other']
+    if (!note.invoice.tenders.length || note.invoice.tenders.some(tender =>
+      !allowedMethods.includes(tender.method) || !Number.isFinite(tender.amount) || tender.amount < 0
+    )) {
+      throw new Error('Kenya credit note requires valid original payment tenders')
+    }
     return { creditNotes: [{
       isOnline: note.isOnline,
       documentId: note.creditNoteId,
@@ -52,6 +58,9 @@ export const kenyaCreditNotePolicy: CreditNotePolicy = {
       reasonCode: note.reasonCode,
       reason: note.reason.trim() || 'Credit note issued',
       lines,
+      payment: { tenders: note.invoice.tenders.map(tender => ({
+        method: tender.method as ProxyPaymentMethod, amount: tender.amount,
+      })) },
     }] }
   },
 }
