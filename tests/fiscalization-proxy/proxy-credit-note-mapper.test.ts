@@ -41,8 +41,8 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
   assert.equal('IsOnline' in note, false)
   assert.equal(note.isOnline, true)
   assert.equal('DocumentId' in note, false)
-  assert.equal(note.documentId, 'POS-100')
-  assert.equal(note.documentNumber, '1194')
+  assert.equal(note.documentId, 'cn-200')
+  assert.equal(note.documentNumber, null)
   assert.equal(note.documentReference, 'INV-445')
   assert.equal(note.documentType, 'Return')
   assert.equal(note.modificationType, 'None')
@@ -64,7 +64,7 @@ test('maps credit note payload with full invoice-derived values for proxy', () =
   assert.equal(note.lines?.[0]?.taxes?.[0]?.rate, 16)
 })
 
-test('Kenya credit note rejects an invalid POS reference or reason code', () => {
+test('Kenya credit note rejects invalid original reference or reason code', () => {
   const base = {
     transaction: {
       id: 'txn-1',
@@ -84,9 +84,30 @@ test('Kenya credit note rejects an invalid POS reference or reason code', () => 
     creditNoteId: 'cn-1',
   }
   assert.throws(() => mapTransactionToProxyCreditNote({
-    ...base, reasonCode: 'RETURN',
+    ...base, documentReference: 'ORIGINAL-DOC', reasonCode: 'RETURN',
   }), /reasonCode/)
   assert.throws(() => mapTransactionToProxyCreditNote({
-    ...base, transaction: { ...base.transaction, pos_reference: 'A'.repeat(21) },
-  }), /documentId/)
+    ...base, documentReference: 'cn-1',
+  }), /distinct new documentId/)
+  assert.throws(() => mapTransactionToProxyCreditNote({
+    ...base, documentReference: '',
+  }), /original fiscal documentId/)
+})
+
+test('Kenya credit note rejects nonfuel lines and unsupported countries', () => {
+  const base = {
+    transaction: {
+      id: 'txn-2', transaction_date_time: '2026-10-23T08:00:00Z',
+      lines: [{ productId: 'SNACK', description: 'Snack', quantity: 1, unitPrice: 10, lineTotal: 10 }],
+    },
+    customer: null, station: { country: 'KE' },
+    creditNoteId: 'cn-2', documentReference: 'ORIGINAL-2', reasonCode: '06',
+  }
+  assert.throws(() => mapTransactionToProxyCreditNote(base), /only for fuel transactions/)
+  assert.throws(() => mapTransactionToProxyCreditNote({
+    ...base, station: { country: 'TZ' },
+  }), /only for Kenya/)
+  assert.throws(() => mapTransactionToProxyCreditNote({
+    ...base, station: { country: 'ZA' },
+  }), /only for Kenya/)
 })
