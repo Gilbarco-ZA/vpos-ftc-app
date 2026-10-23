@@ -1,4 +1,4 @@
-import { query, txQuery, withTransaction } from '@/src/platform/db/postgres'
+import { query, queryOne, txQuery, withTransaction } from '@/src/platform/db/postgres'
 import { AppError } from '@/src/shared/errors/AppError'
 import { shortenUUID } from '@/src/shared/utils/shortenUUID'
 import { uuidv4 } from '@/src/shared/utils/uuid'
