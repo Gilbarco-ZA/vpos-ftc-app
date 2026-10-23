@@ -93,7 +93,7 @@ test('Kenya credit note rejects invalid original reference or reason code', () =
   }), /original fiscal document/)
   assert.throws(() => mapTransactionToProxyCreditNote({
     ...base, documentReference: '',
-  }), /original fiscal documentId/)
+  }), /original fiscal document ID/)
 })
 
 test('Kenya credit note rejects nonfuel lines and unsupported countries', () => {
