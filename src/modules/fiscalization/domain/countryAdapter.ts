@@ -25,6 +25,7 @@ export interface CanonicalProduct {
   price: number
   currency: string
   taxCode?: string | null
+  taxRate?: number | null
   hazardousIndicator?: boolean
 }
 
