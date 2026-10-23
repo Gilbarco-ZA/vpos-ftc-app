@@ -684,7 +684,7 @@ export function mapTransactionToProxyCreditNote(
   if (!documentReference || !creditDocumentId || documentReference === creditDocumentId) {
     throw new Error('Credit note needs a new document ID and the original fiscal document ID as reference')
   }
-  if (!invoice.lines?.length || invoice.lines.some(line => !line.product?.fuel || line.lineType !== 'FuelSale')) {
+  if (!invoice.lines?.length || invoice.lines.some(line => !line.product?.fuel)) {
     throw new Error('Credit notes are currently supported only for fuel transactions')
   }
 
