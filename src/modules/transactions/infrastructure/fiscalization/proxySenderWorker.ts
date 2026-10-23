@@ -1584,9 +1584,18 @@ async function sendCreditNoteQueueItemToProxy(input: {
       fullTxn.fuel_type ?? null,
     )
 
-    const documentReference =
-      trimString(fullTxn.fiscalization_reference) ??
-      trimString(fullTxn.fiscal_document_id)
+    if (country !== 'KE') {
+      throw new Error('Credit notes are currently supported only for Kenya')
+    }
+    const fuelId = trimString(fullTxn.grade_id)
+    const fuelType = trimString(fullTxn.fuel_type)
+    if (!fuelId && !fuelType) {
+      throw new Error('Credit notes are currently supported only for fuel transactions')
+    }
+    const documentReference = trimString(fullTxn.fiscal_document_id)
+    if (!documentReference || documentReference === creditNoteId) {
+      throw new Error('Credit note requires the original transaction fiscal document ID')
+    }
 
     const creditNotePayload = mapTransactionToProxyCreditNote({
       transaction: fullTxn,
