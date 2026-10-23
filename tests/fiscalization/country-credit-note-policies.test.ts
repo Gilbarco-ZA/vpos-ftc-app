@@ -16,7 +16,7 @@ const kenyaNote: CanonicalCreditNote = {
     documentId: 'INV-101',
     issuedAt: '2026-10-18T10:00:00.000Z',
     currency: 'KES',
-    tenders: [],
+    tenders: [{ method: 'Cash', amount: 366 }],
     lines: [{
       product: {
         id: 'PRD-1', code: 'KE2TYL0000001', name: 'Petrol 93',
@@ -24,7 +24,7 @@ const kenyaNote: CanonicalCreditNote = {
         unitOfMeasure: 'L', unitOfPackaging: 'TY',
         currency: 'KES', price: 183, taxCode: 'B',
       },
-      lineType: 'Sale', quantity: 2, unitPrice: 183,
+      lineType: 'FuelSale', fuel: { gradeId: '4' }, quantity: 2, unitPrice: 183,
       taxes: [{ type: 'B', rate: 16 }],
     }],
   },
@@ -34,11 +34,11 @@ test('Kenya credit note has current proxy envelope and document reference', () =
   const policy = getCountryCreditNotePolicy('KE')
   assert.equal(policy.validate(kenyaNote).valid, true)
   const payload = policy.buildPayload(kenyaNote) as {
-    creditNotes: Array<{ documentReference: string | null; Lines: unknown[]; lines: unknown[]; reasonCode: string }>
+    creditNotes: Array<{ documentReference: string | null; lines: unknown[]; reasonCode: string; payment: { tenders: unknown[] } }>
   }
   assert.equal(payload.creditNotes[0].documentReference, 'INV-101')
   assert.equal(payload.creditNotes[0].reasonCode, '13')
-  assert.deepEqual(payload.creditNotes[0].Lines, payload.creditNotes[0].lines)
+  assert.equal(payload.creditNotes[0].payment.tenders.length, 1)
 })
 
 test('credit note cannot refer to itself', () => {
