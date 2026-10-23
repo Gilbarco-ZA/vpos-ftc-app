@@ -5,7 +5,7 @@ import {
 } from '@/src/shared/http/defineRoute'
 import { isUuid } from '@/src/shared/utils/uuid'
 
-import { getStationCountryCode, isTanzaniaCountry } from '@/src/modules/tanzania-fiscal/application/country'
+import { getStationCountryCode } from '@/src/modules/tanzania-fiscal/application/country'
 
 import { isKenyaCreditNoteReasonCode } from '@/src/modules/transactions/domain/kenyaCreditNoteReasons'
 import { createCreditNote } from '@/src/modules/transactions/application/commands'
