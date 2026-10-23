@@ -1,4 +1,5 @@
 import type { NormalizedReceipt } from '@/src/shared/receipts/normalizeReceipt'
+import { applyKenyaReceiptFiscalUpdate } from './kenya-receipt-fiscal-update'
 
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
 import { getBrandingSettings } from '@/src/shared/branding/settings'
@@ -186,6 +187,7 @@ export async function getReceiptRoutePayload(input: {
     taxPinKv?.pin,
     taxPinKv?.tax_pin,
   )
+  const isKenya = ['KE', 'KEN', 'KENYA'].includes(String(station?.country ?? '').trim().toUpperCase())
   const isTanzania = ['TZ', 'TZA', 'TANZANIA'].includes(
     String(station?.country ?? '')
       .trim()
@@ -369,6 +371,13 @@ export async function getReceiptRoutePayload(input: {
     if (tanzaniaProxyReceipt?.receiptSignature) {
       receipt.footer.receiptSignature = tanzaniaProxyReceipt.receiptSignature
     }
+  }
+  if (receipt && isKenya) {
+    applyKenyaReceiptFiscalUpdate(receipt, {
+      eventResponsePayload: latestFiscalEvent?.response_payload,
+      canonicalResponsePayload: canonicalFiscalization.payload,
+      storedFiscalData: storedReceipt?.fiscal_data,
+    })
   }
   if (!receipt) {
     return {
