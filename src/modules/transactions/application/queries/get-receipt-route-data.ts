@@ -393,7 +393,8 @@ export async function getReceiptRoutePayload(input: {
   const payload: ReceiptRoutePayload = {
     ok: true,
     receipt,
-    raw: rawResponse ?? null,
+    // Expose the freshly queried proxy result to the Refresh/raw-details UI.
+    raw: isKenya && input.kenyaStatusRow ? input.kenyaStatusRow : (rawResponse ?? null),
   }
   if (storedReceipt && presentation) {
     payload.presentation = {
