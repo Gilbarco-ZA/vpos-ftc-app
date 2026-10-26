@@ -234,3 +234,39 @@ export async function getLatestFiscalizationEventRepo(input: {
     [input.stationId, input.transactionId, input.status ?? null],
   )
 }
+
+/**
+ * Read-only diagnostic evidence, always scoped to the selected station and
+ * transaction. When an inbox message names an event, never silently substitute
+ * a different retry attempt.
+ */
+export async function getProxyFiscalizationExchangeRepo(input: {
+  stationId: string
+  transactionId: string
+  eventId?: string | null
+}) {
+  return await queryOne<
+    Pick<
+      PersistedFiscalizationEvent,
+      | 'id'
+      | 'status'
+      | 'engine'
+      | 'transport'
+      | 'request_payload'
+      | 'response_payload'
+      | 'error_message'
+      | 'occurred_at'
+    >
+  >(
+    `SELECT id, status, engine, transport, request_payload,
+            response_payload, error_message, occurred_at
+       FROM fiscalization_events
+      WHERE station_id::text = $1::text
+        AND transaction_id::text = $2::text
+        AND transport = 'proxy'
+        AND ($3::text IS NULL OR id::text = $3::text)
+      ORDER BY occurred_at DESC, created_at DESC
+      LIMIT 1`,
+    [input.stationId, input.transactionId, input.eventId ?? null],
+  )
+}
