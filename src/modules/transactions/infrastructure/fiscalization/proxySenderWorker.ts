@@ -931,25 +931,8 @@ async function reconcilePendingProxyFiscalizations(input: {
       continue
     }
 
-    // Manual and worker reconciliation can overlap. Only process an attempt
-    // whose transaction and latest event are still pending.
-    if (directKenyaLookup) {
-      const current = await queryOne<{
-        status: string
-        latest_fiscal_event_id: string | null
-      }>(
-        `SELECT status, latest_fiscal_event_id
-           FROM transactions
-          WHERE station_id = $1
-            AND id = $2::uuid
-            AND deleted_at IS NULL`,
-        [input.stationId, String(txn.id)],
-      )
-      if (!current || current.status !== 'FISCALIZING' ||
-          String(current.latest_fiscal_event_id ?? '') !==
-            String(txn.fiscal_event_id ?? '')) continue
-    }
-
+    // A final decision is committed under a row lock below so overlapping
+    // browser and worker requests cannot both finalize this attempt.
     const merged = mergeFiscalizationResponses(stored, matched)
     const matchedDocId =
       extractProxyDocumentId(matched) ||
@@ -992,8 +975,27 @@ async function reconcilePendingProxyFiscalizations(input: {
     }
 
     if (isFailedFiscalizationPayload(matched)) {
-      const failedTransaction = await markTransactionFailed({
+      const failedTransaction = await withTransaction(async (client) => {
+        const locked = await txQuery<{
+          status: string
+          latest_fiscal_event_id: string | null
+        }>(
+          client,
+          `SELECT status, latest_fiscal_event_id
+             FROM transactions
+            WHERE station_id = $1
+              AND id = $2::uuid
+              AND deleted_at IS NULL
+            FOR UPDATE`,
+          [input.stationId, String(txn.id)],
+        )
+        const current = locked.rows?.[0]
+        if (!current || current.status !== 'FISCALIZING' ||
+          String(current.latest_fiscal_event_id ?? '') !==
+            String(txn.fiscal_event_id ?? '')) return null
+        return await markTransactionFailed({
         stationId: input.stationId,
+        client,
         transactionId: String(txn.id),
         lastError:
           extractFailureMessage(matched) || 'Proxy fiscalization failed',
@@ -1008,6 +1010,7 @@ async function reconcilePendingProxyFiscalizations(input: {
           errorMessage:
             extractFailureMessage(matched) || 'Proxy fiscalization failed',
         },
+        })
       }).catch(() => null)
       if (!failedTransaction) continue
 
@@ -1032,8 +1035,27 @@ async function reconcilePendingProxyFiscalizations(input: {
       extractProxyDocumentNumber(matched) ||
       extractProxyDocumentNumber(stored)
 
-    const fiscalizedTransaction = await markTransactionFiscalized({
+    const fiscalizedTransaction = await withTransaction(async (client) => {
+      const locked = await txQuery<{
+        status: string
+        latest_fiscal_event_id: string | null
+      }>(
+        client,
+        `SELECT status, latest_fiscal_event_id
+           FROM transactions
+          WHERE station_id = $1
+            AND id = $2::uuid
+            AND deleted_at IS NULL
+          FOR UPDATE`,
+        [input.stationId, String(txn.id)],
+      )
+      const current = locked.rows?.[0]
+      if (!current || current.status !== 'FISCALIZING' ||
+        String(current.latest_fiscal_event_id ?? '') !==
+          String(txn.fiscal_event_id ?? '')) return null
+      return await markTransactionFiscalized({
       stationId: input.stationId,
+      client,
       transactionId: String(txn.id),
       fiscalizationReference: fiscalReference,
       fiscalDocumentId: matchedDocId,
@@ -1045,6 +1067,7 @@ async function reconcilePendingProxyFiscalizations(input: {
         requestPayload: txn?.fiscal_event_request_payload ?? null,
         responsePayload: merged,
       },
+      })
     }).catch(() => null)
     if (!fiscalizedTransaction) continue
 
