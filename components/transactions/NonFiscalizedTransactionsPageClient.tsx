@@ -418,10 +418,18 @@ const NonFiscalizedTransactionsPageClient = ({
   }, [search, status, startDate, endDate, page, pageSize])
 
   const manualRefresh = async () => {
-    const kenyaStation = ['KE', 'KEN', 'KENYA'].includes(
-      String(stationCountry ?? '').trim().toUpperCase(),
-    )
-    const transactionIds = kenyaStation
+    const country = String(stationCountry ?? '').trim().toUpperCase()
+    const isKenya = ['KE', 'KEN', 'KENYA', 'REPUBLIC OF KENYA'].includes(country)
+    const isTanzania = [
+      'TZ',
+      'TZA',
+      'TANZANIA',
+      'UNITED REPUBLIC OF TANZANIA',
+    ].includes(country)
+    const statusEndpoint = isTanzania
+      ? '/api/transactions/reconcile-tanzania-status'
+      : '/api/transactions/reconcile-kenya-status'
+    const transactionIds = isKenya || isTanzania
       ? transactions
           .filter((row) => String(row.status).toUpperCase() === 'FISCALIZING')
           .map((row) => row.id)
@@ -433,7 +441,7 @@ const NonFiscalizedTransactionsPageClient = ({
       } else {
         setLoading(true)
         try {
-          const response = await fetch('/api/transactions/reconcile-kenya-status', {
+          const response = await fetch(statusEndpoint, {
             method: 'POST',
             headers: {
               'content-type': 'application/json',
