@@ -79,7 +79,7 @@ export function FiscalInboxDetailView({
                 Event <span className="font-mono">{proxyExchange.eventId}</span>
                 {' · '}Status: {proxyExchange.status}
                 {' · '}Engine: {proxyExchange.engine}
-                {' · '}Sent/recorded: {formatDate(proxyExchange.occurredAt)}
+                {' · '}Recorded at: {formatDate(proxyExchange.occurredAt)}
               </div>
               <div>
                 {proxyExchange.matchType === 'inbox-event'
