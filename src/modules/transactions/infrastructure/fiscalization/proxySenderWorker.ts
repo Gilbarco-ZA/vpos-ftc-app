@@ -780,63 +780,63 @@ async function reconcilePendingProxyFiscalizations(input: {
 
   let results: any[] = []
   if (!directKenyaLookup) {
-  try {
-    const sinceRes = await getFiscalizationResultsSinceViaProxy(
-      input.stationId,
-      {
-        since: new Date(sinceMs).toISOString(),
-        limit: Math.max(25, Number(input.resultsLimit ?? 200)),
-      },
-    )
-
-    if (!sinceRes.ok) {
-      logger.warn(`[${WORKER_NAME}] proxy result reconciliation poll failed`, {
-        stationId: input.stationId,
-        status: sinceRes.status,
-      })
-    } else {
-      results = extractProxyResults(sinceRes.data)
-    }
-  } catch (error: any) {
-    logger.warn(`[${WORKER_NAME}] proxy result reconciliation poll errored`, {
-      stationId: input.stationId,
-      error: String(error?.message || error),
-    })
-  }
-
-  if (!results.length) {
     try {
-      const pendingRes = await getOfflineQueuePendingViaProxy(input.stationId)
-      if (!pendingRes.ok) {
-        logger.warn(
-          `[${WORKER_NAME}] proxy offline queue pending poll failed`,
-          {
-            stationId: input.stationId,
-            status: pendingRes.status,
-          },
-        )
+      const sinceRes = await getFiscalizationResultsSinceViaProxy(
+        input.stationId,
+        {
+          since: new Date(sinceMs).toISOString(),
+          limit: Math.max(25, Number(input.resultsLimit ?? 200)),
+        },
+      )
+
+      if (!sinceRes.ok) {
+        logger.warn(`[${WORKER_NAME}] proxy result reconciliation poll failed`, {
+          stationId: input.stationId,
+          status: sinceRes.status,
+        })
       } else {
-        results = extractProxyResults(pendingRes.data)
+        results = extractProxyResults(sinceRes.data)
       }
     } catch (error: any) {
-      logger.warn(`[${WORKER_NAME}] proxy offline queue pending poll errored`, {
+      logger.warn(`[${WORKER_NAME}] proxy result reconciliation poll errored`, {
         stationId: input.stationId,
         error: String(error?.message || error),
       })
     }
-  }
 
-  if (pending.length && !results.length) {
-    logger.warn(
-      `[${WORKER_NAME}] no proxy reconciliation results for pending fiscalizations`,
-      {
-        stationId: input.stationId,
-        pendingCount: pending.length,
-        since: new Date(sinceMs).toISOString(),
-        transactionIds: pending.map((row) => String(row.id)),
-      },
-    )
-  }
+    if (!results.length) {
+      try {
+        const pendingRes = await getOfflineQueuePendingViaProxy(input.stationId)
+        if (!pendingRes.ok) {
+          logger.warn(
+            `[${WORKER_NAME}] proxy offline queue pending poll failed`,
+            {
+              stationId: input.stationId,
+              status: pendingRes.status,
+            },
+          )
+        } else {
+          results = extractProxyResults(pendingRes.data)
+        }
+      } catch (error: any) {
+        logger.warn(`[${WORKER_NAME}] proxy offline queue pending poll errored`, {
+          stationId: input.stationId,
+          error: String(error?.message || error),
+        })
+      }
+    }
+
+    if (pending.length && !results.length) {
+      logger.warn(
+        `[${WORKER_NAME}] no proxy reconciliation results for pending fiscalizations`,
+        {
+          stationId: input.stationId,
+          pendingCount: pending.length,
+          since: new Date(sinceMs).toISOString(),
+          transactionIds: pending.map((row) => String(row.id)),
+        },
+      )
+    }
 
   }
 
@@ -1023,9 +1023,11 @@ async function reconcilePendingProxyFiscalizations(input: {
       continue
     }
 
-    if (directKenyaLookup
-      ? classifyKenyaProxyInvoiceStatus(matched) !== 'approved'
-      : !hasFinalFiscalizationPayload(matched)) continue
+    if (
+      directKenyaLookup
+        ? classifyKenyaProxyInvoiceStatus(matched) !== 'approved'
+        : !hasFinalFiscalizationPayload(matched)
+    ) continue
 
     const receipt = mapFiscalReceipt(merged) || mapFiscalReceipt(matched)
     const fiscalReference =
@@ -1123,7 +1125,7 @@ export async function reconcileKenyaFiscalizingTransactions(input: {
   transactionIds?: string[]
 }) {
   const route = await getStationFiscalizationRoute(input.stationId)
-  if (route.country !== 'KE' || route.route !== 'proxy') {
+  if (!['KE', 'KEN', 'KENYA'].includes(String(route.country ?? '').toUpperCase()) || route.route !== 'proxy') {
     return { checked: 0, finalized: 0, failed: 0, polledResults: 0, skipped: true }
   }
   return await reconcilePendingProxyFiscalizations({
@@ -2028,7 +2030,7 @@ export function startProxyFiscalSenderWorker(opts?: {
   let creditNoteTickRunning = false
   let lastReconcileAt = 0
   let lastKenyaDocumentStatusAt = 0
-  const KENYA_DOCUMENT_STATUS_INTERVAL_MS = 10 * 60 * 1000
+  const kenyaDocumentStatusIntervalMs = 10 * 60 * 1000
   const inFlight = new Map<string, Promise<unknown>>()
   const cnInFlight = new Map<string, Promise<unknown>>()
 
@@ -2112,8 +2114,8 @@ export function startProxyFiscalSenderWorker(opts?: {
       }
 
       if (
-        route.country === 'KE' &&
-        Date.now() - lastKenyaDocumentStatusAt >= KENYA_DOCUMENT_STATUS_INTERVAL_MS
+        ['KE', 'KEN', 'KENYA'].includes(String(route.country ?? '').toUpperCase()) &&
+        Date.now() - lastKenyaDocumentStatusAt >= kenyaDocumentStatusIntervalMs
       ) {
         // This runs in the worker even when no operator/browser is connected.
         lastKenyaDocumentStatusAt = Date.now()
