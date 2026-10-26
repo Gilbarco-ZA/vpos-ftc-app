@@ -329,6 +329,7 @@ const ManagerNonFiscalizedView = async ({
           }))}
           csrfToken={csrfToken}
           decimals={decimals}
+          stationCountry={user.station?.country ?? null}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
