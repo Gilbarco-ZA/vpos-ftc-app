@@ -417,6 +417,50 @@ const NonFiscalizedTransactionsPageClient = ({
     }
   }, [search, status, startDate, endDate, page, pageSize])
 
+  const manualRefresh = async () => {
+    const kenyaStation = ['KE', 'KEN', 'KENYA'].includes(
+      String(stationCountry ?? '').trim().toUpperCase(),
+    )
+    const transactionIds = kenyaStation
+      ? transactions
+          .filter((row) => String(row.status).toUpperCase() === 'FISCALIZING')
+          .map((row) => row.id)
+      : []
+
+    if (transactionIds.length > 0) {
+      if (!csrfToken) {
+        showToast('error', 'Security token not ready. Refreshing transaction list only.')
+      } else {
+        setLoading(true)
+        try {
+          const response = await fetch('/api/transactions/reconcile-kenya-status', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-csrf-token': csrfToken,
+            },
+            body: JSON.stringify({ transactionIds, csrf_token: csrfToken }),
+          })
+          const body = await response.json().catch(() => ({}))
+          if (!response.ok || body?.ok === false) {
+            throw new Error(body?.error?.message ?? 'Proxy invoice status lookup failed')
+          }
+          const result = body?.data ?? body
+          if (Number(result?.finalized ?? 0) > 0) {
+            showToast('success', `Confirmed ${result.finalized} fiscalized invoice(s) with vpos-proxy`)
+          }
+        } catch (error: unknown) {
+          showToast(
+            'error',
+            error instanceof Error ? error.message : 'Unable to check proxy status',
+          )
+        }
+      }
+    }
+
+    await refresh()
+  }
+
   const formatMoney = (value: number | null | undefined) =>
     formatNumber(value == null ? null : Number(value), decimals.money)
   const formatVolume = (value: number | null | undefined) =>
@@ -444,7 +488,7 @@ const NonFiscalizedTransactionsPageClient = ({
   const filteredTransactions = useMemo(() => transactions, [transactions])
 
   return (
-    <TransactionsUIContext.Provider value={{ refresh, showToast }}>
+    <TransactionsUIContext.Provider value={{ refresh: manualRefresh, showToast }}>
       <CsrfBootstrap onToken={setCsrfToken} />
       <div className="space-y-4">
         {children}
@@ -467,7 +511,7 @@ const NonFiscalizedTransactionsPageClient = ({
             setEndDate('')
           }}
           todayDisabled={!businessDate}
-          onRefresh={refresh}
+          onRefresh={manualRefresh}
         />
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <span>{total} transactions · Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</span>
