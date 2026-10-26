@@ -107,9 +107,17 @@ export function ManagerNonFiscalizedTable(props: {
   const fiscalizingIds = tableRows
     .filter((row) => String(row.status ?? '').toUpperCase() === 'FISCALIZING')
     .map((row) => String(row.id))
-  const isKenya = ['KE', 'KEN', 'KENYA'].includes(
-    String(props.stationCountry ?? '').trim().toUpperCase(),
-  )
+  const country = String(props.stationCountry ?? '').trim().toUpperCase()
+  const isKenya = ['KE', 'KEN', 'KENYA', 'REPUBLIC OF KENYA'].includes(country)
+  const isTanzania = [
+    'TZ',
+    'TZA',
+    'TANZANIA',
+    'UNITED REPUBLIC OF TANZANIA',
+  ].includes(country)
+  const statusEndpoint = isTanzania
+    ? '/api/transactions/reconcile-tanzania-status'
+    : '/api/transactions/reconcile-kenya-status'
 
   const checkFiscalizingStatuses = async () => {
     if (!fiscalizingIds.length || checkingStatus) return
@@ -120,7 +128,7 @@ export function ManagerNonFiscalizedTable(props: {
     setCheckingStatus(true)
     setStatusMessage(null)
     try {
-      const res = await fetch('/api/transactions/reconcile-kenya-status', {
+      const res = await fetch(statusEndpoint, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -164,7 +172,7 @@ export function ManagerNonFiscalizedTable(props: {
             {statusMessage}
           </span>
         ) : null}
-        {isKenya && fiscalizingIds.length > 0 ? (
+        {(isKenya || isTanzania) && fiscalizingIds.length > 0 ? (
           <Button
             variant="secondary"
             size="sm"
