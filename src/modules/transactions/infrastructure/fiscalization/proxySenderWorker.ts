@@ -1043,10 +1043,16 @@ async function reconcilePendingProxyFiscalizations(input: {
       extractProxyDocumentId(stored) ||
       trimString(txn?.fiscal_document_id)
 
-    if (directDocumentLookup ? directOutcome === 'pending' :
-      !hasFinalFiscalizationPayload(matched) &&
-        !isFailedFiscalizationPayload(matched)) {
+    const awaitingFinalResult = directDocumentLookup
+      ? directOutcome === 'pending'
+      : !hasFinalFiscalizationPayload(matched) &&
+        !isFailedFiscalizationPayload(matched)
+
+    if (awaitingFinalResult) {
       if (directDocumentLookup) {
+        // Most frequent 10-minute GET responses are unchanged. Compare the
+        // already-loaded snapshot before taking a database lock.
+        if (mergeChangedProxyInvoiceStatus(stored, matched) === null) continue
         await updatePendingProxyInvoiceStatus({
           stationId: input.stationId,
           transactionId: String(txn.id),
