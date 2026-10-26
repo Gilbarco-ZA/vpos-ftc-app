@@ -29,7 +29,7 @@ import {
 } from '@/src/modules/tanzania-fiscal/infrastructure/country'
 import { enrichTanzaniaProxyInvoice } from '@/src/modules/tanzania-fiscal/infrastructure/proxyInvoice'
 import { getStationFiscalizationRoute } from '@/src/modules/tanzania-fiscal/infrastructure/route'
-import { classifyKenyaProxyInvoiceStatus } from '@/src/modules/transactions/domain/kenya-proxy-invoice-status'
+import { classifyProxyInvoiceStatus } from '@/src/modules/transactions/domain/kenya-proxy-invoice-status'
 import { markTransactionFailed } from '@/src/modules/transactions/application/commands/mark-transaction-failed'
 import { markTransactionFiscalized } from '@/src/modules/transactions/application/commands/mark-transaction-fiscalized'
 import { enqueueAutoPrintFiscalReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/autoPrintFiscalReceipt'
@@ -870,7 +870,7 @@ async function reconcilePendingProxyFiscalizations(input: {
             originalDocumentId,
             directCountry,
           )
-          if (classifyKenyaProxyInvoiceStatus(invoice) !== 'pending') {
+          if (classifyProxyInvoiceStatus(invoice) !== 'pending') {
             statusByTransactionId.set(String(txn.id), invoice)
           }
         } catch (error: unknown) {
@@ -1033,7 +1033,7 @@ async function reconcilePendingProxyFiscalizations(input: {
 
     if (
       directDocumentLookup
-        ? classifyKenyaProxyInvoiceStatus(matched) !== 'approved'
+        ? classifyProxyInvoiceStatus(matched) !== 'approved'
         : !hasFinalFiscalizationPayload(matched)
     ) continue
 
