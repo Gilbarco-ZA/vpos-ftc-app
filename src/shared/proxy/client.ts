@@ -312,44 +312,68 @@ export const stopOfflineQueueProcessingViaProxy = async (
 }
 
 /**
- * Lookup the authoritative Kenya invoice status by its original DocumentId.
- * A successful HTTP envelope is not itself a fiscalization approval: callers
- * must check the matched invoice's status before changing local state.
+ * Look up a proxy-routed invoice by the original DocumentId. The supplied
+ * country (resolved server-side from the station) selects the endpoint; never
+ * infer approval from a successful HTTP envelope.
  */
-export async function getKenyaInvoiceStatusViaProxy(
+export async function getCountryInvoiceStatusViaProxy(
   stationId: string,
   documentId: string,
+  country: 'KE' | 'TZ',
 ): Promise<Record<string, unknown>> {
   const requestedId = documentId.trim()
   if (!requestedId) throw new Error('A fiscal DocumentId is required')
 
+  const path =
+    country === 'TZ'
+      ? '/api/tanzania/invoices/status'
+      : '/api/invoices/status'
   const result = await proxyRequest(stationId, {
     method: 'GET',
-    path: '/api/invoices/status',
+    path,
     query: { DocumentId: requestedId },
     timeoutMs: 10_000,
   })
   if (!result.ok) {
     throw new Error(`Proxy invoice status lookup failed (HTTP ${result.status})`)
   }
+
   const payload = result.data
-  if (!payload || typeof payload !== 'object' || payload.error === true ||
-      !Array.isArray(payload.invoices)) {
+  if (!payload || typeof payload !== 'object' || payload.error === true) {
     throw new Error('Proxy returned an invalid invoice status envelope')
   }
+  const invoices = Array.isArray(payload.invoices)
+    ? payload.invoices
+    : Array.isArray(payload.data?.invoices)
+      ? payload.data.invoices
+      : null
+  if (!invoices) {
+    throw new Error('Proxy did not return an invoice status collection')
+  }
 
-  const matches = (payload.invoices as unknown[]).filter(
+  const matches = (invoices as unknown[]).filter(
     (entry): entry is Record<string, unknown> =>
       entry !== null &&
       typeof entry === 'object' &&
       !Array.isArray(entry) &&
-      String((entry as Record<string, unknown>).documentId ?? '').trim().toUpperCase() ===
-        requestedId.toUpperCase(),
+      String(
+        (entry as Record<string, unknown>).documentId ??
+        (entry as Record<string, unknown>).DocumentId ??
+        '',
+      ).trim().toUpperCase() === requestedId.toUpperCase(),
   )
   if (matches.length !== 1) {
     throw new Error('Proxy did not return exactly one matching DocumentId')
   }
   return matches[0]
+}
+
+/** Compatibility for Kenya receipt refresh and other existing callers. */
+export async function getKenyaInvoiceStatusViaProxy(
+  stationId: string,
+  documentId: string,
+): Promise<Record<string, unknown>> {
+  return getCountryInvoiceStatusViaProxy(stationId, documentId, 'KE')
 }
 
 export const getFiscalizationResultsSinceViaProxy = async (
