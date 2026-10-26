@@ -30,6 +30,7 @@ import {
 import { enrichTanzaniaProxyInvoice } from '@/src/modules/tanzania-fiscal/infrastructure/proxyInvoice'
 import { getStationFiscalizationRoute } from '@/src/modules/tanzania-fiscal/infrastructure/route'
 import { classifyProxyInvoiceStatus } from '@/src/modules/transactions/domain/kenya-proxy-invoice-status'
+import { mergeChangedProxyInvoiceStatus } from '@/src/modules/transactions/domain/proxy-invoice-status-evidence'
 import { markTransactionFailed } from '@/src/modules/transactions/application/commands/mark-transaction-failed'
 import { markTransactionFiscalized } from '@/src/modules/transactions/application/commands/mark-transaction-fiscalized'
 import { enqueueAutoPrintFiscalReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/autoPrintFiscalReceipt'
@@ -744,6 +745,97 @@ function matchesFiscalizationResult(txn: any, result: any): boolean {
   return resultKeys.some((value) => candidateKeys.has(value))
 }
 
+/**
+ * Keep the latest non-terminal proxy status in the existing fiscalization
+ * event. Never create an event for a GET and never touch transactions.updated_at
+ * (which controls the pending reconciliation order). Skip identical responses.
+ */
+async function updatePendingProxyInvoiceStatus(input: {
+  stationId: string
+  transactionId: string
+  eventId: string | null
+  documentId: string | null
+  statusResponse: unknown
+}): Promise<boolean> {
+  if (!input.eventId) return false
+
+  return await withTransaction(async (client) => {
+    const tx = await txQuery<{
+      status: string
+      latest_fiscal_event_id: string | null
+    }>(
+      client,
+      `SELECT status, latest_fiscal_event_id
+         FROM transactions
+        WHERE station_id = $1
+          AND id = $2::uuid
+          AND deleted_at IS NULL
+        FOR UPDATE`,
+      [input.stationId, input.transactionId],
+    )
+    const current = tx.rows?.[0]
+    if (
+      current?.status !== 'FISCALIZING' ||
+      current.latest_fiscal_event_id !== input.eventId
+    ) return false
+
+    const event = await txQuery<{
+      engine: string
+      status: string
+      request_payload: unknown
+      response_payload: unknown
+    }>(
+      client,
+      `SELECT engine, status, request_payload, response_payload
+         FROM fiscalization_events
+        WHERE id = $1::uuid
+          AND station_id = $2::uuid
+          AND transaction_id = $3::uuid
+          AND transport = 'proxy'
+        FOR UPDATE`,
+      [input.eventId, input.stationId, input.transactionId],
+    )
+    const existing = event.rows?.[0]
+    if (!existing || existing.status !== 'PENDING') return false
+
+    const responsePayload = mergeChangedProxyInvoiceStatus(
+      existing.response_payload,
+      input.statusResponse,
+    )
+    if (responsePayload === null) return false
+
+    const recorded = await persistFiscalizationEventRepo({
+      stationId: input.stationId,
+      transactionId: input.transactionId,
+      engine: existing.engine,
+      transport: 'proxy',
+      status: 'PENDING',
+      existingEventId: input.eventId,
+      fiscalDocumentId: input.documentId,
+      requestPayload: existing.request_payload,
+      responsePayload,
+      client,
+    })
+
+    await txQuery(
+      client,
+      `UPDATE transactions
+          SET fiscalization_response = $3
+        WHERE station_id = $1
+          AND id = $2::uuid
+          AND status = 'FISCALIZING'
+          AND latest_fiscal_event_id = $4::uuid`,
+      [
+        input.stationId,
+        input.transactionId,
+        JSON.stringify(recorded.compatibilitySummary),
+        input.eventId,
+      ],
+    )
+    return true
+  })
+}
+
 async function reconcilePendingProxyFiscalizations(input: {
   stationId: string
   pendingLimit?: number
@@ -870,9 +962,9 @@ async function reconcilePendingProxyFiscalizations(input: {
             originalDocumentId,
             directCountry,
           )
-          if (classifyProxyInvoiceStatus(invoice) !== 'pending') {
-            statusByTransactionId.set(String(txn.id), invoice)
-          }
+          // Include non-terminal results: the current event can be updated
+          // in place when the returned invoice status materially changes.
+          statusByTransactionId.set(String(txn.id), invoice)
         } catch (error: unknown) {
           logger.warn(`[${WORKER_NAME}] ${directCountry} invoice status lookup failed`, {
             stationId: input.stationId,
@@ -939,16 +1031,38 @@ async function reconcilePendingProxyFiscalizations(input: {
 
     // A final decision is committed under a row lock below so overlapping
     // browser and worker requests cannot both finalize this attempt.
+    const directOutcome = directDocumentLookup
+      ? classifyProxyInvoiceStatus(matched)
+      : null
     const merged = mergeFiscalizationResponses(stored, matched)
+    if (directDocumentLookup) {
+      merged.statusLookup = matched
+    }
     const matchedDocId =
       extractProxyDocumentId(matched) ||
       extractProxyDocumentId(stored) ||
       trimString(txn?.fiscal_document_id)
 
-    if (
+    if (directDocumentLookup ? directOutcome === 'pending' :
       !hasFinalFiscalizationPayload(matched) &&
-      !isFailedFiscalizationPayload(matched)
-    ) {
+        !isFailedFiscalizationPayload(matched)) {
+      if (directDocumentLookup) {
+        await updatePendingProxyInvoiceStatus({
+          stationId: input.stationId,
+          transactionId: String(txn.id),
+          eventId: txn?.fiscal_event_id ?? null,
+          documentId: matchedDocId,
+          statusResponse: matched,
+        }).catch((error: unknown) => {
+          logger.warn(`[${WORKER_NAME}] unable to update pending invoice status`, {
+            stationId: input.stationId,
+            transactionId: String(txn.id),
+            error: String(error instanceof Error ? error.message : error),
+          })
+        })
+        continue
+      }
+
       const matchedRequestId = extractProxyRequestId(matched, {
         includeGenericId: false,
       })
@@ -980,7 +1094,9 @@ async function reconcilePendingProxyFiscalizations(input: {
       continue
     }
 
-    if (isFailedFiscalizationPayload(matched)) {
+    if (directDocumentLookup
+      ? directOutcome === 'failed'
+      : isFailedFiscalizationPayload(matched)) {
       const failedTransaction = await withTransaction(async (client) => {
         const locked = await txQuery<{
           status: string
@@ -1033,7 +1149,7 @@ async function reconcilePendingProxyFiscalizations(input: {
 
     if (
       directDocumentLookup
-        ? classifyProxyInvoiceStatus(matched) !== 'approved'
+        ? directOutcome !== 'approved'
         : !hasFinalFiscalizationPayload(matched)
     ) continue
 
