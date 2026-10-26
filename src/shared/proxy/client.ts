@@ -311,6 +311,47 @@ export const stopOfflineQueueProcessingViaProxy = async (
   })
 }
 
+/**
+ * Lookup the authoritative Kenya invoice status by its original DocumentId.
+ * A successful HTTP envelope is not itself a fiscalization approval: callers
+ * must check the matched invoice's status before changing local state.
+ */
+export async function getKenyaInvoiceStatusViaProxy(
+  stationId: string,
+  documentId: string,
+): Promise<Record<string, unknown>> {
+  const requestedId = documentId.trim()
+  if (!requestedId) throw new Error('A fiscal DocumentId is required')
+
+  const result = await proxyRequest(stationId, {
+    method: 'GET',
+    path: '/api/invoices/status',
+    query: { DocumentId: requestedId },
+    timeoutMs: 10_000,
+  })
+  if (!result.ok) {
+    throw new Error(`Proxy invoice status lookup failed (HTTP ${result.status})`)
+  }
+  const payload = result.data
+  if (!payload || typeof payload !== 'object' || payload.error === true ||
+      !Array.isArray(payload.invoices)) {
+    throw new Error('Proxy returned an invalid invoice status envelope')
+  }
+
+  const matches = (payload.invoices as unknown[]).filter(
+    (entry): entry is Record<string, unknown> =>
+      entry !== null &&
+      typeof entry === 'object' &&
+      !Array.isArray(entry) &&
+      String((entry as Record<string, unknown>).documentId ?? '').trim().toUpperCase() ===
+        requestedId.toUpperCase(),
+  )
+  if (matches.length !== 1) {
+    throw new Error('Proxy did not return exactly one matching DocumentId')
+  }
+  return matches[0]
+}
+
 export const getFiscalizationResultsSinceViaProxy = async (
   stationId: string | undefined,
   query: { since: string; limit?: number },
