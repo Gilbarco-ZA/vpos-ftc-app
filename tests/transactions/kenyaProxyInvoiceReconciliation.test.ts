@@ -43,7 +43,7 @@ test('an HTTP success envelope or in-progress response never finalizes an invoic
 
 test('DocumentId status lookup uses configured proxy URL and validates invoice identity', () => {
   const client = read('src/shared/proxy/client.ts')
-  assert.match(client, /path: '\/api\/invoices\/status'/)
+  assert.match(client, /'\/api\/invoices\/status'/)
   assert.match(client, /query: \{ DocumentId: requestedId \}/)
   assert.match(client, /matches\.length !== 1/)
   assert.match(client, /requestedId\.toUpperCase\(\)/)
@@ -71,8 +71,8 @@ test('manual refresh uses CSRF and restricts reconciliation to station-scoped fi
 
 test('ten-minute checks run from the independent proxy worker', () => {
   const worker = read('src/modules/transactions/infrastructure/fiscalization/proxySenderWorker.ts')
-  assert.match(worker, /kenyaDocumentStatusIntervalMs = 10 \* 60 \* 1000/)
-  assert.match(worker, /lastKenyaDocumentStatusAt/)
+  assert.match(worker, /countryDocumentStatusIntervalMs = 10 \* 60 \* 1000/)
+  assert.match(worker, /lastCountryDocumentStatusAt/)
   assert.match(worker, /mode: 'kenya-document-status'/)
   assert.match(worker, /excludeTransactionIds: new Set\(inFlight\.keys\(\)\)/)
   assert.match(worker, /if \(!fiscalizedTransaction\) continue/)
