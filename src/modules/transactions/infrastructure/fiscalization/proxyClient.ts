@@ -84,9 +84,16 @@ async function parseProxyResponse(res: Response): Promise<any> {
 export async function submitInvoiceToProxy(
   stationId: string,
   invoice: ProxyInvoiceRequest,
-  opts?: { signal?: AbortSignal; idempotencyKey?: string },
+  opts?: {
+    signal?: AbortSignal
+    idempotencyKey?: string
+    onPreparedPayload?: (payload: unknown) => void
+  },
 ): Promise<{ ok: boolean; status: number; data: ProxyInvoiceResponse | any }> {
-  const outboundInvoice = invoice
+  const outboundPayload = stripNulls(toCountrySpecificInvoicePayload(invoice))
+  // Capture the exact body used by fetch, before the network request can fail.
+  // The observer must not mutate this payload.
+  opts?.onPreparedPayload?.(outboundPayload)
   const url =
     (await baseUrl(stationId)) + (await basePath(stationId)) + '/api/invoices'
   const res = await fetch(url, {
@@ -99,9 +106,7 @@ export async function submitInvoiceToProxy(
         : {}),
     },
     signal: opts?.signal,
-    body: JSON.stringify(
-      stripNulls(toCountrySpecificInvoicePayload(outboundInvoice)),
-    ),
+    body: JSON.stringify(outboundPayload),
   })
 
   const data = await parseProxyResponse(res)
