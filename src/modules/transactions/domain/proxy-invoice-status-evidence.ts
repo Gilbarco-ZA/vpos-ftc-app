@@ -16,10 +16,10 @@ const asObject = (value: unknown): JsonObject | null =>
  * The full latest response (including that timestamp) is kept when an actual
  * status / fiscal detail change occurs.
  */
-const comparableStatus = (source: JsonObject): JsonObject => {
-  const { lastStatusTime: _lastStatusTime, ...rest } = source
-  return rest
-}
+const comparableStatus = (source: JsonObject): JsonObject =>
+  Object.fromEntries(
+    Object.entries(source).filter(([key]) => key !== 'lastStatusTime'),
+  )
 
 /**
  * Replace a single latest status snapshot in an existing fiscalization event.
