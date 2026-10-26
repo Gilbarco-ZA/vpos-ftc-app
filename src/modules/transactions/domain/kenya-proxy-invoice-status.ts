@@ -1,9 +1,9 @@
-/** Kenya invoice status responses are authoritative only for terminal states. */
-export type KenyaProxyInvoiceOutcome = 'approved' | 'failed' | 'pending'
+/** Only an invoice's own terminal status can complete reconciliation. */
+export type ProxyInvoiceOutcome = 'approved' | 'failed' | 'pending'
 
-export function classifyKenyaProxyInvoiceStatus(
+export function classifyProxyInvoiceStatus(
   value: unknown,
-): KenyaProxyInvoiceOutcome {
+): ProxyInvoiceOutcome {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return 'pending'
   }
@@ -14,3 +14,7 @@ export function classifyKenyaProxyInvoiceStatus(
   if (['FAILED', 'REJECTED', 'DECLINED'].includes(status)) return 'failed'
   return 'pending'
 }
+
+/** Preserve the Kenya-specific API used by existing tests and callers. */
+export type KenyaProxyInvoiceOutcome = ProxyInvoiceOutcome
+export const classifyKenyaProxyInvoiceStatus = classifyProxyInvoiceStatus
