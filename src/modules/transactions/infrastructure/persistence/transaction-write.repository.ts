@@ -1,4 +1,4 @@
-import { query, queryOne, txQuery, withTransaction } from '@/src/platform/db/postgres'
+import { query, txQuery, withTransaction } from '@/src/platform/db/postgres'
 import { AppError } from '@/src/shared/errors/AppError'
 import { shortenUUID } from '@/src/shared/utils/shortenUUID'
 import { uuidv4 } from '@/src/shared/utils/uuid'
@@ -1087,27 +1087,6 @@ export async function createCreditNoteRepo(
   transactionId: string,
   input: any,
 ) {
-  const eligible = await queryOne<{
-    country: string | null
-    fiscal_document_id: string | null
-    grade_id: string | null
-    fuel_type: string | null
-  }>(
-    `SELECT s.country, t.fiscal_document_id, t.grade_id, t.fuel_type
-       FROM transactions t
-       JOIN fuel_stations s ON s.id = t.station_id
-      WHERE t.station_id = $1::uuid AND t.id = $2::uuid AND t.deleted_at IS NULL`,
-    [stationId, transactionId],
-  )
-  if (String(eligible?.country ?? '').trim().toUpperCase() !== 'KE') {
-    throw new Error('Credit notes are currently supported only for Kenya')
-  }
-  if (!String(eligible?.grade_id ?? '').trim() && !String(eligible?.fuel_type ?? '').trim()) {
-    throw new Error('Credit notes are currently supported only for fuel transactions')
-  }
-  if (!String(eligible?.fiscal_document_id ?? '').trim()) {
-    throw new Error('Original fiscal document ID is required for a credit note')
-  }
   const creditNoteId = uuidv4()
   await query(insertCreditNoteSql, [
     creditNoteId,

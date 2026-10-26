@@ -3,7 +3,6 @@
 import { useEffect } from 'react'
 import { z } from 'zod'
 
-import { isValidKenyaPin } from '@/src/modules/customers/domain/kenyaPin'
 import { useForm } from '@/src/shared/hooks/useForm'
 
 import CsrfBootstrap from '@/components/security/CsrfBootstrap'
@@ -127,12 +126,7 @@ export const CustomerDrawer = ({
     reset,
   } = useForm<CustomerFormData>({
     initial: emptyForm,
-    schema: isKenyaStation(stationCountry)
-      ? customerSchema.refine((value) => isValidKenyaPin(value.tin), {
-          path: ['tin'],
-          message: 'Kenya PIN/TIN must match [AP] followed by 9 digits and one letter.',
-        })
-      : customerSchema,
+    schema: customerSchema,
     onSubmit: async (data, csrf) => {
       const normalizedTin = normalize(data.tin)?.toUpperCase()
       const countryCode = stationCountryCode(stationCountry)
@@ -151,9 +145,7 @@ export const CustomerDrawer = ({
             buyerName: normalize(data.buyerName),
             tin: normalizedTin,
             buyerType: normalize(data.buyerType),
-            pin: isKenyaStation(stationCountry)
-              ? normalizedTin
-              : normalize(data.pin),
+            pin: normalize(data.pin),
             passportNumber: normalize(data.passportNumber),
             businessName: normalize(data.businessName),
             taxNinbrn: normalize(data.taxNinbrn),

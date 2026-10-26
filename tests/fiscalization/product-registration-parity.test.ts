@@ -24,7 +24,7 @@ test('Kenya product adapter matches existing registration payload', () => {
     id: current.productId, code: current.productCode, name: current.productName,
     classCode: current.productClassCode, typeCode: current.productTypeCode,
     price: current.unitPrice, currency: current.currency,
-    taxCode: current.taxCode, taxRate: current.taxRate, unitOfMeasure: current.unitOfMeasure,
+    taxCode: current.taxCode, unitOfMeasure: current.unitOfMeasure,
     unitOfPackaging: current.unitOfPackaging,
     hazardousIndicator: current.hazardousIndicator,
   }

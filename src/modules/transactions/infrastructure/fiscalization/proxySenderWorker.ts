@@ -1547,9 +1547,6 @@ async function sendCreditNoteQueueItemToProxy(input: {
     const country = station?.country
       ? String(station.country).toUpperCase()
       : null
-    if (isTanzaniaCountry(country)) {
-      throw new Error('Credit notes are not supported for Tanzania stations.')
-    }
     const defaultTaxType = await getDefaultTaxTypeForCountry(country)
     const vatRate =
       defaultTaxType?.rate != null
@@ -1584,18 +1581,9 @@ async function sendCreditNoteQueueItemToProxy(input: {
       fullTxn.fuel_type ?? null,
     )
 
-    if (country !== 'KE') {
-      throw new Error('Credit notes are currently supported only for Kenya')
-    }
-    const fuelId = trimString(fullTxn.grade_id)
-    const fuelType = trimString(fullTxn.fuel_type)
-    if (!fuelId && !fuelType) {
-      throw new Error('Credit notes are currently supported only for fuel transactions')
-    }
-    const documentReference = trimString(fullTxn.fiscal_document_id)
-    if (!documentReference || documentReference === creditNoteId) {
-      throw new Error('Credit note requires the original transaction fiscal document ID')
-    }
+    const documentReference =
+      trimString(fullTxn.fiscalization_reference) ??
+      trimString(fullTxn.fiscal_document_id)
 
     const creditNotePayload = mapTransactionToProxyCreditNote({
       transaction: fullTxn,
@@ -1706,16 +1694,6 @@ async function resolveEnrichmentFromTables(
   pumpNumber: number | null,
   fuelType?: string | null,
 ) {
-  // Resolve the product actually sold, not an arbitrary nozzle on the pump.
-  // This also picks up refreshed cloud mappings on a first retry.
-  const exactProduct = await queryOne<any>(
-    `SELECT p.*
-       FROM transaction_lines tl
-       JOIN products p ON p.id = tl.product_id AND p.station_id = $1
-      WHERE tl.transaction_id = $2::uuid
-      ORDER BY tl.created_at ASC LIMIT 1`,
-    [stationId, transactionId],
-  )
   if (pumpNumber == null) return {}
 
   const pump = await queryOne<{ id: string }>(
@@ -1818,8 +1796,6 @@ async function resolveEnrichmentFromTables(
     [stationId, transactionId],
   )
 
-  if (exactProduct) bestProduct = { ...bestProduct, ...exactProduct }
-
   return {
     pumpId: String(pump.id),
     nozzleId: String(bestNozzle.id),
@@ -1857,7 +1833,7 @@ async function resolveEnrichmentFromTables(
           ? Number(bestProduct.tax_rate)
           : null,
     currency: bestProduct?.ext_currency ?? null,
-    taxCode: bestProduct?.ext_tax_code ?? bestProduct?.tax_code ?? line?.tax_code ?? null,
+    taxCode: line?.tax_code ?? bestProduct?.ext_tax_code ?? null,
     commodityCode: bestProduct?.commodity_code ?? null,
     hazardousIndicator:
       bestProduct?.ext_hazardous_indicator != null

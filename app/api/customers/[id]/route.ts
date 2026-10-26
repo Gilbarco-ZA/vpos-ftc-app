@@ -27,7 +27,6 @@ export const PATCH = defineMutationRoute<Record<string, any>, { id: string }>({
   handler: async (_req, { user, body, params }) => {
     const result = await updateCustomerRecord({
       stationId: user.stationId,
-      stationCountry: user.station?.country,
       customerId: params.id,
       body,
     })

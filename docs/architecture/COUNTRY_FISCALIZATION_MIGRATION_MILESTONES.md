@@ -42,15 +42,3 @@ layer until M1 and the applicable country parity/rollout gates are satisfied.
 Do not treat a generic status success as receipt fiscal metadata. The guarded
 receipt writer cannot create a receipt without a complete authoritative
 candidate and a verified persisted transaction/event.
-
-## Fiscal event provenance gate (20 Oct 2026)
-
-Missing receipt insertion now independently reads the exact linked fiscalization event within the recovery transaction. It rejects mismatched document, event ID, status or reference, nonstructured response payloads, and synthetic `vpos-proxy-status-recovery` audit events. This is deliberate: a status confirmation does not include the authoritative receipt data needed for generation. A future provider-specific adapter must establish that provenance before creating a candidate; accepting an arbitrary caller-supplied receipt snapshot is not enough. The new reader **does not** manufacture fiscal receipt fields or activate the recovery worker.
-
-## KE/TZ status field mapping baseline (20 Oct 2026)
-
-The isolated `recoveryProviderFieldInventory` preserves the five named status fields (`fiscalId`, `fiscalCode`, `fiscalVerificationCode`, `fiscalQrCodeData`, `revenueAuthorityReference`). It can report missing fields and contradictory fields when **the same exact field name** is present on a linked provider response. It does not interpret aliases, traverse unrelated nested payloads, infer event reference identities, or provide receipt authorization; `referenceMappingApproved` always remains false. A real provider contract sample and approved country-specific mapping are still required. This helper is not wired into production.
-
-## Mapping review evidence (20 Oct 2026)
-
-Use `buildRecoveryProviderReview` to compare precisely named KE/TZ status and linked-event fields. Reports contain presence and conflict classifications only—not raw fiscal identifiers or QR data. Even five matching names do not establish country-specific fiscal reference semantics; `mappingReady` and `receiptCreationAuthorized` remain false until explicitly approved against authoritative provider samples. No worker integration or fiscal-reference writes were added.

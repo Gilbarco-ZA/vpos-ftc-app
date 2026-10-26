@@ -341,7 +341,7 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Validate real PostgreSQL rollback and parallel-worker race behavior.
 - [ ] Confirm receipt enrichment and auto-print parity before any production integration.
 
-## Contradictory fiscal status regression pass (20 Oct 2026)
+## Contradictory fiscal status regression pass
 
 - [x] Align the legacy status-policy test with fail-closed handling when `error: true` conflicts with `details.isFiscalized: true`.
 - [x] Keep explicit success with `error: false` accepted; unknown and error states never grant automatic retry.
@@ -358,7 +358,7 @@ Sources: uploaded cloud-swagger.json, internal-swagger.json, tanzania-swagger.js
 - [ ] Validate guarded transition, rollback, and simultaneous workers against a disposable PostgreSQL instance.
 - [ ] Confirm receipt and print parity; no production worker connection is authorized.
 
-## Receipt and print completion parity assessment (20 Oct 2026)
+## Receipt and print completion parity assessment
 
 Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCCESS event, changes transaction status, reuses or creates a receipt, and conditionally enqueues a print job with idempotency key `receipt:<transactionId>:default`. The isolated recovery PostgreSQL boundary currently persists the event, updates status and compatibility summary, but does not yet execute receipt creation or print queue handling.
 
@@ -382,7 +382,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Wire completion into atomic PostgreSQL recovery only when all receipt-fiscalization fields and transaction consistency are proven.
 - [ ] Add actual database concurrency and rollback tests; until then recovery worker remains disconnected.
 
-## Receipt document/event correlation pass (20 Oct 2026)
+## Receipt document/event correlation pass
 
 - [x] Require persisted recovery receipt evidence to include a matching fiscal document ID and fiscalization event ID.
 - [x] Replace the standalone `fiscalEventLinked` boolean on the receipt coordinator input with a nonempty fiscal event ID.
@@ -391,7 +391,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Add regression coverage for mismatched document and event evidence.
 - [ ] Existing `fiscalDataVerified` remains port-supplied; implement authoritative DB verification, receipt fiscal metadata validation, and proof of same-transaction consistency before integration.
 
-## PostgreSQL receipt verification pass (20 Oct 2026)
+## PostgreSQL receipt verification pass
 
 - [x] Add read-only receipt evidence verification scoped to a transaction and its current linked fiscalization event.
 - [x] Add transaction-scoped PostgreSQL receipt query using `receipts`, `transactions` and `fiscalization_events`; exclude voided and deleted records.
@@ -402,14 +402,14 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Wire receipt-read verification to completion coordinator only after authoritative fiscal proof and transactional receipt generation are implemented.
 
 
-## Swagger status error-flag hardening (20 Oct 2026)
+## Swagger status error-flag hardening
 
 - [x] Require boolean collection-level and matching-row error flags before accepting invoice status as recoverable evidence.
 - [x] Keep status response parsing fail-closed on missing, malformed or string-valued error flags.
 - [x] Align test fixtures with the Swagger-required explicit error flags.
 - [ ] Confirm operational proxy responses consistently include both error flags across KE and TZ.
 
-## Invoice status fiscal evidence preservation (20 Oct 2026)
+## Invoice status fiscal evidence preservation
 
 - [x] Retain fiscalId, fiscalCode, fiscalVerificationCode, fiscalQrCodeData and revenueAuthorityReference from the exactly matched Swagger status row.
 - [x] Reject malformed or empty metadata values instead of treating contradictory shapes as reliable evidence.
@@ -418,7 +418,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Establish country-specific authoritative mapping from these named fields to transaction fiscalization_reference, fiscal event reference and receipt fiscal snapshots using redacted operational samples.
 - [ ] Do not persist candidate reference values or mark receipt parity complete until mapping and receipt provenance are verified.
 
-## KE/TZ fiscal reference provenance policy (20 Oct 2026)
+## KE/TZ fiscal reference provenance policy
 
 - [x] Add isolated country-aware reference decision for Kenya and Tanzania.
 - [x] Require exact transaction document correlation and a SUCCESS event before trusting a persisted reference.
@@ -428,7 +428,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Obtain verified KE/TZ field semantics and transaction-to-receipt reference provenance from redacted provider responses.
 - [ ] Integrate policy with transaction-scoped receipt verification only after confirmed mapping and receipt/print parity.
 
-## Country reference provenance enforced by receipt verifier (20 Oct 2026)
+## Country reference provenance enforced by receipt verifier
 
 - [x] Require an explicit KE/TZ country code for read-only persisted receipt verification.
 - [x] Apply the existing fiscal-reference provenance policy to the transaction and linked SUCCESS event before accepting the receipt snapshot's reference.
@@ -438,7 +438,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Resolve authoritative country-specific mappings and receipt data provenance before activating any recovery worker.
 - [ ] Wire transactional receipt creation and idempotent auto-print only after verified event and receipt lifecycle parity is established.
 
-## Verified persisted receipt before optional auto-print (20 Oct 2026)
+## Verified persisted receipt before optional auto-print
 
 - [x] Add isolated read-verify-print coordinator requiring transaction-scoped receipt verification before print eligibility.
 - [x] Use existing country-specific fiscal-reference provenance, linked SUCCESS event and receipt snapshot checks.
@@ -448,7 +448,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Implement transaction-scoped PostgreSQL printing adapter and authoritative receipt creation before production recovery activation.
 - [ ] Ensure receipt verification and print-job persistence execute within the same transaction as recovery status and event writes.
 
-## Opt-in PostgreSQL recovery auto-print adapter (20 Oct 2026)
+## Opt-in PostgreSQL recovery auto-print adapter
 
 - [x] Add a transaction-scoped PostgreSQL printing port that reuses the existing receipt reference payload and `receipt:<transactionId>:default` idempotency key.
 - [x] Read station auto-print setting using the caller's existing PostgreSQL client.
@@ -458,7 +458,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Connect the receipt verifier and print adapter within a single approved recovery transaction after authoritative fiscal reference and receipt lifecycle integration.
 - [ ] Do not enable production recovery workers while missing receipt generation and fiscal evidence mapping remain unresolved.
 
-## Transactional verified receipt and auto-print boundary (20 Oct 2026)
+## Transactional verified receipt and auto-print boundary
 
 - [x] Add opt-in recovery receipt/print transaction coordinator.
 - [x] Bind PostgreSQL receipt verification and idempotent print persistence to a single transaction-scoped PoolClient.
@@ -468,7 +468,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Integrate this transaction with the earlier guarded status recovery transaction only after authoritative fiscal reference and receipt generation parity. Currently these are separate opt-in workflows.
 - [ ] Validate real PostgreSQL isolation, concurrency and receipt/print rollback, and confirm the referenced fiscal receipt snapshot is complete before activating workers.
 
-## Unified recovery transaction coordinator (20 Oct 2026)
+## Unified recovery transaction coordinator
 
 - [x] Compose guarded FISCALIZING-to-FISCALIZED transition and event audit with linked fiscal event discovery, persisted receipt verification and optional idempotent print handling under one injected transaction boundary.
 - [x] Return stale without receipt/print operations when guarded UPDATE changes zero rows.
@@ -478,7 +478,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Add opt-in unified PostgreSQL boundary sharing one PoolClient for status, audit, linked event lookup, receipt verification and print persistence.
 - [ ] Resolve fiscal reference and missing-receipt metadata parity before enabling workers or assuming recovered transactions are complete.
 
-## Unified PostgreSQL client milestone (20 Oct 2026)
+## Unified PostgreSQL client milestone
 
 - [x] Implement `createPostgresUnifiedRecoveryBoundary` with a single `withTransaction` enclosing guarded UPDATE, fiscalization event/audit, linked event lookup, receipt verification, station settings and print-job operations.
 - [x] Keep linked-event discovery scoped to station, transaction and fiscal document, requiring the FISCALIZED state and a nondeleted row.
@@ -487,7 +487,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Current recovery status collection does not provide proven receipt reference semantics. Missing references/receipts continue to block completion and roll back fiscal status updates.
 - [ ] Validate real PostgreSQL concurrency and transactional rollback prior to production activation.
 
-## Unified recovery print integrity safeguards (20 Oct 2026)
+## Unified recovery print integrity safeguards
 
 - [x] Treat absent or malformed station auto-print configuration as an error, not implicit printing-disabled permission.
 - [x] Validate an INSERT RETURNING print job against the expected receipt/transaction identity instead of treating a single returned row as sufficient.
@@ -496,7 +496,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Validate PostgreSQL concurrent insertion and rollback semantics with the disposable integration database.
 - [ ] Retain worker-disabled state until authoritative fiscal reference and receipt generation are available.
 
-## Concurrent receipt verification safety (20 Oct 2026)
+## Concurrent receipt verification safety
 
 - [x] Lock the selected persisted receipt row within the caller-owned PostgreSQL transaction before fiscal-data verification and optional auto-print.
 - [x] Read up to two nonvoided receipts for the same station and transaction; reject ambiguous duplicate receipts instead of silently choosing the newest.
@@ -505,7 +505,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Establish an approved receipt generation path and authoritative fiscal metadata provenance for delayed fiscalization.
 - [ ] Verify concurrent receipt mutation, transaction rollback and duplicate print-job behavior in disposable PostgreSQL before worker activation.
 
-## Missing receipt authorization gate (20 Oct 2026)
+## Missing receipt authorization gate
 
 - [x] Add isolated validation for a candidate fiscal receipt snapshot before permitting future persistence.
 - [x] Require exact expected document/event IDs, receipt number, schemaVersion 1 and matching fiscal reference.
@@ -515,7 +515,7 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [ ] Bind authorization to a real transaction-scoped read and insert; the gate alone does not create receipts and cannot authenticate its caller-provided evidence.
 - [ ] Preserve worker-disabled state until provider fiscal reference semantics, receipt parity and real DB concurrency are verified.
 
-## Transaction-scoped missing-receipt fiscal evidence (20 Oct 2026)
+## Transaction-scoped missing-receipt fiscal evidence
 
 - [x] Inspect the existing receipt generator and identify independent pool reads in receiptBuilder and branding loading that are unsafe for uncommitted recovery state.
 - [x] Add opt-in PostgreSQL fiscal identity reader using the existing recovery transaction client, locking the transaction and correlating its linked fiscalization event.
@@ -523,3 +523,16 @@ Existing completion path: `completeTransactionFiscalizationRepo` persists a SUCC
 - [x] Reject stale, mismatched and absent fiscal evidence in isolated regression coverage.
 - [ ] Refactor the complete receipt builder dependency tree for transaction-visible reads or supply an equivalent authoritative snapshot without changing production entrypoints.
 - [ ] Implement guarded receipt insertion only after the source and generated fiscal snapshot have been independently verified. This pass does not insert receipts or enable workers.
+
+
+## Fiscal event provenance gate
+
+Missing receipt insertion now independently reads the exact linked fiscalization event within the recovery transaction. It rejects mismatched document, event ID, status or reference, nonstructured response payloads, and synthetic `vpos-proxy-status-recovery` audit events. This is deliberate: a status confirmation does not include the authoritative receipt data needed for generation. A future provider-specific adapter must establish that provenance before creating a candidate; accepting an arbitrary caller-supplied receipt snapshot is not enough. The new reader **does not** manufacture fiscal receipt fields or activate the recovery worker.
+
+## KE/TZ status field mapping baseline
+
+The isolated `recoveryProviderFieldInventory` preserves the five named status fields (`fiscalId`, `fiscalCode`, `fiscalVerificationCode`, `fiscalQrCodeData`, `revenueAuthorityReference`). It can report missing fields and contradictory fields when **the same exact field name** is present on a linked provider response. It does not interpret aliases, traverse unrelated nested payloads, infer event reference identities, or provide receipt authorization; `referenceMappingApproved` always remains false. A real provider contract sample and approved country-specific mapping are still required. This helper is not wired into production.
+
+## Mapping review evidence
+
+Use `buildRecoveryProviderReview` to compare precisely named KE/TZ status and linked-event fields. Reports contain presence and conflict classifications only—not raw fiscal identifiers or QR data. Even five matching names do not establish country-specific fiscal reference semantics; `mappingReady` and `receiptCreationAuthorized` remain false until explicitly approved against authoritative provider samples. No worker integration or fiscal-reference writes were added.

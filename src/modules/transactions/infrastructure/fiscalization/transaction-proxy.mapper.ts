@@ -396,12 +396,12 @@ export function mapTransactionToProxyInvoice(args: {
           : roundMoney(num(rawLine.unitPrice, 0), 0)
 
       const taxTypeCode = String(
-        enrichment.taxCode || rawLine.taxCode || args.taxType || 'B',
+        rawLine.taxCode || enrichment.taxCode || args.taxType || 'B',
       )
       const codeFallback = defaultRateForTaxCode(taxTypeCode, vatRate)
       const lineTaxRate = roundMoney(
         normalizeRate(
-          enrichment.taxRate ?? rawLine.taxRate ?? args.taxRate,
+          rawLine.taxRate ?? enrichment.taxRate ?? args.taxRate,
           codeFallback,
         ),
       )
@@ -469,10 +469,10 @@ export function mapTransactionToProxyInvoice(args: {
         productId: strOrNull(rawLine.productId ?? enrichment.productId),
         productCode: strOrNull(rawLine.productCode ?? enrichment.productCode),
         productClassCode: strOrNull(
-          enrichment.productClassCode ?? rawLine.productClassCode,
+          rawLine.productClassCode ?? enrichment.productClassCode,
         ),
         productTypeCode: strOrNull(
-          enrichment.productTypeCode ?? rawLine.productTypeCode,
+          rawLine.productTypeCode ?? enrichment.productTypeCode,
         ),
         description:
           strOrNull(
@@ -669,9 +669,6 @@ export function mapTransactionToProxyCreditNote(
   },
 ): import('@/src/shared/fiscalization/proxy/contracts').ProxyCreditNotesRequest {
   // Reuse the invoice mapper because it already applies ext_* product overrides.
-  if (String(args.station?.country ?? '').trim().toUpperCase() !== 'KE') {
-    throw new Error('Credit notes are currently supported only for Kenya')
-  }
   const invoice = mapTransactionToProxyInvoice(args)
 
   const reasonCode = (() => {
@@ -679,14 +676,15 @@ export function mapTransactionToProxyCreditNote(
     return raw.length ? raw : '13'
   })()
 
-  const documentReference = String(args.documentReference ?? '').trim()
-  const creditDocumentId = String(args.creditNoteId ?? '').trim()
-  if (!documentReference || !creditDocumentId || documentReference === creditDocumentId) {
-    throw new Error('Credit note needs a new document ID and the original fiscal document ID as reference')
-  }
-  if (!invoice.lines?.length || invoice.lines.some(line => !line.product?.fuel)) {
-    throw new Error('Credit notes are currently supported only for fuel transactions')
-  }
+  const documentReference = (() => {
+    const raw = String(
+      args.documentReference ??
+        invoice.documentNumber ??
+        invoice.documentId ??
+        '',
+    ).trim()
+    return raw.length ? raw : null
+  })()
 
   const createdByName =
     strOrNull(args.createdByName ?? invoice.createdByName) ?? 'VPOS-LITE'
@@ -696,14 +694,12 @@ export function mapTransactionToProxyCreditNote(
   const documentNumber = (() => {
     const raw = String(
       args.documentNumber ??
+        invoice.documentNumber ??
+        documentReference ??
         args.creditNoteId,
     ).trim()
     return raw.length ? raw : null
   })()
-
-  if (!invoice.payment?.tenders?.length) {
-    throw new Error('Kenya credit note requires original payment tenders')
-  }
 
   const reason = (() => {
     const raw = String(args.notes ?? invoice.notes ?? '').trim()
@@ -751,7 +747,9 @@ export function mapTransactionToProxyCreditNote(
   return {
     creditNotes: [
       {
+        IsOnline: isOnline,
         isOnline,
+        DocumentId: String(args.creditNoteId),
         documentId: String(args.creditNoteId),
         documentNumber,
         documentReference,
@@ -761,8 +759,8 @@ export function mapTransactionToProxyCreditNote(
         createdByName,
         reasonCode,
         reason,
+        Lines,
         lines: Lines,
-        payment: invoice.payment,
       },
     ],
   }

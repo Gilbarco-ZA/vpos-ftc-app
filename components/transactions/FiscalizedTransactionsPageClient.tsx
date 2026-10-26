@@ -1,6 +1,5 @@
 'use client'
 
-import { KENYA_CREDIT_NOTE_REASONS } from '@/src/modules/transactions/domain/kenyaCreditNoteReasons'
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import type { FiscalizedTransactionListItem } from '@/src/shared/types/transactions'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -827,23 +826,14 @@ const FiscalizedTransactionsPageClient = ({
             ) : null}
 
             <div className="space-y-2">
-              <label htmlFor="kenya-credit-reason" className="text-xs font-semibold text-[var(--text-secondary)]">
-                Credit note reason code
-              </label>
-              <select
-                id="kenya-credit-reason"
+              <div className="text-xs font-semibold text-[var(--text-secondary)]">
+                Reason code (optional)
+              </div>
+              <Input
                 value={creditReasonCode}
                 onChange={(e) => setCreditReasonCode(e.target.value)}
-                required
-                className="w-full rounded border border-border bg-surface-card px-3 py-2 text-sm"
-              >
-                <option value="">Select a reason</option>
-                {KENYA_CREDIT_NOTE_REASONS.map((reason) => (
-                  <option key={reason.code} value={reason.code}>
-                    {reason.code} — {reason.description}
-                  </option>
-                ))}
-              </select>
+                placeholder="e.g. RETURN, ERROR, CANCEL"
+              />
             </div>
 
             <div className="space-y-2">
@@ -878,7 +868,7 @@ const FiscalizedTransactionsPageClient = ({
               </Button>
               <Button
                 onClick={submitCreditNote}
-                disabled={!csrfToken || isCreatingCreditNote || !creditReasonCode}
+                disabled={!csrfToken || isCreatingCreditNote}
                 title={!csrfToken ? 'Loading security token…' : undefined}
               >
                 {isCreatingCreditNote ? 'Creating…' : 'Create credit note'}

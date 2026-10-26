@@ -369,7 +369,6 @@ export function buildKenyaProductRegistrationPayload(
     unitPrice: product.extUnitPrice ?? product.unitPrice,
     currency: product.extCurrency ?? product.currency,
     taxCode: product.extTaxCode ?? product.taxCode,
-    taxRate: Number(product.taxRate),
     hazardousIndicator:
       product.extHazardousIndicator ?? product.hazardousIndicator ?? false,
   }

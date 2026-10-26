@@ -79,7 +79,6 @@ export const kenyaProductPolicy: ProductPolicy = {
         unitPrice: product.price,
         currency: 'KES',
         taxCode: String(product.taxCode).trim().toUpperCase(),
-        ...(product.taxRate != null ? { taxRate: product.taxRate } : {}),
         hazardousIndicator: product.hazardousIndicator ?? false,
       })),
     }
