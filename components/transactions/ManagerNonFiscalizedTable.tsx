@@ -60,6 +60,7 @@ export function ManagerNonFiscalizedTable(props: {
   products: TransactionBuilderProduct[]
   csrfToken: string
   decimals: DecimalSettings
+  stationCountry?: string | null
 }) {
   const { csrfToken } = props
   const router = useRouter()
@@ -73,6 +74,8 @@ export function ManagerNonFiscalizedTable(props: {
   const [detailsTxn, setDetailsTxn] = useState<TxnRow | null>(null)
   const [editingTxn, setEditingTxn] = useState<TxnRow | null>(null)
   const [cancelTxn, setCancelTxn] = useState<TxnRow | null>(null)
+  const [checkingStatus, setCheckingStatus] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const formatMoney = (value: any) =>
     formatNumber(value == null ? null : Number(value), props.decimals.money)
   const formatVolume = (value: any) =>
@@ -101,6 +104,51 @@ export function ManagerNonFiscalizedTable(props: {
     })
   }, [tableRows])
 
+  const fiscalizingIds = tableRows
+    .filter((row) => String(row.status ?? '').toUpperCase() === 'FISCALIZING')
+    .map((row) => String(row.id))
+  const isKenya = ['KE', 'KEN', 'KENYA'].includes(
+    String(props.stationCountry ?? '').trim().toUpperCase(),
+  )
+
+  const checkFiscalizingStatuses = async () => {
+    if (!fiscalizingIds.length || checkingStatus) return
+    if (!csrfToken) {
+      setStatusMessage('Security token is not ready. Try again.')
+      return
+    }
+    setCheckingStatus(true)
+    setStatusMessage(null)
+    try {
+      const res = await fetch('/api/transactions/reconcile-kenya-status', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
+        body: JSON.stringify({
+          csrf_token: csrfToken,
+          transactionIds: fiscalizingIds,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || body?.ok === false) {
+        throw new Error(body?.error?.message ?? 'Proxy status check failed')
+      }
+      const result = body?.data ?? body
+      setStatusMessage(
+        `Proxy status checked: ${result.checked ?? 0}, approved: ${result.finalized ?? 0}`,
+      )
+    } catch (error: unknown) {
+      setStatusMessage(
+        error instanceof Error ? error.message : 'Proxy status check failed',
+      )
+    } finally {
+      setCheckingStatus(false)
+      router.refresh()
+    }
+  }
+
   const submitFiscalize = (transactionId: string) => {
     const form = document.getElementById(
       `fiscalize-${transactionId}`,
@@ -110,7 +158,22 @@ export function ManagerNonFiscalizedTable(props: {
 
   return (
     <>
-      <div className="flex justify-end border-b border-border px-4 py-3">
+      <div className="flex flex-wrap items-center justify-end gap-3 border-b border-border px-4 py-3">
+        {statusMessage ? (
+          <span role="status" className="text-xs text-[var(--text-secondary)]">
+            {statusMessage}
+          </span>
+        ) : null}
+        {isKenya && fiscalizingIds.length > 0 ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={checkingStatus}
+            onClick={() => void checkFiscalizingStatuses()}
+          >
+            {checkingStatus ? 'Checking proxy…' : 'Refresh fiscalizing status'}
+          </Button>
+        ) : null}
         <BulkRetryFailedTransactionsButton
           transactionIds={tableRows
             .filter((row) => String(row?.status || '').toUpperCase() === 'FAILED')
