@@ -36,3 +36,15 @@ export type FiscalInboxItemViewModel = {
 }
 
 export type FiscalInboxDetailViewModel = FiscalInboxDetailRow
+
+export type FiscalInboxProxyExchangeViewModel = {
+  eventId: string
+  engine: string
+  transport: string
+  status: string
+  occurredAt: string
+  matchType: 'inbox-event' | 'latest-transaction-attempt'
+  requestPayload: unknown
+  responsePayload: unknown
+  errorMessage: string | null
+}

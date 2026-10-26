@@ -1,4 +1,7 @@
-import type { FiscalInboxDetailViewModel } from '@/src/modules/fiscal-inbox/presentation/view-models/fiscal-inbox.view-model'
+import type {
+  FiscalInboxDetailViewModel,
+  FiscalInboxProxyExchangeViewModel,
+} from '@/src/modules/fiscal-inbox/presentation/view-models/fiscal-inbox.view-model'
 
 import { DetailItem, DetailList } from '@/components/ui/detail-list'
 
@@ -16,8 +19,10 @@ function formatDate(v: any) {
 
 export function FiscalInboxDetailView({
   row,
+  proxyExchange,
 }: {
   row: FiscalInboxDetailViewModel
+  proxyExchange: FiscalInboxProxyExchangeViewModel | null
 }) {
   return (
     <>
@@ -63,6 +68,70 @@ export function FiscalInboxDetailView({
         <pre className="mt-2 overflow-auto rounded bg-[var(--surface-muted)] p-3 text-xs">
           {jsonStringifySafe(row.message_json)}
         </pre>
+      </div>
+
+      <div className="space-y-3 rounded border bg-[var(--surface-card)] p-4">
+        <h2 className="text-sm font-semibold">Proxy request and response</h2>
+        {proxyExchange ? (
+          <>
+            <div className="space-y-1 text-xs text-[var(--text-secondary)]">
+              <div>
+                Event <span className="font-mono">{proxyExchange.eventId}</span>
+                {' · '}Status: {proxyExchange.status}
+                {' · '}Engine: {proxyExchange.engine}
+                {' · '}Recorded at: {formatDate(proxyExchange.occurredAt)}
+              </div>
+              <div>
+                {proxyExchange.matchType === 'inbox-event'
+                  ? 'Matched to the fiscalization event referenced by this inbox message.'
+                  : 'Latest recorded proxy attempt for the related transaction; not necessarily the attempt that generated this inbox message.'}
+              </div>
+              <div>
+                Recorded diagnostic evidence is redacted for secrets. Historical
+                requests may use the pre-transport invoice shape; new submissions
+                capture the JSON body passed to the proxy HTTP request.
+              </div>
+            </div>
+            <details open className="rounded border border-border p-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                Outgoing proxy request payload
+              </summary>
+              {proxyExchange.requestPayload == null ? (
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  No request payload was recorded for this attempt.
+                </p>
+              ) : (
+                <pre className="mt-2 max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded bg-[var(--surface-muted)] p-3 font-mono text-xs">
+                  {jsonStringifySafe(proxyExchange.requestPayload)}
+                </pre>
+              )}
+            </details>
+            <details open className="rounded border border-border p-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                Proxy response payload
+              </summary>
+              {proxyExchange.responsePayload == null ? (
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  No proxy response has been recorded for this attempt.
+                </p>
+              ) : (
+                <pre className="mt-2 max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded bg-[var(--surface-muted)] p-3 font-mono text-xs">
+                  {jsonStringifySafe(proxyExchange.responsePayload)}
+                </pre>
+              )}
+            </details>
+            {proxyExchange.errorMessage ? (
+              <p className="break-words text-xs text-red-700">
+                Recorded error: {proxyExchange.errorMessage}
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-xs text-[var(--text-secondary)]">
+            No matching proxy fiscalization event was found for this inbox
+            message. The inbound Message JSON above remains available.
+          </p>
+        )}
       </div>
     </>
   )

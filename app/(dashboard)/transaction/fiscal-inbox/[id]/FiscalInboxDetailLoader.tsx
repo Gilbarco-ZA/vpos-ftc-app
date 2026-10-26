@@ -1,7 +1,10 @@
 'use client'
 
 import type { TransactionBuilderProduct } from '@/components/transactions/TransactionProductEditor'
-import type { FiscalInboxDetailViewModel } from '@/src/modules/fiscal-inbox/presentation/view-models/fiscal-inbox.view-model'
+import type {
+  FiscalInboxDetailViewModel,
+  FiscalInboxProxyExchangeViewModel,
+} from '@/src/modules/fiscal-inbox/presentation/view-models/fiscal-inbox.view-model'
 import type { DecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { useEffect, useState } from 'react'
 
@@ -18,6 +21,7 @@ type DetailData = {
   transaction: unknown | null
   products: TransactionBuilderProduct[]
   decimals: DecimalSettings
+  proxyExchange: FiscalInboxProxyExchangeViewModel | null
 }
 
 export function FiscalInboxDetailLoader({ id }: { id: string }) {
@@ -89,7 +93,7 @@ export function FiscalInboxDetailLoader({ id }: { id: string }) {
         </div>
       </div>
 
-      <FiscalInboxDetailView row={row} />
+      <FiscalInboxDetailView row={row} proxyExchange={data.proxyExchange} />
 
       {data.transactionId ? (
         <RelatedTransactionPanel

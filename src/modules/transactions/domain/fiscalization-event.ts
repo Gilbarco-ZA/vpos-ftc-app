@@ -27,7 +27,7 @@ const REDACTED = '[REDACTED]'
 const MAX_SUMMARY_VALUE_LENGTH = 512
 
 const sensitiveKeyPattern =
-  /(?:authorization|access[_-]?token|refresh[_-]?token|bearer|password|passwd|secret|private[_-]?key|client[_-]?secret|certificate|cert[_-]?data|pfx|pkcs12|cvv|cvc|card[_-]?number|account[_-]?number|full[_-]?pan|^pan$)/i
+  /(?:authorization|api[_-]?key|client[_-]?key|^token$|cookie|set[_-]?cookie|access[_-]?token|refresh[_-]?token|bearer|password|passwd|secret|private[_-]?key|client[_-]?secret|certificate|cert[_-]?data|pfx|pkcs12|cvv|cvc|card[_-]?number|account[_-]?number|full[_-]?pan|^pan$)/i
 
 export const sanitizeFiscalText = (value: unknown): string =>
   String(value ?? '')

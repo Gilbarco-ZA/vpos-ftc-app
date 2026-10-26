@@ -1041,6 +1041,7 @@ export async function sendClaimedTransactionToProxy(input: {
   let docNo: string | null = null
   let proxyEngine = 'proxy'
   let proxyRequestPayload: unknown = null
+  let proxyHttpResponse: { status: number; body: unknown } | null = null
 
   try {
     proxyEngine = await loadFiscalizationEngine(stationId)
@@ -1112,7 +1113,11 @@ export async function sendClaimedTransactionToProxy(input: {
 
     const res = await submitInvoiceToProxy(stationId, invoice, {
       idempotencyKey: `${stationId}:${txn.id}`,
+      onPreparedPayload: (payload) => {
+        proxyRequestPayload = payload
+      },
     })
+    proxyHttpResponse = { status: res.status, body: res.data }
     if (!res.ok)
       throw new Error(
         `Proxy submit failed: ${res.status} ${JSON.stringify(res.data)}`,
@@ -1142,7 +1147,7 @@ export async function sendClaimedTransactionToProxy(input: {
           fiscalEvent: {
             engine: proxyEngine,
             transport: 'proxy',
-            requestPayload: invoice,
+            requestPayload: proxyRequestPayload,
             responsePayload: res.data ?? {},
             errorMessage:
               extractFailureMessage(res.data) || 'Proxy fiscalization failed',
@@ -1186,7 +1191,7 @@ export async function sendClaimedTransactionToProxy(input: {
             engine: proxyEngine,
             transport: 'proxy',
             reference: docNo,
-            requestPayload: invoice,
+            requestPayload: proxyRequestPayload,
             responsePayload: res.data ?? {},
             idempotencyKey: `proxy:${txn.id}:attempt:${Number(txn.retry_count ?? 0)}`,
           },
@@ -1198,7 +1203,7 @@ export async function sendClaimedTransactionToProxy(input: {
           engine: proxyEngine,
           fiscalDocumentId: docId,
           cloudTransactionId: requestId,
-          requestPayload: invoice,
+          requestPayload: proxyRequestPayload,
           responsePayload: {
             submission: res.data ?? {},
             requestId,
@@ -1333,6 +1338,12 @@ export async function sendClaimedTransactionToProxy(input: {
         responsePayload: {
           error: String(e?.message || e),
           documentId: docId,
+          ...(proxyHttpResponse
+            ? {
+                httpStatus: proxyHttpResponse.status,
+                proxyResponse: proxyHttpResponse.body,
+              }
+            : {}),
         },
         errorMessage: String(e?.message || e),
         idempotencyKey: `proxy:${txn.id}:attempt:${Number(txn.retry_count ?? 0)}`,

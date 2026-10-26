@@ -20,6 +20,8 @@ test('fiscal event payloads redact transport and payment secrets', () => {
     authorization: 'Bearer secret',
     nested: {
       accessToken: 'token-value',
+      apiKey: 'api-secret',
+      cookie: 'session-secret',
       password: 'password-value',
       pan: '4111111111111111',
       receipt: {
@@ -32,6 +34,8 @@ test('fiscal event payloads redact transport and payment secrets', () => {
   assert.equal(sanitized.reference, 'FISCAL-1')
   assert.equal(sanitized.authorization, '[REDACTED]')
   assert.equal(sanitized.nested.accessToken, '[REDACTED]')
+  assert.equal(sanitized.nested.apiKey, '[REDACTED]')
+  assert.equal(sanitized.nested.cookie, '[REDACTED]')
   assert.equal(sanitized.nested.password, '[REDACTED]')
   assert.equal(sanitized.nested.pan, '[REDACTED]')
   assert.equal(sanitized.nested.receipt.number, 'R-1')

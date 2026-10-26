@@ -24,6 +24,7 @@ import {
   prepareFiscalInboxItemMutation,
 } from '@/src/modules/runtime/application/prepareFiscalInboxItemMutation'
 import { getTransactionDetails } from '@/src/modules/transactions/application/queries/get-transaction-details'
+import { getProxyFiscalizationExchangeQuery } from '@/src/modules/transactions/application/queries/get-proxy-fiscalization-exchange'
 import { listTransactionCatalogProducts } from '@/src/modules/transactions/application/queries/list-transaction-catalog-products'
 
 export const runtime = 'nodejs'
@@ -52,6 +53,31 @@ export const GET = defineGetRoute<{ id: string }>({
         ])
       : [null, [], await getStationDecimalSettings(user.stationId)]
 
+    // The inbox may point to a particular failed proxy attempt. Prefer that
+    // event over the latest retry; if no event ID was captured, clearly label
+    // any returned evidence as the latest attempt for this transaction.
+    const message =
+      detail.message_json && typeof detail.message_json === 'object'
+        ? (detail.message_json as Record<string, unknown>)
+        : null
+    const summary =
+      message?.fiscalizationSummary &&
+      typeof message.fiscalizationSummary === 'object'
+        ? (message.fiscalizationSummary as Record<string, unknown>)
+        : null
+    const rawEventId = message?.fiscalEventId ?? summary?.eventId
+    const eventId =
+      typeof rawEventId === 'string' && rawEventId.trim()
+        ? rawEventId.trim()
+        : null
+    const proxyExchange = detail.related_transaction_id
+      ? await getProxyFiscalizationExchangeQuery({
+          stationId: user.stationId,
+          transactionId: detail.related_transaction_id,
+          eventId,
+        }).catch(() => null)
+      : null
+
     return ok({
       item: presentFiscalInboxItem(row),
       detail,
@@ -59,6 +85,7 @@ export const GET = defineGetRoute<{ id: string }>({
       transaction,
       products,
       decimals,
+      proxyExchange,
     })
   },
 })
