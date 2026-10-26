@@ -60,7 +60,7 @@ test('manual refresh uses CSRF and restricts reconciliation to station-scoped fi
   assert.match(route, /roles: \['manager', 'administrator', 'field_engineer'\]/)
   assert.match(route, /stationId: user\.stationId/)
   assert.match(route, /isUuid\(id\)/)
-  assert.match(worker, /route\.country !== 'KE'/)
+  assert.match(worker, /\['KE', 'KEN', 'KENYA'\]\.includes/)
   assert.match(worker, /t\.status = 'FISCALIZING'/)
   assert.match(worker, /t\.id = ANY\(\$3::uuid\[\]\)/)
   assert.match(worker, /FOR UPDATE/)
@@ -71,7 +71,7 @@ test('manual refresh uses CSRF and restricts reconciliation to station-scoped fi
 
 test('ten-minute checks run from the independent proxy worker', () => {
   const worker = read('src/modules/transactions/infrastructure/fiscalization/proxySenderWorker.ts')
-  assert.match(worker, /KENYA_DOCUMENT_STATUS_INTERVAL_MS = 10 \* 60 \* 1000/)
+  assert.match(worker, /kenyaDocumentStatusIntervalMs = 10 \* 60 \* 1000/)
   assert.match(worker, /lastKenyaDocumentStatusAt/)
   assert.match(worker, /mode: 'kenya-document-status'/)
   assert.match(worker, /excludeTransactionIds: new Set\(inFlight\.keys\(\)\)/)
