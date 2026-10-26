@@ -155,6 +155,8 @@ export function buildFiscalizationCompatibilitySummary(input: {
     reference:
       compactString(input.reference) ||
       firstPath(responsePayload, [
+        'statusLookup.documentNumber',
+        'statusLookup.DocumentNumber',
         'documentNumber',
         'document_number',
         'details.documentNumber',
@@ -166,6 +168,8 @@ export function buildFiscalizationCompatibilitySummary(input: {
     fiscalDocumentId:
       compactString(input.fiscalDocumentId) ||
       firstPath(responsePayload, [
+        'statusLookup.documentId',
+        'statusLookup.DocumentId',
         'documentId',
         'document_id',
         'details.documentId',
@@ -181,6 +185,8 @@ export function buildFiscalizationCompatibilitySummary(input: {
       'details.requestId',
     ]),
     responseStatus: firstPath(responsePayload, [
+      'statusLookup.status',
+      'statusLookup.Status',
       'status',
       'state',
       'result.status',
@@ -192,6 +198,8 @@ export function buildFiscalizationCompatibilitySummary(input: {
     message: compactString(
       sanitizeFiscalText(
         firstPath(responsePayload, [
+          'statusLookup.message',
+          'statusLookup.Message',
           'message',
           'errorMessage',
           'error_message',
