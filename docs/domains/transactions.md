@@ -17,6 +17,8 @@ The transactions module owns transaction lifecycle, line and payment data, fisca
 - `/transactions` and `/receipts` default to the station's current business day. Date-only filters are interpreted in the configured `fuel_stations.timezone`, with an exclusive next-day upper boundary so daylight-saving and UTC offsets do not omit or duplicate records. Operators can explicitly select **All dates** or a custom range.
 - When receipt printing is configured before fiscalization, a healthy printer still preserves print-before-fiscalize ordering. If the print worker confirms that the configured printer is unavailable because of a transport, DNS, network, or socket failure, fiscalization fails open rather than blocking the sale. The receipt print job remains pending for retry and can be released when printer connectivity returns. Receipt rendering, data, or other non-connectivity print failures continue to block the pre-fiscalization gate.
 
+Operators can copy a diagnostic support bundle for fiscalized and non-fiscalized transactions. When browser clipboard access is blocked, the UI displays selectable support text and offers a local text-file download. The fallback does not change transaction or fiscalization state. Treat exported support text as potentially sensitive customer and transaction information.
+
 ## Product stock lifecycle
 
 Manual/POS transaction capture reserves non-fuel product stock immediately by creating transaction-linked stock-out ledger movements. The transaction write and stock reconciliation share one database transaction, so insufficient stock rejects the whole capture.
