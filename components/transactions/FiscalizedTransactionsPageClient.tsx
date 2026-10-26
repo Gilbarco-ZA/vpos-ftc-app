@@ -17,6 +17,7 @@ import FiscalizedErrorState from '@/components/transactions/fiscalized/Fiscalize
 import FiscalizedFiltersRow from '@/components/transactions/fiscalized/FiscalizedFiltersRow'
 import StatusBadge from '@/components/transactions/StatusBadge'
 import { buildFiscalizedSupportBundle } from '@/components/transactions/supportBundle'
+import SupportBundleFallbackDialog from '@/components/transactions/SupportBundleFallbackDialog'
 import TransactionReceiptSheet from '@/components/transactions/TransactionReceiptSheet'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -284,6 +285,10 @@ const FiscalizedTransactionsPageClient = ({
   const [statusTransaction, setStatusTransaction] =
     useState<FiscalizedTransactionListItem | null>(null)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const [blockedSupportBundle, setBlockedSupportBundle] = useState<{
+    transactionId: string
+    text: string
+  } | null>(null)
   const [enqueueError, setEnqueueError] = useState<{
     title: string
     message: string
@@ -320,10 +325,12 @@ const FiscalizedTransactionsPageClient = ({
   ) => {
     const bundle = buildFiscalizedSupportBundle(transaction)
     const ok = await safeCopy(bundle)
-    showToast(
-      ok ? 'success' : 'error',
-      ok ? 'Copied support bundle' : 'Copy failed',
-    )
+    if (ok) {
+      showToast('success', 'Copied support bundle')
+    } else {
+      setBlockedSupportBundle({ transactionId: transaction.id, text: bundle })
+      showToast('error', 'Clipboard blocked — support bundle opened for manual copy')
+    }
   }
 
   const refresh = useCallback(async () => {
@@ -751,6 +758,14 @@ const FiscalizedTransactionsPageClient = ({
           <Button variant="secondary" size="sm" disabled={loading || page * pageSize >= total} onClick={() => setPage((n) => n + 1)}>Next</Button>
         </div>
       </div>
+      {blockedSupportBundle ? (
+        <SupportBundleFallbackDialog
+          key={blockedSupportBundle.transactionId}
+          transactionId={blockedSupportBundle.transactionId}
+          text={blockedSupportBundle.text}
+          onClose={() => setBlockedSupportBundle(null)}
+        />
+      ) : null}
       <ToastViewport>
         {toasts.map((toast) => (
           <ToastItem key={toast.id} variant={toast.variant}>
