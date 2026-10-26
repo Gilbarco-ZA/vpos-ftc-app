@@ -7,6 +7,7 @@ import {
 import { getEnvValue } from '@/src/shared/config/envDb'
 import {
   getFiscalizationResultsSinceViaProxy,
+  getKenyaInvoiceStatusViaProxy,
   getOfflineQueueItemViaProxy,
   getOfflineQueuePendingViaProxy,
 } from '@/src/shared/proxy/client'
@@ -686,6 +687,7 @@ async function persistProxySubmission(input: {
 async function listPendingProxyFiscalizationTransactions(
   stationId: string,
   limit = 50,
+  transactionIds?: readonly string[],
 ) {
   return await queryAll<any>(
     `SELECT t.id,
@@ -711,9 +713,10 @@ async function listPendingProxyFiscalizationTransactions(
         AND t.deleted_at IS NULL
         AND t.status = 'FISCALIZING'
         AND (t.fiscalization_reference IS NULL OR btrim(t.fiscalization_reference) = '')
+        AND ($3::uuid[] IS NULL OR t.id = ANY($3::uuid[]))
       ORDER BY t.updated_at ASC
       LIMIT $2`,
-    [stationId, limit],
+    [stationId, limit, transactionIds ?? null],
   )
 }
 
@@ -745,10 +748,14 @@ async function reconcilePendingProxyFiscalizations(input: {
   pendingLimit?: number
   resultsLimit?: number
   excludeTransactionIds?: ReadonlySet<string>
+  mode?: 'bulk-results' | 'kenya-document-status'
+  transactionIds?: readonly string[]
 }) {
+  const directKenyaLookup = input.mode === 'kenya-document-status'
   const pendingRows = await listPendingProxyFiscalizationTransactions(
     input.stationId,
     Math.max(1, Number(input.pendingLimit ?? 50)),
+    input.transactionIds,
   )
   const pending = input.excludeTransactionIds?.size
     ? pendingRows.filter(
@@ -771,6 +778,7 @@ async function reconcilePendingProxyFiscalizations(input: {
   )
 
   let results: any[] = []
+  if (!directKenyaLookup) {
   try {
     const sinceRes = await getFiscalizationResultsSinceViaProxy(
       input.stationId,
@@ -829,6 +837,47 @@ async function reconcilePendingProxyFiscalizations(input: {
     )
   }
 
+  }
+
+  // Independently recover older Kenya invoices that have fallen outside the
+  // short time-windowed bulk results feed. Never infer approval from the
+  // HTTP 200 envelope; only an exactly matching invoice's terminal status.
+  const statusByTransactionId = new Map<string, Record<string, unknown>>()
+  if (directKenyaLookup) {
+    const batchSize = 4
+    for (let index = 0; index < pending.length; index += batchSize) {
+      const batch = pending.slice(index, index + batchSize)
+      await Promise.all(batch.map(async (txn) => {
+        const request = txn?.fiscal_event_request_payload
+        const originalDocumentId =
+          (request && typeof request === 'object'
+            ? String(request.documentId ?? request.DocumentId ?? '').trim()
+            : '') ||
+          trimString(txn?.fiscal_document_id) ||
+          trimString(txn?.pos_reference)
+        if (!originalDocumentId) return
+        try {
+          const invoice = await getKenyaInvoiceStatusViaProxy(
+            input.stationId,
+            originalDocumentId,
+          )
+          const status = extractProxyStatus(invoice)
+          if (status === 'APPROVED' ||
+              (status != null && (FINAL_SUCCESS_STATUSES.has(status) ||
+                FINAL_FAILURE_STATUSES.has(status)))) {
+            statusByTransactionId.set(String(txn.id), invoice)
+          }
+        } catch (error: unknown) {
+          logger.warn(`[${WORKER_NAME}] Kenya invoice status lookup failed`, {
+            stationId: input.stationId,
+            transactionId: String(txn.id),
+            error: String(error instanceof Error ? error.message : error),
+          })
+        }
+      }))
+    }
+  }
+
   let finalized = 0
   let failed = 0
   const defaultProxyEngine = await loadFiscalizationEngine(input.stationId)
@@ -838,11 +887,11 @@ async function reconcilePendingProxyFiscalizations(input: {
     const proxyEngine =
       String(txn?.fiscal_event_engine || defaultProxyEngine).trim() ||
       defaultProxyEngine
-    let matched = results.find((result) =>
-      matchesFiscalizationResult(txn, result),
-    )
+    let matched = directKenyaLookup
+      ? statusByTransactionId.get(String(txn.id))
+      : results.find((result) => matchesFiscalizationResult(txn, result))
 
-    if (!matched) {
+    if (!matched && !directKenyaLookup) {
       const requestId = extractProxyRequestId(stored, {
         includeGenericId: false,
       })
@@ -865,6 +914,7 @@ async function reconcilePendingProxyFiscalizations(input: {
     }
 
     if (!matched) {
+      if (directKenyaLookup) continue
       logger.warn(
         `[${WORKER_NAME}] pending proxy fiscalization has no matching proxy result`,
         {
@@ -879,6 +929,25 @@ async function reconcilePendingProxyFiscalizations(input: {
         },
       )
       continue
+    }
+
+    // Manual and worker reconciliation can overlap. Only process an attempt
+    // whose transaction and latest event are still pending.
+    if (directKenyaLookup) {
+      const current = await queryOne<{
+        status: string
+        latest_fiscal_event_id: string | null
+      }>(
+        `SELECT status, latest_fiscal_event_id
+           FROM transactions
+          WHERE station_id = $1
+            AND id = $2::uuid
+            AND deleted_at IS NULL`,
+        [input.stationId, String(txn.id)],
+      )
+      if (!current || current.status !== 'FISCALIZING' ||
+          String(current.latest_fiscal_event_id ?? '') !==
+            String(txn.fiscal_event_id ?? '')) continue
     }
 
     const merged = mergeFiscalizationResponses(stored, matched)
@@ -923,7 +992,7 @@ async function reconcilePendingProxyFiscalizations(input: {
     }
 
     if (isFailedFiscalizationPayload(matched)) {
-      await markTransactionFailed({
+      const failedTransaction = await markTransactionFailed({
         stationId: input.stationId,
         transactionId: String(txn.id),
         lastError:
@@ -939,7 +1008,8 @@ async function reconcilePendingProxyFiscalizations(input: {
           errorMessage:
             extractFailureMessage(matched) || 'Proxy fiscalization failed',
         },
-      }).catch(() => {})
+      }).catch(() => null)
+      if (!failedTransaction) continue
 
       logger.warn(`[${WORKER_NAME}] proxy fiscalization result marked failed`, {
         stationId: input.stationId,
@@ -952,7 +1022,8 @@ async function reconcilePendingProxyFiscalizations(input: {
       continue
     }
 
-    if (!hasFinalFiscalizationPayload(matched)) continue
+    if (!hasFinalFiscalizationPayload(matched) &&
+        !(directKenyaLookup && extractProxyStatus(matched) === 'APPROVED')) continue
 
     const receipt = mapFiscalReceipt(merged) || mapFiscalReceipt(matched)
     const fiscalReference =
@@ -961,7 +1032,7 @@ async function reconcilePendingProxyFiscalizations(input: {
       extractProxyDocumentNumber(matched) ||
       extractProxyDocumentNumber(stored)
 
-    await markTransactionFiscalized({
+    const fiscalizedTransaction = await markTransactionFiscalized({
       stationId: input.stationId,
       transactionId: String(txn.id),
       fiscalizationReference: fiscalReference,
@@ -974,7 +1045,8 @@ async function reconcilePendingProxyFiscalizations(input: {
         requestPayload: txn?.fiscal_event_request_payload ?? null,
         responsePayload: merged,
       },
-    })
+    }).catch(() => null)
+    if (!fiscalizedTransaction) continue
 
     await syncDeductionForTransaction({
       stationId: input.stationId,
@@ -1018,6 +1090,26 @@ async function reconcilePendingProxyFiscalizations(input: {
     failed,
     polledResults: results.length,
   }
+}
+
+/**
+ * Explicit reconciliation for a Kenya station, limited to existing local
+ * FISCALIZING transactions. No invoice is submitted or re-submitted.
+ */
+export async function reconcileKenyaFiscalizingTransactions(input: {
+  stationId: string
+  transactionIds?: string[]
+}) {
+  const route = await getStationFiscalizationRoute(input.stationId)
+  if (route.country !== 'KE' || route.route !== 'proxy') {
+    return { checked: 0, finalized: 0, failed: 0, polledResults: 0, skipped: true }
+  }
+  return await reconcilePendingProxyFiscalizations({
+    stationId: input.stationId,
+    mode: 'kenya-document-status',
+    pendingLimit: input.transactionIds?.length || 50,
+    transactionIds: input.transactionIds,
+  })
 }
 
 export async function sendClaimedTransactionToProxy(input: {
@@ -1913,6 +2005,8 @@ export function startProxyFiscalSenderWorker(opts?: {
   let tickRunning = false
   let creditNoteTickRunning = false
   let lastReconcileAt = 0
+  let lastKenyaDocumentStatusAt = 0
+  const KENYA_DOCUMENT_STATUS_INTERVAL_MS = 10 * 60 * 1000
   const inFlight = new Map<string, Promise<unknown>>()
   const cnInFlight = new Map<string, Promise<unknown>>()
 
@@ -1991,6 +2085,33 @@ export function startProxyFiscalSenderWorker(opts?: {
           logger.info(`[${WORKER_NAME}] proxy result reconciliation summary`, {
             stationId,
             ...summary,
+          })
+        }
+      }
+
+      if (
+        route.country === 'KE' &&
+        Date.now() - lastKenyaDocumentStatusAt >= KENYA_DOCUMENT_STATUS_INTERVAL_MS
+      ) {
+        // This runs in the worker even when no operator/browser is connected.
+        lastKenyaDocumentStatusAt = Date.now()
+        try {
+          const summary = await reconcilePendingProxyFiscalizations({
+            stationId,
+            mode: 'kenya-document-status',
+            pendingLimit,
+            excludeTransactionIds: new Set(inFlight.keys()),
+          })
+          if (summary.finalized || summary.failed) {
+            logger.info(`[${WORKER_NAME}] Kenya DocumentId reconciliation`, {
+              stationId,
+              ...summary,
+            })
+          }
+        } catch (error: unknown) {
+          logger.warn(`[${WORKER_NAME}] Kenya DocumentId reconciliation failed`, {
+            stationId,
+            error: String(error instanceof Error ? error.message : error),
           })
         }
       }
