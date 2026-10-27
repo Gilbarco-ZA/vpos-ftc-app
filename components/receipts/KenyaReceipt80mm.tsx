@@ -3,6 +3,7 @@
 import type { NormalizedReceipt } from '@/src/shared/receipts/normalizeReceipt'
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
+import { RuntimeImage } from '@/components/ui/runtime-image'
 
 type Props = { receipt: NormalizedReceipt }
 const amount = (v?: number, digits = 2) => v == null || !Number.isFinite(v)
@@ -17,7 +18,7 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
   useEffect(() => {
     let active = true
     if (!isKraUrl(verificationUrl)) {
-      setQr(null)
+      queueMicrotask(() => { if (active) setQr(null) })
       return
     }
     QRCode.toDataURL(verificationUrl!, { width: 180, margin: 1 })
@@ -97,7 +98,7 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       {receipt.footer.receiptInternalData && <div className="break-all">Internal Data: {dashGroups(receipt.footer.receiptInternalData)}</div>}
       {receipt.footer.receiptSignature && <div className="break-all">Receipt Signature: {receipt.footer.receiptSignature}</div>}
       {qr && <div className="mt-3 flex flex-col items-center gap-1">
-        <img src={qr} alt="KRA eTIMS verification QR" width={160} height={160} />
+        <RuntimeImage src={qr} alt="KRA eTIMS verification QR" width={160} height={160} />
       </div>}
       {separator}
       {receipt.meta.receiptTraNumber && <>
