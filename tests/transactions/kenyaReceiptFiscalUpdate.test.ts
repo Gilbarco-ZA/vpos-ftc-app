@@ -71,3 +71,48 @@ test('Kenya POST sdcId becomes SCU ID and sdcId/receiptNumber becomes CU invoice
   assert.equal(receipt.meta.cuInvoiceNo, 'KRACU0300003727/1058')
   assert.equal(receipt.footer.fiscalVerificationCode, 'RCTPJKUDBLEHV2SK')
 })
+
+test('Kenya approved refresh replaces stale SDC and receipt number without overwriting original fiscal reference', () => {
+  const receipt = makeReceipt()
+  receipt.meta.receiptNumber = 'OLD'
+  receipt.meta.scuId = 'OLDSDC'
+  receipt.meta.cuInvoiceNo = 'OLDSDC/OLD'
+  applyKenyaReceiptFiscalUpdate(receipt, {
+    eventResponsePayload: {
+      details: { sdcId: 'OLDSDC', receipt: { receiptNumber: 'OLD' } },
+    },
+    canonicalResponsePayload: null,
+    storedFiscalData: null,
+    expectedDocumentId: '5F3070A39841',
+    statusRow: {
+      documentId: '5F3070A39841',
+      documentNumber: '1056',
+      sdcId: 'KRACU0300003727',
+      status: 'Approved',
+      fiscalVerificationCode: 'VHGJJJTFLBTAOCXS',
+      fiscalQrCodeData: 'https://etims-sbx.kra.go.ke/common/link/etims/receipt/indexEtimsReceiptData?Data=TEST',
+      revenueAuthorityReference: '1056',
+      error: false,
+    },
+  })
+  assert.equal(receipt.meta.scuId, 'KRACU0300003727')
+  assert.equal(receipt.meta.receiptNumber, '1056')
+  assert.equal(receipt.meta.cuInvoiceNo, 'KRACU0300003727/1056')
+  assert.equal(receipt.footer.fiscalVerificationCode, 'VHGJJJTFLBTAOCXS')
+})
+
+test('Kenya mismatching approved refresh cannot replace SDC or CU invoice number', () => {
+  const receipt = makeReceipt()
+  receipt.meta.scuId = 'ORIGINALSDC'
+  receipt.meta.cuInvoiceNo = 'ORIGINALSDC/1055'
+  applyKenyaReceiptFiscalUpdate(receipt, {
+    eventResponsePayload: null, canonicalResponsePayload: null, storedFiscalData: null,
+    expectedDocumentId: '5F3070A39841',
+    statusRow: {
+      documentId: 'WRONG', documentNumber: '1056',
+      sdcId: 'WRONGSDC', status: 'Approved', error: false,
+    },
+  })
+  assert.equal(receipt.meta.scuId, 'ORIGINALSDC')
+  assert.equal(receipt.meta.cuInvoiceNo, 'ORIGINALSDC/1055')
+})
