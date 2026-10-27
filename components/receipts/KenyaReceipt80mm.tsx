@@ -101,7 +101,7 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       {receipt.footer.fiscalVerificationCode && <div>SCU ID: {receipt.footer.fiscalVerificationCode}</div>}
       {receipt.meta.receiptNumber && <div>CU INVOICE NO: {receipt.meta.receiptNumber}</div>}
       {receipt.footer.receiptInternalData && <div className="break-all">Internal Data: {dashGroups(receipt.footer.receiptInternalData)}</div>}
-      {receipt.footer.receiptSignature && <div className="break-all">Receipt Signature: {receipt.footer.receiptSignature}</div>}
+      {receipt.footer.receiptSignature && <div className="break-all">Receipt Signature: {dashGroups(receipt.footer.receiptSignature)}</div>}
       {qr && <div className="mt-3 flex flex-col items-center gap-1">
         <RuntimeImage src={qr} alt="KRA eTIMS verification QR" width={160} height={160} />
       </div>}
