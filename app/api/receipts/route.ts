@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { ok, serverError } from '@/src/platform/web/api/response'
 import { requireAuth } from '@/src/shared/auth'
 
+import { persistKenyaReceiptRefresh } from '@/src/modules/transactions/application/commands/persist-kenya-receipt-refresh'
 import { refreshKenyaReceiptStatus } from '@/src/modules/transactions/application/queries/refresh-kenya-receipt-status'
 import { prepareReceiptPreview } from '@/src/modules/transactions/application/commands/prepare-receipt-preview'
 import {
@@ -35,6 +36,9 @@ export const GET = async (req: Request) => {
       const kenyaStatusRow = refresh && !previewMode
         ? await refreshKenyaReceiptStatus(user.stationId, transactionId)
         : null
+      if (kenyaStatusRow) {
+        await persistKenyaReceiptRefresh({ stationId: user.stationId, transactionId, status: kenyaStatusRow })
+      }
       const result = await getReceiptRoutePayload({
         kenyaStatusRow,
         stationId: user.stationId,
