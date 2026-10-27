@@ -35,6 +35,6 @@ test('Kenya receipt has required fiscal labels and omits redundant labels', () =
   assert.match(print, /\['A', 'B', 'C', 'D', 'E'\]/)
   assert.match(kenya, /receiptHeaderText/)
   assert.match(kenya, /receiptFooterText/)
-  assert.match(print, /model\.customization\.headerLines/)
-  assert.match(print, /model\.customization\.footerLines/)
+  assert.match(print, /model\.customization\?\.headerLines/)
+  assert.match(print, /model\.customization\?\.footerLines/)
 })
