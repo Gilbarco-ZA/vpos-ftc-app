@@ -487,6 +487,7 @@ const renderReceiptText = (lines: PrintableLine[], width = WIDTH) => {
 export const buildFiscalReceipt = async (params: {
   stationId: string
   transactionId: string
+  kenyaApprovedStatus?: Record<string, unknown> | null
 }) => {
   const txn = await pgOne<any>(
     `SELECT * FROM transactions WHERE id = $1 AND station_id = $2`,
@@ -897,17 +898,27 @@ export const buildFiscalReceipt = async (params: {
       : null,
   )
 
+  const refreshedKenyaStatus = stationCountry === 'KE' &&
+    params.kenyaApprovedStatus?.status === 'Approved' &&
+    params.kenyaApprovedStatus?.error !== true &&
+    String(params.kenyaApprovedStatus?.documentId ?? '').trim() ===
+      String(txn.fiscal_document_id ?? '').trim()
+      ? params.kenyaApprovedStatus : null
+  const refreshedSdc = coerceString(refreshedKenyaStatus?.sdcId)
+  const refreshedNumber = coerceString(refreshedKenyaStatus?.documentNumber)
+  const kenyaNumber = refreshedNumber || receiptNumber
+
   const fiscalMeta: FiscalMeta = {
-    scuId: stationCountry === 'KE' ? pickFirst(fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId) : pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
+    scuId: stationCountry === 'KE' ? pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId) : pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
     cuInvoiceNo: stationCountry === 'KE'
-      ? (() => { const id = pickFirst(fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId); return id && receiptNumber ? `${id}/${receiptNumber}` : null })()
+      ? (() => { const id = pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId); return id && kenyaNumber ? `${id}/${kenyaNumber}` : null })()
       : pickFirst(
       fiscalSource?.cu_invoice_no,
       fiscalSource?.cuInvoiceNo,
       fiscalSource?.fiscal_number,
       fiscalSource?.fiscalNumber,
     ),
-    receiptNumber,
+    receiptNumber: stationCountry === 'KE' ? kenyaNumber : receiptNumber,
     internalData: pickFirst(
       templateModel?.receiptInternalData,
       fiscalSource?.internal_data,
@@ -940,6 +951,7 @@ export const buildFiscalReceipt = async (params: {
       tanzaniaProxyMetadata?.zNumber,
     ),
     verificationCode: pickFirst(
+      refreshedKenyaStatus?.fiscalVerificationCode,
       templateModel?.fiscalVerificationCode,
       tanzaniaCounters?.receiptVerificationNo,
       tanzaniaCounters?.verificationCode,
@@ -947,6 +959,7 @@ export const buildFiscalReceipt = async (params: {
       stationCountry === 'KE' ? null : txn.fiscalization_reference,
     ),
     verificationUrl: pickFirst(
+      refreshedKenyaStatus?.fiscalQrCodeData,
       templateModel?.fiscalQrCodeData,
       tanzaniaCounters?.verificationUrl,
       tanzaniaResponse?.verificationUrl,
