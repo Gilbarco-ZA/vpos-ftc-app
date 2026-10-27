@@ -151,6 +151,13 @@ export function buildReceiptEscposLines(input: {
     lines.push({ type: 'text', value: row })
   }
 
+  if (isKenya && /^https:\/\/[^\s]+$/i.test(qrOverride) &&
+      !lines.some(line => line.type === 'qr')) {
+    // Stored receipt text may predate status approval and have no [QR] row.
+    lines.push({ type: 'text', value: 'KRA Verification QR', align: 'center' })
+    lines.push({ type: 'qr', value: qrOverride })
+  }
+
   if (isTanzania) {
     const hasStart = lines.some(
       (line) => line.type === 'image' && line.asset === 'tra-receipt-start',
