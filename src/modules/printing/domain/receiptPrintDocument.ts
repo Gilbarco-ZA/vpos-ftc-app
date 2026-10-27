@@ -96,6 +96,7 @@ export function buildReceiptEscposLines(input: {
   const source = String(input.plainText ?? '').replace(/\r\n/g, '\n')
   const rows = source.split('\n')
   const lines: EscposLine[] = []
+  const isKenya = ['KE', 'KEN', 'KENYA'].includes(textValue(input.country).toUpperCase())
   const qrOverride = textValue(input.qrData)
   const width = Math.max(20, Math.floor(input.width ?? 42))
   const isTanzania = ['TZ', 'TZA', 'TANZANIA'].includes(
@@ -120,7 +121,9 @@ export function buildReceiptEscposLines(input: {
       const serializedQrRow = textValue(rows[index + 1])
       const qrData = qrOverride || serializedQrRow
       if (serializedQrRow) index += 1
-      if (qrData) lines.push({ type: 'qr', value: qrData })
+      if (qrData && (!isKenya || /^https:\/\/[^\s]+$/i.test(qrData))) {
+        lines.push({ type: 'qr', value: qrData })
+      }
       continue
     }
     if (!row) {
