@@ -96,8 +96,10 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       })}
       {separator}
       <div className="text-center font-bold">SCU INFORMATION</div>
-      {(receipt.meta.receiptDate || receipt.meta.receiptDateTime) && <div>Date: {formattedDate(receipt.meta.receiptDate || receipt.meta.receiptDateTime || '')}</div>}
-      {(receipt.meta.receiptTime || receipt.meta.receiptDateTime?.match(/\d{2}:\d{2}:\d{2}/)?.[0]) && <div>Time: {receipt.meta.receiptTime || receipt.meta.receiptDateTime?.match(/\d{2}:\d{2}:\d{2}/)?.[0]}</div>}
+      <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+        <span>{receipt.meta.receiptDate || receipt.meta.receiptDateTime ? `Date: ${formattedDate(receipt.meta.receiptDate || receipt.meta.receiptDateTime || '')}` : ''}</span>
+        <span className="ml-auto text-right">{receipt.meta.receiptTime || receipt.meta.receiptDateTime?.match(/\d{2}:\d{2}:\d{2}/)?.[0] ? `Time: ${receipt.meta.receiptTime || receipt.meta.receiptDateTime?.match(/\d{2}:\d{2}:\d{2}/)?.[0]}` : ''}</span>
+      </div>
       {receipt.meta.scuId && <div>SCU ID: {receipt.meta.scuId}</div>}
       {receipt.meta.cuInvoiceNo && <div>CU INVOICE NO: {receipt.meta.cuInvoiceNo}</div>}
       {receipt.footer.receiptInternalData && <div className="break-all">Internal Data: {dashGroups(receipt.footer.receiptInternalData)}</div>}
