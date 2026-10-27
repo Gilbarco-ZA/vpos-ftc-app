@@ -48,7 +48,7 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
   )
   const separator = <div className="my-3 border-t border-dashed border-black" />
   return (
-    <div className="receipt-print-area mx-auto w-[300px] max-w-full bg-white p-3 font-mono text-xs leading-relaxed text-black">
+    <div className="receipt-print-area mx-auto w-[300px] max-w-full bg-white p-3 font-mono text-xs leading-relaxed text-black">\n      <style jsx global>{`@media print { .no-print { display: none !important; } body * { visibility: hidden !important; } .receipt-print-area, .receipt-print-area * { visibility: visible !important; } .receipt-print-area { position: absolute; left: 0; top: 0; width: 300px; background: white !important; color: black !important; } .receipt-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }`}</style>
       <div className="text-center">
         <div className="text-sm font-bold">TAX INVOICE</div>
         <div className="font-bold">{receipt.header.companyName || receipt.header.stationName}</div>
