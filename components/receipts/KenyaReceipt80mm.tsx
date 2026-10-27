@@ -82,18 +82,16 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       {['A', 'B', 'C', 'D', 'E', ...Object.keys(taxRows).filter(code => !['A', 'B', 'C', 'D', 'E'].includes(code))].map(code => {\n        const t = taxRows[code] ?? { rate: code === 'B' ? 16 : code === 'E' ? 8 : 0, taxable: 0, tax: 0 }; return (
         <div key={code}>{row(`${code} ${t.rate}%`,
           `${amount(t.taxable, decimals.money)} / ${amount(t.tax, decimals.money)}`)}</div>
-      ))}
+      )})}
       {separator}
       <div className="text-center font-bold">SCU INFORMATION</div>
-      {receipt.meta.receiptDateTime && <div>Date/Time: {receipt.meta.receiptDateTime}</div>}
-      {receipt.meta.scuId && <div>SCU ID: {receipt.meta.scuId}</div>}
-      {receipt.meta.cuInvoiceNo && <div>CU INVOICE NO: {receipt.meta.cuInvoiceNo}</div>}
-      {receipt.meta.receiptNumber && <div>Receipt Number: {receipt.meta.receiptNumber}</div>}
+      {(receipt.meta.receiptDate || receipt.meta.receiptDateTime) && <div>Date: {formattedDate(receipt.meta.receiptDate || receipt.meta.receiptDateTime || '')}</div>}
+      {(receipt.meta.receiptTime || receipt.meta.receiptDateTime?.match(/\d{2}:\d{2}:\d{2}/)?.[0]) && <div>Time: {receipt.meta.receiptTime || receipt.meta.receiptDateTime?.match(/\d{2}:\d{2}:\d{2}/)?.[0]}</div>}
+      {receipt.footer.fiscalVerificationCode && <div>SCU ID: {receipt.footer.fiscalVerificationCode}</div>}
+      {receipt.meta.receiptNumber && <div>CU INVOICE NO: {receipt.meta.receiptNumber}</div>}
       {receipt.footer.receiptInternalData && <div className="break-all">Internal Data: {dashGroups(receipt.footer.receiptInternalData)}</div>}
       {receipt.footer.receiptSignature && <div className="break-all">Receipt Signature: {receipt.footer.receiptSignature}</div>}
-      {receipt.footer.fiscalVerificationCode && <div className="break-all">Verification Code: {receipt.footer.fiscalVerificationCode}</div>}
       {qr && <div className="mt-3 flex flex-col items-center gap-1">
-        <div>KRA Verification QR</div>
         <img src={qr} alt="KRA eTIMS verification QR" width={160} height={160} />
       </div>}
       {separator}
