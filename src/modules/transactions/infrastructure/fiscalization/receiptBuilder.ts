@@ -781,8 +781,8 @@ export const buildFiscalReceipt = async (params: {
     fiscalReference,
     status: coerceString(txn.status) ?? null,
     attendant: coerceString(attendant?.full_name) ?? null,
-    receiptDate: stationCountry === 'TZ' ? tanzaniaReceiptDate : null,
-    receiptTime: stationCountry === 'TZ' ? tanzaniaReceiptTime : null,
+    receiptDate: stationCountry === 'TZ' ? tanzaniaReceiptDate : stationCountry === 'KE' ? (templateModel?.receiptDate || fallbackReceiptDateTime.date) : null,
+    receiptTime: stationCountry === 'TZ' ? tanzaniaReceiptTime : stationCountry === 'KE' ? (templateModel?.receiptTime || fallbackReceiptDateTime.time) : null,
     pumpNumber: pickFirst(
       txn.pump_number,
       queuePayload?.payload?.pumpNumber,
@@ -942,7 +942,7 @@ export const buildFiscalReceipt = async (params: {
       tanzaniaCounters?.receiptVerificationNo,
       tanzaniaCounters?.verificationCode,
       tanzaniaProxyMetadata?.receiptVerificationNumber,
-      txn.fiscalization_reference,
+      stationCountry === 'KE' ? null : txn.fiscalization_reference,
     ),
     verificationUrl: pickFirst(
       templateModel?.fiscalQrCodeData,
