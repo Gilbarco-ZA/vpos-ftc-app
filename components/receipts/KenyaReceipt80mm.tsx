@@ -98,8 +98,8 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       <div className="text-center font-bold">SCU INFORMATION</div>
       {(receipt.meta.receiptDate || receipt.meta.receiptDateTime) && <div>Date: {formattedDate(receipt.meta.receiptDate || receipt.meta.receiptDateTime || '')}</div>}
       {(receipt.meta.receiptTime || receipt.meta.receiptDateTime?.match(/\d{2}:\d{2}:\d{2}/)?.[0]) && <div>Time: {receipt.meta.receiptTime || receipt.meta.receiptDateTime?.match(/\d{2}:\d{2}:\d{2}/)?.[0]}</div>}
-      {receipt.footer.fiscalVerificationCode && <div>SCU ID: {receipt.footer.fiscalVerificationCode}</div>}
-      {receipt.meta.receiptNumber && <div>CU INVOICE NO: {receipt.meta.receiptNumber}</div>}
+      {receipt.meta.scuId && <div>SCU ID: {receipt.meta.scuId}</div>}
+      {receipt.meta.cuInvoiceNo && <div>CU INVOICE NO: {receipt.meta.cuInvoiceNo}</div>}
       {receipt.footer.receiptInternalData && <div className="break-all">Internal Data: {dashGroups(receipt.footer.receiptInternalData)}</div>}
       {receipt.footer.receiptSignature && <div className="break-all">Receipt Signature: {dashGroups(receipt.footer.receiptSignature)}</div>}
       {qr && <div className="mt-3 flex flex-col items-center gap-1">
