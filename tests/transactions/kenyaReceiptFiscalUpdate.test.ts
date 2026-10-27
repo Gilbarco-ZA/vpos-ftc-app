@@ -53,3 +53,21 @@ test('Kenya receipt prefers fresh approved verification over stale local metadat
   assert.equal(receipt.footer.fiscalVerificationCode, 'DIFFERENT')
   assert.equal(receipt.footer.receiptSignature, undefined)
 })
+
+test('Kenya POST sdcId becomes SCU ID and sdcId/receiptNumber becomes CU invoice number', () => {
+  const receipt = makeReceipt()
+  applyKenyaReceiptFiscalUpdate(receipt, {
+    eventResponsePayload: {
+      documentId: 'INV-2026-10-27-01', status: 'Submitted',
+      details: {
+        sdcId: 'KRACU0300003727',
+        receipt: { receiptNumber: '1058', fiscalVerificationCode: 'RCTPJKUDBLEHV2SK' },
+      },
+    },
+    canonicalResponsePayload: null, storedFiscalData: null,
+    expectedDocumentId: 'INV-2026-10-27-01',
+  })
+  assert.equal(receipt.meta.scuId, 'KRACU0300003727')
+  assert.equal(receipt.meta.cuInvoiceNo, 'KRACU0300003727/1058')
+  assert.equal(receipt.footer.fiscalVerificationCode, 'RCTPJKUDBLEHV2SK')
+})
