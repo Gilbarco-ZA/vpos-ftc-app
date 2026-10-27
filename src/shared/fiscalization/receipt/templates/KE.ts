@@ -74,8 +74,12 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
       money(item.taxAmount, model.decimals.money)))
   }
   lines.push(sep(), text('SCU INFORMATION', 'center', true))
-  if (model.transaction.receiptDate || model.transaction.date) lines.push(text('Date: ' + formattedDate(model.transaction.receiptDate || model.transaction.date)))
-  if (model.transaction.receiptTime) lines.push(text('Time: ' + model.transaction.receiptTime))
+  const dateLabel = model.transaction.receiptDate || model.transaction.date
+    ? 'Date: ' + formattedDate(model.transaction.receiptDate || model.transaction.date)
+    : ''
+  const timeLabel = model.transaction.receiptTime ? 'Time: ' + model.transaction.receiptTime : ''
+  if (dateLabel && timeLabel) lines.push(pair(dateLabel, timeLabel))
+  else if (dateLabel || timeLabel) lines.push(text(dateLabel || timeLabel))
   if (model.fiscalMeta.scuId) lines.push(text('SCU ID: ' + model.fiscalMeta.scuId))
   if (model.fiscalMeta.cuInvoiceNo) lines.push(text('CU INVOICE NO: ' + model.fiscalMeta.cuInvoiceNo))
   if (model.fiscalMeta.internalData) {
