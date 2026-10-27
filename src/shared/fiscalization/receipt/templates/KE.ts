@@ -54,17 +54,24 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
   lines.push(sep())
   lines.push(pair(model.payment.method.toUpperCase(), money(total, model.decimals.money)))
   lines.push(pair('ITEMS NUMBER', String(model.payment.itemsCount)))
-  lines.push(sep(), text('Rate        Taxable Amount        VAT'))
+  // Exactly 42 monospace characters: fixed centered columns for thermal printing.
+  const columns = (rate: string, taxable: string, vat: string) =>
+    text(rate.padStart(Math.floor((8 + rate.length) / 2)).padEnd(8) +
+      taxable.padStart(Math.floor((20 + taxable.length) / 2)).padEnd(20) +
+      vat.padStart(Math.floor((14 + vat.length) / 2)).padEnd(14))
+  lines.push(sep(), columns('Rate', 'Taxable Amount', 'VAT'))
   for (const code of ['A', 'B', 'C', 'D', 'E']) {
     const item = model.taxSummary.find(row => row.taxCode.toUpperCase() === code)
-    const label = code === 'A' ? 'EX' : code === 'B' ? '16%' : code === 'C' ? '0%' : code === 'D' ? 'Non-VAT' : '8%'
-    lines.push(pair(label, money(item?.taxableAmount ?? 0, model.decimals.money) + '  ' + money(item?.taxAmount ?? 0, model.decimals.money)))
+    lines.push(columns(
+      code + ' ' + String(item?.rate ?? (code === 'B' ? 16 : code === 'E' ? 8 : 0)) + '%',
+      money(item?.taxableAmount ?? 0, model.decimals.money),
+      money(item?.taxAmount ?? 0, model.decimals.money),
+    ))
   }
   for (const item of model.taxSummary.filter(row => !['A', 'B', 'C', 'D', 'E'].includes(row.taxCode.toUpperCase()))) {
-    lines.push(pair(
-      item.label + ' ' + String(item.rate) + '%',
-      money(item.taxableAmount, model.decimals.money) + '  ' + money(item.taxAmount, model.decimals.money),
-    ))
+    lines.push(columns(item.taxCode + ' ' + item.rate + '%',
+      money(item.taxableAmount, model.decimals.money),
+      money(item.taxAmount, model.decimals.money)))
   }
   lines.push(sep(), text('SCU INFORMATION', 'center', true))
   if (model.transaction.receiptDate || model.transaction.date) lines.push(text('Date: ' + formattedDate(model.transaction.receiptDate || model.transaction.date)))
