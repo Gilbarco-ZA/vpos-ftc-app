@@ -158,31 +158,28 @@ The Azure pipeline packages the application for the supported Node.js 22 control
 
 The generated server bundle remains a required package artifact, but it is produced by CI rather than stored as source.
 
-## Build an installable DOMS package
+## Stage the DOMS application runtime locally
 
-DOMS installation archives are owned by the shared `vpos-mono-package-mgr`
-Azure pipeline, not by `npm pack`, `next build` or a hand-built tarball.
-To queue the **existing** production packaging pipeline and download its
-published artifacts, install the Azure CLI and `azure-devops` extension,
-authenticate to the Gilbarco Azure DevOps organization, then run:
+Use `npm run package:doms` to compile the app and create the directory
+tree intended to live under `/opt/fccapps/vpos-ftc`, **without Azure CLI**:
 
 ```bash
-export DOMS_AZ_ORG='https://dev.azure.com/YOUR-ORG'
-export DOMS_AZ_PROJECT='GAFS.Vpos'
-export DOMS_AZ_PIPELINE_ID='YOUR-EXISTING-PIPELINE-ID'
+npm ci
 npm run package:doms
 ```
 
-On Windows PowerShell, set the same variables with `$env:DOMS_AZ_ORG = '...'`
-and similarly for the project and pipeline ID. Optional variables:
-`DOMS_AZ_BRANCH` (defaults to `main`),
-`DOMS_PACKAGE_OUTPUT` (defaults to `artifacts/doms-packages`),
-`DOMS_PACKAGE_POLL_SECONDS`, and `DOMS_PACKAGE_MAX_CHECKS`.
+The output is `artifacts/doms-root/opt/fccapps/vpos-ftc/`. It contains the
+Next.js standalone server and static assets, public assets, `start.cjs`,
+`vpos-server.cjs`, required runtime defaults and trace helper, and
+application migration scripts. The build uses `npm run build` and fails if
+required output is absent. For inspecting a pre-existing build without
+rebuilding, set `DOMS_STAGE_SKIP_BUILD=1`. Set `DOMS_STAGE_DIR` to override
+the staging destination inside the repository.
 
-The command queues the configured pipeline, waits for successful completion,
-then downloads all published pipeline artifacts. It fails instead of generating
-a lookalike archive if Azure packaging is unavailable. Select the package built
-for the site's **CPB539 ARMv7l** or **CPB579 ARM64** controller, and verify the
-version/build and installation procedure before applying it through FccWebApp
-Software Update. The package manager retains ownership of manifest, installer,
-architecture-specific runtime and deployment dependencies.
+This **stages application files**, not a controller installable software-update
+package. The Azure `vpos-mono-package-mgr` owns architecture-specific Node
+binaries, installation metadata, startup service integration, dependencies,
+permissions and system/persistent-directory setup. Compare the staged contents
+to the package-manager output before deploying to a CPB539 or CPB579. Do not
+copy over `/opt/fccapps/vpos-perm` or apply to a production controller without
+the approved update process.
