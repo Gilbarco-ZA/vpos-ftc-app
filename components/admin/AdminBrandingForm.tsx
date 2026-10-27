@@ -180,24 +180,24 @@ export const AdminBrandingForm = () => {
       </div>
 
       <FormField
-        label="Receipt header text"
-        helpText="Printed above the receipt details. Branding colors are ignored on mono laser prints."
+        label="Commercial Message Header"
+        helpText="Displayed below TAX INVOICE on Kenya receipts."
       >
         <Textarea
           name="receiptHeaderText"
           defaultValue={initial?.receipt_header_text ?? ''}
-          placeholder="Receipt header text"
+          placeholder="Commercial message displayed below TAX INVOICE"
           rows={3}
         />
       </FormField>
       <FormField
-        label="Receipt footer text"
-        helpText="Printed below the fiscal details and QR code."
+        label="Commercial Footer"
+        helpText="Displayed at the bottom of Kenya receipts."
       >
         <Textarea
           name="receiptFooterText"
           defaultValue={initial?.receipt_footer_text ?? ''}
-          placeholder="Receipt footer text"
+          placeholder="Commercial footer displayed after THANK YOU"
           rows={3}
         />
       </FormField>
