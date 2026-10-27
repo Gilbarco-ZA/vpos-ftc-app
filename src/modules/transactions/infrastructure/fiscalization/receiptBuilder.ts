@@ -881,6 +881,9 @@ export const buildFiscalReceipt = async (params: {
   )
 
   const verificationUrl = pickFirst(
+    stationCountry === 'KE' && params.kenyaApprovedStatus?.status === 'Approved' &&
+    String(params.kenyaApprovedStatus?.documentId ?? '') === String(txn.fiscal_document_id ?? '')
+      ? params.kenyaApprovedStatus?.fiscalQrCodeData : null,
     stationCountry === 'TZ' || stationCountry === 'KE' ? templateModel?.fiscalQrCodeData : null,
     tanzaniaCounters?.verificationUrl,
     tanzaniaResponse?.verificationUrl,
