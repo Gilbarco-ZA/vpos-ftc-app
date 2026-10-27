@@ -42,4 +42,7 @@ export function applyKenyaReceiptFiscalUpdate(
   if (internal) receipt.footer.receiptInternalData = internal
   const number = value(eventReceipt?.receiptNumber, prior?.receiptNumber, checkedStatus?.documentNumber)
   if (number) receipt.meta.receiptNumber = number
+  const sdcId = value(record(event?.details)?.sdcId, event?.sdcId, record(canonical?.details)?.sdcId, canonical?.sdcId, record(snapshot?.details)?.sdcId, snapshot?.sdcId, receipt.meta.scuId)
+  if (sdcId) receipt.meta.scuId = sdcId
+  if (sdcId && number) receipt.meta.cuInvoiceNo = `${sdcId}/${number}`
 }
