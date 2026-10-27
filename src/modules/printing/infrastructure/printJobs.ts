@@ -301,12 +301,14 @@ export async function handlePrintJob(job: PrintJobRow) {
         )
         const country = String(metadata.country ?? receipt?.station_country ?? '').trim().toUpperCase()
         let qrData = extractReceiptQrData(receipt?.fiscal_data)
+        let kenyaApprovedStatus: Record<string, unknown> | null = null
         if (['KE', 'KEN', 'KENYA'].includes(country)) {
           // A stored pre-approval receipt can contain a legacy JSON fallback QR.
           // Use only the correlated Approved eTIMS URL from a fresh proxy read.
           const refreshed = await refreshKenyaReceiptStatus(job.station_id, transactionId)
           const status = refreshed && typeof refreshed === 'object'
             ? refreshed as Record<string, unknown> : null
+          kenyaApprovedStatus = status?.status === 'Approved' && status?.error !== true ? status : null
           const url = String(status?.fiscalQrCodeData ?? '').trim()
           qrData = status?.status === 'Approved' && status?.error !== true &&
             /^https:\/\/[^\s]+$/i.test(url) ? url : null
@@ -314,7 +316,7 @@ export async function handlePrintJob(job: PrintJobRow) {
         // Existing saved receipts may predate the Kenya layout update.
         // Regenerate the text in memory for print; do not overwrite fiscal rows.
         const printTextContent = ['KE', 'KEN', 'KENYA'].includes(country)
-          ? (await buildFiscalReceipt({ stationId: job.station_id, transactionId })).text
+          ? (await buildFiscalReceipt({ stationId: job.station_id, transactionId, kenyaApprovedStatus })).text
           : canonicalText
         const lines = buildReceiptEscposLines({
           plainText: printTextContent,
