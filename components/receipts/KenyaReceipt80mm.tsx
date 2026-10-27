@@ -7,7 +7,9 @@ import QRCode from 'qrcode'
 type Props = { receipt: NormalizedReceipt }
 const amount = (v?: number, digits = 2) => v == null || !Number.isFinite(v)
   ? '—' : v.toLocaleString('en-KE', { minimumFractionDigits: digits, maximumFractionDigits: digits })
-const formattedDate = (value: string) => { const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : value }\nconst dashGroups = (value: string) => value.replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.join('-') ?? value\nconst isKraUrl = (value?: string) => /^https:\/\/[^\s]+$/i.test(String(value ?? ''))
+const formattedDate = (value: string) => { const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : value }
+const dashGroups = (value: string) => value.replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.join('-') ?? value
+const isKraUrl = (value?: string) => /^https:\/\/[^\s]+$/i.test(String(value ?? ''))
 
 export default function KenyaReceipt80mm({ receipt }: Props) {
   const [qr, setQr] = useState<string | null>(null)
@@ -48,11 +50,13 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
   )
   const separator = <div className="my-3 border-t border-dashed border-black" />
   return (
-    <div className="receipt-print-area mx-auto w-[300px] max-w-full bg-white p-3 font-mono text-xs leading-relaxed text-black">\n      <style jsx global>{`@media print { .no-print { display: none !important; } body * { visibility: hidden !important; } .receipt-print-area, .receipt-print-area * { visibility: visible !important; } .receipt-print-area { position: absolute; left: 0; top: 0; width: 300px; background: white !important; color: black !important; } .receipt-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }`}</style>
+    <div className="receipt-print-area mx-auto w-[300px] max-w-full bg-white p-3 font-mono text-xs leading-relaxed text-black">
+      <style jsx global>{`@media print { .no-print { display: none !important; } body * { visibility: hidden !important; } .receipt-print-area, .receipt-print-area * { visibility: visible !important; } .receipt-print-area { position: absolute; left: 0; top: 0; width: 300px; background: white !important; color: black !important; } .receipt-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }`}</style>
       <div className="text-center">
-        <div className="text-sm font-bold">TAX INVOICE</div>
         <div className="font-bold">{receipt.header.companyName || receipt.header.stationName}</div>
-        {receipt.header.companyPin && <div>PIN: {receipt.header.companyPin}</div>}\n        <div className="text-sm font-bold">TAX INVOICE</div>\n        {receipt.branding?.receiptHeaderText?.split(/\\r?\\n/).filter(Boolean).map((message, i) => <div key={i}>{message}</div>)}
+        {receipt.header.companyPin && <div>PIN: {receipt.header.companyPin}</div>}
+        <div className="text-sm font-bold">TAX INVOICE</div>
+        {receipt.branding?.receiptHeaderText?.split(/\r?\n/).filter(Boolean).map((message, i) => <div key={i}>{message}</div>)}
         {receipt.meta.isOfflineFiscalization || receipt.meta.offlinePending
           ? <div className="font-bold">PENDING FISCALIZATION</div>
           : null}
@@ -79,7 +83,8 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       {row('ITEMS NUMBER', String(receipt.items.length))}
       {separator}
       <div className="font-bold">Rate / Taxable Amount / VAT</div>
-      {['A', 'B', 'C', 'D', 'E', ...Object.keys(taxRows).filter(code => !['A', 'B', 'C', 'D', 'E'].includes(code))].map(code => {\n        const t = taxRows[code] ?? { rate: code === 'B' ? 16 : code === 'E' ? 8 : 0, taxable: 0, tax: 0 }; return (
+      {['A', 'B', 'C', 'D', 'E', ...Object.keys(taxRows).filter(code => !['A', 'B', 'C', 'D', 'E'].includes(code))].map(code => {
+        const t = taxRows[code] ?? { rate: code === 'B' ? 16 : code === 'E' ? 8 : 0, taxable: 0, tax: 0 }; return (
         <div key={code}>{row(`${code} ${t.rate}%`,
           `${amount(t.taxable, decimals.money)} / ${amount(t.tax, decimals.money)}`)}</div>
       )})}
@@ -102,7 +107,8 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
         {receipt.meta.receiptTime && row('TIME', receipt.meta.receiptTime)}
         {separator}
       </>}
-      <div className="text-center font-bold">THANK YOU</div>\n      {receipt.branding?.receiptFooterText?.split(/\\r?\\n/).filter(Boolean).map((message, i) => <div className="text-center" key={i}>{message}</div>)}
+      <div className="text-center font-bold">THANK YOU</div>
+      {receipt.branding?.receiptFooterText?.split(/\\r?\\n/).filter(Boolean).map((message, i) => <div className="text-center" key={i}>{message}</div>)}
       {receipt.footer.copyLabel && <div className="text-center">{receipt.footer.copyLabel}</div>}
     </div>
   )
