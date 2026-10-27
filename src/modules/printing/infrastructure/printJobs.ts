@@ -1,5 +1,3 @@
-import { buildFiscalReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptBuilder'
-import { refreshKenyaReceiptStatus } from '@/src/modules/transactions/application/queries/refresh-kenya-receipt-status'
 import { renderEscpos } from '@/src/shared/printers/escposRenderer'
 import { normalizeReceiptBrandingSnapshot } from '@/src/shared/receipts/receiptSnapshots'
 
@@ -300,24 +298,13 @@ export async function handlePrintJob(job: PrintJobRow) {
           receipt?.branding_snapshot,
         )
         const country = String(metadata.country ?? receipt?.station_country ?? '').trim().toUpperCase()
-        let qrData = extractReceiptQrData(receipt?.fiscal_data)
-        let kenyaApprovedStatus: Record<string, unknown> | null = null
-        if (['KE', 'KEN', 'KENYA'].includes(country)) {
-          // A stored pre-approval receipt can contain a legacy JSON fallback QR.
-          // Use only the correlated Approved eTIMS URL from a fresh proxy read.
-          const refreshed = await refreshKenyaReceiptStatus(job.station_id, transactionId)
-          const status = refreshed && typeof refreshed === 'object'
-            ? refreshed as Record<string, unknown> : null
-          kenyaApprovedStatus = status?.status === 'Approved' && status?.error !== true ? status : null
-          const url = String(status?.fiscalQrCodeData ?? '').trim()
-          qrData = status?.status === 'Approved' && status?.error !== true &&
-            /^https:\/\/[^\s]+$/i.test(url) ? url : null
-        }
-        // Existing saved receipts may predate the Kenya layout update.
-        // Regenerate the text in memory for print; do not overwrite fiscal rows.
-        const printTextContent = ['KE', 'KEN', 'KENYA'].includes(country)
-          ? (await buildFiscalReceipt({ stationId: job.station_id, transactionId, kenyaApprovedStatus })).text
-          : canonicalText
+        const savedQr = extractReceiptQrData(receipt?.fiscal_data)
+        // Reprints must be offline-capable and use the last persisted receipt.
+        // Never generate a proxy lookup or overwrite stored fiscal evidence here.
+        const qrData = ['KE', 'KEN', 'KENYA'].includes(country)
+          ? (typeof savedQr === 'string' && /^https:\/\/[^\s]+$/i.test(savedQr) ? savedQr : null)
+          : savedQr
+        const printTextContent = canonicalText
         const lines = buildReceiptEscposLines({
           plainText: printTextContent,
           qrData,
