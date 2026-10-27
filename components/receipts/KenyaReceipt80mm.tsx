@@ -83,12 +83,17 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       {row((receipt.totals.paymentMethod || 'PAYMENT').toUpperCase(), amount(total, decimals.money))}
       {row('ITEMS NUMBER', String(receipt.items.length))}
       {separator}
-      <div className="font-bold">Rate / Taxable Amount / VAT</div>
+      <div className="grid grid-cols-[22%_45%_33%] border-b border-dashed border-black pb-1 text-center font-bold">
+        <span>Rate</span><span>Taxable Amount</span><span>VAT</span>
+      </div>
       {['A', 'B', 'C', 'D', 'E', ...Object.keys(taxRows).filter(code => !['A', 'B', 'C', 'D', 'E'].includes(code))].map(code => {
-        const t = taxRows[code] ?? { rate: code === 'B' ? 16 : code === 'E' ? 8 : 0, taxable: 0, tax: 0 }; return (
-        <div key={code}>{row(`${code} ${t.rate}%`,
-          `${amount(t.taxable, decimals.money)} / ${amount(t.tax, decimals.money)}`)}</div>
-      )})}
+        const t = taxRows[code] ?? { rate: code === 'B' ? 16 : code === 'E' ? 8 : 0, taxable: 0, tax: 0 }
+        return <div key={code} className="grid grid-cols-[22%_45%_33%] text-center tabular-nums">
+          <span>{code} {t.rate}%</span>
+          <span>{amount(t.taxable, decimals.money)}</span>
+          <span>{amount(t.tax, decimals.money)}</span>
+        </div>
+      })}
       {separator}
       <div className="text-center font-bold">SCU INFORMATION</div>
       {(receipt.meta.receiptDate || receipt.meta.receiptDateTime) && <div>Date: {formattedDate(receipt.meta.receiptDate || receipt.meta.receiptDateTime || '')}</div>}
