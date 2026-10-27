@@ -40,9 +40,9 @@ export function applyKenyaReceiptFiscalUpdate(
   const internal = value(eventReceipt?.receiptInternalData, prior?.receiptInternalData)
   if (signature) receipt.footer.receiptSignature = signature
   if (internal) receipt.footer.receiptInternalData = internal
-  const number = value(checkedStatus?.documentNumber, checkedStatus?.revenueAuthorityReference, eventReceipt?.receiptNumber, prior?.receiptNumber, receipt.meta.receiptNumber)
+  const number = value(checkedStatus?.documentNumber, checkedStatus?.revenueAuthorityReference, prior?.receiptNumber, eventReceipt?.receiptNumber, receipt.meta.receiptNumber)
   if (number) receipt.meta.receiptNumber = number
-  const sdcId = value(checkedStatus?.sdcId, record(event?.details)?.sdcId, event?.sdcId, record(canonical?.details)?.sdcId, canonical?.sdcId, record(snapshot?.details)?.sdcId, snapshot?.sdcId, receipt.meta.scuId)
+  const sdcId = value(checkedStatus?.sdcId, prior?.scuId, record(event?.details)?.sdcId, event?.sdcId, record(canonical?.details)?.sdcId, canonical?.sdcId, record(snapshot?.details)?.sdcId, snapshot?.sdcId, receipt.meta.scuId)
   if (sdcId) receipt.meta.scuId = sdcId
   if (sdcId && number) receipt.meta.cuInvoiceNo = `${sdcId}/${number}`
 }
