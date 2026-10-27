@@ -1,79 +1,64 @@
 #!/usr/bin/env node
 'use strict'
 
-/**
- * Fetch an authentic DOMS package from the Azure pipeline, which delegates
- * packaging to vpos-mono-package-mgr. This script never creates its own archive.
- *
- * Required: Azure CLI with azure-devops extension and logged-in access.
- * Environment: DOMS_AZ_ORG, DOMS_AZ_PROJECT, DOMS_AZ_PIPELINE_ID.
- * Optional: DOMS_AZ_BRANCH (default main), DOMS_PACKAGE_OUTPUT.
- */
+// Locally stage the application files, not the DOMS/FccWebApp installer.
+// Azure's vpos-mono-package-mgr remains authoritative for install metadata.
 const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 
-function fail(message) {
-  process.stderr.write('DOMS packaging: ' + message + '\n')
-  process.exit(1)
+const root = path.resolve(__dirname, '..')
+const stage = path.resolve(root, process.env.DOMS_STAGE_DIR || 'artifacts/doms-root/opt/fccapps/vpos-ftc')
+const standalone = path.join(root, '.next', 'standalone')
+const die = message => { console.error('[package:doms] ' + message); process.exit(1) }
+const inside = (parent, child) => child.startsWith(parent + path.sep)
+if (stage === root || !inside(root, stage) || inside(path.join(root, '.next'), stage) ||
+    inside(path.join(root, 'node_modules'), stage)) {
+  die('DOMS_STAGE_DIR must be a safe directory inside the repository, outside .next and node_modules')
 }
-const env = process.env
-const org = env.DOMS_AZ_ORG
-const project = env.DOMS_AZ_PROJECT
-const pipeline = env.DOMS_AZ_PIPELINE_ID
-if (!org || !project || !pipeline) {
-  fail('Set DOMS_AZ_ORG, DOMS_AZ_PROJECT and DOMS_AZ_PIPELINE_ID for the existing production Azure pipeline.')
+const required = relative => {
+  const full = path.join(root, relative)
+  if (!fs.existsSync(full)) die('Missing required build artifact: ' + relative)
+  return full
 }
-if (!/^\d+$/.test(pipeline)) fail('DOMS_AZ_PIPELINE_ID must be a numeric Azure pipeline ID')
-const branch = env.DOMS_AZ_BRANCH || 'main'
-const output = path.resolve(env.DOMS_PACKAGE_OUTPUT || 'artifacts/doms-packages')
-
-function az(args) {
-  const result = spawnSync('az', args, {
-    encoding: 'utf8',
-    shell: process.platform === 'win32',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  if (result.error) fail('Azure CLI unavailable: ' + result.error.message)
-  if (result.status !== 0) {
-    fail('Azure CLI failed: ' + args.join(' ') + '\n' + (result.stderr || result.stdout || '').trim())
-  }
-  return (result.stdout || '').trim()
+const copy = (from, to) => {
+  fs.mkdirSync(path.dirname(to), { recursive: true })
+  fs.cpSync(from, to, { recursive: true, force: true, dereference: false })
 }
-const common = ['--organization', org, '--project', project]
-let run
-try {
-  run = JSON.parse(az([
-    'pipelines', 'run', '--id', pipeline, '--branch', branch,
-    ...common, '--output', 'json',
-  ]))
-} catch (error) {
-  fail('Could not queue the production packaging pipeline: ' + String(error))
+if (process.env.DOMS_STAGE_SKIP_BUILD !== '1') {
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  const result = spawnSync(npm, ['run', 'build'], { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' })
+  if (result.error || result.status !== 0) die('npm run build failed; no staged deployment produced')
 }
-const id = String(run.id ?? '')
-if (!/^\d+$/.test(id)) fail('Azure pipeline did not return a valid run ID')
-process.stdout.write('Queued DOMS package pipeline run ' + id + '\n')
-process.stdout.write('Waiting for the existing pipeline to complete. No local package will be fabricated.\n')
-const wait = Number(env.DOMS_PACKAGE_POLL_SECONDS || '15')
-if (!Number.isInteger(wait) || wait < 5 || wait > 120) fail('DOMS_PACKAGE_POLL_SECONDS must be 5..120')
-const maxChecks = Number(env.DOMS_PACKAGE_MAX_CHECKS || '120')
-if (!Number.isInteger(maxChecks) || maxChecks < 1 || maxChecks > 500) fail('DOMS_PACKAGE_MAX_CHECKS must be 1..500')
-const sleep = ms => { const buffer = new SharedArrayBuffer(4); Atomics.wait(new Int32Array(buffer), 0, 0, ms) }
-let completed = false
-for (let attempt = 0; attempt < maxChecks; attempt++) {
-  const status = JSON.parse(az([
-    'pipelines', 'runs', 'show', '--id', id, ...common, '--output', 'json',
-  ]))
-  if (status.state === 'completed') {
-    if (status.result !== 'succeeded') fail('Package pipeline run ' + id + ' completed with result: ' + status.result)
-    completed = true
-    break
-  }
-  sleep(wait * 1000)
+required('.next/standalone')
+required('.next/static')
+required('start.cjs')
+required('vpos-server.cjs')
+required('src/platform/runtime/env-defaults.cjs')
+required('scripts/trace-net.cjs')
+if (inside(stage, standalone)) die('Staging directory cannot be inside the build output')
+fs.rmSync(stage, { recursive: true, force: true })
+fs.mkdirSync(stage, { recursive: true })
+copy(standalone, stage)
+copy(required('.next/static'), path.join(stage, '.next/static'))
+if (fs.existsSync(path.join(root, 'public'))) copy(path.join(root, 'public'), path.join(stage, 'public'))
+for (const relative of [
+  'start.cjs',
+  'vpos-server.cjs',
+  'src/platform/runtime/env-defaults.cjs',
+  'scripts/trace-net.cjs',
+]) copy(required(relative), path.join(stage, relative))
+if (fs.existsSync(path.join(root, 'scripts/migrations'))) {
+  copy(path.join(root, 'scripts/migrations'), path.join(stage, 'scripts/migrations'))
 }
-if (!completed) fail('Timed out waiting for run ' + id + '. Retrieve artifacts from Azure DevOps after it completes.')
-fs.mkdirSync(output, { recursive: true })
-az(['pipelines', 'runs', 'artifact', 'download', '--run-id', id,
-  '--path', output, ...common])
-process.stdout.write('Downloaded genuine DOMS pipeline artifacts to ' + output + '\n')
-process.stdout.write('Check controller architecture (CPB539 armv7l or CPB579 arm64) before installation.\n')
+const manifest = {
+  kind: 'doms-local-runtime-staging',
+  source: 'npm run build / Next.js standalone',
+  version: require(path.join(root, 'package.json')).version,
+  deploymentPath: '/opt/fccapps/vpos-ftc',
+  targetNode: '22.15.0',
+  note: 'Staged runtime only. Not a DOMS installer package; excludes system services, install scripts, controller-specific Node binaries and persistent configuration.',
+}
+fs.writeFileSync(path.join(stage, 'staging-manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
+console.log('[package:doms] Staged application directory: ' + stage)
+console.log('[package:doms] Copy this tree only through an approved deployment process; do not overwrite /opt/fccapps/vpos-perm.')
