@@ -84,7 +84,7 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
   }
   if (model.fiscalMeta.signature) {
     lines.push(text('Receipt Signature:'))
-    for (const row of wrap(model.fiscalMeta.signature)) lines.push(text(row))
+    for (const row of wrap(dashGroups(model.fiscalMeta.signature))) lines.push(text(row))
   }
   const url = model.qrPayload?.verificationUrl
   if (url && /^https:\/\/[^\s]+$/i.test(url)) {
