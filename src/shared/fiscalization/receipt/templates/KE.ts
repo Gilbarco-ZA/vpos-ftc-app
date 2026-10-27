@@ -1,6 +1,8 @@
 import type { FiscalReceiptModel, PrintableLine } from '../types'
 
 const WIDTH = 42
+const formattedDate = (value: string) => { const m = value.match(/^(\\d{4})-(\\d{2})-(\\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : value }
+const dashGroups = (value: string) => value.replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.join('-') ?? value
 const text = (value: string, align: 'left' | 'center' | 'right' = 'left', bold = false): PrintableLine =>
   ({ type: 'text', value, align, bold })
 const sep = (): PrintableLine => ({ type: 'separator' })
@@ -19,11 +21,12 @@ const pair = (label: string, value: string) =>
  */
 export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] => {
   const lines: PrintableLine[] = [
-    text('TAX INVOICE', 'center', true),
     text(model.station.name || 'TRADE NAME', 'center', true),
   ]
   if (model.station.taxId) lines.push(text('PIN: ' + model.station.taxId, 'center'))
-  lines.push(sep(), text('Normal Invoice', 'center'), empty())
+  lines.push(text('TAX INVOICE', 'center', true))
+  for (const message of model.customization.headerLines ?? []) lines.push(text(message, 'center'))
+  lines.push(sep())
   if (model.customer.name) lines.push(text('Buyer: ' + model.customer.name))
   if (model.customer.tin) lines.push(text('Buyer PIN: ' + model.customer.tin))
   lines.push(sep())
@@ -39,7 +42,7 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
   const discount = Number(model.payment.discount || 0)
   const total = Number(model.payment.amount || 0)
   lines.push(pair('TOTAL BEFORE DISCOUNT', money(total + discount, model.decimals.money)))
-  if (discount) lines.push(pair('TOTAL DISCOUNT AWARDED', money(discount, model.decimals.money)))
+  lines.push(pair('TOTAL DISCOUNT AWARDED', money(discount, model.decimals.money)))
   lines.push(pair('SUB TOTAL', money(total - tax, model.decimals.money)))
   lines.push(pair('VAT', money(tax, model.decimals.money)))
   lines.push(pair('TOTAL', money(total, model.decimals.money)))
@@ -47,21 +50,25 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
   lines.push(pair(model.payment.method.toUpperCase(), money(total, model.decimals.money)))
   lines.push(pair('ITEMS NUMBER', String(model.payment.itemsCount)))
   lines.push(sep(), text('Rate        Taxable Amount        VAT'))
-  for (const item of model.taxSummary) {
+  for (const code of ['A', 'B', 'C', 'D', 'E']) {
+    const item = model.taxSummary.find(row => row.taxCode.toUpperCase() === code)
+    const label = code === 'A' ? 'EX' : code === 'B' ? '16%' : code === 'C' ? '0%' : code === 'D' ? 'Non-VAT' : '8%'
+    lines.push(pair(label, money(item?.taxableAmount ?? 0, model.decimals.money) + '  ' + money(item?.taxAmount ?? 0, model.decimals.money)))
+  }
+  for (const item of model.taxSummary.filter(row => !['A', 'B', 'C', 'D', 'E'].includes(row.taxCode.toUpperCase()))) {
     lines.push(pair(
       item.label + ' ' + String(item.rate) + '%',
       money(item.taxableAmount, model.decimals.money) + '  ' + money(item.taxAmount, model.decimals.money),
     ))
   }
   lines.push(sep(), text('SCU INFORMATION', 'center', true))
-  if (model.transaction.date) lines.push(text('Date: ' + model.transaction.date))
-  if (model.fiscalMeta.scuId) lines.push(text('SCU ID: ' + model.fiscalMeta.scuId))
-  if (model.fiscalMeta.cuInvoiceNo) lines.push(text('CU INVOICE NO: ' + model.fiscalMeta.cuInvoiceNo))
-  if (model.fiscalMeta.receiptNumber) lines.push(text('Receipt Number: ' + model.fiscalMeta.receiptNumber))
-  if (model.fiscalMeta.verificationCode) lines.push(text('Verification Code: ' + model.fiscalMeta.verificationCode))
+  if (model.transaction.date) lines.push(text('Date: ' + formattedDate(model.transaction.date)))
+  if (model.transaction.receiptTime) lines.push(text('Time: ' + model.transaction.receiptTime))
+  if (model.fiscalMeta.verificationCode) lines.push(text('SCU ID: ' + model.fiscalMeta.verificationCode))
+  if (model.fiscalMeta.receiptNumber) lines.push(text('CU INVOICE NO: ' + model.fiscalMeta.receiptNumber))
   if (model.fiscalMeta.internalData) {
     lines.push(text('Internal Data:'))
-    for (const row of wrap(model.fiscalMeta.internalData)) lines.push(text(row))
+    for (const row of wrap(dashGroups(model.fiscalMeta.internalData))) lines.push(text(row))
   }
   if (model.fiscalMeta.signature) {
     lines.push(text('Receipt Signature:'))
@@ -69,7 +76,7 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
   }
   const url = model.qrPayload?.verificationUrl
   if (url && /^https:\/\/[^\s]+$/i.test(url)) {
-    lines.push(empty(), text('KRA Verification QR', 'center'))
+    lines.push(empty())
     lines.push({ type: 'qr', value: url })
   }
   lines.push(sep())
@@ -81,5 +88,6 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
     lines.push(sep())
   }
   lines.push(text('THANK YOU', 'center', true))
+  for (const message of model.customization.footerLines ?? []) lines.push(text(message, 'center'))
   return lines
 }
