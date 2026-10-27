@@ -15,6 +15,7 @@ import { RuntimeImage } from '@/components/ui/runtime-image'
 import { Textarea } from '@/components/ui/textarea'
 
 type Branding = {
+  station_country?: string | null
   primary_color?: string | null
   secondary_color?: string | null
   station_display_name?: string | null
@@ -32,6 +33,8 @@ export const AdminBrandingForm = () => {
   const [initial, setInitial] = useState<Branding | null>(null)
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
+
+  const isKenya = ['KE', 'KEN', 'KENYA'].includes(String(initial?.station_country ?? '').trim().toUpperCase())
 
   const previewLogoSrc = useMemo(() => {
     return logoPreviewUrl || initial?.logo_path || null
@@ -180,24 +183,24 @@ export const AdminBrandingForm = () => {
       </div>
 
       <FormField
-        label="Commercial Message Header"
-        helpText="Displayed below TAX INVOICE on Kenya receipts."
+        label={isKenya ? 'Commercial Message Header' : 'Receipt header text'}
+        helpText={isKenya ? 'Displayed below TAX INVOICE on Kenya receipts.' : 'Printed above the receipt details. Branding colors are ignored on monochrome prints.'}
       >
         <Textarea
           name="receiptHeaderText"
           defaultValue={initial?.receipt_header_text ?? ''}
-          placeholder="Commercial message displayed below TAX INVOICE"
+          placeholder={isKenya ? 'Commercial message displayed below TAX INVOICE' : 'Receipt header text'}
           rows={3}
         />
       </FormField>
       <FormField
-        label="Commercial Footer"
-        helpText="Displayed at the bottom of Kenya receipts."
+        label={isKenya ? 'Commercial Footer' : 'Receipt footer text'}
+        helpText={isKenya ? 'Displayed at the bottom of Kenya receipts.' : 'Printed below the receipt fiscal details and QR code.'}
       >
         <Textarea
           name="receiptFooterText"
           defaultValue={initial?.receipt_footer_text ?? ''}
-          placeholder="Commercial footer displayed after THANK YOU"
+          placeholder={isKenya ? 'Commercial footer displayed after THANK YOU' : 'Receipt footer text'}
           rows={3}
         />
       </FormField>
