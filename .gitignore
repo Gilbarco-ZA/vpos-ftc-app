@@ -39,3 +39,4 @@ yarn-error.log*
 # Generated DOMS/JPL validation evidence
 /doms-jpl-*-report.json
 /doms-jpl-*-evidence.json
+/artifacts

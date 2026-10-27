@@ -8,7 +8,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
-const stage = path.resolve(root, process.env.DOMS_STAGE_DIR || 'artifacts/doms-root/opt/fccapps/vpos-ftc')
+const stage = path.resolve(root, process.env.DOMS_STAGE_DIR || 'artifacts/vpos-ftc')
 const standalone = path.join(root, '.next', 'standalone')
 const die = message => { console.error('[package:doms] ' + message); process.exit(1) }
 const inside = (parent, child) => child.startsWith(parent + path.sep)
