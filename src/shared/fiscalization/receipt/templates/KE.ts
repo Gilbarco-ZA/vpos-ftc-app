@@ -58,6 +58,7 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
   if (model.fiscalMeta.scuId) lines.push(text('SCU ID: ' + model.fiscalMeta.scuId))
   if (model.fiscalMeta.cuInvoiceNo) lines.push(text('CU INVOICE NO: ' + model.fiscalMeta.cuInvoiceNo))
   if (model.fiscalMeta.receiptNumber) lines.push(text('Receipt Number: ' + model.fiscalMeta.receiptNumber))
+  if (model.fiscalMeta.verificationCode) lines.push(text('Verification Code: ' + model.fiscalMeta.verificationCode))
   if (model.fiscalMeta.internalData) {
     lines.push(text('Internal Data:'))
     for (const row of wrap(model.fiscalMeta.internalData)) lines.push(text(row))
