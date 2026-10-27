@@ -898,8 +898,10 @@ export const buildFiscalReceipt = async (params: {
   )
 
   const fiscalMeta: FiscalMeta = {
-    scuId: pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
-    cuInvoiceNo: pickFirst(
+    scuId: stationCountry === 'KE' ? pickFirst(fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId) : pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
+    cuInvoiceNo: stationCountry === 'KE'
+      ? (() => { const id = pickFirst(fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId); return id && receiptNumber ? `${id}/${receiptNumber}` : null })()
+      : pickFirst(
       fiscalSource?.cu_invoice_no,
       fiscalSource?.cuInvoiceNo,
       fiscalSource?.fiscal_number,
