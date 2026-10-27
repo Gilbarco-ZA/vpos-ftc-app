@@ -750,11 +750,15 @@ export const normalizeReceipt = (opts: {
         transaction?.fiscalizationReference,
       ),
       attendant: attendantName,
-      scuId: pickScuId(parsed, receipt, receiptNumber),
+      scuId: String(station?.country ?? transaction?.station_country ?? '').trim().toUpperCase() === 'KE'
+        ? pickFirst(parsed?.details?.sdcId, parsed?.sdcId, receiptModel?.fiscalMeta?.scuId)
+        : pickScuId(parsed, receipt, receiptNumber),
       isOfflineFiscalization,
       offlinePending: isOfflinePending,
       fiscalizationStatus: transactionStatus || undefined,
-      cuInvoiceNo: pickFirst(
+      cuInvoiceNo: String(station?.country ?? transaction?.station_country ?? '').trim().toUpperCase() === 'KE'
+        ? (() => { const id = pickFirst(parsed?.details?.sdcId, parsed?.sdcId, receiptModel?.fiscalMeta?.scuId); return id && receiptNumber ? `${id}/${receiptNumber}` : undefined })()
+        : pickFirst(
         parsed?.cu_invoice_no,
         parsed?.cuInvoiceNo,
         parsed?.details?.cu_invoice_no,
