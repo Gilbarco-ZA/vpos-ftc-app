@@ -4,13 +4,19 @@ import {
   defineMutationRoute,
 } from '@/src/shared/http/defineRoute'
 
+import { getStationCountryCode } from '@/src/modules/tanzania-fiscal/application/country'
+
 import { getAdminBranding } from '@/src/modules/admin-config/application/getAdminBranding'
 import { saveAdminBranding } from '@/src/modules/admin-config/application/saveAdminBranding'
 
 export const GET = defineGetRoute({
   roles: ['administrator'],
   handler: async (_req, { user }) => {
-    return ok(await getAdminBranding(user.stationId))
+    const [branding, country] = await Promise.all([
+      getAdminBranding(user.stationId),
+      getStationCountryCode(user.stationId),
+    ])
+    return ok({ ...(branding ?? {}), station_country: country })
   },
 })
 
