@@ -880,7 +880,7 @@ export const buildFiscalReceipt = async (params: {
   )
 
   const verificationUrl = pickFirst(
-    stationCountry === 'TZ' ? templateModel?.fiscalQrCodeData : null,
+    stationCountry === 'TZ' || stationCountry === 'KE' ? templateModel?.fiscalQrCodeData : null,
     tanzaniaCounters?.verificationUrl,
     tanzaniaResponse?.verificationUrl,
     fiscalSource?.verification_url,
@@ -980,14 +980,13 @@ export const buildFiscalReceipt = async (params: {
     taxSummary,
     payment,
     fiscalMeta,
-    qrPayload: verificationUrl
-      ? {
-          data: stationCountry === 'TZ' ? verificationUrl : qrData,
-          verificationUrl,
-        }
-      : qrData
-        ? { data: qrData, verificationUrl }
-        : null,
+    qrPayload: stationCountry === 'KE'
+      ? (verificationUrl && /^https:\/\/[^\s]+$/i.test(verificationUrl)
+          ? { data: verificationUrl, verificationUrl }
+          : null)
+      : verificationUrl
+        ? { data: stationCountry === 'TZ' ? verificationUrl : qrData, verificationUrl }
+        : qrData ? { data: qrData, verificationUrl } : null,
     customization: {
       headerLines: splitCustomLines(branding?.receipt_header_text),
       footerLines: splitCustomLines(branding?.receipt_footer_text),
