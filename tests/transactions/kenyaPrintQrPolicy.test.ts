@@ -40,3 +40,12 @@ test('Kenya fiscal receipt has tax invoice, VAT and SCU sections with KRA QR', (
   assert.ok(lines.some(line => line.type === 'text' && line.value.includes('VAT')))
   assert.deepEqual(lines.filter(line => line.type === 'qr'), [{ type: 'qr', value: url }])
 })
+
+test('Kenya print appends refreshed KRA QR to historical receipt without QR marker', () => {
+  const url = 'https://etims-sbx.kra.go.ke/common/link/etims/receipt/indexEtimsReceiptData?Data=NEW'
+  const lines = buildReceiptEscposLines({
+    country: 'KE', plainText: 'TAX INVOICE\nSCU INFORMATION\nReceipt Number: 36',
+    qrData: url,
+  })
+  assert.deepEqual(lines.filter(line => line.type === 'qr'), [{ type: 'qr', value: url }])
+})
