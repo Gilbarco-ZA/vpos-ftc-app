@@ -24,8 +24,8 @@ export function applyKenyaReceiptFiscalUpdate(
     String(status.status ?? '').trim().toUpperCase() === 'APPROVED' &&
     status.error !== true)
   const checkedStatus = matches ? status : null
-  const previousCode = value(eventReceipt?.fiscalVerificationCode, prior?.fiscalVerificationCode, canonical?.fiscalVerificationCode, receipt.footer.fiscalVerificationCode)
-  const previousQr = value(eventReceipt?.fiscalQrCodeData, prior?.fiscalQrCodeData, canonical?.fiscalQrCodeData, receipt.footer.fiscalQrCodeData)
+  const previousCode = value(prior?.fiscalVerificationCode, eventReceipt?.fiscalVerificationCode, canonical?.fiscalVerificationCode, receipt.footer.fiscalVerificationCode)
+  const previousQr = value(prior?.fiscalQrCodeData, eventReceipt?.fiscalQrCodeData, canonical?.fiscalQrCodeData, receipt.footer.fiscalQrCodeData)
   // An explicitly refreshed, correlated Approved status supersedes stale local
   // verification fields for display. Never persist this display-only merge.
   const statusCode = value(checkedStatus?.fiscalVerificationCode)
