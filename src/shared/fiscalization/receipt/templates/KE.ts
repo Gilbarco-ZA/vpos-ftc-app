@@ -30,7 +30,7 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
   ]
   if (model.station.taxId) lines.push(text('PIN: ' + model.station.taxId, 'center'))
   lines.push(text('TAX INVOICE', 'center', true))
-  for (const message of model.customization.headerLines ?? []) lines.push(text(message, 'center'))
+  for (const message of model.customization?.headerLines ?? []) lines.push(text(message, 'center'))
   lines.push(sep())
   if (model.customer.name) lines.push(text('Buyer: ' + model.customer.name))
   if (model.customer.tin) lines.push(text('Buyer PIN: ' + model.customer.tin))
@@ -93,6 +93,6 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
     lines.push(sep())
   }
   lines.push(text('THANK YOU', 'center', true))
-  for (const message of model.customization.footerLines ?? []) lines.push(text(message, 'center'))
+  for (const message of model.customization?.footerLines ?? []) lines.push(text(message, 'center'))
   return lines
 }
