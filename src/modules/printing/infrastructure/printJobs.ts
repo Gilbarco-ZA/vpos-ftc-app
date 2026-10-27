@@ -1,3 +1,4 @@
+import { refreshKenyaReceiptStatus } from '@/src/modules/transactions/application/queries/refresh-kenya-receipt-status'
 import { renderEscpos } from '@/src/shared/printers/escposRenderer'
 import { normalizeReceiptBrandingSnapshot } from '@/src/shared/receipts/receiptSnapshots'
 
@@ -297,9 +298,21 @@ export async function handlePrintJob(job: PrintJobRow) {
         const branding = normalizeReceiptBrandingSnapshot(
           receipt?.branding_snapshot,
         )
+        const country = String(metadata.country ?? receipt?.station_country ?? '').trim().toUpperCase()
+        let qrData = extractReceiptQrData(receipt?.fiscal_data)
+        if (['KE', 'KEN', 'KENYA'].includes(country)) {
+          // A stored pre-approval receipt can contain a legacy JSON fallback QR.
+          // Use only the correlated Approved eTIMS URL from a fresh proxy read.
+          const refreshed = await refreshKenyaReceiptStatus(job.station_id, transactionId)
+          const status = refreshed && typeof refreshed === 'object'
+            ? refreshed as Record<string, unknown> : null
+          const url = String(status?.fiscalQrCodeData ?? '').trim()
+          qrData = status?.status === 'Approved' && status?.error !== true &&
+            /^https:\/\/[^\s]+$/i.test(url) ? url : null
+        }
         const lines = buildReceiptEscposLines({
           plainText: canonicalText,
-          qrData: extractReceiptQrData(receipt?.fiscal_data),
+          qrData,
           country: metadata.country ?? receipt?.station_country,
           width,
           siteNames: [
