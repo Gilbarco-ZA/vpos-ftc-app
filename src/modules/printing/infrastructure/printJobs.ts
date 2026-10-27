@@ -1,3 +1,4 @@
+import { buildFiscalReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/receiptBuilder'
 import { refreshKenyaReceiptStatus } from '@/src/modules/transactions/application/queries/refresh-kenya-receipt-status'
 import { renderEscpos } from '@/src/shared/printers/escposRenderer'
 import { normalizeReceiptBrandingSnapshot } from '@/src/shared/receipts/receiptSnapshots'
@@ -310,8 +311,13 @@ export async function handlePrintJob(job: PrintJobRow) {
           qrData = status?.status === 'Approved' && status?.error !== true &&
             /^https:\/\/[^\s]+$/i.test(url) ? url : null
         }
+        // Existing saved receipts may predate the Kenya layout update.
+        // Regenerate the text in memory for print; do not overwrite fiscal rows.
+        const printTextContent = ['KE', 'KEN', 'KENYA'].includes(country)
+          ? (await buildFiscalReceipt({ stationId: job.station_id, transactionId })).text
+          : canonicalText
         const lines = buildReceiptEscposLines({
-          plainText: canonicalText,
+          plainText: printTextContent,
           qrData,
           country: metadata.country ?? receipt?.station_country,
           width,
