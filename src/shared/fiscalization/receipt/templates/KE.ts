@@ -1,7 +1,12 @@
 import type { FiscalReceiptModel, PrintableLine } from '../types'
 
 const WIDTH = 42
-const formattedDate = (value: string) => { const m = value.match(/^(\\d{4})-(\\d{2})-(\\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : value }
+const formattedDate = (value: string) => {
+  const parts = value.slice(0, 10).split('-')
+  return parts.length === 3 && parts[0].length === 4
+    ? [parts[2], parts[1], parts[0]].join('/')
+    : value.slice(0, 10)
+}
 const dashGroups = (value: string) => value.replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.join('-') ?? value
 const text = (value: string, align: 'left' | 'center' | 'right' = 'left', bold = false): PrintableLine =>
   ({ type: 'text', value, align, bold })
@@ -62,7 +67,7 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
     ))
   }
   lines.push(sep(), text('SCU INFORMATION', 'center', true))
-  if (model.transaction.date) lines.push(text('Date: ' + formattedDate(model.transaction.date)))
+  if (model.transaction.receiptDate || model.transaction.date) lines.push(text('Date: ' + formattedDate(model.transaction.receiptDate || model.transaction.date)))
   if (model.transaction.receiptTime) lines.push(text('Time: ' + model.transaction.receiptTime))
   if (model.fiscalMeta.verificationCode) lines.push(text('SCU ID: ' + model.fiscalMeta.verificationCode))
   if (model.fiscalMeta.receiptNumber) lines.push(text('CU INVOICE NO: ' + model.fiscalMeta.receiptNumber))
