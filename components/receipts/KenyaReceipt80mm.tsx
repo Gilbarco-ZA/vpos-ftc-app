@@ -7,7 +7,7 @@ import QRCode from 'qrcode'
 type Props = { receipt: NormalizedReceipt }
 const amount = (v?: number, digits = 2) => v == null || !Number.isFinite(v)
   ? '—' : v.toLocaleString('en-KE', { minimumFractionDigits: digits, maximumFractionDigits: digits })
-const isKraUrl = (value?: string) => /^https:\/\/[^\s]+$/i.test(String(value ?? ''))
+const formattedDate = (value: string) => { const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : value }\nconst dashGroups = (value: string) => value.replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.join('-') ?? value\nconst isKraUrl = (value?: string) => /^https:\/\/[^\s]+$/i.test(String(value ?? ''))
 
 export default function KenyaReceipt80mm({ receipt }: Props) {
   const [qr, setQr] = useState<string | null>(null)
@@ -52,10 +52,10 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       <div className="text-center">
         <div className="text-sm font-bold">TAX INVOICE</div>
         <div className="font-bold">{receipt.header.companyName || receipt.header.stationName}</div>
-        {receipt.header.companyPin && <div>PIN: {receipt.header.companyPin}</div>}
+        {receipt.header.companyPin && <div>PIN: {receipt.header.companyPin}</div>}\n        <div className="text-sm font-bold">TAX INVOICE</div>\n        {receipt.branding?.receiptHeaderText?.split(/\\r?\\n/).filter(Boolean).map((message, i) => <div key={i}>{message}</div>)}
         {receipt.meta.isOfflineFiscalization || receipt.meta.offlinePending
           ? <div className="font-bold">PENDING FISCALIZATION</div>
-          : <div>Normal Invoice</div>}
+          : null}
       </div>
       {separator}
       {receipt.buyer?.name && <div>Buyer: {receipt.buyer.name}</div>}
@@ -70,7 +70,7 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       ))}
       {separator}
       {row('TOTAL BEFORE DISCOUNT', amount(total != null ? total + discount : undefined, decimals.money))}
-      {discount !== 0 && row('TOTAL DISCOUNT AWARDED', amount(discount, decimals.money))}
+      {row('TOTAL DISCOUNT AWARDED', amount(discount, decimals.money))}
       {row('SUB TOTAL', amount(net, decimals.money))}
       {row('VAT', amount(tax, decimals.money))}
       {row('TOTAL', amount(total, decimals.money), true)}
@@ -79,7 +79,7 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       {row('ITEMS NUMBER', String(receipt.items.length))}
       {separator}
       <div className="font-bold">Rate / Taxable Amount / VAT</div>
-      {Object.entries(taxRows).map(([code, t]) => (
+      {['A', 'B', 'C', 'D', 'E', ...Object.keys(taxRows).filter(code => !['A', 'B', 'C', 'D', 'E'].includes(code))].map(code => {\n        const t = taxRows[code] ?? { rate: code === 'B' ? 16 : code === 'E' ? 8 : 0, taxable: 0, tax: 0 }; return (
         <div key={code}>{row(`${code} ${t.rate}%`,
           `${amount(t.taxable, decimals.money)} / ${amount(t.tax, decimals.money)}`)}</div>
       ))}
@@ -89,7 +89,7 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
       {receipt.meta.scuId && <div>SCU ID: {receipt.meta.scuId}</div>}
       {receipt.meta.cuInvoiceNo && <div>CU INVOICE NO: {receipt.meta.cuInvoiceNo}</div>}
       {receipt.meta.receiptNumber && <div>Receipt Number: {receipt.meta.receiptNumber}</div>}
-      {receipt.footer.receiptInternalData && <div className="break-all">Internal Data: {receipt.footer.receiptInternalData}</div>}
+      {receipt.footer.receiptInternalData && <div className="break-all">Internal Data: {dashGroups(receipt.footer.receiptInternalData)}</div>}
       {receipt.footer.receiptSignature && <div className="break-all">Receipt Signature: {receipt.footer.receiptSignature}</div>}
       {receipt.footer.fiscalVerificationCode && <div className="break-all">Verification Code: {receipt.footer.fiscalVerificationCode}</div>}
       {qr && <div className="mt-3 flex flex-col items-center gap-1">
@@ -104,7 +104,7 @@ export default function KenyaReceipt80mm({ receipt }: Props) {
         {receipt.meta.receiptTime && row('TIME', receipt.meta.receiptTime)}
         {separator}
       </>}
-      <div className="text-center font-bold">THANK YOU</div>
+      <div className="text-center font-bold">THANK YOU</div>\n      {receipt.branding?.receiptFooterText?.split(/\\r?\\n/).filter(Boolean).map((message, i) => <div className="text-center" key={i}>{message}</div>)}
       {receipt.footer.copyLabel && <div className="text-center">{receipt.footer.copyLabel}</div>}
     </div>
   )
