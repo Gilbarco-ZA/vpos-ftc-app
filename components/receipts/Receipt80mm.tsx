@@ -11,6 +11,7 @@ import { TZ_DATASET } from '@/src/shared/config/datasets/TZ'
 import { RuntimeImage } from '@/components/ui/runtime-image'
 
 import TanzaniaReceipt80mm from './TanzaniaReceipt80mm'
+import KenyaReceipt80mm from './KenyaReceipt80mm'
 
 export type Receipt80mmProps = {
   receipt: NormalizedReceipt
@@ -112,6 +113,9 @@ const Receipt80mm = ({ receipt }: Receipt80mmProps) => {
 
   if (receiptCountry === 'TZ') {
     return <TanzaniaReceipt80mm receipt={receipt} />
+  }
+  if (['KE', 'KEN', 'KENYA'].includes(receiptCountry)) {
+    return <KenyaReceipt80mm receipt={receipt} />
   }
 
   const receiptHeaderLines = (receipt.branding?.receiptHeaderText || '')
