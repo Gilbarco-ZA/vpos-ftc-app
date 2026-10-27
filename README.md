@@ -157,3 +157,32 @@ The Azure pipeline packages the application for the supported Node.js 22 control
 - CPB579 ARM64
 
 The generated server bundle remains a required package artifact, but it is produced by CI rather than stored as source.
+
+## Build an installable DOMS package
+
+DOMS installation archives are owned by the shared `vpos-mono-package-mgr`
+Azure pipeline, not by `npm pack`, `next build` or a hand-built tarball.
+To queue the **existing** production packaging pipeline and download its
+published artifacts, install the Azure CLI and `azure-devops` extension,
+authenticate to the Gilbarco Azure DevOps organization, then run:
+
+```bash
+export DOMS_AZ_ORG='https://dev.azure.com/YOUR-ORG'
+export DOMS_AZ_PROJECT='GAFS.Vpos'
+export DOMS_AZ_PIPELINE_ID='YOUR-EXISTING-PIPELINE-ID'
+npm run package:doms
+```
+
+On Windows PowerShell, set the same variables with `$env:DOMS_AZ_ORG = '...'`
+and similarly for the project and pipeline ID. Optional variables:
+`DOMS_AZ_BRANCH` (defaults to `main`),
+`DOMS_PACKAGE_OUTPUT` (defaults to `artifacts/doms-packages`),
+`DOMS_PACKAGE_POLL_SECONDS`, and `DOMS_PACKAGE_MAX_CHECKS`.
+
+The command queues the configured pipeline, waits for successful completion,
+then downloads all published pipeline artifacts. It fails instead of generating
+a lookalike archive if Azure packaging is unavailable. Select the package built
+for the site's **CPB539 ARMv7l** or **CPB579 ARM64** controller, and verify the
+version/build and installation procedure before applying it through FccWebApp
+Software Update. The package manager retains ownership of manifest, installer,
+architecture-specific runtime and deployment dependencies.
