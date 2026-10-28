@@ -155,6 +155,27 @@ const ProductsPageClient = ({
     void onRefresh()
   }, [onRefresh])
 
+  const handleSetActive = async (product: ProductListItem) => {
+    const isActive = product.isActive === false
+    if (!isActive && !window.confirm(`Mark "${product.name}" inactive? Existing transaction history is preserved.`)) return
+    try {
+      const response = await fetch(`/api/products/${encodeURIComponent(product.id)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+        body: JSON.stringify({ isActive }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || data.ok === false) {
+        throw new Error(data?.error?.message ?? data?.message ?? 'Could not update product status')
+      }
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, isActive } : p))
+      showToast('success', isActive ? 'Product reactivated' : 'Product marked inactive')
+      void onRefresh()
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Could not update product status')
+    }
+  }
+
   const handleResync = async (product: ProductListItem) => {
     try {
       const res = await fetch(
@@ -333,6 +354,7 @@ const ProductsPageClient = ({
               onViewEventLog={setEventLogProduct}
               onResync={handleResync}
               onEdit={(p) => setEditProductId(p.id)}
+              onSetActive={handleSetActive}
             />
           )}
         </div>
