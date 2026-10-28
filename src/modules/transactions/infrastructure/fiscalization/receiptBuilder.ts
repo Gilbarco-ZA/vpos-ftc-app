@@ -964,7 +964,7 @@ export const buildFiscalReceipt = async (params: {
   const fiscalMeta: FiscalMeta = {
     scuId: stationCountry === 'KE' ? pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId, kenyaSite?.value?.sdcId) : pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
     cuInvoiceNo: stationCountry === 'KE'
-      ? (() => { const id = pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId, kenyaSite?.value?.sdcId); return id && kenyaNumber && ( !kenyaOfflineEligible || /^\\d+$/.test(String(kenyaNumber)) ) ? `${id}/${kenyaNumber}` : null })()
+      ? (() => { const id = pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId, kenyaSite?.value?.sdcId); return id && kenyaNumber && ( !kenyaOfflineEligible || /^\d+$/.test(String(kenyaNumber)) ) ? `${id}/${kenyaNumber}` : null })()
       : pickFirst(
       fiscalSource?.cu_invoice_no,
       fiscalSource?.cuInvoiceNo,
