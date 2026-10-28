@@ -1,5 +1,5 @@
 import { Sheet, SheetContent } from '../ui/sheet'
-import { createEmptyForm, ProductsAddSheetWrapperProps } from './products.types'
+import { ProductsAddSheetWrapperProps } from './products.types'
 import { ProductsUpsertSheetContent } from './ProductsUpsertSheetContent'
 
 export const ProductsAddSheetWrapper = ({
@@ -15,13 +15,13 @@ export const ProductsAddSheetWrapper = ({
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex h-dvh flex-col p-0">
         <ProductsUpsertSheetContent
+          key={isOpen ? "new-product-open" : "new-product-closed"}
           title="Add product"
           submitLabel="Save product"
           onClose={() => onOpenChange(false)}
           defaultCurrency={defaultCurrency}
           taxTypeOptions={taxTypeOptions}
           isDevEnv={isDevEnv}
-          initialValues={createEmptyForm(defaultCurrency)}
           onSubmit={onSubmit}
           onSuccess={onSuccess}
         />
