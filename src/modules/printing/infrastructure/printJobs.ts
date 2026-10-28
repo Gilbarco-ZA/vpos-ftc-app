@@ -317,7 +317,7 @@ export async function handlePrintJob(job: PrintJobRow) {
           ],
           siteTin: metadata.siteTin ?? receipt?.station_tin ?? '',
           includeBrandLogo: Boolean(branding?.logoPath),
-          offlinePrint: payload?.offlinePrint === true,
+          offlinePrint: payload?.offlinePrint === true || payload?.data?.offlinePrint === true,
         })
         const printableLines = await resolveReceiptEscposImages(lines, {
           widthCharacters: width,
