@@ -1,3 +1,4 @@
+import { queryOne } from '@/src/platform/db/postgres'
 import type { SessionUser } from '@/src/shared/types'
 
 import { readBody, toBool } from '@/src/platform/web/api/request'
@@ -104,6 +105,13 @@ export const POST = async (req: Request) => {
       )
     }
 
+    const fiscalState = await queryOne<{ fiscalized_at: string | null; country: string | null }>(
+      `SELECT t.fiscalized_at, fs.country FROM transactions t
+       JOIN fuel_stations fs ON fs.id = t.station_id
+       WHERE t.station_id = $1::uuid AND t.id = $2::uuid`,
+      [user.stationId, transactionId],
+    )
+    const pendingKenya = ['KE', 'KEN', 'KENYA'].includes(String(fiscalState?.country ?? '').toUpperCase()) && !fiscalState?.fiscalized_at
     const correlationId = uuidv4()
     const printPayload = {
       type: 'receipt',
@@ -122,6 +130,7 @@ export const POST = async (req: Request) => {
         receiptId: String(receipt.id),
         receiptNumber: currentReceipt?.receiptNumber ?? receipt.receipt_number,
         isReprint,
+        offlinePrint: pendingKenya,
         pumpNumber: pumpNumber ?? undefined,
       },
     }
