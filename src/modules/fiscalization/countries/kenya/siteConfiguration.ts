@@ -1,3 +1,4 @@
+import { kenyaQrPrefix, type KenyaQrMode } from './qr'
 import { query, queryOne } from '@/src/platform/db/postgres'
 import { getStationCountryCode } from '@/src/modules/tanzania-fiscal/application/country'
 import { getSiteConfigurationPublic } from '@/src/shared/proxy/client'
@@ -10,6 +11,8 @@ export type KenyaSiteConfiguration = {
   sdcId: string
   nextDocumentNumber: number
   fetchedAt: string
+  qrMode?: KenyaQrMode
+  manualQrUrl?: string
 }
 
 export function parseKenyaSiteConfiguration(raw: unknown): Omit<KenyaSiteConfiguration, 'fetchedAt'> {
@@ -42,7 +45,9 @@ export async function fetchAndSaveKenyaSiteConfiguration(stationId: string): Pro
   const response = await getSiteConfigurationPublic()
   if (!response.ok) throw new Error('Could not fetch site configuration from proxy')
   const verified = parseKenyaSiteConfiguration(response.data)
-  const value = { ...verified, fetchedAt: new Date().toISOString() }
+  const existing = await readKenyaSiteConfiguration(stationId)
+  const value = { ...verified, fetchedAt: new Date().toISOString(),
+    qrMode: existing?.qrMode ?? 'development', manualQrUrl: existing?.manualQrUrl ?? '' }
   await query(
     `INSERT INTO station_kv (station_id, key, value)
      VALUES ($1::uuid, $2, $3::jsonb)
@@ -50,5 +55,18 @@ export async function fetchAndSaveKenyaSiteConfiguration(stationId: string): Pro
      DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
     [stationId, KENYA_SITE_CONFIG_KEY, JSON.stringify(value)],
   )
+  return value
+}
+
+export async function saveKenyaQrSettings(stationId: string, mode: KenyaQrMode, manualQrUrl: string) {
+  if (!['development', 'production', 'manual'].includes(mode)) throw new Error('Invalid Kenya QR mode')
+  kenyaQrPrefix(mode, manualQrUrl)
+  if (await getStationCountryCode(stationId) !== 'KE') throw new Error('Kenya station required')
+  const existing = await readKenyaSiteConfiguration(stationId)
+  if (!existing) throw new Error('Fetch and verify Kenya site configuration first')
+  const value = { ...existing, qrMode: mode, manualQrUrl: mode === 'manual' ? manualQrUrl.trim() : '' }
+  await query(`UPDATE station_kv SET value = $3::jsonb, updated_at = NOW()
+    WHERE station_id = $1::uuid AND key = $2`,
+    [stationId, KENYA_SITE_CONFIG_KEY, JSON.stringify(value)])
   return value
 }
