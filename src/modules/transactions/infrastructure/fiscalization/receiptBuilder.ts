@@ -18,6 +18,7 @@ import { toNumberLoose as coerceNumber } from '@/src/shared/numbers'
 import { resolveDecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { mapFiscalReceipt } from '@/src/shared/receipts/mapFiscalReceipt'
 import { formatDateTime } from '@/src/shared/utils/dates'
+import { ensureKenyaOfflineReceiptNumber } from '@/src/modules/fiscalization/countries/kenya/offlineNumber'
 import { generateKenyaOfflineEvidence, kenyaQrPrefix } from '@/src/modules/fiscalization/countries/kenya/qr'
 
 import { resolveTanzaniaCustomerIdentity } from '@/src/modules/tanzania-fiscal/domain/customerIdentity'
@@ -131,6 +132,7 @@ const pickScuId = (raw: any, fiscalSource: any, fiscalDevice: any) => {
     receipt?.fiscal_device
 
   const receiptNumber = pickFirst(
+    offlineReceiptNumber,
     receipt?.receiptNumber,
     receipt?.receipt_number,
     details?.receiptNumber,
@@ -875,12 +877,16 @@ export const buildFiscalReceipt = async (params: {
   const offlineIssuedAt = new Date(txn.transaction_date_time ?? txn.created_at ?? 0)
   const offlineStamp = offlineIssuedAt.getTime()
   const fallbackReceiptNumber = `R-${Number.isSafeInteger(offlineStamp) && offlineStamp > 0 ? offlineStamp : 0}-${String(txn.id).slice(0, 6)}`
-  const kenyaOffline = stationCountry === 'KE' && !txn.fiscalized_at && !templateModel?.fiscalQrCodeData &&
+  const kenyaOfflineEligible = stationCountry === 'KE' && !txn.fiscalized_at && !templateModel?.fiscalQrCodeData &&
     !txn.fiscal_document_id && Number.isSafeInteger(offlineStamp) && offlineStamp > 0 &&
     kenyaSite?.value?.tin && kenyaSite?.value?.branchId && kenyaSite?.value?.sdcId
+  const offlineReceiptNumber = kenyaOfflineEligible
+    ? await ensureKenyaOfflineReceiptNumber(params.stationId, params.transactionId)
+    : null
+  const kenyaOffline = offlineReceiptNumber != null
     ? generateKenyaOfflineEvidence({
         pin: kenyaSite.value.tin,
-        invoiceNumber: offlineStamp,
+        invoiceNumber: offlineReceiptNumber,
         issuedAt: offlineIssuedAt,
       })
     : null
@@ -1045,7 +1051,7 @@ export const buildFiscalReceipt = async (params: {
     model,
     lines,
     text,
-    receiptNumber,
+    receiptNumber: stationCountry === 'KE' ? kenyaNumber : receiptNumber,
     templateModel,
   }
 }
