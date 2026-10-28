@@ -14,6 +14,12 @@ test('pending Kenya receipts allocate numeric CU invoice numbers even with a doc
 })
 test('pending Kenya CU invoice suffix is numeric and never the R- transaction reference', () => {
   assert.match(builder, /const kenyaNumber = stationCountry === 'KE' && kenyaOfflineEligible/)
-  assert.ok(builder.includes(String.raw`/^\d+$/.test(String(kenyaNumber))`))
+  // Check the CU invoice construction rather than requiring an exact source layout.
+  // The offline allocator returns a number; the guard must reject R- references.
+  const cuInvoiceBlock = builder.slice(builder.indexOf('cuInvoiceNo: stationCountry'), builder.indexOf('receiptNumber: stationCountry', builder.indexOf('cuInvoiceNo: stationCountry')))
+  assert.ok(cuInvoiceBlock.length > 0, 'Kenya CU invoice assignment must exist')
+  assert.match(cuInvoiceBlock, /kenyaOfflineEligible/)
+  assert.match(cuInvoiceBlock, /\/\^\\d\+\$\/\.test\(String\(kenyaNumber\)\)/)
+  assert.match(cuInvoiceBlock, /\`\$\{id\}\/\$\{kenyaNumber\}\`/)
   assert.match(builder, /Verified Kenya fiscal configuration/)
 })
