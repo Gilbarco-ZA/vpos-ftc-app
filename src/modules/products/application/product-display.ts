@@ -59,5 +59,6 @@ export const normalizeProductsForDisplay = (
     lastSyncStatus: (String(item.lastSyncStatus ?? 'UNKNOWN').toUpperCase() ||
       'UNKNOWN') as ProductListItem['lastSyncStatus'],
     lastSynced: item.lastSyncAt ? String(item.lastSyncAt) : null,
+    isActive: item.isActive,
   }))
 }
