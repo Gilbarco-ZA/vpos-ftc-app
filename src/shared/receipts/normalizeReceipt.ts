@@ -832,12 +832,23 @@ export const normalizeReceipt = (opts: {
         receipt?.fiscal_verification_code,
         receiptModel?.fiscalMeta?.verificationCode,
       ),
-      fiscalQrCodeData: pickFirst(
-        receipt?.fiscalQrCodeData,
-        receipt?.fiscal_qr_code_data,
-        receiptModel?.qrPayload?.data,
-        receiptModel?.fiscalMeta?.verificationUrl,
-      ),
+      fiscalQrCodeData: String(
+        receiptModel?.station?.country ?? station?.country ?? '',
+      ).trim().toUpperCase() === 'KE'
+        ? [
+            receiptModel?.qrPayload?.verificationUrl,
+            receiptModel?.qrPayload?.data,
+            receipt?.fiscalQrCodeData,
+            receipt?.fiscal_qr_code_data,
+            receiptModel?.fiscalMeta?.verificationUrl,
+          ].map(value => String(value ?? '').trim())
+            .find(value => /^https:\/\/[^\s]+$/i.test(value)) ?? ''
+        : pickFirst(
+            receipt?.fiscalQrCodeData,
+            receipt?.fiscal_qr_code_data,
+            receiptModel?.qrPayload?.data,
+            receiptModel?.fiscalMeta?.verificationUrl,
+          ),
       copyLabel:
         String(receiptModel?.station?.country ?? station?.country ?? '')
           .trim()
