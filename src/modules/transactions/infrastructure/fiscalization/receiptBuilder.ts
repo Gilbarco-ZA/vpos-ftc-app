@@ -876,9 +876,21 @@ export const buildFiscalReceipt = async (params: {
   const offlineIssuedAt = new Date(txn.transaction_date_time ?? txn.created_at ?? 0)
   const offlineStamp = offlineIssuedAt.getTime()
   const fallbackReceiptNumber = `R-${Number.isSafeInteger(offlineStamp) && offlineStamp > 0 ? offlineStamp : 0}-${String(txn.id).slice(0, 6)}`
-  const kenyaOfflineEligible = stationCountry === 'KE' && !txn.fiscalized_at && !templateModel?.fiscalQrCodeData &&
-    !txn.fiscal_document_id && Number.isSafeInteger(offlineStamp) && offlineStamp > 0 &&
-    kenyaSite?.value?.tin && kenyaSite?.value?.branchId && kenyaSite?.value?.sdcId
+  // A pending Kenya sale must have a station-scoped numeric document number.
+  // Never use the internal R-transaction reference as a CU invoice number.
+  const kenyaOfflineEligible =
+    stationCountry === 'KE' &&
+    !txn.fiscalized_at &&
+    params.kenyaApprovedStatus?.status !== 'Approved'
+  if (kenyaOfflineEligible && (
+    !kenyaSite?.value?.tin ||
+    !kenyaSite?.value?.branchId ||
+    !kenyaSite?.value?.sdcId ||
+    !Number.isFinite(offlineStamp) ||
+    offlineStamp <= 0
+  )) {
+    throw new Error('Verified Kenya fiscal configuration and transaction date required for offline receipt')
+  }
   const offlineReceiptNumber = kenyaOfflineEligible
     ? await ensureKenyaOfflineReceiptNumber(params.stationId, params.transactionId)
     : null
@@ -938,12 +950,14 @@ export const buildFiscalReceipt = async (params: {
       ? params.kenyaApprovedStatus : null
   const refreshedSdc = coerceString(refreshedKenyaStatus?.sdcId)
   const refreshedNumber = coerceString(refreshedKenyaStatus?.documentNumber)
-  const kenyaNumber = refreshedNumber || receiptNumber
+  const kenyaNumber = stationCountry === 'KE' && kenyaOfflineEligible
+    ? String(offlineReceiptNumber)
+    : refreshedNumber || receiptNumber
 
   const fiscalMeta: FiscalMeta = {
     scuId: stationCountry === 'KE' ? pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId, kenyaSite?.value?.sdcId) : pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
     cuInvoiceNo: stationCountry === 'KE'
-      ? (() => { const id = pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId, kenyaSite?.value?.sdcId); return id && kenyaNumber ? `${id}/${kenyaNumber}` : null })()
+      ? (() => { const id = pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId, kenyaSite?.value?.sdcId); return id && kenyaNumber && ( !kenyaOfflineEligible || /^\\d+$/.test(String(kenyaNumber)) ) ? `${id}/${kenyaNumber}` : null })()
       : pickFirst(
       fiscalSource?.cu_invoice_no,
       fiscalSource?.cuInvoiceNo,
