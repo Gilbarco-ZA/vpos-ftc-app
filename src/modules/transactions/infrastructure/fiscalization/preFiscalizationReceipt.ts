@@ -147,7 +147,23 @@ export async function getOrCreatePreFiscalizationReceipt(input: {
     [input.stationId, input.transactionId],
   )
   if (existing) {
-    if (!isTanzania) return existing
+    const isKenya = ['KE', 'KEN', 'KENYA'].includes(
+      String(station?.country ?? '').trim().toUpperCase(),
+    )
+    if (isKenya) {
+      const state = await queryOne<{ fiscalized_at: string | null }>(
+        `SELECT fiscalized_at FROM transactions
+         WHERE station_id = $1::uuid AND id = $2::uuid`,
+        [input.stationId, input.transactionId],
+      )
+      // Do not revise fiscalized documents. Supersede pending legacy R-numbered copies.
+      const legacyCuNumber = /CU INVOICE NO\s*:\s*[^\s/]+\/R-[^\s]+/i.test(
+        String(existing.plain_text_content ?? ''),
+      )
+      if (state?.fiscalized_at || !legacyCuNumber) return existing
+    } else if (!isTanzania) {
+      return existing
+    }
     const fiscalData =
       typeof existing.fiscal_data === 'string'
         ? (() => {
