@@ -658,6 +658,11 @@ export const buildFiscalReceipt = async (params: {
     [params.stationId, 'tax_pin'],
   )
 
+  const kenyaSite = await pgOne<{ value: { sdcId?: string; tin?: string; branchId?: string } }>(
+    `SELECT value FROM station_kv WHERE station_id = $1 AND key = $2`,
+    [params.stationId, 'kenya.fiscal.site.configuration'],
+  ).catch(() => null)
+
   const fiscalDevice = await pgOne<any>(
     `SELECT config_json FROM fiscal_devices WHERE station_id = $1 AND is_active = TRUE ORDER BY updated_at DESC LIMIT 1`,
     [params.stationId],
@@ -676,6 +681,7 @@ export const buildFiscalReceipt = async (params: {
       stationCountry === 'KE'
         ? pickFirst(
             station?.pin,
+            kenyaSite?.value?.tin,
             stationKv?.value?.pin,
             stationKv?.value?.tax_pin,
             stationSettings?.tax_pin,
@@ -912,9 +918,9 @@ export const buildFiscalReceipt = async (params: {
   const kenyaNumber = refreshedNumber || receiptNumber
 
   const fiscalMeta: FiscalMeta = {
-    scuId: stationCountry === 'KE' ? pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId) : pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
+    scuId: stationCountry === 'KE' ? pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId, kenyaSite?.value?.sdcId) : pickScuId(fiscalResponse, fiscalSource, fiscalDevice),
     cuInvoiceNo: stationCountry === 'KE'
-      ? (() => { const id = pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId); return id && kenyaNumber ? `${id}/${kenyaNumber}` : null })()
+      ? (() => { const id = pickFirst(refreshedSdc, fiscalResponse?.details?.sdcId, fiscalResponse?.sdcId, kenyaSite?.value?.sdcId); return id && kenyaNumber ? `${id}/${kenyaNumber}` : null })()
       : pickFirst(
       fiscalSource?.cu_invoice_no,
       fiscalSource?.cuInvoiceNo,
