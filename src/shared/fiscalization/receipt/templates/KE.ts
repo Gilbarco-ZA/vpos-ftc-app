@@ -2,7 +2,12 @@ import type { FiscalReceiptModel, PrintableLine } from '../types'
 
 const WIDTH = 42
 const formattedDate = (value: string) => {
-  const parts = value.slice(0, 10).split('-')
+  const raw = String(value ?? '')
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return [iso[3], iso[2], iso[1]].join('/')
+  const parsed = new Date(raw)
+  if (!Number.isNaN(parsed.getTime())) return [String(parsed.getDate()).padStart(2, '0'), String(parsed.getMonth() + 1).padStart(2, '0'), String(parsed.getFullYear())].join('/')
+  const parts = raw.slice(0, 10).split('-')
   return parts.length === 3 && parts[0].length === 4
     ? [parts[2], parts[1], parts[0]].join('/')
     : value.slice(0, 10)
@@ -31,6 +36,9 @@ export const buildReceiptLines = (model: FiscalReceiptModel): PrintableLine[] =>
   if (model.station.taxId) lines.push(text('PIN: ' + model.station.taxId, 'center'))
   lines.push(text('TAX INVOICE', 'center', true))
   for (const message of model.customization?.headerLines ?? []) lines.push(text(message, 'center'))
+  if (model.transaction.status && ['ALLOCATED', 'FISCALIZING', 'FAILED', 'PENDING'].includes(model.transaction.status.toUpperCase())) {
+    lines.push(text('PENDING FISCALIZATION', 'center', true))
+  }
   lines.push(sep())
   if (model.customer.name) lines.push(text('Buyer: ' + model.customer.name))
   if (model.customer.tin) lines.push(text('Buyer PIN: ' + model.customer.tin))
