@@ -30,7 +30,9 @@ const eslintConfig = [
       ".next/**",
       "out/**",
       "build/**",
+      "artifacts/**",
       "next-env.d.ts",
+      "vpos-server.cjs"
     ],
   },
 ];
