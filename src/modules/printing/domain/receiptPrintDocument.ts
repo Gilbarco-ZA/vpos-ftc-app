@@ -151,6 +151,11 @@ export function buildReceiptEscposLines(input: {
     lines.push({ type: 'text', value: row })
   }
 
+  if (isKenya && input.offlinePrint === true &&
+      !lines.some(line => line.type === 'text' && line.value.includes('PENDING FISCALIZATION'))) {
+    lines.unshift({ type: 'text', value: 'PENDING FISCALIZATION', align: 'center', bold: true })
+  }
+
   if (isKenya && /^https:\/\/[^\s]+$/i.test(qrOverride) &&
       !lines.some(line => line.type === 'qr')) {
     // Stored receipt text may predate status approval and have no [QR] row.
