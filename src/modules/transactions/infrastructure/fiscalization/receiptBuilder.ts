@@ -132,7 +132,6 @@ const pickScuId = (raw: any, fiscalSource: any, fiscalDevice: any) => {
     receipt?.fiscal_device
 
   const receiptNumber = pickFirst(
-    offlineReceiptNumber,
     receipt?.receiptNumber,
     receipt?.receipt_number,
     details?.receiptNumber,
