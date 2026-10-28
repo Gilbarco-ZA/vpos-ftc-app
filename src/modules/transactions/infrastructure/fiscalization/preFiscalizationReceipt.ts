@@ -160,7 +160,24 @@ export async function getOrCreatePreFiscalizationReceipt(input: {
       const legacyCuNumber = /CU INVOICE NO\s*:\s*[^\s/]+\/R-[^\s]+/i.test(
         String(existing.plain_text_content ?? ''),
       )
-      if (state?.fiscalized_at || !legacyCuNumber) return existing
+      const storedFiscal = typeof existing.fiscal_data === 'string'
+        ? (() => { try { return JSON.parse(existing.fiscal_data) } catch { return null } })()
+        : existing.fiscal_data
+      const savedQr = String(
+        storedFiscal?.receipt?.fiscalQrCodeData ??
+        storedFiscal?.model?.qrPayload?.verificationUrl ??
+        '',
+      ).trim()
+      const missingQr = !/^https:\/\/[^\s]+$/i.test(savedQr)
+      const qrConfig = missingQr
+        ? await queryOne<{ value: { qrMode?: string; manualQrUrl?: string } }>(
+            `SELECT value FROM station_kv WHERE station_id = $1::uuid AND key = $2`,
+            [input.stationId, 'kenya.fiscal.site.configuration'],
+          ).catch(() => null)
+        : null
+      const canRecoverQr = Boolean(qrConfig?.value) &&
+        (qrConfig?.value?.qrMode !== 'manual' || /^https:\/\/[^\s]+$/i.test(String(qrConfig?.value?.manualQrUrl ?? '')))
+      if (state?.fiscalized_at || (!legacyCuNumber && !(missingQr && canRecoverQr))) return existing
     } else if (!isTanzania) {
       return existing
     }
