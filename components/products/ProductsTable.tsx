@@ -23,12 +23,14 @@ export function ProductsTable({
   onViewEventLog,
   onResync,
   onEdit,
+  onSetActive,
 }: {
   products: ProductListItem[]
   onViewStatus: (p: ProductListItem) => void
   onViewEventLog: (p: ProductListItem) => void
   onResync: (p: ProductListItem) => void
   onEdit: (p: ProductListItem) => void
+  onSetActive: (p: ProductListItem) => void
 }) {
   return (
     <Table>
@@ -38,6 +40,7 @@ export function ProductsTable({
           <TableHead>Product code</TableHead>
           <TableHead>SKU</TableHead>
           <TableHead>Unit price</TableHead>
+          <TableHead>Active</TableHead>
           <TableHead>Sync status</TableHead>
           <TableHead>Last synced</TableHead>
           <TableHead className="text-right">Actions</TableHead>
@@ -64,6 +67,7 @@ export function ProductsTable({
                 {p.currency || 'Currency not set'}
               </div>
             </TableCell>
+            <TableCell><Badge variant={p.isActive === false ? 'warn' : 'success'}>{p.isActive === false ? 'Inactive' : 'Active'}</Badge></TableCell>
             <TableCell>
               <Badge variant={statusVariant(p.lastSyncStatus ?? 'UNKNOWN')}>
                 {statusLabel(p.lastSyncStatus ?? 'UNKNOWN')}
@@ -77,6 +81,7 @@ export function ProductsTable({
                 item={p}
                 actions={[
                   { label: 'Edit', onSelect: onEdit },
+                  { label: p.isActive === false ? 'Reactivate' : 'Mark inactive', onSelect: onSetActive },
                   { label: 'View status', onSelect: onViewStatus },
                   { label: 'View event log', onSelect: onViewEventLog },
                   {
