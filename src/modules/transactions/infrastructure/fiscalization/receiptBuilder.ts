@@ -885,7 +885,7 @@ export const buildFiscalReceipt = async (params: {
     : null
   const kenyaOffline = offlineReceiptNumber != null
     ? generateKenyaOfflineEvidence({
-        pin: kenyaSite.value.tin,
+        pin: kenyaSite!.value.tin!,
         invoiceNumber: offlineReceiptNumber,
         issuedAt: offlineIssuedAt,
       })
@@ -895,6 +895,7 @@ export const buildFiscalReceipt = async (params: {
     ? offlineQrPrefix + kenyaSite!.value.tin + kenyaSite!.value.branchId + kenyaOffline.receiptSignature
     : ''
   const receiptNumber = pickFirst(
+    offlineReceiptNumber,
     stationCountry === 'TZ' ? templateModel?.receiptNumber : null,
     stationCountry === 'TZ' ? tanzaniaCounters?.receiptNo : null,
     stationCountry === 'TZ' ? tanzaniaCounters?.globalCount : null,
