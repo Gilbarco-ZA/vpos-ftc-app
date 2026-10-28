@@ -14,6 +14,6 @@ test('pending Kenya receipts allocate numeric CU invoice numbers even with a doc
 })
 test('pending Kenya CU invoice suffix is numeric and never the R- transaction reference', () => {
   assert.match(builder, /const kenyaNumber = stationCountry === 'KE' && kenyaOfflineEligible/)
-  assert.match(builder, /\^\\d\+\$/)
+  assert.ok(builder.includes(String.raw`/^\d+$/.test(String(kenyaNumber))`))
   assert.match(builder, /Verified Kenya fiscal configuration/)
 })
