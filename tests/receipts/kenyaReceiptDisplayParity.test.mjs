@@ -38,3 +38,9 @@ test('Kenya receipt has required fiscal labels and omits redundant labels', () =
   assert.match(print, /model\.customization\?\.headerLines/)
   assert.match(print, /model\.customization\?\.footerLines/)
 })
+
+test('Kenya preview formats stored JavaScript date strings as dd/MM/yyyy', () => {
+  assert.match(kenya, /const parsed = new Date\(value\)/)
+  assert.match(kenya, /parsed\.getDate\(\)/)
+  assert.match(kenya, /parsed\.getMonth\(\) \+ 1/)
+})
