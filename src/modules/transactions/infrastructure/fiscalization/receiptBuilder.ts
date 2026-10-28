@@ -924,6 +924,7 @@ export const buildFiscalReceipt = async (params: {
     stationCountry === 'KE' && params.kenyaApprovedStatus?.status === 'Approved' &&
     String(params.kenyaApprovedStatus?.documentId ?? '') === String(txn.fiscal_document_id ?? '')
       ? params.kenyaApprovedStatus?.fiscalQrCodeData : null,
+    stationCountry === 'KE' && kenyaOfflineEligible ? offlineQrUrl : null,
     stationCountry === 'TZ' || stationCountry === 'KE' ? templateModel?.fiscalQrCodeData : null,
     stationCountry === 'KE' ? offlineQrUrl : null,
     tanzaniaCounters?.verificationUrl,
@@ -942,6 +943,12 @@ export const buildFiscalReceipt = async (params: {
       : null,
   )
 
+  // Discard stale non-URL QR fields instead of hiding a valid later fallback.
+  const kenyaVerificationUrl = stationCountry === 'KE'
+    ? [verificationUrl, offlineQrUrl, templateModel?.fiscalQrCodeData]
+        .map(value => String(value ?? '').trim())
+        .find(value => /^https:\/\/[^\s]+$/i.test(value)) ?? ''
+    : ''
   const refreshedKenyaStatus = stationCountry === 'KE' &&
     params.kenyaApprovedStatus?.status === 'Approved' &&
     params.kenyaApprovedStatus?.error !== true &&
@@ -1044,8 +1051,8 @@ export const buildFiscalReceipt = async (params: {
     payment,
     fiscalMeta,
     qrPayload: stationCountry === 'KE'
-      ? (verificationUrl && /^https:\/\/[^\s]+$/i.test(verificationUrl)
-          ? { data: verificationUrl, verificationUrl }
+      ? (kenyaVerificationUrl
+          ? { data: kenyaVerificationUrl, verificationUrl: kenyaVerificationUrl }
           : null)
       : verificationUrl
         ? { data: stationCountry === 'TZ' ? verificationUrl : qrData, verificationUrl }
