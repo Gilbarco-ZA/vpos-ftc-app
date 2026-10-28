@@ -12,7 +12,8 @@ export async function ensureKenyaOfflineReceiptNumber(stationId: string, transac
     const assignments = await txQuery(client,
       `SELECT value FROM station_kv WHERE station_id = $1::uuid AND key = $2`,
       [stationId, 'kenya.fiscal.offline.number.' + transactionId])
-    const saved = Number(assignments.rows[0]?.value?.receiptNumber)
+    const savedAssignment = assignments.rows[0]?.value as { receiptNumber?: number } | undefined
+    const saved = Number(savedAssignment?.receiptNumber)
     if (Number.isSafeInteger(saved) && saved > 0) return saved
     const next = Number(config.nextDocumentNumber)
     if (!Number.isSafeInteger(next) || next < 1) throw new Error('Invalid Kenya next document number')
