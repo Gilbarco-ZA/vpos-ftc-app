@@ -25,6 +25,7 @@ export type ProductListItem = {
   currency: string
   lastSyncStatus?: ProductStatus
   lastSynced: string | null
+  isActive?: boolean
 }
 
 export type ProductStatusPayload = {
