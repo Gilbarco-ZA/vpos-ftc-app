@@ -210,6 +210,7 @@ export const ProductsUpsertSheetContent = ({
                   setForm((prev: any) => ({
                     ...prev,
                     extDescription: event.target.value,
+                    productName: event.target.value,
                   }))
                 }
                 placeholder="Premium Diesel"
