@@ -19,7 +19,7 @@ test('pending Kenya CU invoice suffix is numeric and never the R- transaction re
   const cuInvoiceBlock = builder.slice(builder.indexOf('cuInvoiceNo: stationCountry'), builder.indexOf('receiptNumber: stationCountry', builder.indexOf('cuInvoiceNo: stationCountry')))
   assert.ok(cuInvoiceBlock.length > 0, 'Kenya CU invoice assignment must exist')
   assert.match(cuInvoiceBlock, /kenyaOfflineEligible/)
-  assert.match(cuInvoiceBlock, /\/\^\\d\+\$\/\.test\(String\(kenyaNumber\)\)/)
+  assert.ok(cuInvoiceBlock.includes(String.raw`/^\d+$/.test(String(kenyaNumber))`), 'offline CU invoice guard must match digits, not a literal backslash')
   assert.match(cuInvoiceBlock, /\`\$\{id\}\/\$\{kenyaNumber\}\`/)
   assert.match(builder, /Verified Kenya fiscal configuration/)
 })
