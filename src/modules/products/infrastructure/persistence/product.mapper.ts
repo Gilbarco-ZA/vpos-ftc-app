@@ -12,6 +12,7 @@ export type ProductListItemRecord = {
   currency: string
   lastSyncStatus?: ProductSyncStatus
   lastSyncAt: string | null
+  isActive: boolean
 }
 
 export type ProductRecord = Product & {
@@ -44,6 +45,7 @@ export function mapProductListItemRow(
     lastSyncStatus: row.last_sync_status
       ? (String(row.last_sync_status) as ProductSyncStatus)
       : undefined,
+    isActive: row.is_active !== false,
     lastSyncAt: row.last_sync_at
       ? new Date(String(row.last_sync_at)).toISOString()
       : null,
