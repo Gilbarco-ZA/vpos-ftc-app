@@ -175,6 +175,9 @@ export const getNavSections = (
     {
       label: 'Fiscal Services',
       items: [
+        ...(['KE', 'KEN', 'KENYA'].includes(String(stationCountry ?? '').trim().toUpperCase())
+          ? [{ label: 'Kenya Fiscal', href: '/admin/kenya-fiscal' }]
+          : []),
         ...(isTanzaniaCountry(stationCountry)
           ? [{ label: 'Tanzania Fiscal', href: '/admin/tanzania-fiscal' }]
           : []),
