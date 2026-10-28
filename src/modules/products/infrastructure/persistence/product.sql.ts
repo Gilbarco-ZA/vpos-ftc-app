@@ -1,5 +1,5 @@
 export const LIST_PRODUCTS_SQL = `SELECT p.id, p.product_id, p.product_code, p.product_name, p.sku, p.unit_price, p.currency,
-        p.last_sync_status, p.last_sync_at,
+        p.last_sync_status, p.last_sync_at, p.is_active,
         COALESCE(pc.name, p.category) AS category_name
    FROM products p
    LEFT JOIN product_categories pc
