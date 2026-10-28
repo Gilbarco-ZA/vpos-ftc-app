@@ -682,8 +682,8 @@ export const buildFiscalReceipt = async (params: {
     taxId:
       stationCountry === 'KE'
         ? pickFirst(
-            station?.pin,
             kenyaSite?.value?.tin,
+            station?.pin,
             stationKv?.value?.pin,
             stationKv?.value?.tax_pin,
             stationSettings?.tax_pin,
