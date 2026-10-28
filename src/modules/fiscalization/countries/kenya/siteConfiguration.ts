@@ -52,7 +52,9 @@ export async function fetchAndSaveKenyaSiteConfiguration(stationId: string): Pro
     `INSERT INTO station_kv (station_id, key, value)
      VALUES ($1::uuid, $2, $3::jsonb)
      ON CONFLICT (station_id, key)
-     DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+     DO UPDATE SET value = jsonb_set(EXCLUDED.value, '{nextDocumentNumber}',
+       to_jsonb(GREATEST((station_kv.value->>'nextDocumentNumber')::bigint,
+         (EXCLUDED.value->>'nextDocumentNumber')::bigint))), updated_at = NOW()`,
     [stationId, KENYA_SITE_CONFIG_KEY, JSON.stringify(value)],
   )
   return value
