@@ -8,7 +8,7 @@ const snapshot = readFileSync('src/shared/receipts/receiptSnapshots.ts', 'utf8')
 
 test('Kenya offline receipts derive evidence from stable transaction timestamp and configured PIN and branch', () => {
   assert.match(builder, /generateKenyaOfflineEvidence\(/)
-  assert.match(builder, /invoiceNumber: offlineStamp/)
+  assert.match(builder, /invoiceNumber: offlineReceiptNumber/)
   assert.match(builder, /issuedAt: offlineIssuedAt/)
   assert.match(builder, /offlineQrPrefix \+ kenyaSite!\.value\.tin \+ kenyaSite!\.value\.branchId \+ kenyaOffline\.receiptSignature/)
   assert.match(builder, /kenyaOffline\?\.receiptInternalData/)
