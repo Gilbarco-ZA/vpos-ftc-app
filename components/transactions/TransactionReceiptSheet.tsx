@@ -215,8 +215,8 @@ export const TransactionReceiptSheet = ({
                   variant={STATUS_VARIANT.INFO}
                   title="Receipt preview only"
                 >
-                  This transaction has not been fiscalized. The preview is for
-                  review only and is not a valid fiscal receipt.
+                  This transaction has not been fiscalized. You can manually print
+                  a pending receipt while offline; it is not a valid fiscal receipt.
                 </Alert>
               ) : null}
               {voided && (
@@ -273,7 +273,7 @@ export const TransactionReceiptSheet = ({
                     >
                       Refresh
                     </Button>
-                    {!previewMode ? (
+                    {(
                       <Button
                         variant="secondary"
                         onClick={() => void printReceipt()}
@@ -282,7 +282,7 @@ export const TransactionReceiptSheet = ({
                           !csrfToken ? 'Loading security token…' : undefined
                         }
                       >
-                        {printing ? 'Printing…' : 'Print Receipt'}
+                        {printing ? 'Printing…' : previewMode ? 'Print Pending Receipt' : 'Print Receipt'}
                       </Button>
                     ) : null}
                   </div>
