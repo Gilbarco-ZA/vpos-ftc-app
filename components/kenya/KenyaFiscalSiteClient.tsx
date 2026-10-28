@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
+import CsrfBootstrap from '@/components/security/CsrfBootstrap'
 
 type SiteConfig = {
   countryCode: string
@@ -16,6 +17,7 @@ export function KenyaFiscalSiteClient() {
   const [configuration, setConfiguration] = useState<SiteConfig | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [csrfToken, setCsrfToken] = useState('')
   useEffect(() => {
     fetch('/api/admin/kenya-fiscal/site', { cache: 'no-store' })
       .then(r => r.json())
@@ -25,7 +27,7 @@ export function KenyaFiscalSiteClient() {
   async function refresh() {
     setLoading(true); setError('')
     try {
-      const response = await fetch('/api/admin/kenya-fiscal/site', { method: 'POST' })
+      const response = await fetch('/api/admin/kenya-fiscal/site', { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: '{}' })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error(data.error || 'Site configuration fetch failed')
       setConfiguration(data.configuration)
@@ -34,11 +36,12 @@ export function KenyaFiscalSiteClient() {
     } finally { setLoading(false) }
   }
   return <div className="space-y-5">
+    <CsrfBootstrap onToken={setCsrfToken} />
     <PageHeader title="Kenya Fiscal Setup" description="Verify the proxy country and save eTIMS site identifiers for offline receipts." />
     <div className="rounded-xl border border-border p-5 space-y-4">
       <div className="flex items-center justify-between gap-4">
         <h2 className="font-semibold">Site configuration</h2>
-        <Button type="button" onClick={refresh} disabled={loading}>{loading ? 'Fetching…' : 'Fetch from proxy & save'}</Button>
+        <Button type="button" onClick={refresh} disabled={loading || !csrfToken}>{loading ? 'Fetching…' : 'Fetch from proxy & save'}</Button>
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {!configuration ? <p className="text-sm text-muted-foreground">No verified Kenya configuration saved yet.</p> :
