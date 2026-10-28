@@ -32,10 +32,10 @@ export const GET = async (
   }
 }
 
-export const PATCH = defineMutationRoute<{ isActive: boolean }>({
+export const PATCH = defineMutationRoute<{ isActive: boolean }, { productId: string }>({
   roles: ['administrator'],
   handler: async (_req, { user, body, params }) => {
-    const productId = String((await params)?.productId ?? '').trim()
+    const productId = String(params.productId ?? '').trim()
     if (!productId || typeof body.isActive !== 'boolean') return fail('Invalid product status', 400)
     const updated = await setProductActive({ stationId: user.stationId, productId, isActive: body.isActive })
     return updated ? ok(updated) : fail('Product not found', 404)
