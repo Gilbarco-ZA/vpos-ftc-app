@@ -256,7 +256,6 @@ export const TransactionReceiptSheet = ({
                       <span className="ml-2 text-[var(--text-secondary)]">
                         • {copied}
                       </span>
-                    ) : null}
                   </div>
                   <div className="no-print flex items-center gap-2">
                     <Button
@@ -273,8 +272,7 @@ export const TransactionReceiptSheet = ({
                     >
                       Refresh
                     </Button>
-                    {(
-                      <Button
+                    <Button
                         variant="secondary"
                         onClick={() => void printReceipt()}
                         disabled={!csrfToken || printing}
