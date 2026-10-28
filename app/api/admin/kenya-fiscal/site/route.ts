@@ -3,7 +3,7 @@ import { defineMutationRoute } from '@/src/shared/http/defineRoute'
 import { requireAuth } from '@/src/shared/auth'
 import { getStationCountryCode } from '@/src/modules/tanzania-fiscal/application/country'
 import {
-  readKenyaSiteConfiguration, fetchAndSaveKenyaSiteConfiguration,
+  readKenyaSiteConfiguration, fetchAndSaveKenyaSiteConfiguration, saveKenyaQrSettings,
 } from '@/src/modules/fiscalization/countries/kenya/siteConfiguration'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +33,20 @@ export const POST = defineMutationRoute<Record<string, never>>({
     }
     try {
       const configuration = await fetchAndSaveKenyaSiteConfiguration(user.stationId)
+      return NextResponse.json({ ok: true, configuration })
+    } catch (error) {
+      return NextResponse.json({
+        ok: false, error: error instanceof Error ? error.message : String(error),
+      }, { status: 400 })
+    }
+  },
+})
+
+export const PUT = defineMutationRoute<{ mode: 'development' | 'production' | 'manual'; manualQrUrl?: string }>({
+  roles: ['administrator'],
+  handler: async (_req, { user, body }) => {
+    try {
+      const configuration = await saveKenyaQrSettings(user.stationId, body.mode, body.manualQrUrl ?? '')
       return NextResponse.json({ ok: true, configuration })
     } catch (error) {
       return NextResponse.json({
