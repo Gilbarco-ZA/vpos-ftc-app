@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 test('pending receipt preview exposes manual print while blocking automatic print', () => {
   const view = readFileSync('components/transactions/TransactionReceiptSheet.tsx', 'utf8')
   assert.match(view, /Print Pending Receipt/)
-  assert.match(view, /previewMode \? 'Print Pending Receipt' : 'Print Receipt'/)
+  assert.match(view, /previewMode\s*\?\s*'Print Pending Receipt'\s*:\s*'Print Receipt'/)
   assert.match(view, /previewMode \|\|\s*!open/)
 })
 
