@@ -308,6 +308,7 @@ export const normalizeReceipt = (opts: {
   station?: any
   stationTaxNumber?: string
   stationPin?: string
+  verifiedKenyaPin?: string
   transactionLines?: any[]
   raw: any
   attendantName?: string
@@ -332,6 +333,7 @@ export const normalizeReceipt = (opts: {
     station,
     stationTaxNumber,
     stationPin,
+    verifiedKenyaPin,
     transactionLines,
     raw,
     attendantName,
@@ -658,6 +660,7 @@ export const normalizeReceipt = (opts: {
         station?.name,
       ),
       companyTin: pickFirst(
+        verifiedKenyaPin,
         receipt?.companyTin,
         receipt?.company_tin,
         stationTaxNumber,
@@ -668,6 +671,7 @@ export const normalizeReceipt = (opts: {
       ),
       companyPin:
         pickFirst(
+          verifiedKenyaPin,
           receipt?.companyPin,
           receipt?.company_pin,
           stationPin,
