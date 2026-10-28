@@ -215,8 +215,8 @@ export const TransactionReceiptSheet = ({
                   variant={STATUS_VARIANT.INFO}
                   title="Receipt preview only"
                 >
-                  This transaction has not been fiscalized. You can manually print
-                  a pending receipt while offline; it is not a valid fiscal receipt.
+                  This transaction has not been fiscalized. You can manually
+                  print a pending receipt; This is not a valid fiscal receipt.
                 </Alert>
               ) : null}
               {voided && (
@@ -256,6 +256,7 @@ export const TransactionReceiptSheet = ({
                       <span className="ml-2 text-[var(--text-secondary)]">
                         • {copied}
                       </span>
+                    ) : null}
                   </div>
                   <div className="no-print flex items-center gap-2">
                     <Button
@@ -273,16 +274,17 @@ export const TransactionReceiptSheet = ({
                       Refresh
                     </Button>
                     <Button
-                        variant="secondary"
-                        onClick={() => void printReceipt()}
-                        disabled={!csrfToken || printing}
-                        title={
-                          !csrfToken ? 'Loading security token…' : undefined
-                        }
-                      >
-                        {printing ? 'Printing…' : previewMode ? 'Print Pending Receipt' : 'Print Receipt'}
-                      </Button>
-                    ) : null}
+                      variant="secondary"
+                      onClick={() => void printReceipt()}
+                      disabled={!csrfToken || printing}
+                      title={!csrfToken ? 'Loading security token…' : undefined}
+                    >
+                      {printing
+                        ? 'Printing…'
+                        : previewMode
+                          ? 'Print Pending Receipt'
+                          : 'Print Receipt'}
+                    </Button>
                   </div>
                 </div>
                 <Receipt80mm receipt={receipt} />
