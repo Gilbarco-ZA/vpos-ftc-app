@@ -8,7 +8,15 @@ import { RuntimeImage } from '@/components/ui/runtime-image'
 type Props = { receipt: NormalizedReceipt }
 const amount = (v?: number, digits = 2) => v == null || !Number.isFinite(v)
   ? '—' : v.toLocaleString('en-KE', { minimumFractionDigits: digits, maximumFractionDigits: digits })
-const formattedDate = (value: string) => { const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : value }
+const formattedDate = (value: string) => {
+  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
+  const parsed = new Date(value)
+  if (!Number.isNaN(parsed.getTime())) {
+    return [String(parsed.getDate()).padStart(2, '0'), String(parsed.getMonth() + 1).padStart(2, '0'), String(parsed.getFullYear())].join('/')
+  }
+  return value
+}
 const dashGroups = (value: string) => value.replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.join('-') ?? value
 const isKraUrl = (value?: string) => /^https:\/\/[^\s]+$/i.test(String(value ?? ''))
 
