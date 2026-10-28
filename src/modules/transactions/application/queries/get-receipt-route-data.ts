@@ -174,7 +174,16 @@ export async function getReceiptRoutePayload(input: {
     ),
   ])
 
+  const kenyaSiteConfig = await queryOne<{ value: { tin?: string } }>(
+    `SELECT value FROM station_kv WHERE station_id = $1::uuid AND key = $2`,
+    [input.stationId, 'kenya.fiscal.site.configuration'],
+  ).catch(() => null)
+  const verifiedKenyaPin = ['KE', 'KEN', 'KENYA'].includes(String(station?.country ?? '').trim().toUpperCase())
+    ? firstNonEmpty(kenyaSiteConfig?.value?.tin)
+    : ''
+
   const stationTaxNumber = firstNonEmpty(
+    verifiedKenyaPin,
     station?.tin,
     station?.tax_pin,
     station?.taxPin,
@@ -184,6 +193,7 @@ export async function getReceiptRoutePayload(input: {
     taxPinKv?.pin,
   )
   const stationPin = firstNonEmpty(
+    verifiedKenyaPin,
     station?.pin,
     taxPinKv?.pin,
     taxPinKv?.tax_pin,
@@ -277,6 +287,7 @@ export async function getReceiptRoutePayload(input: {
     station,
     stationTaxNumber,
     stationPin,
+    verifiedKenyaPin,
     transactionLines: receiptTransactionLines,
     raw: rawResponse,
     attendantName: input.attendantName,
