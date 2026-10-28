@@ -18,6 +18,7 @@ import { toNumberLoose as coerceNumber } from '@/src/shared/numbers'
 import { resolveDecimalSettings } from '@/src/shared/receipts/decimalSettings'
 import { mapFiscalReceipt } from '@/src/shared/receipts/mapFiscalReceipt'
 import { formatDateTime } from '@/src/shared/utils/dates'
+import { generateKenyaOfflineEvidence, kenyaQrPrefix } from '@/src/modules/fiscalization/countries/kenya/qr'
 
 import { resolveTanzaniaCustomerIdentity } from '@/src/modules/tanzania-fiscal/domain/customerIdentity'
 import { getTanzaniaDomsUnitPrice } from '@/src/modules/tanzania-fiscal/domain/domsUnitPrice'
@@ -658,7 +659,7 @@ export const buildFiscalReceipt = async (params: {
     [params.stationId, 'tax_pin'],
   )
 
-  const kenyaSite = await pgOne<{ value: { sdcId?: string; tin?: string; branchId?: string } }>(
+  const kenyaSite = await pgOne<{ value: { sdcId?: string; tin?: string; branchId?: string; qrMode?: 'development' | 'production' | 'manual'; manualQrUrl?: string } }>(
     `SELECT value FROM station_kv WHERE station_id = $1 AND key = $2`,
     [params.stationId, 'kenya.fiscal.site.configuration'],
   ).catch(() => null)
@@ -871,7 +872,22 @@ export const buildFiscalReceipt = async (params: {
     discount: coerceNumber(tanzaniaRequest?.totals?.discount) ?? 0,
   }
 
-  const fallbackReceiptNumber = `R-${Date.now()}-${String(txn.id).slice(0, 6)}`
+  const offlineIssuedAt = new Date(txn.transaction_date_time ?? txn.created_at ?? 0)
+  const offlineStamp = offlineIssuedAt.getTime()
+  const fallbackReceiptNumber = `R-${Number.isSafeInteger(offlineStamp) && offlineStamp > 0 ? offlineStamp : 0}-${String(txn.id).slice(0, 6)}`
+  const kenyaOffline = stationCountry === 'KE' && !txn.fiscalized_at && !templateModel?.fiscalQrCodeData &&
+    !txn.fiscal_document_id && Number.isSafeInteger(offlineStamp) && offlineStamp > 0 &&
+    kenyaSite?.value?.tin && kenyaSite?.value?.branchId && kenyaSite?.value?.sdcId
+    ? generateKenyaOfflineEvidence({
+        pin: kenyaSite.value.tin,
+        invoiceNumber: offlineStamp,
+        issuedAt: offlineIssuedAt,
+      })
+    : null
+  const offlineQrPrefix = kenyaOffline ? kenyaQrPrefix(kenyaSite?.value?.qrMode ?? 'development', kenyaSite?.value?.manualQrUrl ?? '') : ''
+  const offlineQrUrl = kenyaOffline && offlineQrPrefix
+    ? offlineQrPrefix + kenyaSite!.value.tin + kenyaSite!.value.branchId + kenyaOffline.receiptSignature
+    : ''
   const receiptNumber = pickFirst(
     stationCountry === 'TZ' ? templateModel?.receiptNumber : null,
     stationCountry === 'TZ' ? tanzaniaCounters?.receiptNo : null,
@@ -891,6 +907,7 @@ export const buildFiscalReceipt = async (params: {
     String(params.kenyaApprovedStatus?.documentId ?? '') === String(txn.fiscal_document_id ?? '')
       ? params.kenyaApprovedStatus?.fiscalQrCodeData : null,
     stationCountry === 'TZ' || stationCountry === 'KE' ? templateModel?.fiscalQrCodeData : null,
+    stationCountry === 'KE' ? offlineQrUrl : null,
     tanzaniaCounters?.verificationUrl,
     tanzaniaResponse?.verificationUrl,
     fiscalSource?.verification_url,
@@ -930,6 +947,7 @@ export const buildFiscalReceipt = async (params: {
     receiptNumber: stationCountry === 'KE' ? kenyaNumber : receiptNumber,
     internalData: pickFirst(
       templateModel?.receiptInternalData,
+      kenyaOffline?.receiptInternalData,
       fiscalSource?.internal_data,
       fiscalSource?.hash,
       fiscalSource?.encoded,
@@ -937,6 +955,7 @@ export const buildFiscalReceipt = async (params: {
     ),
     signature: pickFirst(
       templateModel?.receiptSignature,
+      kenyaOffline?.receiptSignature,
       fiscalSource?.signature,
       fiscalSource?.receipt_signature,
       fiscalSource?.receiptSignature,
