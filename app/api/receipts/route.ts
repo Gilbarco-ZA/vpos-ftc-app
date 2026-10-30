@@ -4,11 +4,9 @@ import { NextResponse } from 'next/server'
 import { fail, ok, serverError } from '@/src/platform/web/api/response'
 import { requireAuth } from '@/src/shared/auth'
 
-import { isPendingKenyaReceipt } from '@/src/modules/transactions/application/queries/is-pending-kenya-receipt'
-import { getOrCreatePreFiscalizationReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/preFiscalizationReceipt'
 import { persistKenyaReceiptRefresh } from '@/src/modules/transactions/application/commands/persist-kenya-receipt-refresh'
 import { refreshKenyaReceiptStatus } from '@/src/modules/transactions/application/queries/refresh-kenya-receipt-status'
-import { prepareReceiptPreview } from '@/src/modules/transactions/application/commands/prepare-receipt-preview'
+import { preparePendingKenyaReceipt, prepareReceiptPreview } from '@/src/modules/transactions/application/commands/prepare-receipt-preview'
 import {
   getReceiptRoutePayload,
   listReceiptRouteRows,
@@ -35,21 +33,17 @@ export const GET = async (req: Request) => {
         previewMode,
       })
 
-      const pendingKenya = await isPendingKenyaReceipt(user.stationId, transactionId)
-      if (pendingKenya && !previewMode) {
-        // A pending Kenya receipt must come from the canonical persisted offline
-        // document, not a generic normalization of an unfinished transaction.
-        try {
-          await getOrCreatePreFiscalizationReceipt({
-            stationId: user.stationId,
-            transactionId,
-          })
-        } catch (error) {
-          return fail(
-            `Kenya offline receipt is unavailable: ${error instanceof Error ? error.message : 'receipt generation failed'}`,
-            409,
-          )
-        }
+      try {
+        await preparePendingKenyaReceipt({
+          stationId: user.stationId,
+          transactionId,
+          previewMode,
+        })
+      } catch (error) {
+        return fail(
+          `Kenya offline receipt is unavailable: ${error instanceof Error ? error.message : 'receipt generation failed'}`,
+          409,
+        )
       }
 
       let kenyaStatusRow: unknown = null
