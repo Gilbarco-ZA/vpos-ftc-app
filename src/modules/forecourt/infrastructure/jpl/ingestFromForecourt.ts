@@ -280,7 +280,7 @@ async function ingestJplTransaction(args: IngestJplTransactionArgs) {
         )
         VALUES (
           $1, $2, $3, $4::timestamptz, $5, $6, $7, 'OPEN', $8,
-          CASE WHEN $9::int IS NULL THEN NULL ELSE ($4::timestamptz + ($9::int * INTERVAL '1 second')) END,
+          CASE WHEN $9::int IS NULL THEN NULL ELSE (NOW() + ($9::int * INTERVAL '1 second')) END,
           $10::uuid, $11::int,
           'jpl', $12, $13, $14, $15, $16, $17::jsonb, $18, NOW(), NOW(), NOW(), NOW()
         )
