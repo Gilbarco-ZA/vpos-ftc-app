@@ -422,7 +422,7 @@ const createTransactionForSession = async (session: FuelingSession) => {
         $9,
         CASE
           WHEN $10::int IS NULL THEN NULL
-          ELSE $4::timestamptz + ($10::int * INTERVAL '1 second')
+          ELSE NOW() + ($10::int * INTERVAL '1 second')
         END,
         $11,
         $12,
