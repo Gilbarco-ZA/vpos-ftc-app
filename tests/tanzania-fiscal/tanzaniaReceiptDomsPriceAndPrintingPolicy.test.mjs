@@ -23,7 +23,7 @@ test('DOMS transaction price is captured separately and only consumed by Tanzani
   assert.match(values, /resolveTransactionUnitPrice/)
   assert.match(events, /stationDecimals\.unitPrice/)
   assert.match(events, /unitPrice: Number\.isFinite/)
-  assert.match(ingest, /unitPrice,\n\s+occurredAt:/)
+  assert.match(ingest, /unitPrice,\r?\n\s+occurredAt:/)
   assert.match(helper, /getTanzaniaDomsUnitPrice/)
   assert.match(builder, /stationCountry === 'TZ' \? getTanzaniaDomsUnitPrice\(txn\) : null/)
   assert.match(route, /isTanzania\s*\? getTanzaniaDomsUnitPrice\(transaction\)/)
