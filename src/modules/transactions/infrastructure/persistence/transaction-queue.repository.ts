@@ -106,7 +106,8 @@ async function attachPendingPreFuelCustomersTx(client: any, stationId: string) {
         AND t.station_id = $1::uuid
         AND t.deleted_at IS NULL
         AND t.customer_id IS NULL
-        AND t.status IN ('OPEN', 'PENDING', 'ALLOCATED')`,
+        AND t.status IN ('OPEN', 'PENDING', 'ALLOCATED')
+        AND t.linking_window_expires_at IS NULL`,
     [stationId],
   )
 }
@@ -156,7 +157,6 @@ function buildBeforePrintLocalClaim(input: {
   const eligibility = hasTimer
     ? `(
          customer_id IS NOT NULL
-         OR status = 'PENDING'
          OR NOW() >= COALESCE(
               linking_window_expires_at,
               created_at + ($3::int * INTERVAL '1 second')
