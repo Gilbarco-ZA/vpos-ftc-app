@@ -7,9 +7,11 @@ const read = (path) => readFileSync(path, 'utf8')
 test('Kenya pending receipt read materializes canonical offline receipt before normalization', () => {
   const route = read('app/api/receipts/route.ts')
   const payload = read('src/modules/transactions/application/queries/get-receipt-route-data.ts')
-  assert.match(route, /await isPendingKenyaReceipt\(user\.stationId, transactionId\)/)
-  assert.match(route, /await getOrCreatePreFiscalizationReceipt\(/)
-  assert.ok(route.indexOf('await getOrCreatePreFiscalizationReceipt(') < route.indexOf('const result = await getReceiptRoutePayload('))
+  const command = read('src/modules/transactions/application/commands/prepare-receipt-preview.ts')
+  assert.match(command, /await isPendingKenyaReceipt\(input\.stationId, input\.transactionId\)/)
+  assert.match(route, /await preparePendingKenyaReceipt\(/)
+  assert.match(command, /await getOrCreatePreFiscalizationReceipt\(/)
+  assert.ok(route.indexOf('await preparePendingKenyaReceipt(') < route.indexOf('const result = await getReceiptRoutePayload('))
   for (const name of ['scuId', 'cuInvoiceNo', 'receiptNumber', 'receiptInternalData', 'receiptSignature', 'fiscalQrCodeData']) {
     assert.match(payload, new RegExp('take\\(saved\\.' + name + '\\)'))
   }
