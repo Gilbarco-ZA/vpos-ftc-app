@@ -35,6 +35,7 @@ export type ReceiptRoutePayload = {
   ok: true
   receipt: NormalizedReceipt
   raw?: unknown
+  refreshWarning?: string
   voided?: boolean
   voidedAt?: string | null
   presentation?: {
@@ -382,6 +383,21 @@ export async function getReceiptRoutePayload(input: {
     }
     if (tanzaniaProxyReceipt?.receiptSignature) {
       receipt.footer.receiptSignature = tanzaniaProxyReceipt.receiptSignature
+    }
+  }
+  if (receipt && isKenya && !transaction.fiscalized_at && storedReceipt?.fiscal_data) {
+    const snapshot = typeof storedReceipt.fiscal_data === 'string'
+      ? (() => { try { return JSON.parse(storedReceipt.fiscal_data) } catch { return null } })()
+      : storedReceipt.fiscal_data
+    const saved = snapshot?.receipt
+    if (saved && typeof saved === 'object') {
+      const take = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : undefined
+      receipt.meta.receiptNumber = take(saved.receiptNumber) ?? receipt.meta.receiptNumber
+      receipt.meta.scuId = take(saved.scuId) ?? receipt.meta.scuId
+      receipt.meta.cuInvoiceNo = take(saved.cuInvoiceNo) ?? receipt.meta.cuInvoiceNo
+      receipt.footer.receiptInternalData = take(saved.receiptInternalData) ?? receipt.footer.receiptInternalData
+      receipt.footer.receiptSignature = take(saved.receiptSignature) ?? receipt.footer.receiptSignature
+      receipt.footer.fiscalQrCodeData = take(saved.fiscalQrCodeData) ?? receipt.footer.fiscalQrCodeData
     }
   }
   if (receipt && isKenya) {
