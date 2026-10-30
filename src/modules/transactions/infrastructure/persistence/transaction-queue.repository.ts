@@ -8,22 +8,6 @@ import {
 } from './transaction.sql'
 
 async function attachPendingPreFuelCustomersTx(client: any, stationId: string) {
-  await txQuery(
-    client,
-    `UPDATE pre_fuel_customer_allocations a
-        SET status = 'CANCELLED',
-            cancelled_at = NOW(),
-            updated_at = NOW()
-       FROM station_settings ss
-      WHERE ss.station_id = a.station_id
-        AND a.station_id = $1::uuid
-        AND a.status = 'PENDING'
-        AND ss.tin_capture_order = 'before_transaction'
-        AND COALESCE(ss.linking_window_seconds, 0) > 0
-        AND a.created_at + (ss.linking_window_seconds * INTERVAL '1 second') <= NOW()`,
-    [stationId],
-  )
-
   const matches = await txQuery<{
     transaction_id: string
     allocation_id: string
@@ -89,6 +73,24 @@ async function attachPendingPreFuelCustomersTx(client: any, stationId: string) {
       [match.allocation_id, match.transaction_id],
     )
   }
+
+  // Expire unmatched allocations only after attempting to attach an eligible
+  // completed pump transaction; worker scheduling delay must not lose the TIN.
+  await txQuery(
+    client,
+    `UPDATE pre_fuel_customer_allocations a
+        SET status = 'CANCELLED',
+            cancelled_at = NOW(),
+            updated_at = NOW()
+       FROM station_settings ss
+      WHERE ss.station_id = a.station_id
+        AND a.station_id = $1::uuid
+        AND a.status = 'PENDING'
+        AND ss.tin_capture_order = 'before_transaction'
+        AND COALESCE(ss.linking_window_seconds, 0) > 0
+        AND a.created_at + (ss.linking_window_seconds * INTERVAL '1 second') <= NOW()`,
+    [stationId],
+  )
 
   // Pre-transaction capture is an opportunity to attach a customer before the
   // sale, not a hard fiscalization dependency. If no allocation matched, mark
