@@ -1,9 +1,11 @@
 import type { SessionUser } from '@/src/shared/types'
 import { NextResponse } from 'next/server'
 
-import { ok, serverError } from '@/src/platform/web/api/response'
+import { fail, ok, serverError } from '@/src/platform/web/api/response'
 import { requireAuth } from '@/src/shared/auth'
 
+import { isPendingKenyaReceipt } from '@/src/modules/transactions/application/queries/is-pending-kenya-receipt'
+import { getOrCreatePreFiscalizationReceipt } from '@/src/modules/transactions/infrastructure/fiscalization/preFiscalizationReceipt'
 import { persistKenyaReceiptRefresh } from '@/src/modules/transactions/application/commands/persist-kenya-receipt-refresh'
 import { refreshKenyaReceiptStatus } from '@/src/modules/transactions/application/queries/refresh-kenya-receipt-status'
 import { prepareReceiptPreview } from '@/src/modules/transactions/application/commands/prepare-receipt-preview'
@@ -33,11 +35,51 @@ export const GET = async (req: Request) => {
         previewMode,
       })
 
-      const kenyaStatusRow = refresh && !previewMode
-        ? await refreshKenyaReceiptStatus(user.stationId, transactionId)
-        : null
-      if (kenyaStatusRow) {
-        await persistKenyaReceiptRefresh({ stationId: user.stationId, transactionId, status: kenyaStatusRow })
+      const pendingKenya = await isPendingKenyaReceipt(user.stationId, transactionId)
+      if (pendingKenya && !previewMode) {
+        // A pending Kenya receipt must come from the canonical persisted offline
+        // document, not a generic normalization of an unfinished transaction.
+        try {
+          await getOrCreatePreFiscalizationReceipt({
+            stationId: user.stationId,
+            transactionId,
+          })
+        } catch (error) {
+          return fail(
+            `Kenya offline receipt is unavailable: ${error instanceof Error ? error.message : 'receipt generation failed'}`,
+            409,
+          )
+        }
+      }
+
+      let kenyaStatusRow: unknown = null
+      let refreshWarning: string | undefined
+      if (refresh && !previewMode) {
+        try {
+          kenyaStatusRow = await refreshKenyaReceiptStatus(user.stationId, transactionId)
+        } catch (error) {
+          // An unavailable/unmatched proxy status must not suppress the saved
+          // offline receipt, nor be misreported as successful fiscalization.
+          refreshWarning = `Kenya proxy status lookup failed: ${error instanceof Error ? error.message : 'unknown error'}`
+        }
+      }
+      const refreshedStatus =
+        kenyaStatusRow && typeof kenyaStatusRow === 'object' && !Array.isArray(kenyaStatusRow)
+          ? String((kenyaStatusRow as { status?: unknown }).status ?? '').trim().toUpperCase()
+          : ''
+      if (refreshedStatus === 'APPROVED') {
+        try {
+          await persistKenyaReceiptRefresh({
+            stationId: user.stationId,
+            transactionId,
+            status: kenyaStatusRow,
+          })
+        } catch (error) {
+          return fail(
+            `Approved Kenya receipt could not be verified and saved: ${error instanceof Error ? error.message : 'unknown error'}`,
+            502,
+          )
+        }
       }
       const result = await getReceiptRoutePayload({
         kenyaStatusRow,
@@ -52,6 +94,7 @@ export const GET = async (req: Request) => {
           { status: 404 },
         )
       }
+      if (refreshWarning) result.payload.refreshWarning = refreshWarning
       return NextResponse.json(result.payload)
     }
 
