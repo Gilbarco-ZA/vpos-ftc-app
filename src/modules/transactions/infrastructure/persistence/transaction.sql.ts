@@ -105,7 +105,6 @@ export function buildClaimEligibleTransactionFiscalizationQueueSql(input: {
          )
          AND (
            customer_id IS NOT NULL
-           OR status = 'PENDING'
            OR NOW() >= COALESCE(
                 linking_window_expires_at,
                 created_at + ($3::int * INTERVAL '1 second')
