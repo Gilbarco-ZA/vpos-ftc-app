@@ -168,6 +168,14 @@ export async function getOrCreatePreFiscalizationReceipt(input: {
         storedFiscal?.model?.qrPayload?.verificationUrl ??
         '',
       ).trim()
+      const savedScuId = String(storedFiscal?.receipt?.scuId ?? '').trim()
+      const savedCuNumber = String(storedFiscal?.receipt?.cuInvoiceNo ?? '').trim()
+      const savedNumber = String(storedFiscal?.receipt?.receiptNumber ?? '').trim()
+      const savedInternal = String(storedFiscal?.receipt?.receiptInternalData ?? '').trim()
+      const savedSignature = String(storedFiscal?.receipt?.receiptSignature ?? '').trim()
+      const missingOfflineMetadata = !savedScuId || !/^\d+$/.test(savedNumber) ||
+        savedCuNumber !== `${savedScuId}/${savedNumber}` ||
+        !savedInternal || !savedSignature
       const missingQr = !/^https:\/\/[^\s]+$/i.test(savedQr)
       const qrConfig = missingQr
         ? await queryOne<{ value: { qrMode?: string; manualQrUrl?: string } }>(
@@ -177,7 +185,7 @@ export async function getOrCreatePreFiscalizationReceipt(input: {
         : null
       const canRecoverQr = Boolean(qrConfig?.value) &&
         (qrConfig?.value?.qrMode !== 'manual' || /^https:\/\/[^\s]+$/i.test(String(qrConfig?.value?.manualQrUrl ?? '')))
-      if (state?.fiscalized_at || (!legacyCuNumber && !(missingQr && canRecoverQr))) return existing
+      if (state?.fiscalized_at || (!legacyCuNumber && !missingOfflineMetadata && !(missingQr && canRecoverQr))) return existing
     } else if (!isTanzania) {
       return existing
     }
