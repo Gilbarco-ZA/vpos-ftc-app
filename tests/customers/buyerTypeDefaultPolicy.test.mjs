@@ -60,7 +60,7 @@ test('form and preview B2C defaults are Kenya-only', () => {
   assert.match(sheet, /setBuyerType\(isKenyaStation\(stationCountry\) \? 'B2C' : ''\)/)
   assert.match(
     sheet,
-    /setBuyerType\(mapped\.buyerType \|\| \(isKenyaStation\(stationCountry\) \? 'B2C' : ''\)\)/,
+    /setBuyerType\(\s*mapped\.buyerType \|\| \(isKenyaStation\(stationCountry\) \? 'B2C' : ''\),?\s*\)/,
   )
   assert.match(sheet, /!isKenyaStation\(stationCountry\) && \(/)
   assert.match(sheet, /<option value="">Unspecified<\/option>/)
