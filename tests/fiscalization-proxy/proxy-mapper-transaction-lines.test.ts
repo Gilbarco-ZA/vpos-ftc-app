@@ -200,7 +200,7 @@ test('defaults a populated Kenya invoice buyer to B2C without overriding explici
     })
     assert.equal(nonKenyaInvoice.buyer?.buyerType, null)
     const outbound = toCountrySpecificInvoicePayload(nonKenyaInvoice) as any
-    assert.equal(outbound.buyer.buyerType, null)
+    assert.equal('buyerType' in outbound.buyer, false)
   }
 
   const anonymousInvoice = mapTransactionToProxyInvoice({ ...base, customer: null })
