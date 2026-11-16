@@ -21,10 +21,12 @@ test('corrective migrations preserve non-Kenya null buyer classifications', () =
   const correction = read(`scripts/migrations/postgres/${correctionName}`)
 
   assert.match(snapshot, /buyer_type IS NULL/i)
+  assert.match(snapshot, /previous_updated_at TIMESTAMPTZ NOT NULL/i)
   assert.match(snapshot, /NOT IN \('KE', 'KEN', 'KENYA'\)/)
   assert.match(correction, /ALTER COLUMN buyer_type DROP DEFAULT/i)
   assert.match(correction, /FROM migration_1341_non_kenya_null_buyer_types/i)
   assert.match(correction, /SET buyer_type = NULL/i)
+  assert.match(correction, /updated_at = snapshot\.previous_updated_at/i)
   assert.match(correction, /IN \('KE', 'KEN', 'KENYA'\)/)
   assert.match(correction, /WHERE buyer_type IS NULL/i)
 })
