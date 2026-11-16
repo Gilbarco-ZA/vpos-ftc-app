@@ -162,3 +162,36 @@ test('maps Kenya payment codes and aliases to proxy tender methods', () => {
     assert.equal(invoice.payment?.tenders[0]?.amount, 100)
   }
 })
+
+test('defaults a populated Kenya invoice buyer to B2C without overriding explicit B2B', () => {
+  const base = {
+    transaction: {
+      id: 'txn-default-buyer-type',
+      transaction_date_time: '2026-11-05T13:16:48Z',
+      total_amount: 100,
+      fuel_type: 'Unleaded',
+      volume: 1,
+    },
+    station: { country: 'KE' },
+  }
+
+  for (const customer of [
+    { name: 'Customer without type', pin: 'P000000002F' },
+    { name: 'Customer with null type', pin: 'P000000002F', buyer_type: null },
+    { name: 'Customer with blank type', pin: 'P000000002F', buyerType: '  ' },
+  ]) {
+    const invoice = mapTransactionToProxyInvoice({ ...base, customer })
+    assert.equal(invoice.buyer?.buyerType, 'B2C')
+    const outbound = toCountrySpecificInvoicePayload(invoice) as any
+    assert.equal(outbound.buyer.buyerType, 'B2C')
+  }
+
+  const businessInvoice = mapTransactionToProxyInvoice({
+    ...base,
+    customer: { name: 'Business customer', buyer_type: 'B2B', pin: 'P000000002F' },
+  })
+  assert.equal(businessInvoice.buyer?.buyerType, 'B2B')
+
+  const anonymousInvoice = mapTransactionToProxyInvoice({ ...base, customer: null })
+  assert.equal(anonymousInvoice.buyer, null)
+})
