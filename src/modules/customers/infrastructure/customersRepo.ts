@@ -285,7 +285,7 @@ export async function createOrUpdateCustomerRepo(params: {
          WHERE id = $25`,
         [
           data.buyerName,
-          data.buyerType?.trim() || 'B2C',
+          buyerType,
           data.pin || null,
           data.passportNumber || null,
           data.businessName || null,
@@ -334,7 +334,7 @@ export async function createOrUpdateCustomerRepo(params: {
           newId,
           data.tin,
           data.buyerName,
-          data.buyerType?.trim() || 'B2C',
+          buyerType,
           data.pin || null,
           data.passportNumber || null,
           data.businessName || null,
