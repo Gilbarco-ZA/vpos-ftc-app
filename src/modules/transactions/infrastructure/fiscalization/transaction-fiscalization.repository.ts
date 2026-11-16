@@ -123,7 +123,7 @@ export async function getTransactionInvoicePayloadRepo(
       txn.buyer_name || txn.tin
         ? {
             name: txn.buyer_name ?? null,
-            buyerType: txn.buyer_type ?? 'B2C',
+            buyerType: txn.buyer_type ?? (String(station?.country ?? '').trim().toUpperCase() === 'KE' ? 'B2C' : null),
             pin: txn.tin ?? null,
           }
         : null,
