@@ -79,6 +79,10 @@ export async function createCustomerRecord(params: {
       ...data,
       tin: normalizedTin,
       buyerName: normalizedBuyer,
+      buyerType:
+        stationCountry === 'KE'
+          ? (data.buyerType?.trim() || 'B2C')
+          : data.buyerType,
       pin: normalizedPin || undefined,
       country: normalizedCountry,
       addressCountryCode: normalizedAddressCountryCode,
