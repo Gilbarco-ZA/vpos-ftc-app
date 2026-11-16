@@ -573,7 +573,7 @@ export function mapTransactionToProxyInvoice(args: {
           name: strOrNull(
             buyerSource.buyer_name ?? buyerSource.buyerName ?? buyerSource.name,
           ),
-          buyerType: strOrNull(buyerSource.buyer_type ?? buyerSource.buyerType),
+          buyerType: strOrNull(buyerSource.buyer_type ?? buyerSource.buyerType) ?? 'B2C',
           pin: strOrNull(buyerSource.pin),
           passportNumber: strOrNull(
             buyerSource.passport_number ?? buyerSource.passportNumber,
@@ -754,7 +754,15 @@ export function mapTransactionToProxyCreditNote(
   const hasOriginalBuyer = sourceObject !== null &&
     sourceDocumentId === documentReference &&
     Object.prototype.hasOwnProperty.call(sourceObject, 'buyer')
-  const buyer = hasOriginalBuyer ? sourceObject!.buyer ?? null : invoice.buyer
+  const originalBuyer = hasOriginalBuyer ? sourceObject!.buyer ?? null : invoice.buyer
+  // Keep the original buyer identity and any explicit classification, but do not
+  // send a null buyerType on a populated Kenya credit note.
+  const buyer = originalBuyer && typeof originalBuyer === 'object' && !Array.isArray(originalBuyer)
+    ? {
+        ...originalBuyer,
+        buyerType: strOrNull((originalBuyer as Record<string, unknown>).buyerType) ?? 'B2C',
+      }
+    : originalBuyer
 
   const lines = (invoice.lines ?? []).map((line) => ({
     lineType: line.lineType ?? 'Sale',
