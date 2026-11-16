@@ -195,3 +195,36 @@ test('defaults a populated Kenya invoice buyer to B2C without overriding explici
   const anonymousInvoice = mapTransactionToProxyInvoice({ ...base, customer: null })
   assert.equal(anonymousInvoice.buyer, null)
 })
+
+test('preserves null buyer types outside Kenya', () => {
+  const transaction = {
+    id: 'txn-non-kenya-buyer',
+    transaction_date_time: '2026-11-05T13:16:48Z',
+    volume: 1,
+    total_amount: 100,
+    fuel_type: 'Diesel',
+  }
+
+  for (const country of ['TZ', 'ZA']) {
+    const invoice = mapTransactionToProxyInvoice({
+      transaction,
+      customer: { name: 'Buyer without type', pin: 'P000000002F' },
+      station: { country },
+    })
+    assert.equal(invoice.buyer?.buyerType, null, `country ${country}`)
+
+    const explicit = mapTransactionToProxyInvoice({
+      transaction,
+      customer: { name: 'Existing B2B buyer', buyer_type: 'B2B' },
+      station: { country },
+    })
+    assert.equal(explicit.buyer?.buyerType, 'B2B')
+  }
+
+  const kenya = mapTransactionToProxyInvoice({
+    transaction,
+    customer: { name: 'Kenya buyer', pin: 'P000000002F' },
+    station: { country: 'KE' },
+  })
+  assert.equal(kenya.buyer?.buyerType, 'B2C')
+})
