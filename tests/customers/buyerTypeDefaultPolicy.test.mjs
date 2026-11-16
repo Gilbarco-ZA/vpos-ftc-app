@@ -57,5 +57,15 @@ test('form and preview B2C defaults are Kenya-only', () => {
   assert.match(drawer, /customer\.buyerType \|\|/)
   assert.match(sheet, /buyerType: isKenyaStation\(stationCountry\) \? 'B2C' : null/)
   assert.match(sheet, /isKenyaStation\(stationCountry\) \? 'B2C' : null/)
+  assert.match(sheet, /setBuyerType\(isKenyaStation\(stationCountry\) \? 'B2C' : ''\)/)
+  assert.match(
+    sheet,
+    /setBuyerType\(mapped\.buyerType \|\| \(isKenyaStation\(stationCountry\) \? 'B2C' : ''\)\)/,
+  )
+  assert.match(sheet, /!isKenyaStation\(stationCountry\) && \(/)
+  assert.match(sheet, /<option value="">Unspecified<\/option>/)
+  assert.match(sheet, /buyerType: buyerType\.trim\(\) \|\| undefined/)
+  assert.doesNotMatch(sheet, /setBuyerType\(buyerTypeOptions\[0\]\?\.value/)
+  assert.doesNotMatch(sheet, /setBuyerType\(mapped\.buyerType \|\| 'B2C'\)/)
   assert.match(preview, /buyerType: txn\.buyer_type \?\? null/)
 })
