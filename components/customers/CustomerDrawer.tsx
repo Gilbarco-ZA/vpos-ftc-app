@@ -59,7 +59,7 @@ type CustomerDrawerProps = {
 const emptyForm: CustomerFormData = {
   buyerName: '',
   tin: '',
-  buyerType: 'B2C',
+  buyerType: '',
   pin: '',
   passportNumber: '',
   businessName: '',
@@ -200,11 +200,19 @@ export const CustomerDrawer = ({
   useEffect(() => {
     if (!open) return
     if (mode === 'edit' && customer) {
-      reset({ ...emptyForm, ...customer, buyerType: customer.buyerType || 'B2C' })
+      reset({
+        ...emptyForm,
+        ...customer,
+        buyerType: customer.buyerType ||
+          (isKenyaStation(stationCountry) ? 'B2C' : ''),
+      })
     } else {
-      reset()
+      reset({
+        ...emptyForm,
+        buyerType: isKenyaStation(stationCountry) ? 'B2C' : '',
+      })
     }
-  }, [open, mode, customer, reset])
+  }, [open, mode, customer, reset, stationCountry])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
