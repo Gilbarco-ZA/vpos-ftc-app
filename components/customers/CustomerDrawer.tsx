@@ -59,7 +59,7 @@ type CustomerDrawerProps = {
 const emptyForm: CustomerFormData = {
   buyerName: '',
   tin: '',
-  buyerType: '',
+  buyerType: 'B2C',
   pin: '',
   passportNumber: '',
   businessName: '',
@@ -200,7 +200,7 @@ export const CustomerDrawer = ({
   useEffect(() => {
     if (!open) return
     if (mode === 'edit' && customer) {
-      reset({ ...emptyForm, ...customer })
+      reset({ ...emptyForm, ...customer, buyerType: customer.buyerType || 'B2C' })
     } else {
       reset()
     }
