@@ -15,7 +15,7 @@ export function mapCustomerRow(row: any) {
     id: String(row.id),
     tin: String(row.tin ?? ''),
     buyerName: String(row.buyer_name ?? ''),
-    buyerType: row.buyer_type ?? 'B2C',
+    buyerType: row.buyer_type ?? (String(row.country ?? '').trim().toUpperCase() === 'KE' ? 'B2C' : null),
     pin: row.pin ?? null,
     passportNumber: row.passport_number ?? null,
     businessName: row.business_name ?? null,
@@ -181,7 +181,7 @@ export async function updateCustomerRepo(params: {
   await query(
     `UPDATE customers
        SET buyer_name = COALESCE($1, buyer_name),
-           buyer_type = COALESCE($2, buyer_type, 'B2C'),
+           buyer_type = COALESCE($2, buyer_type),
            pin = COALESCE($3, pin),
            passport_number = COALESCE($4, passport_number),
            business_name = COALESCE($5, business_name),
@@ -242,6 +242,8 @@ export async function createOrUpdateCustomerRepo(params: {
   data: Record<string, any>
 }) {
   const { stationId, data } = params
+  const buyerType = data.buyerType?.trim() ||
+    (String(data.country ?? '').trim().toUpperCase() === 'KE' ? 'B2C' : null)
   return withTransaction(async (client) => {
     const existing = await txQuery<any>(
       client,
@@ -256,7 +258,7 @@ export async function createOrUpdateCustomerRepo(params: {
         client,
         `UPDATE customers
            SET buyer_name = $1,
-               buyer_type = COALESCE($2, 'B2C'),
+               buyer_type = $2,
                pin = $3,
                passport_number = $4,
                business_name = $5,
