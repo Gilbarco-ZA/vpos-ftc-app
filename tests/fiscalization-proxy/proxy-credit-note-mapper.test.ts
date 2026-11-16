@@ -153,3 +153,52 @@ test('Kenya customer-linked credit note preserves the original fiscal invoice bu
   })
   assert.equal(originalWithoutBuyer.creditNotes[0].buyer, null)
 })
+
+test('Kenya credit note defaults missing original buyer type to B2C while preserving explicit B2B', () => {
+  const base = {
+    transaction: {
+      id: 'txn-credit-note-default-buyer',
+      transaction_date_time: '2026-11-05T13:16:48Z',
+      fuel_type: 'Unleaded',
+      grade_id: '5',
+      volume: 20,
+      total_amount: 4540,
+    },
+    customer: { name: 'Current customer', buyer_type: 'B2B' },
+    station: { country: 'KE' },
+    creditNoteId: 'credit-note-default-buyer',
+    documentReference: 'F87CB75898A3',
+    reasonCode: '11',
+  }
+
+  const originalBuyer = { name: 'Original customer', pin: 'P000591674X', buyerType: null }
+  const creditNote = mapTransactionToProxyCreditNote({
+    ...base,
+    originalInvoiceRequest: {
+      DocumentId: base.documentReference,
+      buyer: originalBuyer,
+    },
+  })
+  assert.deepEqual(creditNote.creditNotes[0]?.buyer, {
+    name: 'Original customer',
+    pin: 'P000591674X',
+    buyerType: 'B2C',
+  })
+  assert.equal(originalBuyer.buyerType, null, 'must not mutate stored fiscal evidence')
+
+  const explicitBuyer = { ...originalBuyer, buyerType: 'B2B' }
+  const businessCreditNote = mapTransactionToProxyCreditNote({
+    ...base,
+    originalInvoiceRequest: {
+      DocumentId: base.documentReference,
+      buyer: explicitBuyer,
+    },
+  })
+  assert.deepEqual(businessCreditNote.creditNotes[0]?.buyer, explicitBuyer)
+
+  const currentBuyerFallback = mapTransactionToProxyCreditNote({
+    ...base,
+    customer: { name: 'Current customer', buyer_type: null },
+  })
+  assert.equal(currentBuyerFallback.creditNotes[0]?.buyer?.buyerType, 'B2C')
+})
