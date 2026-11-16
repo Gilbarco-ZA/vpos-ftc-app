@@ -119,8 +119,8 @@ const NonFiscalizedFiscalizeSheet = ({
 
       setTin(linkedTin)
       setBuyerName(linkedBuyerName)
-      setBuyerType(buyerTypeOptions[0]?.value ?? '')
       const kenya = isKenyaStation(stationCountry)
+      setBuyerType(kenya ? 'B2C' : (buyerTypeOptions[0]?.value ?? ''))
       const transactionPaymentType = normalizePaymentSelection(
         transaction.paymentType,
         kenya,
@@ -140,7 +140,7 @@ const NonFiscalizedFiscalizeSheet = ({
               id: linkedCustomerId,
               tin: linkedTin,
               buyerName: linkedBuyerName,
-              buyerType: 'B2C',
+              buyerType: kenya ? 'B2C' : null,
               pin: null,
               contactPhone: null,
               contactEmail: null,
@@ -170,7 +170,10 @@ const NonFiscalizedFiscalizeSheet = ({
       id: String(customer?.id ?? ''),
       tin: String(customer?.tin ?? fallbackTin),
       buyerName: String(customer?.buyer_name ?? customer?.buyerName ?? ''),
-      buyerType: customer?.buyer_type ?? customer?.buyerType ?? 'B2C',
+      buyerType:
+        customer?.buyer_type ??
+        customer?.buyerType ??
+        (isKenyaStation(stationCountry) ? 'B2C' : null),
       pin: customer?.pin ?? null,
       contactPhone: customer?.contact_phone ?? customer?.contactPhone ?? null,
       contactEmail: customer?.contact_email ?? customer?.contactEmail ?? null,
@@ -179,7 +182,7 @@ const NonFiscalizedFiscalizeSheet = ({
       paymentType: customer?.payment_type ?? customer?.paymentType ?? null,
       vehicleRegNr: customer?.vehicle_reg_nr ?? customer?.vehicleRegNr ?? null,
     }),
-    [],
+    [stationCountry],
   )
 
   const lookupCustomer = useCallback(
@@ -210,7 +213,7 @@ const NonFiscalizedFiscalizeSheet = ({
           setResolvedCustomer(mapped)
           setCustomerState(options?.foundState ?? 'found')
           setBuyerName(mapped.buyerName)
-          setBuyerType(mapped.buyerType || 'B2C')
+          setBuyerType(mapped.buyerType || (isKenyaStation(stationCountry) ? 'B2C' : ''))
           setLocalReceiptFields((current) => ({
             odometer: current.odometer.trim() || String(mapped.odometer ?? ''),
             paymentType: normalizePaymentSelection(
