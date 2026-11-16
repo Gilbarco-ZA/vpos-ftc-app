@@ -573,7 +573,8 @@ export function mapTransactionToProxyInvoice(args: {
           name: strOrNull(
             buyerSource.buyer_name ?? buyerSource.buyerName ?? buyerSource.name,
           ),
-          buyerType: strOrNull(buyerSource.buyer_type ?? buyerSource.buyerType) ?? 'B2C',
+          buyerType: strOrNull(buyerSource.buyer_type ?? buyerSource.buyerType) ??
+            (countryCode === 'KE' ? 'B2C' : null),
           pin: strOrNull(buyerSource.pin),
           passportNumber: strOrNull(
             buyerSource.passport_number ?? buyerSource.passportNumber,
