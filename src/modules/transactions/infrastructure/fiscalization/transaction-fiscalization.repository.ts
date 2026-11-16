@@ -114,6 +114,10 @@ export async function getTransactionInvoicePayloadRepo(
     )
   })()
 
+  const isKenya = ['KE', 'KEN', 'KENYA'].includes(
+    String(station?.country ?? '').trim().toUpperCase(),
+  )
+
   const invoice = mapTransactionToProxyInvoice({
     transaction: {
       ...txn,
@@ -123,7 +127,7 @@ export async function getTransactionInvoicePayloadRepo(
       txn.buyer_name || txn.tin
         ? {
             name: txn.buyer_name ?? null,
-            buyerType: txn.buyer_type ?? (String(station?.country ?? '').trim().toUpperCase() === 'KE' ? 'B2C' : null),
+            buyerType: txn.buyer_type ?? (isKenya ? 'B2C' : null),
             pin: txn.tin ?? null,
           }
         : null,
