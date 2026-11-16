@@ -77,7 +77,10 @@ export async function updateCustomerRecord(params: {
       ...data,
       tin: normalizeTin(data.tin),
       buyerName: normalizeOptional(data.buyerName),
-      buyerType: normalizeOptional(data.buyerType),
+      buyerType: normalizeOptional(data.buyerType) ??
+        (existingCountry === 'KE' && !normalizeOptional(existing.buyer_type)
+          ? 'B2C'
+          : undefined),
       pin: existingCountry === 'KE' ? normalizeTin(data.tin) : normalizeOptional(data.pin),
       passportNumber: normalizeOptional(data.passportNumber),
       businessName: normalizeOptional(data.businessName),
