@@ -8,7 +8,7 @@ ALTER TABLE customers ALTER COLUMN buyer_type DROP DEFAULT;
 -- previously converted non-Kenya NULLs cannot be identified safely here.
 UPDATE customers c
    SET buyer_type = NULL,
-       updated_at = NOW()
+       updated_at = snapshot.previous_updated_at
   FROM migration_1341_non_kenya_null_buyer_types snapshot
  WHERE c.id = snapshot.customer_id
    AND c.buyer_type = 'B2C'
