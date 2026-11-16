@@ -213,7 +213,7 @@ const NonFiscalizedFiscalizeSheet = ({
           setResolvedCustomer(mapped)
           setCustomerState(options?.foundState ?? 'found')
           setBuyerName(mapped.buyerName)
-          setBuyerType(mapped.buyerType || (isKenyaStation(stationCountry) ? 'B2C' : ''))
+          setBuyerType(mapped.buyerType || 'B2C')
           setLocalReceiptFields((current) => ({
             odometer: current.odometer.trim() || String(mapped.odometer ?? ''),
             paymentType: normalizePaymentSelection(
