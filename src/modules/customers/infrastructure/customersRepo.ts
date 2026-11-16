@@ -11,11 +11,14 @@ import { uuidv4 } from '@/src/shared/utils/uuid'
 export type CustomerRow = Record<string, any>
 
 export function mapCustomerRow(row: any) {
+  const isKenya = ['KE', 'KEN', 'KENYA'].includes(
+    String(row.country ?? '').trim().toUpperCase(),
+  )
   return {
     id: String(row.id),
     tin: String(row.tin ?? ''),
     buyerName: String(row.buyer_name ?? ''),
-    buyerType: row.buyer_type ?? (String(row.country ?? '').trim().toUpperCase() === 'KE' ? 'B2C' : null),
+    buyerType: row.buyer_type ?? (isKenya ? 'B2C' : null),
     pin: row.pin ?? null,
     passportNumber: row.passport_number ?? null,
     businessName: row.business_name ?? null,
