@@ -6,11 +6,12 @@
 -- On installations that already applied 1341, original NULL values cannot
 -- be reconstructed from the current customer rows alone.
 CREATE TABLE IF NOT EXISTS migration_1341_non_kenya_null_buyer_types (
-  customer_id UUID PRIMARY KEY
+  customer_id UUID PRIMARY KEY,
+  previous_updated_at TIMESTAMPTZ NOT NULL
 );
 
-INSERT INTO migration_1341_non_kenya_null_buyer_types (customer_id)
-SELECT c.id
+INSERT INTO migration_1341_non_kenya_null_buyer_types (customer_id, previous_updated_at)
+SELECT c.id, c.updated_at
   FROM customers c
  WHERE c.buyer_type IS NULL
    AND UPPER(BTRIM(COALESCE(c.country, ''))) NOT IN ('KE', 'KEN', 'KENYA')
