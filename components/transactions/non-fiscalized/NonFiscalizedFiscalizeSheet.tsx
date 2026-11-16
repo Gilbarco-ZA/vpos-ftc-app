@@ -119,7 +119,7 @@ const NonFiscalizedFiscalizeSheet = ({
 
       setTin(linkedTin)
       setBuyerName(linkedBuyerName)
-      setBuyerType(buyerTypeOptions[0]?.value ?? '')
+      setBuyerType(isKenyaStation(stationCountry) ? 'B2C' : '')
       const kenya = isKenyaStation(stationCountry)
       const transactionPaymentType = normalizePaymentSelection(
         transaction.paymentType,
@@ -210,7 +210,7 @@ const NonFiscalizedFiscalizeSheet = ({
           setResolvedCustomer(mapped)
           setCustomerState(options?.foundState ?? 'found')
           setBuyerName(mapped.buyerName)
-          setBuyerType(mapped.buyerType || 'B2C')
+          setBuyerType(mapped.buyerType || (isKenyaStation(stationCountry) ? 'B2C' : ''))
           setLocalReceiptFields((current) => ({
             odometer: current.odometer.trim() || String(mapped.odometer ?? ''),
             paymentType: normalizePaymentSelection(
@@ -498,6 +498,9 @@ const NonFiscalizedFiscalizeSheet = ({
                       value={buyerType}
                       onChange={(event) => setBuyerType(event.target.value)}
                     >
+                      {!isKenyaStation(stationCountry) && (
+                        <option value="">Unspecified</option>
+                      )}
                       {buyerTypeOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
