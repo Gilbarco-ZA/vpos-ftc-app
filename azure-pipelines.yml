@@ -10,12 +10,14 @@ resources:
     - repository: ci
       type: git
       name: GAFS.Vpos/vpos-mono-package-mgr
-      ref: refs/heads/master
+      ref: refs/heads/compliance
 
 extends:
   template: azure/templates/node-nextjs.yml@ci
   parameters:
     consumerPath: 'vpos-ftc-app'
+    mainBranch: 'refs/heads/main'
+    appInstallFolder: 'vposftc'
     artifactsPackageName: 'vpos-ftc-app'
     nodeVersion: '22.15.0'
     esbuildTarget: 'node22'
@@ -27,6 +29,7 @@ extends:
       - start.cjs
       - vpos-server.cjs
       - src/platform/runtime/env-defaults.cjs
+      - scripts/trace-net.cjs
     packageTargets:
       - id: cpb539_node22
         name: 'cpb-539-node22'
