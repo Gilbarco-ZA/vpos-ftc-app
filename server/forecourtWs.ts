@@ -33,6 +33,7 @@ import {
 
 declare global {
   var __vposForecourtWsAttached: boolean | undefined
+  var __vposLifecycleSuspending: boolean | undefined
 }
 
 const SAFE_OFFLINE_ACTIONS = new Set([
@@ -354,6 +355,10 @@ export function attachForecourtWs(server: HttpServer) {
   }, 2000)
 
   io.on('connection', (socket) => {
+    if (globalThis.__vposLifecycleSuspending) {
+      socket.disconnect(true)
+      return
+    }
     void (async () => {
       const stationId = await resolveStationId(
         resolveStationIdFromSocket(socket),
@@ -396,6 +401,10 @@ export function attachForecourtWs(server: HttpServer) {
       sendProtocolHealth(socket, stationId)
 
       const handleCommandEnvelope = (payload: unknown) => {
+        if (globalThis.__vposLifecycleSuspending) {
+          sendEnvelope(socket, { type: 'error', data: { message: 'suspending' } })
+          return
+        }
         void (async () => {
           const parsed = normalizeEnvelope(payload)
           if (!isRecord(parsed)) return
@@ -467,6 +476,10 @@ export function attachForecourtWs(server: HttpServer) {
           }
           sendEnvelope(socket, { type: 'cmd:ack', data: ack })
 
+          if (globalThis.__vposLifecycleSuspending) {
+            sendEnvelope(socket, { type: 'error', data: { message: 'suspending' } })
+            return
+          }
           commandClients.set(normalizedCmd.id, socket)
           await enqueue(normalizedCmd)
           triggerForecourtCommandProcessing()
