@@ -126,6 +126,11 @@ const config = {
   emailListCC,
   environmentVariables,
   startScriptTemplate,
+  // Shared package manager emits persist.sh only for the CPB539 Node22
+  // Next.js runtime; other package targets are deliberately unaffected.
+  enableNodeWebPersistHook:
+    (process.env.FNEZ_PACKAGE_TARGET_NAME || 'cpb-539-node22') === 'cpb-539-node22',
+  persistHookPort: 3080,
   nodeVersionDir,
   installationSteps,
   exclude,
