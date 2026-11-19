@@ -53,6 +53,7 @@ import { attachForecourtWs } from './server/forecourtWs'
 
 // The server bundle includes this small CommonJS module. It can also be
 // exercised directly with Node's built-in test runner.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { awaitQueuesDrained } = require('./src/platform/runtime/persist-readiness.cjs') as {
   awaitQueuesDrained: (
     readQueues: () => Array<{ active: number; queued: number; failed: number }>,
