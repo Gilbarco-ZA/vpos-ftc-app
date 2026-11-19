@@ -221,15 +221,25 @@ export function startLocalServerRuntime(stationId: string) {
 
   return {
     stop: async () => {
+      let stopFailures = 0
       for (const stop of stopFns.reverse()) {
         try {
           await stop()
-        } catch {}
+        } catch (error) {
+          stopFailures += 1
+          logger.error('[lifecycle]', {
+            msg: 'runtime worker stop failed',
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       }
 
       globalThis.__proxyFiscalSenderWorkerStarted = false
       globalThis.__supervisorMonitorWorkerStarted = false
       globalThis.__pssXmlSyncWorkerStarted = false
+      if (stopFailures > 0) {
+        throw new Error(`${stopFailures} runtime worker stop operation(s) failed`)
+      }
     },
   }
 }
