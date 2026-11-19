@@ -223,6 +223,7 @@ async function main() {
   let runtime: ReturnType<typeof startLocalServerRuntime> | null = null
   let stopForecourtConfigWatcher: (() => void) | null = null
   let runtimeStop: Promise<void> | null = null
+  let activeHttpRequests = 0
   let suspending = false
   let suspendAck: Promise<{ ok: boolean; status: string; reason?: string }> | null = null
 
@@ -247,6 +248,7 @@ async function main() {
         getJplPersistenceQueueDiagnostics(),
         getJplEventProcessingQueueDiagnostics(),
         getForecourtMaterializationQueueDiagnostics(),
+        { active: activeHttpRequests, queued: 0, failed: 0 },
       ]
       return await awaitQueuesDrained(readQueues, checkPostgresHealth, {
         timeoutMs: 10000,
@@ -307,7 +309,25 @@ async function main() {
         status: 'starting',
         data: getStartupStatus(),
       })
-    return nextHandler(req, res)
+    // Existing writes must finish before a persistence receipt is issued.
+    // Refuse new requests as soon as suspend begins; count in-flight work
+    // until its response completes or the client disconnects.
+    activeHttpRequests += 1
+    let completed = false
+    const finish = () => {
+      if (!completed) {
+        completed = true
+        activeHttpRequests -= 1
+      }
+    }
+    res.once('finish', finish)
+    res.once('close', finish)
+    try {
+      return nextHandler(req, res)
+    } catch (error) {
+      finish()
+      throw error
+    }
   })
 
   server.on('error', (err: any) => {
