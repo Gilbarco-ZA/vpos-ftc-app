@@ -10,6 +10,7 @@
  */
 
 import fs from 'fs'
+import { randomBytes } from 'crypto'
 import http from 'http'
 import https from 'https'
 import next from 'next'
@@ -26,6 +27,7 @@ import {
   getLegacyPermDir,
 } from '@/src/platform/config/app-config'
 import { getPostgresPoolDiagnostics } from '@/src/platform/db/postgres'
+import { checkHealth as checkPostgresHealth } from '@/src/platform/db/postgres/core'
 import {
   installConsoleCapture,
   updateConsoleCaptureStation,
@@ -48,6 +50,17 @@ import { getJplPersistenceQueueDiagnostics } from '@/src/modules/forecourt/infra
 import { getForecourtMaterializationQueueDiagnostics } from '@/src/modules/forecourt/infrastructure/persistence'
 
 import { attachForecourtWs } from './server/forecourtWs'
+
+// The server bundle includes this small CommonJS module. It can also be
+// exercised directly with Node's built-in test runner.
+const { awaitQueuesDrained } = require('./src/platform/runtime/persist-readiness.cjs') as {
+  awaitQueuesDrained: (
+    readQueues: () => Array<{ active: number; queued: number; failed: number }>,
+    checkDatabase: () => Promise<boolean>,
+    opts: { timeoutMs: number },
+  ) => Promise<{ ok: boolean; status: string; reason?: string }>
+}
+
 
 bootstrapRuntimeEnvironment()
 
@@ -149,6 +162,50 @@ function sendJson(res: http.ServerResponse, statusCode: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
+function prepareLifecycleToken(): string | null {
+  // Only controller-managed production launches expose a suspend endpoint.
+  if (process.env.VPOS_MANAGED_BY_START_SH !== '1') return null
+
+  const dir = '/tmp/fccapps/vposftc'
+  const state = fs.lstatSync(dir)
+  if (!state.isDirectory() || state.isSymbolicLink()) {
+    throw new Error('Unsafe lifecycle token directory')
+  }
+
+  const token = randomBytes(32).toString('hex')
+  const tmp = `${dir}/.vpos-lifecycle-token.next.${process.pid}`
+  const live = `${dir}/.vpos-lifecycle-token`
+  // Never follow a symlink when replacing the token. Each restart rotates it
+  // and only the platform fccuser can read it (0600, tmpfs).
+  fs.writeFileSync(tmp, token + '\n', { mode: 0o600, flag: 'wx' })
+  try {
+    fs.renameSync(tmp, live)
+  } catch (error) {
+    fs.unlinkSync(tmp)
+    throw error
+  }
+  return token
+}
+
+function isLoopback(remote: string | undefined): boolean {
+  return remote === '127.0.0.1' || remote === '::1' ||
+    remote === '::ffff:127.0.0.1'
+}
+
+async function withinDeadline(work: Promise<void>, timeoutMs: number): Promise<void> {
+  let handle: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      work,
+      new Promise<never>((_resolve, reject) => {
+        handle = setTimeout(() => reject(new Error('runtime shutdown timeout')), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (handle) clearTimeout(handle)
+  }
+}
+
 async function main() {
   const processGuard = createDomsProcessGuard('vpos-ftc-app')
   processGuard.acquireOrHandleCommand()
@@ -161,6 +218,46 @@ async function main() {
   const hostname = process.env.HOST || '0.0.0.0'
   if (!Number.isFinite(port) || port <= 0)
     throw new Error(`Invalid PORT value: ${String(port)}`)
+
+  const lifecycleToken = prepareLifecycleToken()
+  let runtime: ReturnType<typeof startLocalServerRuntime> | null = null
+  let stopForecourtConfigWatcher: (() => void) | null = null
+  let runtimeStop: Promise<void> | null = null
+  let suspending = false
+  let suspendAck: Promise<{ ok: boolean; status: string; reason?: string }> | null = null
+
+  const stopRuntimeOnce = () => {
+    if (!runtimeStop) runtimeStop = runtime?.stop() ?? Promise.resolve()
+    return runtimeStop
+  }
+
+  const acknowledgeSuspend = async () => {
+    if (!runtime || getStartupStatus().phase !== 'ready') {
+      return { ok: false, status: 'unverified', reason: 'runtime not ready' }
+    }
+    // Reject new HTTP application work and WS commands before stopping workers.
+    suspending = true
+    ;(globalThis as typeof globalThis & { __vposLifecycleSuspending?: boolean })
+      .__vposLifecycleSuspending = true
+    try {
+      stopForecourtConfigWatcher?.()
+      stopForecourtConfigWatcher = null
+      await withinDeadline(stopRuntimeOnce(), 9000)
+      const readQueues = () => [
+        getJplPersistenceQueueDiagnostics(),
+        getJplEventProcessingQueueDiagnostics(),
+        getForecourtMaterializationQueueDiagnostics(),
+      ]
+      return await awaitQueuesDrained(readQueues, checkPostgresHealth, {
+        timeoutMs: 10000,
+      })
+    } catch (error) {
+      logger.error('[lifecycle] persistence acknowledgement failed', {
+        error: serializeError(error),
+      })
+      return { ok: false, status: 'unverified', reason: 'runtime stop failed' }
+    }
+  }
 
   logger.info(
     `[server] booting. dev=${dev} pid=${process.pid} stationId=${stationId}`,
@@ -184,6 +281,22 @@ async function main() {
   let nextHandler: http.RequestListener | null = null
   const server = maybeHttpsServer((req, res) => {
     const pathname = (req.url || '').split('?', 1)[0]
+    if (pathname === '/_vpos/internal/persist') {
+      if (req.method !== 'POST' || !lifecycleToken ||
+          !isLoopback(req.socket.remoteAddress) ||
+          req.headers['x-vpos-lifecycle-token'] !== lifecycleToken) {
+        return sendJson(res, 404, { ok: false })
+      }
+      if (!suspendAck) suspendAck = acknowledgeSuspend()
+      void suspendAck.then(
+        (result) => sendJson(res, result.ok ? 200 : 503, result),
+        () => sendJson(res, 503, { ok: false, status: 'unverified' }),
+      )
+      return
+    }
+    if (suspending && pathname !== '/api/livez') {
+      return sendJson(res, 503, { ok: false, status: 'suspending' })
+    }
     if (pathname === '/api/livez')
       return sendJson(res, 200, { ok: true, success: true, status: 'running' })
     if (pathname === '/api/startup/status')
@@ -215,8 +328,6 @@ async function main() {
     progress: 40,
   })
 
-  let runtime: ReturnType<typeof startLocalServerRuntime> | null = null
-  let stopForecourtConfigWatcher: (() => void) | null = null
   const configuredRuntimeDiagnosticsMs = Number(
     process.env.VPOS_RUNTIME_DIAGNOSTICS_MS,
   )
@@ -308,7 +419,9 @@ async function main() {
       jplEventProcessing: getJplEventProcessingQueueDiagnostics(),
       forecourtMaterialization: getForecourtMaterializationQueueDiagnostics(),
     })
-    void (runtime?.stop() ?? Promise.resolve()).finally(() => {
+    void stopRuntimeOnce().catch((error) => {
+      logger.error('[server] shutdown worker-stop failure', { error: serializeError(error) })
+    }).finally(() => {
       try {
         stopForecourtConfigWatcher?.()
         releaseProcessLock?.()
