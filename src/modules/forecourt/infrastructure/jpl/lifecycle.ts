@@ -193,31 +193,17 @@ const attachProcessHandlers = () => {
   if (globalThis.__jplProcessHandlersAttached) return
   globalThis.__jplProcessHandlersAttached = true
 
-  const close = async () => {
-    globalThis.__jplTcpShuttingDown = true
-    clearReconnectTimer()
-
-    const teardown = globalThis.__jplTcpTeardownPromise
-    if (teardown) {
-      try {
-        await teardown
-      } catch {
-        // teardown is best effort during process shutdown
-      }
-    }
-
-    const activeClient = globalThis.__jplTcpClient
-    try {
-      await (activeClient as any)?.disconnect?.()
-    } catch {
-      // ignore
-    }
-    clearPosSessionHeartbeat()
+  const close = () => {
+    void shutdownJplTcpAdapter().catch((error) => {
+      logger.error('[jplTcp] shutdown failed', {
+        error: serializeError(error),
+      })
+    })
   }
 
-  process.on('SIGINT', () => void close())
-  process.on('SIGTERM', () => void close())
-  process.on('beforeExit', () => void close())
+  process.on('SIGINT', close)
+  process.on('SIGTERM', close)
+  process.on('beforeExit', close)
   process.on('unhandledRejection', (reason: any) => {
     logger.error('[jplTcp]', {
       msg: 'unhandledRejection',
@@ -1860,6 +1846,54 @@ const detachClient = async (client?: JplClient) => {
   }
 }
 
+
+/**
+ * Stop the physical JPL session before releasing the matching database lease.
+ * This is awaited by FTC's regular stop and suspend paths; signal handlers
+ * share the same promise rather than racing a second disconnect.
+ */
+export const shutdownJplTcpAdapter = (): Promise<void> => {
+  if (globalThis.__jplTcpShutdownPromise) return globalThis.__jplTcpShutdownPromise
+
+  globalThis.__jplTcpShuttingDown = true
+  clearReconnectTimer()
+
+  const shutdown = (async () => {
+    try {
+      const starting = globalThis.__jplTcpStartPromise
+      if (starting) {
+        try {
+          await starting
+        } catch {
+          // A failed startup must not block release of an already held lease.
+        }
+      }
+
+      const teardown = globalThis.__jplTcpTeardownPromise
+      if (teardown) await teardown
+
+      // detachClient closes the actual socket before releasing ownership.
+      await detachClient(globalThis.__jplTcpClient)
+
+      const pendingTeardown = globalThis.__jplTcpTeardownPromise
+      if (pendingTeardown) await pendingTeardown
+
+      const lease = globalThis.__jplPosSessionLease
+      if (lease) {
+        await releaseJplPosSessionLease(lease)
+        if (globalThis.__jplPosSessionLease === lease) {
+          globalThis.__jplPosSessionLease = undefined
+        }
+      }
+    } finally {
+      clearPosSessionHeartbeat()
+    }
+  })()
+
+  globalThis.__jplTcpShutdownPromise = shutdown
+  return shutdown
+}
+
 const scheduleReconnect = (stationId: string, reason: string) => {
   if (!isEnabled() || globalThis.__jplTcpShuttingDown) return
   if (globalThis.__jplTcpReconnectTimer) return
@@ -2391,6 +2425,9 @@ const startJplTcpAdapterInternal = async () => {
           posId: bootstrap.posId,
           ownerId: posSessionOwnerId,
         })
+        if (globalThis.__jplPosSessionLease?.ownerId === posSessionOwnerId) {
+          globalThis.__jplPosSessionLease = undefined
+        }
       },
     })
     globalThis.__jplTcpTeardownPromise = teardown
