@@ -13,6 +13,27 @@
 
 Never issue an unreviewed maintenance or dispense command solely to test connectivity.
 
+
+## CPB539 Node22 reboot or immediate restart: JPL POS lease recovery
+
+A successful /api/livez response proves only that the HTTP listener is active, not that Next.js pages are renderable. After a reboot or FTC restart, inspect /api/startup/status and verify that /login returns HTTP 200. Unauthenticated /dashboard may normally redirect (HTTP 307).
+
+The JPL PosId lease in PostgreSQL is owner-specific, renewed at 15-second intervals and expires after 45 seconds if renewal stops. A previous instance can leave a temporarily active lease after an abrupt exit. A new instance **must not** steal that lease, delete its row, change expires_at, or terminate a different owner's PostgreSQL session. The candidate recovery change handles startup lease contention with bounded backoff, keeping the web runtime alive. Normal FTC stop/suspend awaits socket teardown before releasing its own lease.
+
+Read-only lease inspection (run as the local PostgreSQL account):
+
+    SELECT pos_id, host_name, process_id, heartbeat_at, expires_at, released_at,
+           CASE WHEN released_at IS NOT NULL THEN 'RELEASED'
+                WHEN expires_at <= NOW() THEN 'EXPIRED'
+                ELSE 'ACTIVE' END AS lease_state
+    FROM forecourt_jpl_pos_sessions
+    ORDER BY pos_id;
+
+If startup reports that the JPL PosId is already leased, confirm whether the recorded owner is genuinely active. A lease can be transiently busy even when the older Node process has exited; let normal expiry and retry proceed. If the web process exits instead, collect the redacted start.log under /tmp/fccapps/vposftc/logs, process inventory, and lease row before any intervention. An unhandledRejection followed by exit code 1 is a fatal runtime failure, not successful reboot recovery.
+
+On the CPB539 Node22 validation controller, the 2026-11-20 t062 test exposed (a) Next.js page HTTP 500 after PostgreSQL startup and (b) a fatal unhandled JPL lease rejection after manual restart. Both are release gates for the subsequent build. Verify login rendering, existing transactions/tank state, one Node instance, JPL reconnection and sustained health after restart. A successful manual recovery does **not** constitute a passing unattended system-reboot test.
+
+
 ## Transactions buffered before station configuration
 
 If DOMS already contains transactions when VPOS is first installed, do not delete the local transaction and do not manually release a foreign DOMS lock.
