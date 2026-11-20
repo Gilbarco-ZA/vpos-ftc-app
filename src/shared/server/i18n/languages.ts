@@ -142,10 +142,13 @@ export const bootstrapDefaultLanguages = async () => {
     })
   }
 
+  const pending = bootstrapPromise
   try {
-    return await bootstrapPromise
+    return await pending
   } catch (err) {
-    if (isUndefinedTableError(err)) bootstrapPromise = null
+    // A transient connection failure must not poison subsequent page renders.
+    // Only invalidate the failed attempt, not a newer in-flight retry.
+    if (bootstrapPromise === pending) bootstrapPromise = null
     throw err
   }
 }
