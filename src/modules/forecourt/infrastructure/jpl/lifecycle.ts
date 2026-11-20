@@ -2287,11 +2287,26 @@ const startJplTcpAdapterInternal = async () => {
     ownerId: posSessionOwnerId,
   })
   if (!posSessionLease) {
-    throw new Error(
+    const error = new Error(
       `JPL PosId ${bootstrap.posId} is already leased by another active physical client for station ${stationId}`,
     )
+    // A previous Node process may have exited before releasing its 45-second
+    // lease. Do not steal an active lease or kill the FTC web process: report
+    // the blocked JPL session and retry through the existing bounded backoff.
+    const attempts = (getJplAdapterState().reconnectAttempts || 0) + 1
+    syncAdapterState(stationId, {
+      connected: false,
+      loggedOn: false,
+      lastError: error.message,
+      reconnectAttempts: attempts,
+      lastDisconnectReason: 'pos_session_lease_busy',
+      lastLifecycleEventAt: nowMs(),
+    })
+    scheduleReconnect(stationId, 'pos_session_lease_busy')
+    throw error
   }
 
+  globalThis.__jplPosSessionLease = posSessionLease
   globalThis.__jplPosSessionHeartbeatTimer = setInterval(() => {
     void renewJplPosSessionLease({
       stationId,
