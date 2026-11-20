@@ -2028,7 +2028,9 @@ const markDisconnected = async (args: {
   }
   clearPosSessionHeartbeat()
 
-  if (shouldReconnect && !globalThis.__jplTcpShuttingDown) {
+  // Never create a replacement physical client while the old socket may
+  // still be alive, even though the database lease belongs to this process.
+  if (shouldReconnect && !globalThis.__jplTcpShuttingDown && physicallyClosed) {
     scheduleReconnect(stationId, reason)
   }
 }
