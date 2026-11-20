@@ -1,10 +1,12 @@
 import type { PumpMappingsCache } from '@/src/modules/forecourt/infrastructure/jpl/types'
+import type { JplPosSessionLease } from '@/src/modules/forecourt/infrastructure/jpl/posSessionLease'
 import type { JplClient } from '@gilbarcoafs/doms-pos-jpl'
 
 declare global {
   var __jplTcpAdapterStarted: boolean | undefined
   var __jplTcpStartPromise: Promise<void> | undefined
   var __jplTcpTeardownPromise: Promise<void> | undefined
+  var __jplTcpShutdownPromise: Promise<void> | undefined
   var __jplTcpShuttingDown: boolean | undefined
   var __jplProcessHandlersAttached: boolean | undefined
   var __jplTcpClient: JplClient | undefined
@@ -22,6 +24,7 @@ declare global {
     | undefined
   var __jplTcpAcceptedAccessCode: string | undefined
   var __jplPosSessionOwnerId: string | undefined
+  var __jplPosSessionLease: JplPosSessionLease | undefined
   var __jplPosSessionHeartbeatTimer: NodeJS.Timeout | undefined
   var __jplPersistDedupe: Map<string, number> | undefined
   var __jplReplayLocks: Map<string, Promise<void>> | undefined
