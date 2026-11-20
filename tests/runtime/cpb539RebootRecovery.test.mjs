@@ -62,6 +62,8 @@ test('regular stop and suspend await owner-matched JPL disconnect and release', 
   )
   assert.match(stop, /await detachClient\(globalThis\.__jplTcpClient\)/)
   assert.match(stop, /await releaseJplPosSessionLease\(lease\)/)
+  assert.match(stop, /if \(!physicallyClosed\)/)
+  assert.match(lifecycle, /if \(releaseLease && !physicallyClosed\)/)
   assert.ok(
     stop.indexOf('await detachClient(') < stop.indexOf('await releaseJplPosSessionLease(lease)'),
     'lease must not be released before the physical socket closes',
