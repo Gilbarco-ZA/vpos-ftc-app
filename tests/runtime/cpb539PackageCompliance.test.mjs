@@ -23,6 +23,7 @@ const loadConfigFor = (target) => {
 test('CPB539 Node22 FTC opts in to complete uninstall with persistence hook', () => {
   const config = loadConfigFor('cpb-539-node22')
   assert.equal(config.completeUninstallAppRoot, true)
+  assert.equal(config.excludeDevelopmentEnvFromPackage, true)
   assert.equal(config.enableNodeWebPersistHook, true)
   assert.equal(config.domsAppId, '472-22')
   assert.equal(config.name, 'vposftc')
@@ -31,10 +32,12 @@ test('CPB539 Node22 FTC opts in to complete uninstall with persistence hook', ()
 test('CPB579 remains on its independent lifecycle and uninstall contract', () => {
   const config = loadConfigFor('cpb-579-node22')
   assert.equal(config.completeUninstallAppRoot, false)
+  assert.equal(config.excludeDevelopmentEnvFromPackage, true)
   assert.equal(config.enableNodeWebPersistHook, false)
 })
 
 test('undeclared package targets must not silently enable destructive uninstall', () => {
   const config = loadConfigFor(undefined)
   assert.equal(config.completeUninstallAppRoot, false)
+  assert.equal(config.excludeDevelopmentEnvFromPackage, true)
 })
