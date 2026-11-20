@@ -46,6 +46,7 @@ import {
   startForecourtRuntimeConfigWatcher,
 } from '@/src/modules/forecourt/application/forecourtRuntime'
 import { getJplEventProcessingQueueDiagnostics } from '@/src/modules/forecourt/infrastructure/jpl/events'
+import { shutdownJplTcpAdapter } from '@/src/modules/forecourt/infrastructure/jpl/lifecycle'
 import { getJplPersistenceQueueDiagnostics } from '@/src/modules/forecourt/infrastructure/jpl/persistence'
 import { getForecourtMaterializationQueueDiagnostics } from '@/src/modules/forecourt/infrastructure/persistence'
 
@@ -229,7 +230,17 @@ async function main() {
   let suspendAck: Promise<{ ok: boolean; status: string; reason?: string }> | null = null
 
   const stopRuntimeOnce = () => {
-    if (!runtimeStop) runtimeStop = runtime?.stop() ?? Promise.resolve()
+    if (!runtimeStop) {
+      runtimeStop = (async () => {
+        try {
+          await (runtime?.stop() ?? Promise.resolve())
+        } finally {
+          // Never acknowledge suspend or finish a normal stop with an owned
+          // JPL lease while its physical socket has not been closed.
+          await shutdownJplTcpAdapter()
+        }
+      })()
+    }
     return runtimeStop
   }
 
