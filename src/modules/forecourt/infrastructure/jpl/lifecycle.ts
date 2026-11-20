@@ -1819,7 +1819,7 @@ const disposeProtocolListeners = () => {
   globalThis.__jplTcpProtocolDisposers = []
 }
 
-const detachClient = async (client?: JplClient) => {
+const detachClient = async (client?: JplClient): Promise<boolean> => {
   const activeClient = client ?? globalThis.__jplTcpClient
   disposeProtocolListeners()
 
@@ -1830,9 +1830,11 @@ const detachClient = async (client?: JplClient) => {
   }
   globalThis.__jplTcpAdapterStarted = false
 
+  let physicallyClosed = true
   try {
     await (activeClient as any)?.disconnect?.()
   } catch (error) {
+    physicallyClosed = false
     logger.warn('[jplTcp]', {
       msg: 'failed to close JPL client during teardown',
       error: serializeError(error),
@@ -1844,6 +1846,7 @@ const detachClient = async (client?: JplClient) => {
   } catch {
     // ignore
   }
+  return physicallyClosed
 }
 
 
@@ -1873,7 +1876,10 @@ export const shutdownJplTcpAdapter = (): Promise<void> => {
       if (teardown) await teardown
 
       // detachClient closes the actual socket before releasing ownership.
-      await detachClient(globalThis.__jplTcpClient)
+      const physicallyClosed = await detachClient(globalThis.__jplTcpClient)
+      if (!physicallyClosed) {
+        throw new Error('JPL socket disconnect failed; retaining POS lease')
+      }
 
       const pendingTeardown = globalThis.__jplTcpTeardownPromise
       if (pendingTeardown) await pendingTeardown
@@ -2001,9 +2007,15 @@ const markDisconnected = async (args: {
   })
 
   // Keep lease ownership until the old physical socket is actually closed.
-  await detachClient(client)
+  const physicallyClosed = await detachClient(client)
 
-  if (releaseLease) {
+  if (releaseLease && !physicallyClosed) {
+    logger.warn('[jplTcp]', {
+      msg: 'retaining POS lease because physical socket closure was unverified',
+      stationId,
+    })
+  }
+  if (releaseLease && physicallyClosed) {
     try {
       await releaseLease()
     } catch (releaseError) {
