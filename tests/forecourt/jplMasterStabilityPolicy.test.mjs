@@ -51,15 +51,22 @@ test('reconnect closes physical JPL client before lease release and replacement'
   assert.match(lifecycle, /if \(teardown\) await teardown/)
 })
 
-test('POS lease heartbeat is independent from fallback polling and shutdown closes current client', () => {
+test('POS heartbeat is independent and shutdown closes current socket before lease release', () => {
   const monitors = functionBody('clearConnectionMonitors')
   const fallback = functionBody('startJplFallbackPolling')
   const handlers = functionBody('attachProcessHandlers')
+  const shutdown = functionBody('shutdownJplTcpAdapter')
 
   assert.doesNotMatch(monitors, /__jplPosSessionHeartbeatTimer/)
   assert.doesNotMatch(fallback, /__jplPosSessionHeartbeatTimer/)
   assert.match(lifecycle, /const clearPosSessionHeartbeat =/)
-  assert.match(handlers, /const activeClient = globalThis\.__jplTcpClient/)
+  assert.match(handlers, /shutdownJplTcpAdapter\(\)\.catch/)
+  assert.match(
+    shutdown,
+    /await detachClient\(globalThis\.__jplTcpClient\)[\s\S]*?await releaseJplPosSessionLease\(lease\)/,
+  )
+  assert.match(globals, /__jplTcpShutdownPromise/)
+  assert.match(globals, /__jplPosSessionLease/)
 })
 
 test('vendor JPL version includes the uncorrelated-response compatibility fix', () => {
