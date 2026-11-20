@@ -130,6 +130,11 @@ const config = {
   // Next.js runtime; other package targets are deliberately unaffected.
   enableNodeWebPersistHook:
     process.env.FNEZ_PACKAGE_TARGET_NAME === 'cpb-539-node22',
+  // Only the CPB539 Node22 FTC target opts into full package-owned
+  // snapshot/application-root removal on explicit uninstall. Customer state
+  // under vpos-perm remains out of scope and must not be deleted.
+  completeUninstallAppRoot:
+    process.env.FNEZ_PACKAGE_TARGET_NAME === 'cpb-539-node22',
   persistHookPort: 3080,
   nodeVersionDir,
   installationSteps,
