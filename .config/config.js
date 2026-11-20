@@ -135,6 +135,9 @@ const config = {
   // under vpos-perm remains out of scope and must not be deleted.
   completeUninstallAppRoot:
     process.env.FNEZ_PACKAGE_TARGET_NAME === 'cpb-539-node22',
+  // .env and .env.* are for local development only, never production packages.
+  // Production startup receives environment exports from generated start.sh.
+  excludeDevelopmentEnvFromPackage: true,
   persistHookPort: 3080,
   nodeVersionDir,
   installationSteps,
