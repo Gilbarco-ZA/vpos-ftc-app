@@ -14,8 +14,10 @@ next-env.d.ts
 # Local runtime state
 /lcks/
 
-# Local environment and credentials
-.env.local
+# Local environment and credentials (development only)
+.env
+.env.*
+!.env.example
 /.certs/
 /public/certs/
 *.key
