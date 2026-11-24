@@ -161,6 +161,9 @@ export function startReportQueueWorker(opts?: {
           await upsertProcessHeartbeat({
             stationId: getStationId(),
             processName: WORKER_NAME,
+            pid: process.pid,
+            status: 'running',
+            connected: true,
             metrics: { pollMs },
           })
           lastHeartbeat = now

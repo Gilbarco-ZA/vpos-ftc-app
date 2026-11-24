@@ -34,9 +34,10 @@ test('printer connectivity recovery preserves and releases queued auto-prints', 
   const runtime = read('src/modules/runtime/infrastructure/inProcessRuntime.ts')
 
   assert.match(worker, /startPrinterConnectivityWorker/)
-  assert.match(worker, /isAutoPrintEnabled/)
-  assert.match(worker, /releasePendingPrintJobs/)
-  assert.match(worker, /wasConnected !== true/)
+  assert.doesNotMatch(worker, /releasePendingPrintJobs/)
+  assert.match(printWorker, /listDueForWorker/)
+  assert.match(printWorker, /blockedUntil/)
+  assert.match(printWorker, /candidate_version/)
   assert.match(printWorker, /isPrinterConnectivityError/)
   assert.match(printWorker, /holdForConnectivityRetry/)
   assert.match(repo, /isAutoPrintEnabled/)

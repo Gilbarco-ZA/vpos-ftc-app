@@ -1,6 +1,6 @@
 import net from 'net'
 
-import { shouldRunProxyWorker } from '@/src/platform/config/app-config'
+import { shouldRunInternalFiscalizationWorkers, shouldRunProxyWorker } from '@/src/platform/config/app-config'
 import { queryAll, queryOne } from '@/src/platform/db/postgres'
 import { jplHealth } from '@/src/platform/integrations/jpl/client'
 import { getJplConfig } from '@/src/platform/integrations/jpl/config'
@@ -10,6 +10,7 @@ import { namosHealth } from '@/src/platform/integrations/namos/client'
 import { getNamosConfig } from '@/src/platform/integrations/namos/config'
 import { ppxHealth } from '@/src/platform/integrations/ppx/client'
 import { getPpxConfig } from '@/src/platform/integrations/ppx/config'
+import { getEffectivePosBackend } from '@/src/shared/integrations/posBackend'
 import { getEnvValue } from '@/src/shared/config/envDb'
 import { getStationSettings } from '@/src/shared/config/stationSettings'
 import { safeAsync } from '@/src/shared/utils/safeAsync'
@@ -37,7 +38,7 @@ async function checkDb() {
 async function checkJpl(stationId: string) {
   const config = await getJplConfig(stationId)
   if (!config) return { configured: false, ok: true }
-  const result = await jplHealth(stationId)
+  const result = await jplHealth(stationId, { accessMode: 'forecourt' })
   return { configured: true, ok: !!result?.ok, data: result ?? null }
 }
 
@@ -87,7 +88,7 @@ async function checkProxyFiscalization(stationId: string) {
   if (!base) return { configured: false, ok: true }
   const url = `${base}${path}/health`
   try {
-    const response = await fetch(url, { method: 'GET' })
+    const response = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(5000) })
     return { configured: true, ok: response.ok, status: response.status }
   } catch (error: any) {
     return {
@@ -142,8 +143,9 @@ async function checkWorkers(stationId: string) {
     'posCommandsWorker',
     'printJobsWorker',
     'reportQueueWorker',
-    'transactionFiscalizationScheduler',
-    'transactionQueueWorker',
+    'offlineReceiptPrintWorker',
+    'printerConnectivityWorker',
+    ...(shouldRunInternalFiscalizationWorkers() ? ['transactionFiscalizationScheduler', 'transactionQueueWorker'] : []),
     'supervisorMonitorWorker',
   ]
 
@@ -229,6 +231,63 @@ export async function getHealth(stationId: string) {
   }
 }
 
+type ReadinessComponent = { ok: boolean; configured?: boolean; reason?: string }
+const readinessInFlight = new Map<string, Promise<ReadinessComponent>>()
+
+async function readinessCheck(
+  stationId: string,
+  name: string,
+  check: () => Promise<ReadinessComponent>,
+): Promise<ReadinessComponent> {
+  const key = JSON.stringify([stationId, name])
+  let pending = readinessInFlight.get(key)
+  if (!pending) {
+    pending = Promise.resolve().then(check).then(
+      (result) => result,
+      () => ({ ok: false, reason: 'dependency_check_failed' }),
+    )
+    readinessInFlight.set(key, pending)
+    const active = pending
+    void pending.finally(() => {
+      if (readinessInFlight.get(key) === active) readinessInFlight.delete(key)
+    })
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<ReadinessComponent>((resolve) => {
+        timer = setTimeout(() => resolve({ ok: false, reason: 'dependency_timeout' }), 6000)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export async function getReadiness(stationId: string) {
-  return await getHealth(stationId)
+  const skipped = { ok: true, configured: false, reason: 'inactive_backend' }
+  const checks = {
+    db: () => checkDb(),
+    jpl: () => checkJpl(stationId),
+    pos: async () => {
+      const backend = await getEffectivePosBackend(stationId)
+      // JPL forecourt health is independent of external POS selection.
+      if (backend === 'ligo') return checkLigo(stationId)
+      if (backend === 'namos') return checkNamos(stationId)
+      if (backend === 'ppx') return checkPpx(stationId)
+      return skipped
+    },
+    proxyFiscalization: () => checkProxyFiscalization(stationId),
+    archiveExporters: () => checkArchiveExporters(stationId),
+    printer: () => checkPrinter(stationId),
+    workers: () => checkWorkers(stationId),
+  }
+  const entries = await Promise.all(
+    Object.entries(checks).map(async ([name, check]) => [
+      name, await readinessCheck(stationId, name, check),
+    ] as const),
+  )
+  const components = Object.fromEntries(entries)
+  return { ok: entries.every(([, component]) => component.ok), components }
 }

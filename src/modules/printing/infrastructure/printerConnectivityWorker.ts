@@ -51,7 +51,6 @@ export function startPrinterConnectivityWorker(opts?: {
   const stationId = getStationId()
   const pollMs = Math.max(1_000, Number(opts?.pollMs ?? DEFAULT_POLL_MS))
   const timeoutMs = Math.max(250, Number(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS))
-  const previous = new Map<string, boolean>()
   let stopped = false
   let tickInFlight = false
 
@@ -62,14 +61,11 @@ export function startPrinterConnectivityWorker(opts?: {
       const rows = await printJobsRepo.listEnabledPrinterConfigRows(stationId)
       let connectedCount = 0
       let configuredCount = 0
-      let releasedJobs = 0
-      let autoPrintEnabled: boolean | null = null
 
       for (const row of rows) {
         const config = parsePrinterDeviceConfig(row.config_json || {})
         if (!config?.host) continue
         configuredCount += 1
-        const key = String(row.device_key || config.host)
         const connected = await canConnect({
           host: config.host,
           port: config.port ?? 9100,
@@ -77,18 +73,8 @@ export function startPrinterConnectivityWorker(opts?: {
         })
         if (connected) connectedCount += 1
 
-        const wasConnected = previous.get(key)
-        previous.set(key, connected)
-        if (connected && wasConnected !== true) {
-          if (autoPrintEnabled == null) {
-            autoPrintEnabled = await printJobsRepo.isAutoPrintEnabled(stationId)
-          }
-          if (autoPrintEnabled) {
-            const released =
-              await printJobsRepo.releasePendingPrintJobs(stationId)
-            releasedJobs += released.length
-          }
-        }
+        // The print worker owns retry eligibility per destination. Do not
+        // release every station job when one printer reconnects.
       }
 
       const connected = configuredCount === 0 || connectedCount > 0
@@ -103,8 +89,6 @@ export function startPrinterConnectivityWorker(opts?: {
           timeoutMs,
           configuredCount,
           connectedCount,
-          releasedJobs,
-          autoPrintEnabled,
         },
         lastError: null,
       })

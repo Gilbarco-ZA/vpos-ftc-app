@@ -4,8 +4,11 @@ import { getRuntimeBus } from '@/src/shared/runtime/bus'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { getStationId } from '@/src/shared/utils/getStationId'
 
-import { handlePrintJob } from '@/src/modules/printing/infrastructure/printJobs'
+import { handlePrintJob, resolvePrintJobPrinter } from '@/src/modules/printing/infrastructure/printJobs'
 import { printJobsRepo } from '@/src/modules/printing/infrastructure/printJobsRepo'
+
+import { logger } from '@/src/shared/utils/logger'
+import { PrinterBackoff } from './printer-backoff'
 
 const DEFAULT_POLL_MS = Number(
   process.env.VPOS_PRINT_WORKER_POLL_MS ||
@@ -18,9 +21,9 @@ const CONNECTIVITY_RETRY_SECONDS = Math.max(
 )
 const PRINTER_UNAVAILABLE_ERROR_PREFIX = 'PRINTER_UNAVAILABLE:'
 
-async function claimNextJob(stationId: string): Promise<PrintJobRow | null> {
-  return (await printJobsRepo.claimNextForWorker(stationId)) ?? null
-}
+const backoffSeconds = Number(process.env.VPOS_PRINTER_BACKOFF_SECONDS ?? 30)
+const BACKOFF_MS = 1000 * (Number.isFinite(backoffSeconds)
+  ? Math.max(5, Math.min(300, backoffSeconds)) : 30)
 
 function isPrinterConnectivityError(error: unknown) {
   const text =
@@ -36,6 +39,7 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
   const pollMs = opts?.pollMs ?? DEFAULT_POLL_MS
   const stationId = getStationId()
   let stopped = false
+  const backoff = new PrinterBackoff()
 
   const loop = async () => {
     while (!stopped) {
@@ -48,8 +52,31 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
           metrics: { pollMs },
         }).catch(() => {})
 
-        const job = await claimNextJob(stationId)
-        if (!job) {
+        const candidates = await printJobsRepo.listDueForWorker(stationId, backoff.excludedIds())
+        let job: PrintJobRow | null = null
+        let printer: Awaited<ReturnType<typeof resolvePrintJobPrinter>> = null
+        let destination = ''
+        for (const candidate of candidates) {
+          if (stopped) break
+          const resolved = await resolvePrintJobPrinter(candidate)
+          if (!resolved?.ip) {
+            backoff.defer(candidate.id, performance.now() + BACKOFF_MS)
+            continue
+          }
+          const key = JSON.stringify([resolved.ip, resolved.port ?? 9100])
+          const until = backoff.blockedUntil(key)
+          if (until > 0) {
+            backoff.defer(candidate.id, until)
+            continue
+          }
+          if (stopped) break
+          job = await printJobsRepo.claimNextForWorker(stationId, candidate.id, candidate.candidate_version) ?? null
+          if (!job) continue
+          printer = resolved
+          destination = key
+          break
+        }
+        if (!job || !printer) {
           await new Promise((r) => setTimeout(r, pollMs))
           continue
         }
@@ -60,7 +87,7 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
           status: 'OK',
           connected: true,
           metrics: { lastJobId: job.id },
-        })
+        }).catch(() => {})
 
         try {
           getRuntimeBus().publish('printer', {
@@ -71,8 +98,15 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
             at: Date.now(),
           })
 
-          await handlePrintJob(job)
-          await printJobsRepo.markDone(job.id)
+          await handlePrintJob(job, printer)
+          try {
+            await printJobsRepo.markDone(job.id)
+          } catch {
+            // Printing may already have succeeded. Leave the claim for explicit
+            // reconciliation rather than automatically delivering a duplicate.
+            logger.error('[printJobsWorker]', { msg: 'Print completion persistence failed; reconciliation required', jobId: job.id })
+            continue
+          }
 
           getRuntimeBus().publish('printer', {
             type: 'printJobDone',
@@ -85,10 +119,11 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
           const msg = e?.message || String(e) || 'Unknown error'
           const connectivityError = isPrinterConnectivityError(e)
           if (connectivityError) {
+            backoff.fail(destination, BACKOFF_MS)
             await printJobsRepo.holdForConnectivityRetry(
               job.id,
               `${PRINTER_UNAVAILABLE_ERROR_PREFIX} ${msg}`,
-              CONNECTIVITY_RETRY_SECONDS,
+              Math.max(CONNECTIVITY_RETRY_SECONDS, BACKOFF_MS / 1000),
             )
           } else {
             await printJobsRepo.scheduleRetry(

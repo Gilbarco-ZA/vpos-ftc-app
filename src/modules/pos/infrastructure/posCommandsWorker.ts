@@ -11,6 +11,7 @@ import {
 import { sendPosCommand } from '@/src/platform/integrations/posGateway'
 import { advisoryUnlock, tryAdvisoryLock } from '@/src/shared/db/locks'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
+import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
 import { serializeError } from '@/src/shared/utils/serializeError'
 
@@ -110,9 +111,9 @@ async function heartbeatAllStations() {
     [WORKER_NAME],
   )
   await Promise.all(
-    stations.map((s) =>
+    Array.from(new Set([getStationId(), ...stations.map((s) => s.station_id)])).map((stationId) =>
       upsertProcessHeartbeat({
-        stationId: s.station_id,
+        stationId,
         processName: WORKER_NAME,
         pid: process.pid,
         status: 'running',

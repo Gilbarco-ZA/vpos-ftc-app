@@ -142,11 +142,22 @@ export const printJobsSql = {
     WHERE id IN (SELECT id FROM next)
     RETURNING id, station_id, job_type, payload, attempts, max_attempts,
       source_transaction_id, source_report_id`,
+  selectDueForWorker: `SELECT id, station_id, job_type, payload, attempts,
+      max_attempts, source_transaction_id, source_report_id,
+      updated_at::text AS candidate_version
+    FROM print_jobs
+    WHERE status = 'PENDING' AND station_id = $1
+      AND scheduled_at <= NOW()
+      AND NOT (id = ANY($2::uuid[]))
+    ORDER BY priority DESC, created_at ASC, id
+    LIMIT 32`,
   claimNextForWorker: `WITH next AS (
       SELECT id FROM print_jobs
       WHERE status = 'PENDING'
         AND station_id = $1
         AND scheduled_at <= NOW()
+        AND ($2::uuid IS NULL OR id = $2::uuid)
+        AND ($3::text IS NULL OR updated_at::text = $3::text)
       ORDER BY priority DESC, created_at ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED

@@ -180,9 +180,8 @@ async function printEscpos(printer: PrinterConfig, payload: Buffer) {
  * Job handler. This function does the side-effect (printing). The worker handles
  * status transitions + retries.
  */
-export async function handlePrintJob(job: PrintJobRow) {
+export async function resolvePrintJobPrinter(job: PrintJobRow) {
   const { payload } = job
-  const jobType = normalizePrintJobType(job.job_type)
 
   // Per-job overrides
   const payloadIp = String(
@@ -202,6 +201,14 @@ export async function handlePrintJob(job: PrintJobRow) {
     if (printer && payloadWidth) printer.width = payloadWidth
   }
 
+  return printer
+}
+
+export async function handlePrintJob(job: PrintJobRow, resolvedPrinter?: PrinterConfig) {
+  const { payload } = job
+  const jobType = normalizePrintJobType(job.job_type)
+  const payloadWidth = payload?.width ? Number(payload.width) : undefined
+  const printer = resolvedPrinter ?? await resolvePrintJobPrinter(job)
   if (!printer?.ip) {
     throw new Error(
       'No printer configured (set device_configs device_type=printer, or pass printerIP)',

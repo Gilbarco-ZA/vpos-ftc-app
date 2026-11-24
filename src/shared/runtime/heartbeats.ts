@@ -1,5 +1,14 @@
 import { query, queryAll, queryOne } from '@/src/platform/db/postgres'
 
+import { HeartbeatWritePolicy } from './heartbeat-write-policy'
+
+declare global {
+  var __vposHeartbeatWritePolicy: HeartbeatWritePolicy | undefined
+}
+
+const heartbeatWrites = (globalThis.__vposHeartbeatWritePolicy ??=
+  new HeartbeatWritePolicy())
+
 export type ProcessHeartbeat = {
   stationId: string
   processName: string
@@ -33,7 +42,12 @@ export async function upsertProcessHeartbeat(input: {
     restartCount = 0,
   } = input
 
-  await query(
+  const key = JSON.stringify([stationId, processName])
+  // Metrics may include timestamps or counters; they are sampled periodically.
+  // Persist actual state transitions immediately.
+  const signature = JSON.stringify([pid, status, connected, lastError, restartCount])
+  await heartbeatWrites.write(key, signature, async () => {
+    await query(
     `INSERT INTO process_heartbeats
        (station_id, process_name, pid, status, connected, metrics, last_error, restart_count, last_heartbeat_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
@@ -57,7 +71,8 @@ export async function upsertProcessHeartbeat(input: {
       lastError,
       restartCount,
     ],
-  )
+    )
+  })
 }
 
 export async function getProcessHeartbeat(
@@ -97,6 +112,7 @@ export async function getAllProcessHeartbeats(
       WHERE station_id = $1`,
     [stationId],
   )
+  heartbeatWrites.invalidateStation(stationId)
 }
 
 export async function clearProcessErrors(stationId: string) {

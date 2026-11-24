@@ -12,6 +12,7 @@ import { getRuntimeBus } from '@/src/shared/runtime/bus'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { listSetupCountryOptions } from '@/src/shared/server/config/countryDatasets'
 import { getStationId } from '@/src/shared/utils/getStationId'
+import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
 import { serializeError } from '@/src/shared/utils/serializeError'
 import { uuidv4 } from '@/src/shared/utils/uuid'
@@ -612,9 +613,9 @@ async function heartbeatAllStations() {
     [WORKER_NAME],
   )
   await Promise.all(
-    stations.map((s) =>
+    Array.from(new Set([getStationId(), ...stations.map((s) => s.station_id)])).map((stationId) =>
       upsertProcessHeartbeat({
-        stationId: s.station_id,
+        stationId,
         processName: WORKER_NAME,
         pid: process.pid,
         status: 'running',

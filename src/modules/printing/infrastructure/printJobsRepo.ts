@@ -158,9 +158,15 @@ export const printJobsRepo = {
     ])
   },
 
-  async claimNextForWorker(stationId: string) {
+  async listDueForWorker(stationId: string, excludedIds: string[]) {
+    return await queryAll<PrintJobRow & { candidate_version: string }>(
+      printJobsSql.selectDueForWorker, [stationId, excludedIds],
+    )
+  },
+
+  async claimNextForWorker(stationId: string, id?: string, version?: string) {
     return await queryOne<PrintJobRow>(printJobsSql.claimNextForWorker, [
-      stationId,
+      stationId, id ?? null, version ?? null,
     ])
   },
 
