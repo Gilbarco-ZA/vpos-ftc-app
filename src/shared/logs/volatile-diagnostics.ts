@@ -5,7 +5,12 @@ export type DiagnosticLog = {
   updated_at: string
 }
 
-const names = new Set(['application.log', 'application-errors.log', 'errors.log'])
+const names = new Set([
+  'application.log',
+  'application-errors.log',
+  'errors.log',
+  'doms-jpl.log',
+])
 
 export function isVolatileDiagnostic(type: string, filename: string) {
   return process.env.VPOS_MANAGED_BY_START_SH === '1' &&

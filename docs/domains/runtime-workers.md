@@ -37,8 +37,8 @@ JPL forecourt health is independent of POS backend selection.
 
 ## Embedded runtime diagnostics and idle polling
 
-When VPOS_MANAGED_BY_START_SH=1, the three routine live diagnostic logs
-(application.log, application-errors.log and errors.log) use a bounded
+When VPOS_MANAGED_BY_START_SH=1, the four routine live diagnostic logs
+(application.log, application-errors.log, errors.log and doms-jpl.log) use a bounded
 process-global memory buffer instead of rewriting PostgreSQL text values.
 The existing stdout/stderr stream remains unchanged. Live UI listing, reading,
 download and explicit clearing use the same service contract. Older database
@@ -55,3 +55,11 @@ worker are no longer started by the default runtime compositions. The legacy
 transaction queue consumer is retained because it may own existing queue
 items, including credit notes. Proxy sending and pre-fiscal receipt preparation
 remain enabled as before. Standalone legacy entrypoints are unchanged.
+
+The JPL traffic log is a bounded diagnostic view, not the durable forecourt
+event or transaction recovery store. Managed deployments keep new JPL
+traffic diagnostics in the same volatile buffer as application diagnostics;
+historical database records are retained until explicitly cleared or removed
+by existing retention policy. Export diagnostics before restarting if needed
+for field investigation. Sensitive-payment redaction, heartbeat filtering,
+forecourt event persistence and replay/checkpoint processing are unchanged.
