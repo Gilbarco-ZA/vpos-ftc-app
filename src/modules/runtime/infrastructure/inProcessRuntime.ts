@@ -19,11 +19,9 @@ import {
   startPosBusListener,
 } from '@/src/modules/runtime/infrastructure/busListeners'
 // import { startSupervisorMonitorWorker } from '@/src/modules/runtime/infrastructure/supervisorMonitorWorker'
-import { startEwuraRetryWorker } from '@/src/modules/tanzania-fiscal/infrastructure/ewuraRetryWorker'
 import { startTanzaniaDailyTotalsWorker } from '@/src/modules/tanzania-fiscal/infrastructure/proxyDailyTotalsWorker'
 import { publishLatestTanzaniaTankInventories } from '@/src/modules/tanzania-fiscal/infrastructure/proxyTankInventories'
 import { startOfflineReceiptPrintWorker } from '@/src/modules/transactions/infrastructure/fiscalization/offlineReceiptPrintWorker'
-import { startTransactionFiscalizationSchedulerWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionFiscalizationSchedulerWorker'
 import { startTransactionQueueWorker } from '@/src/modules/transactions/infrastructure/fiscalization/transactionQueueWorker'
 
 type StopHandle = { stop: () => void } | (() => void) | null | undefined
@@ -103,22 +101,10 @@ export function startInProcessRuntime(
     ...(shouldRunInternalFiscalizationWorkers()
       ? [
           {
-            name: 'transactionFiscalizationScheduler',
-            start: () => startTransactionFiscalizationSchedulerWorker(),
-            staleMs: 25_000,
-            backoffMs: 3_000,
-          },
-          {
             name: 'transactionQueueWorker',
             start: () => startTransactionQueueWorker(),
             staleMs: 25_000,
             backoffMs: 3_000,
-          },
-          {
-            name: 'ewuraRetryWorker',
-            start: () => startEwuraRetryWorker(),
-            staleMs: 60_000,
-            backoffMs: 5_000,
           },
         ]
       : []),

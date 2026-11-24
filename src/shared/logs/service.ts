@@ -7,6 +7,8 @@ import {
 } from '@/src/platform/db/postgres'
 import { uuidv4 } from '@/src/shared/utils/uuid'
 
+import { isVolatileDiagnostic, volatileDiagnostics } from './volatile-diagnostics'
+
 export type LogType = 'live' | 'archive' | 'restart'
 
 const DEFAULT_MAX_LIVE_LOG_CHARS = 250_000
@@ -34,7 +36,7 @@ export async function listLogs(
     params.push(end)
     where += ` AND updated_at <= $${params.length}`
   }
-  return await queryAll<{
+  const stored = await queryAll<{
     filename: string
     size: number
     created_at: string
@@ -45,6 +47,14 @@ export async function listLogs(
       ORDER BY updated_at DESC, filename ASC`,
     params,
   )
+  if (type !== 'live' || process.env.VPOS_MANAGED_BY_START_SH !== '1') return stored
+  const merged = new Map(stored.map(row => [row.filename, row]))
+  for (const row of volatileDiagnostics.list(stationId)) {
+    if (start && new Date(row.updated_at) < start) continue
+    if (end && new Date(row.updated_at) > end) continue
+    merged.set(row.filename, { filename: row.filename, size: Buffer.byteLength(row.data), created_at: row.created_at, updated_at: row.updated_at })
+  }
+  return [...merged.values()].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || a.filename.localeCompare(b.filename))
 }
 
 export async function appendLogBlock(
@@ -56,6 +66,10 @@ export async function appendLogBlock(
   const chunk = String(block || '').trim()
   if (!chunk) return
   const maxChars = maxLiveLogChars()
+  if (isVolatileDiagnostic(type, filename)) {
+    volatileDiagnostics.append(stationId, filename, chunk, maxChars)
+    return
+  }
 
   await queryUnobserved(
     `INSERT INTO vpos_logs (id, station_id, type, filename, content)
@@ -86,6 +100,10 @@ export async function getLogContent(
   type: LogType,
   filename: string,
 ) {
+  if (isVolatileDiagnostic(type, filename)) {
+    const live = volatileDiagnostics.get(stationId, filename)
+    if (live) return { filename, data: live.data }
+  }
   const row = await queryOne<{ filename: string; content: string }>(
     `SELECT filename, content FROM vpos_logs WHERE station_id = $1 AND type = $2 AND filename = $3`,
     [stationId, type, filename],
@@ -127,7 +145,11 @@ export async function clearLogs(
         AND filename IN (${placeholders})`,
     [stationId, type, ...safeNames],
   )
-  return res.rowCount ?? 0
+  let volatileOnly = 0
+  for (const filename of safeNames) {
+    if (isVolatileDiagnostic(type, filename) && volatileDiagnostics.clear(stationId, filename)) volatileOnly++
+  }
+  return Math.max(res.rowCount ?? 0, volatileOnly)
 }
 
 export async function clearLog(
@@ -139,6 +161,7 @@ export async function clearLog(
     `UPDATE vpos_logs SET content = '', updated_at = NOW() WHERE station_id = $1 AND type = $2 AND filename = $3`,
     [stationId, type, filename],
   )
+  if (isVolatileDiagnostic(type, filename)) volatileDiagnostics.clear(stationId, filename)
 }
 
 export async function readStationLog(

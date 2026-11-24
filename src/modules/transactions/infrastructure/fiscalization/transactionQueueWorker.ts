@@ -9,6 +9,7 @@ import { calculateExponentialBackoffSeconds } from '@/src/platform/queue/retry-p
 import { advisoryUnlock, tryAdvisoryLock } from '@/src/shared/db/locks'
 import { toNumberOr } from '@/src/shared/numbers'
 import { getRuntimeBus } from '@/src/shared/runtime/bus'
+import { IdlePollPolicy } from '@/src/shared/runtime/idle-poll-policy'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { listSetupCountryOptions } from '@/src/shared/server/config/countryDatasets'
 import { getStationId } from '@/src/shared/utils/getStationId'
@@ -635,8 +636,8 @@ const shouldYieldToForegroundDatabaseWork = () => {
   )
 }
 
-async function workerLoop() {
-  if (!(await tryAdvisoryLock(`worker:${WORKER_NAME}`))) return
+async function workerLoop(): Promise<boolean> {
+  if (!(await tryAdvisoryLock(`worker:${WORKER_NAME}`))) return false
   try {
     const claimed = await claimNextBatch(5)
     for (const row of claimed) {
@@ -647,18 +648,21 @@ async function workerLoop() {
     for (const row of creditNotes) {
       await processCreditNote(row)
     }
+    return claimed.length + creditNotes.length > 0
   } finally {
     await advisoryUnlock(`worker:${WORKER_NAME}`)
   }
 }
 
-async function runWorkerLoop() {
+async function runWorkerLoop(policy: IdlePollPolicy) {
   if (stopRequested || loopInFlight || shouldYieldToForegroundDatabaseWork())
     return
+  if (!policy.ready()) return
   loopInFlight = true
   try {
-    await workerLoop()
+    policy.completed(await workerLoop())
   } catch (error) {
+    policy.completed(false)
     logger.error(`[${WORKER_NAME}]`, {
       msg: 'loop error',
       error: serializeError(error),
@@ -701,11 +705,12 @@ export function startTransactionQueueWorker(opts?: { pollMs?: number }) {
 
   // kick immediately. Both loops are process-local single-flight so a slow
   // database acquisition cannot accumulate one Promise per interval tick.
-  void runWorkerLoop()
+  const idlePoll = new IdlePollPolicy(pollMs)
+  void runWorkerLoop(idlePoll)
   void runHeartbeat()
 
   loopTimer = setInterval(() => {
-    void runWorkerLoop()
+    void runWorkerLoop(idlePoll)
   }, pollMs)
 
   heartbeatTimer = setInterval(() => {

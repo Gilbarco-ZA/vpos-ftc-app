@@ -10,6 +10,7 @@ import {
 } from '@/src/platform/db/postgres'
 import { sendPosCommand } from '@/src/platform/integrations/posGateway'
 import { advisoryUnlock, tryAdvisoryLock } from '@/src/shared/db/locks'
+import { IdlePollPolicy } from '@/src/shared/runtime/idle-poll-policy'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { getStationId } from '@/src/shared/utils/getStationId'
 import { logger } from '@/src/shared/utils/logger'
@@ -134,27 +135,30 @@ const shouldYieldToForegroundDatabaseWork = () => {
   )
 }
 
-async function workerLoop() {
+async function workerLoop(): Promise<boolean> {
   // Ensure only one loop per DB cluster (best effort). If lock cannot be acquired, do nothing.
-  if (!(await tryAdvisoryLock(`worker:${WORKER_NAME}`))) return
+  if (!(await tryAdvisoryLock(`worker:${WORKER_NAME}`))) return false
   try {
     // Claim + process batch within a transaction scope in the DB via FOR UPDATE.
     const claimed = await fetchNextBatch(10)
     for (const row of claimed) {
       await processOne(row)
     }
+    return claimed.length > 0
   } finally {
     await advisoryUnlock(`worker:${WORKER_NAME}`)
   }
 }
 
-async function runWorkerLoop() {
+async function runWorkerLoop(policy: IdlePollPolicy) {
   if (stopRequested || loopInFlight || shouldYieldToForegroundDatabaseWork())
     return
+  if (!policy.ready()) return
   loopInFlight = true
   try {
-    await workerLoop()
+    policy.completed(await workerLoop())
   } catch (error) {
+    policy.completed(false)
     logger.error(`[${WORKER_NAME}]`, {
       msg: 'loop error',
       error: serializeError(error),
@@ -204,11 +208,12 @@ export function startPosCommandsWorker(opts?: { pollMs?: number }) {
 
   // kick immediately. Both loops are process-local single-flight so a slow
   // database acquisition cannot accumulate one Promise per interval tick.
-  void runWorkerLoop()
+  const idlePoll = new IdlePollPolicy(pollMs)
+  void runWorkerLoop(idlePoll)
   void runHeartbeat()
 
   loopTimer = setInterval(() => {
-    void runWorkerLoop()
+    void runWorkerLoop(idlePoll)
   }, pollMs)
 
   heartbeatTimer = setInterval(() => {

@@ -94,7 +94,9 @@ export function installConsoleCapture(stationId: string) {
       originalConsole[level](...args)
       const line = formatLine(level, args)
       if (!shouldPersistLine(line)) return
-      queue.push(line)
+      // Bound pending console data even if a legacy DB flush stalls.
+      if (queue.length >= 250) queue.shift()
+      queue.push(line.slice(0, 16000))
       if (queue.length >= 25) {
         void flush()
       }

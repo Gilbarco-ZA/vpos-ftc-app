@@ -145,7 +145,7 @@ async function checkWorkers(stationId: string) {
     'reportQueueWorker',
     'offlineReceiptPrintWorker',
     'printerConnectivityWorker',
-    ...(shouldRunInternalFiscalizationWorkers() ? ['transactionFiscalizationScheduler', 'transactionQueueWorker'] : []),
+    ...(shouldRunInternalFiscalizationWorkers() ? ['transactionQueueWorker'] : []),
     'supervisorMonitorWorker',
   ]
 

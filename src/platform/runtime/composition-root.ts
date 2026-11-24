@@ -12,7 +12,6 @@ import {
 import {
   RuntimeWorkerStopHandle,
   startAtgPollingRuntimeWorker,
-  startEwuraRetryRuntimeWorker,
   startForecourtConfigSyncRuntimeWorker,
   startInProcessRuntimeServices,
   startOfflineReceiptPrintRuntimeWorker,
@@ -24,7 +23,6 @@ import {
   startSupervisorMonitorRuntimeWorker,
   startTanzaniaDailyTotalsRuntimeWorker,
   startTransactionFiscalizationRuntimeWorker,
-  startTransactionFiscalizationSchedulerRuntimeWorker,
 } from './worker-services'
 
 function toStopFn(handle: RuntimeWorkerStopHandle): () => Promise<void> {
@@ -56,7 +54,7 @@ function toStopFn(handle: RuntimeWorkerStopHandle): () => Promise<void> {
  *
  * Important runtime composition:
  * - Dedicated worker process starts supervisor monitoring, proxy sending,
- *   forecourt config sync, POS command polling, transaction scheduling,
+ *   forecourt config sync, POS command polling,
  *   transaction fiscalization execution, pre-fiscal receipt preparation,
  *   and optional PSS XML watching.
  * - Single-process server runtime starts the in-process worker set and
@@ -88,10 +86,6 @@ export function startDedicatedWorkerProcess() {
     process.env.FORECOURT_SYNC_POLL_MS,
     10 * 60_000,
   )
-  const ewuraRetryPollMs = parseRuntimeInterval(
-    process.env.VPOS_EWURA_RETRY_POLL_MS,
-    30_000,
-  )
   const tanzaniaDailyTotalsPollMs = parseRuntimeInterval(
     process.env.VPOS_TANZANIA_DAILY_TOTALS_POLL_MS,
     60_000,
@@ -114,18 +108,8 @@ export function startDedicatedWorkerProcess() {
   if (shouldRunInternalFiscalizationWorkers()) {
     stopFns.push(
       toStopFn(
-        startTransactionFiscalizationSchedulerRuntimeWorker({
-          pollMs: txPollMs,
-        }),
-      ),
-    )
-    stopFns.push(
-      toStopFn(
         startTransactionFiscalizationRuntimeWorker({ pollMs: txPollMs }),
       ),
-    )
-    stopFns.push(
-      toStopFn(startEwuraRetryRuntimeWorker({ pollMs: ewuraRetryPollMs })),
     )
   }
 

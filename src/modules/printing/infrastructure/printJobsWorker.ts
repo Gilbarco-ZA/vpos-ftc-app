@@ -1,6 +1,7 @@
 import type { PrintJobRow } from '@/src/modules/printing/infrastructure/printJobs'
 
 import { getRuntimeBus } from '@/src/shared/runtime/bus'
+import { IdlePollPolicy } from '@/src/shared/runtime/idle-poll-policy'
 import { upsertProcessHeartbeat } from '@/src/shared/runtime/heartbeats'
 import { getStationId } from '@/src/shared/utils/getStationId'
 
@@ -40,6 +41,7 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
   const stationId = getStationId()
   let stopped = false
   const backoff = new PrinterBackoff()
+  const idlePoll = new IdlePollPolicy(Math.max(200, Number.isFinite(pollMs) ? pollMs : 1000))
   let waitingForPrinter = false
 
   const loop = async () => {
@@ -78,10 +80,12 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
           break
         }
         if (!job || !printer) {
-          await new Promise((r) => setTimeout(r, pollMs))
+          idlePoll.completed(false)
+          await new Promise((r) => setTimeout(r, idlePoll.delayMs))
           continue
         }
 
+        idlePoll.reset()
         waitingForPrinter = false
         await upsertProcessHeartbeat({
           stationId: job.station_id,
