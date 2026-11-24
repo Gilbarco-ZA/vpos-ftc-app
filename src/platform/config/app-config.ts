@@ -120,9 +120,8 @@ export const shouldRunProxyWorker = (): boolean => {
 }
 
 export const shouldRunInternalFiscalizationWorkers = (): boolean => {
-  // Production route selection is station-scoped in the database. Keep the
-  // internal workers available so Tanzania sites can switch between local TZ
-  // and proxy/cloud without needing shipped environment changes.
+  // Keep the legacy transaction queue consumer available for existing work.
+  // The retired direct Tanzania scheduler and EWURA retry are not composed.
   return !readBooleanEnv('VPOS_DISABLE_INTERNAL_FISCALIZATION_WORKERS', false)
 }
 

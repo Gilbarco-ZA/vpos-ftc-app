@@ -50,11 +50,12 @@ export async function listLogs(
   if (type !== 'live' || process.env.VPOS_MANAGED_BY_START_SH !== '1') return stored
   const merged = new Map(stored.map(row => [row.filename, row]))
   for (const row of volatileDiagnostics.list(stationId)) {
+    merged.delete(row.filename)
     if (start && new Date(row.updated_at) < start) continue
     if (end && new Date(row.updated_at) > end) continue
     merged.set(row.filename, { filename: row.filename, size: Buffer.byteLength(row.data), created_at: row.created_at, updated_at: row.updated_at })
   }
-  return [...merged.values()].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || a.filename.localeCompare(b.filename))
+  return [...merged.values()].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() || a.filename.localeCompare(b.filename))
 }
 
 export async function appendLogBlock(
@@ -136,20 +137,21 @@ export async function clearLogs(
   if (!safeNames.length) return 0
 
   const placeholders = safeNames.map((_, index) => `$${index + 3}`).join(', ')
-  const res = await query(
+  const rows = await queryAll<{ filename: string }>(
     `UPDATE vpos_logs
         SET content = '',
             updated_at = NOW()
       WHERE station_id = $1
         AND type = $2
-        AND filename IN (${placeholders})`,
+        AND filename IN (${placeholders})
+      RETURNING filename`,
     [stationId, type, ...safeNames],
   )
-  let volatileOnly = 0
+  const cleared = new Set(rows.map(row => row.filename))
   for (const filename of safeNames) {
-    if (isVolatileDiagnostic(type, filename) && volatileDiagnostics.clear(stationId, filename)) volatileOnly++
+    if (isVolatileDiagnostic(type, filename) && volatileDiagnostics.clear(stationId, filename)) cleared.add(filename)
   }
-  return Math.max(res.rowCount ?? 0, volatileOnly)
+  return cleared.size
 }
 
 export async function clearLog(
