@@ -37,28 +37,28 @@ async function checkDb() {
 
 async function checkJpl(stationId: string) {
   const config = await getJplConfig(stationId)
-  if (!config) return { configured: false, ok: true }
+  if (!config) return { configured: false, ok: (await getEffectivePosBackend(stationId)) !== 'jpl' }
   const result = await jplHealth(stationId, { accessMode: 'forecourt' })
   return { configured: true, ok: !!result?.ok, data: result ?? null }
 }
 
 async function checkLigo(stationId: string) {
   const config = await getLigoConfig(stationId)
-  if (!config) return { configured: false, ok: true }
+  if (!config) return { configured: false, ok: false }
   const result = await ligoHealth(stationId)
   return { configured: true, ok: !!result?.ok, data: result ?? null }
 }
 
 async function checkNamos(stationId: string) {
   const config = await getNamosConfig(stationId)
-  if (!config) return { configured: false, ok: true }
+  if (!config) return { configured: false, ok: false }
   const result = await namosHealth(stationId)
   return { configured: true, ok: !!result?.ok, data: result ?? null }
 }
 
 async function checkPpx(stationId: string) {
   const config = await getPpxConfig(stationId)
-  if (!config) return { configured: false, ok: true }
+  if (!config) return { configured: false, ok: false }
   const result = await ppxHealth(stationId)
   return { configured: true, ok: !!result?.ok, data: result ?? null }
 }
@@ -270,14 +270,9 @@ export async function getReadiness(stationId: string) {
   const checks = {
     db: () => checkDb(),
     jpl: () => checkJpl(stationId),
-    pos: async () => {
-      const backend = await getEffectivePosBackend(stationId)
-      // JPL forecourt health is independent of external POS selection.
-      if (backend === 'ligo') return checkLigo(stationId)
-      if (backend === 'namos') return checkNamos(stationId)
-      if (backend === 'ppx') return checkPpx(stationId)
-      return skipped
-    },
+    ligo: async () => (await getEffectivePosBackend(stationId)) === 'ligo' ? checkLigo(stationId) : skipped,
+    namos: async () => (await getEffectivePosBackend(stationId)) === 'namos' ? checkNamos(stationId) : skipped,
+    ppx: async () => (await getEffectivePosBackend(stationId)) === 'ppx' ? checkPpx(stationId) : skipped,
     proxyFiscalization: () => checkProxyFiscalization(stationId),
     archiveExporters: () => checkArchiveExporters(stationId),
     printer: () => checkPrinter(stationId),

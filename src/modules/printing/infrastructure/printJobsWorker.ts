@@ -40,6 +40,7 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
   const stationId = getStationId()
   let stopped = false
   const backoff = new PrinterBackoff()
+  let waitingForPrinter = false
 
   const loop = async () => {
     while (!stopped) {
@@ -47,8 +48,8 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
         await upsertProcessHeartbeat({
           stationId,
           processName: 'printJobsWorker',
-          status: 'running',
-          connected: true,
+          status: waitingForPrinter ? 'waiting-for-printer' : 'running',
+          connected: !waitingForPrinter,
           metrics: { pollMs },
         }).catch(() => {})
 
@@ -81,6 +82,7 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
           continue
         }
 
+        waitingForPrinter = false
         await upsertProcessHeartbeat({
           stationId: job.station_id,
           processName: 'printJobsWorker',
@@ -119,11 +121,12 @@ export function startPrintJobsWorker(opts?: { pollMs?: number }) {
           const msg = e?.message || String(e) || 'Unknown error'
           const connectivityError = isPrinterConnectivityError(e)
           if (connectivityError) {
+            waitingForPrinter = true
             backoff.fail(destination, BACKOFF_MS)
             await printJobsRepo.holdForConnectivityRetry(
               job.id,
               `${PRINTER_UNAVAILABLE_ERROR_PREFIX} ${msg}`,
-              Math.max(CONNECTIVITY_RETRY_SECONDS, BACKOFF_MS / 1000),
+              Math.max(Number.isFinite(CONNECTIVITY_RETRY_SECONDS) ? CONNECTIVITY_RETRY_SECONDS : 5, BACKOFF_MS / 1000),
             )
           } else {
             await printJobsRepo.scheduleRetry(

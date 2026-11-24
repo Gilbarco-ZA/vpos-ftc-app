@@ -112,7 +112,6 @@ export async function getAllProcessHeartbeats(
       WHERE station_id = $1`,
     [stationId],
   )
-  heartbeatWrites.invalidateStation(stationId)
 }
 
 export async function clearProcessErrors(stationId: string) {
@@ -123,4 +122,5 @@ export async function clearProcessErrors(stationId: string) {
       WHERE station_id = $1`,
     [stationId],
   )
+  heartbeatWrites.invalidateStation(stationId)
 }
