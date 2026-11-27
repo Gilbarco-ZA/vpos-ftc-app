@@ -74,22 +74,11 @@ test('delegates ownership and startup policy to vpos-mono-package-mgr', () => {
 
 test('builds only CPB539 Node 22 and CPB579 Node 22 packages', () => {
   const pipeline = fs.readFileSync(pipelinePath, 'utf8')
-  const targetNames = [
-    ...pipeline.matchAll(/^\s+name:\s*['"](cpb-[^'"]+)['"]\s*$/gm),
-  ].map((match) => match[1])
-
-  assert.deepEqual(targetNames, ['cpb-539-node22', 'cpb-579-node22'])
-  assert.match(
-    pipeline,
-    /nodeVersionDir:\s*['"]node-v22\.15\.0-linux-armv7l['"]/,
-  )
-  assert.match(
-    pipeline,
-    /nodeVersionDir:\s*['"]node-v22\.15\.0-linux-arm64['"]/,
-  )
-  assert.match(pipeline, /runtimeArchitecture:\s*['"]armv7l['"]/)
-  assert.match(pipeline, /runtimeArchitecture:\s*['"]arm64['"]/)
-  assert.doesNotMatch(pipeline, /node-v18|node18|18\.12\.1/i)
+  assert.match(pipeline, /template: azure\/templates\/node-nextjs\.yml@ci/)
+  assert.match(pipeline, /runCpb539Node18: false/)
+  assert.match(pipeline, /runCpb539Node22: true/)
+  assert.match(pipeline, /runCpb579Node22: true/)
+  assert.doesNotMatch(pipeline, /^\s*packageTargets:/m)
 })
 
 test('packages direct start.cjs runtime dependencies', () => {
