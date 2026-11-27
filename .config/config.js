@@ -1,4 +1,4 @@
-const { join } = require('path')
+const { commonConsumerConfig, PACKAGE_TARGET_DEFAULTS } = require("./consumer-config.cjs")
 
 const main = 'start.cjs'
 const name = 'vposftc'
@@ -6,8 +6,6 @@ const title = 'PSS 5000 GVR VPOS FTC'
 const project = 'gvr-vpos-ftc-app'
 const domsAppId = '472-22'
 const pid = 'vpos.pid'
-const section = 'base'
-const priority = 'optional'
 const appStartGrep = '[s]tart.cjs'
 const healthPorts = '3080'
 const healthPaths = '/api/livez'
@@ -19,7 +17,7 @@ const startScriptTemplate = 'node-web'
 // The pipeline supplies this per package target. The fallback represents the
 // local CPB539 Node 22 package-rendering target.
 const nodeVersionDir =
-  process.env.FNEZ_NODE_VERSION_DIR || 'node-v22.15.0-linux-armv7l'
+  process.env.FNEZ_NODE_VERSION_DIR || PACKAGE_TARGET_DEFAULTS['cpb-539-node22'].nodeVersionDir
 
 const environmentVariables = {
   NODE_ENV: 'production',
@@ -79,8 +77,6 @@ const installationSteps = [
 const emailListTo = ['bhenning@dearx.co.za']
 const emailListCC = ['']
 
-const changelogFile = join(process.cwd(), '.config', 'changelog.log')
-const archiveFile = join(process.cwd(), '.config', 'changelog.archive.log')
 
 const exclude = [
   'app',
@@ -102,14 +98,13 @@ const exclude = [
 ]
 
 const config = {
+  ...commonConsumerConfig(),
   name,
   main,
   title,
   project,
   domsAppId,
   pid,
-  section,
-  priority,
   appStartGrep,
   healthPorts,
   healthPaths,
@@ -120,8 +115,6 @@ const config = {
   descriptionSml,
   limitations,
   installGuide,
-  changelogFile,
-  archiveFile,
   emailListTo,
   emailListCC,
   environmentVariables,
