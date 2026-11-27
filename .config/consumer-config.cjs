@@ -89,4 +89,65 @@ function resolveConsumerRuntime(options = {}) {
   };
 }
 
-module.exports = { PACKAGE_TARGET_DEFAULTS, getNodeDependency, commonConsumerConfig, resolveConsumerRuntime };
+// Expand a small, declarative application config to the existing builder contract.
+// The optional runtime profiles retain the two existing Node22-only consumers'
+// direct config loading behavior; target selection in CI remains unchanged.
+function defineConsumerConfig(fields, options = {}) {
+  const env = options.env || process.env;
+  const runtime = options.runtime || "validated";
+  let nodeDependency = getNodeDependency("22");
+  let runtimeFields = {};
+  if (runtime === "validated") {
+    const { nodeDependency: selectedDependency, ...target } = resolveConsumerRuntime({
+      env, strictDirectory: options.strictDirectory,
+    });
+    nodeDependency = selectedDependency;
+    runtimeFields = target;
+    if (options.scopedPermOwnership) {
+      runtimeFields.strictPermOwnership =
+        String(target.cpbVersion).toLowerCase().replace("cpb-", "") !== "579";
+    }
+  } else if (runtime === "node22-directory") {
+    runtimeFields.nodeVersionDir = env.FNEZ_NODE_VERSION_DIR ||
+      PACKAGE_TARGET_DEFAULTS["cpb-539-node22"].nodeVersionDir;
+  } else if (runtime !== "node22-static") {
+    throw new Error("Unsupported consumer runtime profile: " + runtime);
+  }
+
+  const config = {
+    ...commonConsumerConfig(),
+    description: "\n  " + fields.descriptionSml + "\n",
+    limitations: "\n  None\n",
+    installGuide: "\n  Install the package via the FccWebApp \"5.2 Software Update\" page.\n  Please consult the installation, configuration and user manuals.\n",
+    installationSteps: [{
+      title: "Upgrade process: ",
+      steps: [
+        "Install the package provided in this email using the FccWebApp '5.2 Software Update' page.",
+        "Make sure your DOMS PSS 5000 is connected to the internet.",
+        "Make sure your EPSON printer is connected to the same network DOMS PSS 5000.",
+      ],
+    }],
+    emailListCC: [""],
+    environmentVariables: {},
+    ...fields,
+    ...runtimeFields,
+    dependencies: fields.dependencies.split(",").map(id => id === "node" ? nodeDependency : id).join(","),
+  };
+  // Keep the existing explicitly bounded legacy package identities. Never
+  // infer or extend a removal allowlist from the current release version.
+  if (options.legacyOpkg) {
+    const { version, through } = options.legacyOpkg;
+    if (!/^\d+\.\d{2}$/.test(version) || !Number.isInteger(through) || through < 0 || through > 999) {
+      throw new Error("Invalid legacy OPKG package range");
+    }
+    const prefix = config.domsAppId + "-" + version;
+    config.legacyOpkgPackages = [
+      prefix,
+      ...Array.from({ length: through }, (_, index) =>
+        prefix + "t" + String(index + 1).padStart(3, "0")),
+    ];
+  }
+  return config;
+}
+
+module.exports = { PACKAGE_TARGET_DEFAULTS, getNodeDependency, commonConsumerConfig, resolveConsumerRuntime, defineConsumerConfig };
